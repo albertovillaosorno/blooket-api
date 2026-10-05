@@ -212,6 +212,28 @@ test("verified canvas area cannot exceed the pixel limit", () => {
   }
 });
 
+test("canvas area validation does not lose safe-integer precision", () => {
+  const result = decodeBlooketCapabilitySnapshot({
+    ...verified,
+    upload: {
+      maxBytes: Number.MAX_SAFE_INTEGER,
+      canvasWidth: Number.MAX_SAFE_INTEGER,
+      canvasHeight: Number.MAX_SAFE_INTEGER,
+      maxPixels: Number.MAX_SAFE_INTEGER,
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some(
+        (issue) => issue.code === "canvas-exceeds-pixel-limit",
+      ),
+      true,
+    );
+  }
+});
+
 test("capability snapshots accept verified facts and explicit unknowns", () => {
   const result = decodeBlooketCapabilitySnapshot(verified);
 
