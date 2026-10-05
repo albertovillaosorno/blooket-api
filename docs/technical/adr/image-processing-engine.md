@@ -46,6 +46,12 @@ Product byte limits, pixel limits, rendition dimensions, and upload constraints
 are not Sharp defaults. They remain explicit caller or capability inputs so an
 upstream library upgrade cannot silently change product policy.
 
+Animated GIF renditions preserve frame delays, loop state, and duplicate frames.
+Sharp's GIF encoder is configured not to merge identical frames because doing so
+changes the persisted frame sequence even when total playback time is similar.
+Animated WebP is decoded for validation but rendition currently fails closed
+until equivalent preservation behavior is implemented and covered by tests.
+
 ## Consequences
 
 - Common image codecs and animation parsing use one mature maintained engine.
