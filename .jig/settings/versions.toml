@@ -67,6 +67,21 @@ kind = "tool"
 target = "rust_stable_cargo"
 template = "{version}"
 
+[authority.sharp]
+current = "0.35.5"
+stable = "0.35.5"
+
+[authority.sharp.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/sharp/latest"
+
+[authority.sharp.projection.package]
+kind = "package"
+target = "sharp"
+template = "{version}"
+
 [authority.typescript]
 current = "7.0.2"
 stable = "7.0.2"

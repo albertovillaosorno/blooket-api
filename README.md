@@ -265,10 +265,14 @@ extension can send an image selected from a web page directly to the local
 service; it never receives Blooket credentials.
 
 Static images may arrive as JPEG, PNG, WebP, AVIF, or another explicitly
-supported decoder format. Animated GIFs remain animated. The media pipeline
-keeps the original and creates a fixed-dimension Blooket rendition separately.
-Static images use an automatic blurred-background fill when aspect ratios do not
-match, with pan and zoom controlling the foreground crop.
+supported decoder format. Animated GIFs remain animated. Source bytes are
+checked by repository format rules and then fully decoded through the reviewed
+Sharp/libvips adapter before durable publication.
+
+The media pipeline keeps the original and creates a fixed-dimension Blooket
+rendition separately. Static images use an automatic blurred-background fill
+when aspect ratios do not match, with pan and zoom controlling the foreground
+crop.
 
 The first editor surface is intentionally small: pan, zoom, keyboard nudging,
 contrast, saturation, simple rectangular blur/redaction, naming, description,

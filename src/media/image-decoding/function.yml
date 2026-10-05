@@ -1,0 +1,9 @@
+identity:
+  id: function:image-decoding
+  name: image-decoding
+  path: src/media/image-decoding
+classification:
+  repository: blooket-api
+  domain: media
+architecture:
+  kind: adapter-outbound

@@ -1,0 +1,10 @@
+{
+  "authority": "sharp",
+  "integrity_kind": "provider-response-sha256",
+  "integrity_sha256": "534cddc062d4b03df11e7558d28cb9f6c8d527f0979377c849b7e5ebb2a10612",
+  "observed_on": "2026-10-05",
+  "provider": "npm-registry",
+  "schema_version": 1,
+  "source": "https://registry.npmjs.org/sharp/latest",
+  "stable": "0.35.5"
+}
