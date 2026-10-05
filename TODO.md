@@ -19,19 +19,6 @@ atomic-replace rules needed to guarantee interruption-safe local state.
 Implement versioned `project.json` loading, validation, migration boundaries,
 stable question identities, media requests, and media references.
 
-### TODO - Implement media metadata and English descriptions
-
-Store stable media IDs, local paths, canonical English descriptions, and
-`english`, which defaults to false until explicitly verified.
-Keep origin URLs outside the required contract.
-
-### TODO - Implement field-aware media search
-
-Provide a dependency-free media searcher with literal search by default,
-optional regular expressions, explicit searchable fields, per-asset results,
-and deterministic machine-readable CLI output. Keep the text index friendly to
-manual `rg` inspection without depending on ripgrep at runtime.
-
 ### TODO - Implement media import and rendition pipeline
 
 Accept paste, drag-and-drop, files, and browser-extension intake; preserve

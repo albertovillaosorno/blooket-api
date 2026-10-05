@@ -32,8 +32,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { decodeMediaRecord } from
-  "../../../../src/media/media-records/domain/media-record.ts";
+import {
+  createMediaRecord,
+  decodeMediaRecord,
+} from "../../../../src/media/media-records/domain/media-record.ts";
 
 const valid = {
   id: "yellow-bus",
@@ -65,4 +67,32 @@ test("media records require explicit English verification state", () => {
   const { english: _english, ...missingEnglish } = valid;
 
   assert.equal(decodeMediaRecord(missingEnglish).ok, false);
+});
+
+
+test("new media records default English verification to false", () => {
+  const result = createMediaRecord({
+    id: "yellow-bus",
+    path: "images/yellow-bus.avif",
+    description: "A yellow school bus viewed from the side.",
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.english, false);
+  }
+});
+
+test("new media records preserve explicit English verification", () => {
+  const result = createMediaRecord({
+    id: "yellow-bus",
+    path: "images/yellow-bus.avif",
+    description: "A yellow school bus viewed from the side.",
+    english: true,
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.english, true);
+  }
 });

@@ -27,7 +27,8 @@
 // - Usage:
 //   - Decode each JSONL line before admitting it to the media vault.
 // - Defaults:
-//   - English verification is explicit and never inferred by this decoder.
+//   - New records default English verification to false; persisted input is
+//     explicit.
 //
 import {
   decodeFailure,
@@ -49,7 +50,25 @@ export interface MediaRecord {
   readonly english: boolean;
 }
 
+export interface MediaRecordInput {
+  readonly id: string;
+  readonly path: string;
+  readonly description: string;
+  readonly english?: boolean;
+}
+
 const MEDIA_KEYS = new Set(["id", "path", "description", "english"]);
+export function createMediaRecord(
+  input: MediaRecordInput,
+): DecodeResult<MediaRecord> {
+  return decodeMediaRecord({
+    id: input.id,
+    path: input.path,
+    description: input.description,
+    english: input.english ?? false,
+  });
+}
+
 export function decodeMediaRecord(value: unknown): DecodeResult<MediaRecord> {
   if (!isRecord(value)) {
     return decodeFailure("$", "expected-object", "Expected a media record.");
