@@ -47,12 +47,15 @@ import {
   removeDurableFile,
   writeAtomicFile,
 } from "../../atomic-files/adapter-outbound/atomic-file.ts";
+import { tryAcquireFileLock } from
+  "../../file-locks/adapter-outbound/file-lock.ts";
 
 const PROJECT_FILE = "project.json";
 const MEDIA_FILE = "media.jsonl";
 const PROJECT_BACKUP = "project.json.bak";
 const MEDIA_BACKUP = "media.jsonl.bak";
 const WRITE_MARKER = ".blooket-api-project-write.json";
+const WRITE_LOCK = ".blooket-api-project.lock";
 
 export type ProjectDirectoryLoadResult =
   | { readonly ok: true; readonly bundle: ProjectBundle }
@@ -89,11 +92,13 @@ export type ProjectDirectorySaveResult =
     };
 
 export type ProjectDirectoryIoCode =
+  | "project-directory-locked"
   | "project-directory-unsafe"
   | "project-files-missing"
   | "project-files-unreadable"
   | "project-write-failed"
-  | "project-recovery-failed";
+  | "project-recovery-failed"
+  | "project-lock-failed";
 
 interface WriteMarker {
   readonly version: 1;
@@ -102,6 +107,37 @@ interface WriteMarker {
 }
 
 export async function loadProjectDirectory(
+  directory: string,
+): Promise<ProjectDirectoryLoadResult> {
+  const directoryState = await safeDirectoryState(directory);
+  if (directoryState === "unsafe") {
+    return ioFailure("project-directory-unsafe");
+  }
+  if (directoryState === "missing") {
+    return ioFailure("project-files-missing");
+  }
+
+  const acquired = await tryAcquireFileLock(join(directory, WRITE_LOCK));
+  if (!acquired.ok) {
+    return ioFailure(projectLockFailureCode(acquired.reason));
+  }
+
+  let result: ProjectDirectoryLoadResult;
+  try {
+    result = await loadProjectDirectoryLocked(directory);
+  } catch {
+    result = ioFailure("project-files-unreadable");
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return ioFailure("project-lock-failed");
+  }
+  return result;
+}
+
+async function loadProjectDirectoryLocked(
   directory: string,
 ): Promise<ProjectDirectoryLoadResult> {
   if (!await isSafeDirectory(directory)) {
@@ -130,6 +166,34 @@ export async function loadProjectDirectory(
 }
 
 export async function saveProjectDirectory(
+  directory: string,
+  bundle: ProjectBundle,
+): Promise<ProjectDirectorySaveResult> {
+  if (!await isSafeDirectory(directory)) {
+    return ioFailure("project-directory-unsafe");
+  }
+
+  const acquired = await tryAcquireFileLock(join(directory, WRITE_LOCK));
+  if (!acquired.ok) {
+    return ioFailure(projectLockFailureCode(acquired.reason));
+  }
+
+  let result: ProjectDirectorySaveResult;
+  try {
+    result = await saveProjectDirectoryLocked(directory, bundle);
+  } catch {
+    result = ioFailure("project-write-failed");
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return ioFailure("project-lock-failed");
+  }
+  return result;
+}
+
+async function saveProjectDirectoryLocked(
   directory: string,
   bundle: ProjectBundle,
 ): Promise<ProjectDirectorySaveResult> {
@@ -186,7 +250,7 @@ export async function saveProjectDirectory(
       return ioFailure("project-write-failed");
     }
 
-    await writeAtomicFile(paths.marker, `${JSON.stringify(marker)}\n`);
+    await writeAtomicFile(paths.marker, JSON.stringify(marker) + "\n");
     await writeAtomicFile(paths.media, serialized.mediaJsonl);
     await writeAtomicFile(paths.project, serialized.projectJson);
     await removeDurableFile(paths.marker);
@@ -340,11 +404,19 @@ async function isOwnedRegularOrMissing(path: string): Promise<boolean> {
 }
 
 async function isSafeDirectory(path: string): Promise<boolean> {
+  return await safeDirectoryState(path) !== "unsafe";
+}
+
+async function safeDirectoryState(
+  path: string,
+): Promise<"directory" | "missing" | "unsafe"> {
   try {
     const metadata = await lstat(path);
-    return metadata.isDirectory() && !metadata.isSymbolicLink();
+    return metadata.isDirectory() && !metadata.isSymbolicLink()
+      ? "directory"
+      : "unsafe";
   } catch (error: unknown) {
-    return isMissingPathError(error);
+    return isMissingPathError(error) ? "missing" : "unsafe";
   }
 }
 
@@ -362,6 +434,17 @@ function projectPaths(directory: string): {
     mediaBackup: join(directory, MEDIA_BACKUP),
     marker: join(directory, WRITE_MARKER),
   };
+}
+
+function projectLockFailureCode(
+  reason: "busy" | "unsafe" | "io",
+): ProjectDirectoryIoCode {
+  if (reason === "busy") {
+    return "project-directory-locked";
+  }
+  return reason === "unsafe"
+    ? "project-directory-unsafe"
+    : "project-lock-failed";
 }
 
 function ioFailure(code: ProjectDirectoryIoCode): {

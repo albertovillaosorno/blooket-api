@@ -47,6 +47,8 @@ import {
 } from "../../../../src/platforms/settings-files/adapter-outbound/file.ts";
 import { defaultLocalServiceSettings } from
   "../../../../src/settings/local-service/domain/local-service-settings.ts";
+import { tryAcquireFileLock } from
+  "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 
 async function withTemporaryDirectory(
   callback: (directory: string) => Promise<void>,
@@ -119,6 +121,36 @@ test(
       ...first,
       schemaVersion: 2,
     });
+    });
+  },
+);
+
+test(
+  "settings saves fail closed while another writer holds the lock",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const path = join(directory, "settings.json");
+      const acquired = await tryAcquireFileLock(path + ".lock");
+      assert.equal(acquired.ok, true);
+      if (!acquired.ok) {
+        return;
+      }
+
+      const saved = await saveSettingsFile(
+        path,
+        defaultLocalServiceSettings(),
+      );
+      assert.deepEqual(saved, {
+        ok: false,
+        kind: "io",
+        code: "settings-file-locked",
+      });
+
+      await acquired.lock.release();
+      assert.deepEqual(
+        await saveSettingsFile(path, defaultLocalServiceSettings()),
+        { ok: true },
+      );
     });
   },
 );

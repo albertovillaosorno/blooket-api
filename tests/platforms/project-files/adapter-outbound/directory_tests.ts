@@ -51,6 +51,8 @@ import {
   saveProjectDirectory,
 } from
   "../../../../src/platforms/project-files/adapter-outbound/directory.ts";
+import { tryAcquireFileLock } from
+  "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 
 const firstProject = {
   schemaVersion: 1,
@@ -115,6 +117,42 @@ test("new project directories save and load one validated bundle", async () => {
     );
   });
 });
+
+test(
+  "project operations fail closed while another writer holds the lock",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      assert.deepEqual(await saveProjectDirectory(directory, firstBundle), {
+        ok: true,
+      });
+      const lock = await tryAcquireFileLock(
+        join(directory, ".blooket-api-project.lock"),
+      );
+      assert.equal(lock.ok, true);
+      if (!lock.ok) {
+        return;
+      }
+
+      assert.deepEqual(await loadProjectDirectory(directory), {
+        ok: false,
+        kind: "io",
+        code: "project-directory-locked",
+      });
+      assert.deepEqual(await saveProjectDirectory(directory, secondBundle), {
+        ok: false,
+        kind: "io",
+        code: "project-directory-locked",
+      });
+
+      await lock.lock.release();
+      const loaded = await loadProjectDirectory(directory);
+      assert.equal(loaded.ok, true);
+      if (loaded.ok) {
+        assert.deepEqual(loaded.bundle, firstBundle);
+      }
+    });
+  },
+);
 
 test(
   "replacement keeps the previous valid project and media backups",

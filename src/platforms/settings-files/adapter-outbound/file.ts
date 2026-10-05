@@ -16,7 +16,7 @@
 //   - Inputs: Trusted settings paths and current validated settings values.
 //   - Outputs: Current settings, defaults, or stable I/O and validation
 //     failures.
-//   - Side effects: Reads settings and atomically replaces files with backups.
+//   - Side effects: Reads settings, serializes writers, and replaces backups.
 // - Split-When:
 //   - Host-specific settings locations require independent path providers.
 // - Merge-When:
@@ -42,6 +42,8 @@ import {
 } from "../../../settings/local-service/domain/local-service-settings.ts";
 import { writeAtomicFile } from
   "../../atomic-files/adapter-outbound/atomic-file.ts";
+import { tryAcquireFileLock } from
+  "../../file-locks/adapter-outbound/file-lock.ts";
 
 export type SettingsFileLoadResult =
   | {
@@ -69,7 +71,10 @@ export type SettingsFileSaveResult =
   | {
       readonly ok: false;
       readonly kind: "io";
-      readonly code: "settings-file-unsafe" | "settings-write-failed";
+      readonly code:
+        | "settings-file-locked"
+        | "settings-file-unsafe"
+        | "settings-write-failed";
     }
   | {
       readonly ok: false;
@@ -132,17 +137,48 @@ export async function saveSettingsFile(
     return { ok: false, kind: "invalid", issues: decoded.issues };
   }
 
+  const acquired = await tryAcquireFileLock(path + ".lock");
+  if (!acquired.ok) {
+    if (acquired.reason === "busy") {
+      return ioSaveFailure("settings-file-locked");
+    }
+    return ioSaveFailure(
+      acquired.reason === "unsafe"
+        ? "settings-file-unsafe"
+        : "settings-write-failed",
+    );
+  }
+
+  let result: SettingsFileSaveResult;
+  try {
+    result = await saveSettingsFileLocked(path, decoded.value);
+  } catch {
+    result = ioSaveFailure("settings-write-failed");
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return ioSaveFailure("settings-write-failed");
+  }
+  return result;
+}
+
+async function saveSettingsFileLocked(
+  path: string,
+  settings: LocalServiceSettings,
+): Promise<SettingsFileSaveResult> {
   const existing = await readOwnedTextFile(path);
   if (existing.kind === "unsafe" || existing.kind === "unreadable") {
     return ioSaveFailure("settings-file-unsafe");
   }
 
-  const contents = `${JSON.stringify(decoded.value, null, 2)}\n`;
+  const contents = JSON.stringify(settings, null, 2) + "\n";
   try {
     await writeAtomicFile(
       path,
       contents,
-      existing.kind === "text" ? { backupPath: `${path}.bak` } : {},
+      existing.kind === "text" ? { backupPath: path + ".bak" } : {},
     );
     return { ok: true };
   } catch {
@@ -177,7 +213,10 @@ function ioLoadFailure(
 }
 
 function ioSaveFailure(
-  code: "settings-file-unsafe" | "settings-write-failed",
+  code:
+    | "settings-file-locked"
+    | "settings-file-unsafe"
+    | "settings-write-failed",
 ): SettingsFileSaveResult {
   return { ok: false, kind: "io", code };
 }
