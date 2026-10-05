@@ -49,6 +49,7 @@ import test from "node:test";
 import {
   importMediaVaultAsset,
   loadMediaVault,
+  loadMediaVaultOriginal,
   updateMediaVaultAsset,
   type MediaVaultImport,
   type MediaVaultUpdate,
@@ -156,6 +157,67 @@ test("imports publish assets before canonical metadata", async () => {
     assert.equal(
       await pathExists(join(directory, ".blooket-api-media-import.json")),
       false,
+    );
+  });
+});
+
+test("original loading resolves one indexed immutable source", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+
+    assert.deepEqual(
+      await loadMediaVaultOriginal(directory, "sun"),
+      {
+        ok: true,
+        record: firstRecord,
+        sourceFormat: "jpeg",
+        bytes: Buffer.from(firstImport.originalBytes),
+      },
+    );
+    assert.deepEqual(
+      await loadMediaVaultOriginal(directory, "missing"),
+      {
+        ok: false,
+        kind: "invalid",
+        code: "media-record-missing",
+      },
+    );
+  });
+});
+
+test("original loading rejects ambiguous or unsafe source paths", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    await writeFile(
+      join(directory, "originals", "sun.png"),
+      Uint8Array.from([99]),
+    );
+
+    assert.deepEqual(
+      await loadMediaVaultOriginal(directory, "sun"),
+      {
+        ok: false,
+        kind: "io",
+        code: "media-vault-recovery-failed",
+      },
+    );
+  });
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    const target = join(directory, "elsewhere");
+    await writeFile(target, Uint8Array.from([1]));
+    await symlink(
+      target,
+      join(directory, "originals", "sun.png"),
+    );
+
+    assert.deepEqual(
+      await loadMediaVaultOriginal(directory, "sun"),
+      {
+        ok: false,
+        kind: "io",
+        code: "media-vault-unsafe",
+      },
     );
   });
 });

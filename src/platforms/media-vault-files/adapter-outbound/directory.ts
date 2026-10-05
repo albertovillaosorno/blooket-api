@@ -106,6 +106,24 @@ export type MediaVaultConflictCode =
   | "media-path-conflict"
   | "media-asset-conflict";
 
+export type MediaVaultOriginalResult =
+  | {
+      readonly ok: true;
+      readonly record: MediaRecord;
+      readonly sourceFormat: ImageFormat;
+      readonly bytes: Uint8Array;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "io";
+      readonly code: MediaVaultIoCode;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "invalid";
+      readonly code: "media-record-missing" | "media-index-invalid";
+    };
+
 export type MediaVaultLoadResult =
   | {
       readonly ok: true;
@@ -222,6 +240,38 @@ export async function loadMediaVault(
   let result: MediaVaultLoadResult;
   try {
     result = await loadMediaVaultLocked(directory);
+  } catch {
+    result = ioFailure("media-vault-unreadable");
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return ioFailure("media-vault-lock-failed");
+  }
+  return result;
+}
+
+export async function loadMediaVaultOriginal(
+  directory: string,
+  mediaId: string,
+): Promise<MediaVaultOriginalResult> {
+  const root = await safeDirectoryState(directory);
+  if (root === "unsafe") {
+    return ioFailure("media-vault-unsafe");
+  }
+  if (root === "missing") {
+    return invalidFailure("media-record-missing");
+  }
+
+  const acquired = await tryAcquireFileLock(join(directory, VAULT_LOCK));
+  if (!acquired.ok) {
+    return ioFailure(lockFailureCode(acquired.reason));
+  }
+
+  let result: MediaVaultOriginalResult;
+  try {
+    result = await loadMediaVaultOriginalLocked(directory, mediaId);
   } catch {
     result = ioFailure("media-vault-unreadable");
   }
@@ -370,6 +420,83 @@ async function loadMediaVaultLocked(
     return invalidFailure("media-index-invalid");
   }
   return { ok: true, records: index.records };
+}
+
+async function loadMediaVaultOriginalLocked(
+  directory: string,
+  mediaId: string,
+): Promise<MediaVaultOriginalResult> {
+  if (!await safeVaultDirectories(directory)) {
+    return ioFailure("media-vault-unsafe");
+  }
+
+  const recovery = await recoverPendingVaultTransaction(directory);
+  if (recovery === "failed") {
+    return ioFailure("media-vault-recovery-failed");
+  }
+
+  const index = await readIndex(directory);
+  if (index.kind === "unsafe") {
+    return ioFailure("media-vault-unsafe");
+  }
+  if (index.kind === "unreadable") {
+    return ioFailure("media-vault-unreadable");
+  }
+  if (index.kind === "invalid") {
+    return invalidFailure("media-index-invalid");
+  }
+
+  const record = index.records.find((candidate) => candidate.id === mediaId);
+  if (record === undefined) {
+    return invalidFailure("media-record-missing");
+  }
+
+  const candidates: Array<{
+    readonly format: ImageFormat;
+    readonly path: string;
+  }> = [];
+  for (
+    const format of ["jpeg", "png", "webp", "avif", "gif"] as const
+  ) {
+    const paths = mediaVaultPaths(record.id, format, "png");
+    if (paths === undefined) {
+      return ioFailure("media-vault-recovery-failed");
+    }
+    candidates.push({
+      format,
+      path: join(directory, paths.original),
+    });
+  }
+
+  const matches: Array<{
+    readonly format: ImageFormat;
+    readonly bytes: Uint8Array;
+  }> = [];
+  for (const candidate of candidates) {
+    const source = await readOwnedBinaryFile(candidate.path);
+    if (source.kind === "unsafe") {
+      return ioFailure("media-vault-unsafe");
+    }
+    if (source.kind === "unreadable") {
+      return ioFailure("media-vault-unreadable");
+    }
+    if (source.kind === "bytes") {
+      matches.push({
+        format: candidate.format,
+        bytes: source.value,
+      });
+    }
+  }
+
+  if (matches.length !== 1) {
+    return ioFailure("media-vault-recovery-failed");
+  }
+  return {
+    ok: true,
+    record,
+    sourceFormat: matches[0]!.format,
+    bytes: matches[0]!.bytes,
+  };
 }
 
 async function updateMediaVaultAssetLocked(
