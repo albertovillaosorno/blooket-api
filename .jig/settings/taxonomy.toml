@@ -1,0 +1,49 @@
+domain = "taxonomy"
+schema_version = 1
+required = true
+one_role_per_path = true
+overlapping_roles = "deny"
+spaces_in_paths = "deny"
+unknown_paths = "deny"
+
+[role.api]
+paths = ["src/api/"]
+
+[role.cli]
+paths = ["src/cli/"]
+
+[role.documentation]
+paths = ["docs/"]
+
+[role.ir]
+paths = ["src/ir/"]
+
+[role.jig_configuration]
+paths = [".jig/"]
+
+[role.mcp]
+paths = ["src/mcp/"]
+
+[role.media]
+paths = ["src/media/"]
+
+[role.platforms]
+paths = ["src/platforms/"]
+
+[role.projects]
+paths = ["src/projects/"]
+
+[role.root_governance]
+paths = [".editorconfig", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE-MIT", "README.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
+
+[role.security]
+paths = ["src/security/"]
+
+[role.settings]
+paths = ["src/settings/"]
+
+[role.tests]
+paths = ["tests/"]
+
+[role.ui]
+paths = ["src/ui/"]

@@ -1,0 +1,59 @@
+domain = "versions"
+schema_version = 1
+
+[authority.git-tool]
+current = "2.55.0"
+stable = "2.55.0"
+
+[authority.git-tool.projection.tool]
+kind = "tool"
+target = "git"
+template = "{version}"
+
+[authority.pnpm]
+current = "12.9.1"
+stable = "12.9.1"
+
+[authority.pnpm.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/pnpm/latest"
+
+[authority.pnpm.projection.package_manager]
+kind = "package-manager"
+target = "pnpm"
+template = "pnpm@{version}"
+
+[authority.python-tool]
+current = "3.14.7"
+stable = "3.14.7"
+
+[authority.python-tool.projection.tool]
+kind = "tool"
+target = "python"
+template = "{version}"
+
+[authority.rust-stable-cargo]
+current = "1.98.1"
+stable = "1.98.1"
+
+[authority.rust-stable-cargo.projection.tool]
+kind = "tool"
+target = "rust_stable_cargo"
+template = "{version}"
+
+[authority.typescript]
+current = "7.0.2"
+stable = "7.0.2"
+
+[authority.typescript.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/typescript/latest"
+
+[authority.typescript.projection.package]
+kind = "package"
+target = "typescript"
+template = "{version}"

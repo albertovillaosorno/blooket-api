@@ -1,0 +1,14 @@
+{
+  "name": "@blooket-api/repository",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "scripts": {
+    "check": ".dependencies/pnpm/node_modules/.bin/tsc -p tsconfig.json",
+    "test": "node --test $(find tests -type f -name '*_tests.ts' -print)",
+    "validate": "pnpm run check && pnpm run test && jig validate --root ."
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

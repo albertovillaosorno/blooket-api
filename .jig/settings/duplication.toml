@@ -1,0 +1,18 @@
+domain = "duplication"
+schema_version = 1
+default = "authored-production"
+exact_languages = []
+
+[override.tests]
+kind = "test"
+selectors = ["prefix:tests/"]
+
+[override.generated_cspell_projection]
+authority = "jig.cspell.projection"
+kind = "generated"
+selectors = ["exact:.jig/cspell/cspell.json"]
+
+[override.generated_package_locks]
+authority = "jig.package-manager.lock-files"
+kind = "generated"
+selectors = ["exact:pnpm-lock.yaml"]

@@ -1,0 +1,6 @@
+packages: []
+
+disallowWorkspaceCycles: true
+modulesDir: .dependencies/pnpm/node_modules
+virtualStoreDir: .dependencies/pnpm/virtual-store
+storeDir: .dependencies/pnpm/store

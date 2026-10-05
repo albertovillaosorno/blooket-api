@@ -1,0 +1,11 @@
+domain = "tools"
+schema_version = 1
+
+[entry.git.linux]
+path = ".dependencies/bin/git"
+
+[entry.rust_stable_cargo.linux]
+path = ".dependencies/bin/rust-stable-cargo"
+
+[entry.python.linux]
+path = ".dependencies/bin/python"

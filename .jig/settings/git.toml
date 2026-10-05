@@ -1,0 +1,5 @@
+domain = "git"
+schema_version = 1
+required_hooks = ["commit-msg"]
+required_ignored_paths = [".jig/graph/jig.db", ".jig/graph/jig.db-shm", ".jig/graph/jig.db-wal"]
+binary_extensions = []

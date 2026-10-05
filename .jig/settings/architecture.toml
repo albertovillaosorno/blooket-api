@@ -1,0 +1,38 @@
+domain = "architecture"
+schema_version = 1
+
+[component.api]
+depends_on = ["ir", "media", "platforms", "projects", "security", "settings"]
+
+[component.cli]
+depends_on = ["api", "ir"]
+
+[component.ir]
+depends_on = []
+
+[component.mcp]
+depends_on = ["cli"]
+
+[component.media]
+depends_on = ["ir"]
+
+[component.platforms]
+depends_on = ["security", "settings"]
+
+[component.projects]
+depends_on = ["ir", "media"]
+
+[component.security]
+depends_on = []
+
+[component.settings]
+depends_on = []
+
+[component.ui_desktop]
+depends_on = ["api", "ui_general"]
+
+[component.ui_extension]
+depends_on = ["ir", "ui_general"]
+
+[component.ui_general]
+depends_on = ["ir"]

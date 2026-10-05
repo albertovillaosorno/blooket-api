@@ -1,0 +1,37 @@
+# Repository-owned runtime state
+.cache/
+.dependencies/
+.logs/
+.temp/
+coverage/
+dist/
+node_modules/
+.pnpm-store/
+.npm/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.key
+*.p12
+*.pem
+*.pfx
+
+# User project and vault state is private by default.
+*.blooket-project
+.vault/
+
+# Editor and operating-system state
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Jig disposable graph query projection
+.jig/graph/jig.db
+.jig/graph/jig.db-shm
+.jig/graph/jig.db-wal
+
+# Jig telemetry
+JIG_SHIT.md
