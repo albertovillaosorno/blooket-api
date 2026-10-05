@@ -1,0 +1,9 @@
+identity:
+  id: function:media-edit
+  name: media-edit
+  path: src/api/media-edit
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
