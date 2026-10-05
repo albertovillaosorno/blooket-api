@@ -14,11 +14,11 @@ capability-bound durable image-import operation once the localhost boundary is
 available. Populate the version-two canvas, pixel, and upload-byte fields only
 from verified Blooket evidence; unknown values continue to fail closed.
 
-### TODO - Render and persist media editor operations
+### TODO - Complete animated and named media editing
 
-Apply the existing editor state/history and pan/zoom geometry to bounded Sharp
-rendering for pan, zoom, contrast, saturation, and rectangular blur/redaction.
-Persist edited metadata and renditions without mutating immutable originals.
+Define persisted display names through a versioned media-record contract without
+renaming stable media IDs. Add animation-preserving editor rendering before
+allowing animated edit persistence; animated edits currently fail closed.
 
 ### TODO - Implement host secret storage
 

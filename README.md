@@ -283,9 +283,22 @@ one means neutral contain scaling. Pan coordinates are fractions of the canvas:
 pan X of one shifts the foreground center by one full canvas width, and pan Y
 uses the corresponding canvas height.
 
+Static editor rendering reopens the immutable vault original and applies bounded
+pan, zoom, contrast, saturation, rectangular blur, and opaque-black redaction.
+Source cropping happens before resize so extreme zoom cannot create an
+unbounded native intermediate. Edited renditions and metadata replace one
+another transactionally while the original is never modified.
+
+Each edit is conditional on the media record and rendition hash loaded before
+rendering. A concurrent edit therefore returns a stable conflict instead of
+silently overwriting newer work. Changing a description resets its English
+verification to false unless the caller explicitly re-verifies the new text.
+
 The first editor surface is intentionally small: pan, zoom, keyboard nudging,
 contrast, saturation, simple rectangular blur/redaction, naming, description,
-and undo/redo. Generative fill is not part of the initial contract.
+and undo/redo. Generative fill is not part of the initial contract. Animated
+editing remains fail-closed, and persisted display names still need a versioned
+schema separate from the stable media ID.
 
 ## Reliability and operating-system behavior
 

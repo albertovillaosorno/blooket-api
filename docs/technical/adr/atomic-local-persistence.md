@@ -103,6 +103,25 @@ required by that metadata is durable. Failed imports leave no metadata reference
 to a missing or partial asset, and recovery never guesses ownership from a path
 name alone.
 
+Media edits use the same vault-wide metadata lock but never replace an original.
+Before exposing an edit marker, the vault durably copies the current rendition
+to one previous-value rendition backup. The strict marker records the previous
+and next media records plus SHA-256 hashes of both index states and both
+rendition states. The rendition is replaced first and media.jsonl second, so
+the index replacement is the edit commit point.
+
+Edit recovery accepts only exact old/new hash combinations. An old index with a
+new rendition restores the rendition backup; an old index with the old rendition
+only needs marker cleanup. A new index commits only with the exact new
+rendition.
+Unknown bytes, an unexpected index, corrupt markers, or simultaneous import and
+edit markers fail recovery closed without deleting evidence.
+
+An editor write also carries the record and rendition hash observed before
+rendering. The locked update compares both values with current vault state and
+returns a conflict when either changed, preventing a stale editor from silently
+overwriting a newer edit.
+
 Temporary names, lock names, transaction markers, and backup names are
 repository-owned implementation details. Product decoders never interpret them
 as lesson media. Normal successful operations remove their temporary files.
