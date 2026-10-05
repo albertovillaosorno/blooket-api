@@ -28,3 +28,10 @@
 *.woff2 binary
 
 *.svg text eol=lf diff
+
+# Linguist Overrides
+docs/**/*         linguist-documentation=false eol=lf linguist-detectable
+tests/**/*        linguist-documentation=false eol=lf linguist-detectable
+tools/**/*        linguist-documentation=false eol=lf linguist-detectable
+cpp/**/*          linguist-documentation=false eol=lf linguist-detectable
+src/**/*          linguist-documentation=false eol=lf linguist-detectable
