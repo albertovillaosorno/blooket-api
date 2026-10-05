@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  mediaRenditionPath,
   mediaVaultPaths,
   sourceExtension,
 } from "../../../../src/media/vault-layout/domain/layout.ts";
@@ -54,6 +55,12 @@ test("source extensions are canonical for every admitted format", () => {
   assert.equal(sourceExtension("webp"), ".webp");
   assert.equal(sourceExtension("avif"), ".avif");
   assert.equal(sourceExtension("gif"), ".gif");
+});
+
+test("rendition paths can be derived without source format", () => {
+  assert.equal(mediaRenditionPath("sun", "png"), "media/sun.png");
+  assert.equal(mediaRenditionPath("timer", "gif"), "media/timer.gif");
+  assert.equal(mediaRenditionPath("../sun", "png"), undefined);
 });
 
 test("invalid media IDs cannot produce vault paths", () => {

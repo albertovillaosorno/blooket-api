@@ -62,11 +62,25 @@ export function mediaVaultPaths(
     original: "originals/"
       + decodedId.value.value
       + sourceExtension(sourceFormat),
-    rendition: "media/"
-      + decodedId.value.value
-      + "."
-      + renditionFormat,
+    rendition: mediaRenditionPath(
+      decodedId.value.value,
+      renditionFormat,
+    )!,
   };
+}
+
+export function mediaRenditionPath(
+  mediaId: string,
+  renditionFormat: RenditionImageFormat,
+): string | undefined {
+  const decodedId = decodeMediaId(mediaId);
+  if (!decodedId.ok) {
+    return undefined;
+  }
+  return "media/"
+    + decodedId.value.value
+    + "."
+    + renditionFormat;
 }
 
 export function sourceExtension(
