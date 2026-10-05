@@ -43,8 +43,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { writeAtomicFile } from
-  "../../../../src/platforms/atomic-files/adapter-outbound/atomic-file.ts";
+import {
+  removeDurableFile,
+  writeAtomicFile,
+} from "../../../../src/platforms/atomic-files/adapter-outbound/atomic-file.ts";
 
 async function withTemporaryDirectory(
   callback: (directory: string) => Promise<void>,
@@ -88,6 +90,34 @@ test("atomic replacement leaves no generated temporary files", async () => {
 
     const names = await readdir(directory);
     assert.deepEqual(names, ["settings.json"]);
+  });
+});
+
+test(
+  "durable removal deletes regular files and tolerates missing paths",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const target = join(directory, "project.json");
+    await writeFile(target, "value", { mode: 0o600 });
+
+    await removeDurableFile(target);
+    await removeDurableFile(target);
+
+    await assert.rejects(readFile(target, "utf8"));
+  });
+  },
+);
+
+test("durable removal refuses symbolic targets", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const realTarget = join(directory, "real.json");
+    const symbolicTarget = join(directory, "project.json");
+    await writeFile(realTarget, "safe", { mode: 0o600 });
+    await symlink(realTarget, symbolicTarget);
+
+    await assert.rejects(removeDurableFile(symbolicTarget));
+    assert.equal(await readFile(realTarget, "utf8"), "safe");
+    assert.equal((await lstat(symbolicTarget)).isSymbolicLink(), true);
   });
 });
 

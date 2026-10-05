@@ -35,7 +35,6 @@
 import {
   lstat,
   readFile,
-  rm,
 } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -44,8 +43,10 @@ import {
   serializeProjectBundle,
   type ProjectBundle,
 } from "../../../projects/project-bundles/domain/project-bundle.ts";
-import { writeAtomicFile } from
-  "../../atomic-files/adapter-outbound/atomic-file.ts";
+import {
+  removeDurableFile,
+  writeAtomicFile,
+} from "../../atomic-files/adapter-outbound/atomic-file.ts";
 
 const PROJECT_FILE = "project.json";
 const MEDIA_FILE = "media.jsonl";
@@ -188,7 +189,7 @@ export async function saveProjectDirectory(
     await writeAtomicFile(paths.marker, `${JSON.stringify(marker)}\n`);
     await writeAtomicFile(paths.media, serialized.mediaJsonl);
     await writeAtomicFile(paths.project, serialized.projectJson);
-    await rm(paths.marker, { force: true });
+    await removeDurableFile(paths.marker);
     return { ok: true };
   } catch {
     const recovered = await recoverInterruptedWrite(directory);
@@ -241,7 +242,7 @@ async function recoverInterruptedWrite(directory: string): Promise<boolean> {
     if (!await restoreFile(paths.media, paths.mediaBackup, marker.hadMedia)) {
       return false;
     }
-    await rm(paths.marker, { force: true });
+    await removeDurableFile(paths.marker);
     return true;
   } catch {
     return false;
@@ -254,7 +255,7 @@ async function restoreFile(
   existedBefore: boolean,
 ): Promise<boolean> {
   if (!existedBefore) {
-    await rm(target, { force: true });
+    await removeDurableFile(target);
     return true;
   }
 

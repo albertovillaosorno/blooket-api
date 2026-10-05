@@ -45,6 +45,17 @@ export interface AtomicWriteOptions {
   readonly mode?: number;
 }
 
+export async function removeDurableFile(targetPath: string): Promise<void> {
+  const directory = dirname(targetPath);
+  await refuseSymbolicTarget(targetPath);
+  if (!await pathExists(targetPath)) {
+    return;
+  }
+
+  await rm(targetPath, { force: true });
+  await syncDirectory(directory);
+}
+
 export async function writeAtomicFile(
   targetPath: string,
   contents: string | Uint8Array,
