@@ -470,6 +470,71 @@ test("vault edits fail while another writer holds the lock", async () => {
   });
 });
 
+test("legacy edit markers recover against legacy JSONL", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const previousRecord = {
+      id: "sun",
+      path: "media/sun.png",
+      description: "A bright yellow sun.",
+      english: true,
+    };
+    const nextRecord = {
+      ...previousRecord,
+      description: "A warm edited sun.",
+      english: false,
+    };
+    const previousIndex = JSON.stringify(previousRecord) + "
+";
+    const nextIndex = JSON.stringify(nextRecord) + "
+";
+    const previousRendition = Buffer.from(firstImport.renditionBytes);
+    const nextRendition = Buffer.from(firstUpdate.renditionBytes);
+    const marker = {
+      version: 1,
+      id: "sun",
+      renditionFormat: "png",
+      previousRecord,
+      nextRecord,
+      previousIndexSha256: sha256(previousIndex),
+      nextIndexSha256: sha256(nextIndex),
+      previousRenditionSha256: sha256(previousRendition),
+      nextRenditionSha256: sha256(nextRendition),
+    } as const;
+
+    await mkdir(join(directory, "media"));
+    await writeFile(join(directory, "media.jsonl"), previousIndex);
+    await writeFile(
+      join(directory, "media", "sun.png.bak"),
+      previousRendition,
+    );
+    await writeFile(
+      join(directory, "media", "sun.png"),
+      nextRendition,
+    );
+    await writeFile(
+      join(directory, ".blooket-api-media-edit.json"),
+      JSON.stringify(marker) + "
+",
+    );
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: true,
+      records: [{
+        ...previousRecord,
+        name: "sun",
+      }],
+    });
+    assert.deepEqual(
+      await readFile(join(directory, "media", "sun.png")),
+      previousRendition,
+    );
+    assert.equal(
+      await readFile(join(directory, "media.jsonl"), "utf8"),
+      previousIndex,
+    );
+  });
+});
+
 test("load rolls back an interrupted rendition-first edit", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importMediaVaultAsset(directory, firstImport);
