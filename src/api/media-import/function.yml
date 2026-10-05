@@ -1,0 +1,9 @@
+identity:
+  id: function:media-import
+  name: media-import
+  path: src/api/media-import
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
