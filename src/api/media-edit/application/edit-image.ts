@@ -139,6 +139,26 @@ export async function editImage(
     return { ...original, stage: "original" };
   }
 
+  const english = request.english
+    ?? (
+      request.state.description === original.record.description
+        ? original.record.english
+        : false
+    );
+  const record = createMediaRecord({
+    id: original.record.id,
+    path: original.record.path,
+    description: request.state.description,
+    english,
+  });
+  if (!record.ok) {
+    return {
+      ok: false,
+      stage: "metadata",
+      issues: record.issues,
+    };
+  }
+
   const admitted = admitSourceImage(
     original.bytes,
     policy.value.maxSourceBytes,
@@ -163,26 +183,6 @@ export async function editImage(
   );
   if (!rendered.ok) {
     return { ...rendered, stage: "rendition" };
-  }
-
-  const english = request.english
-    ?? (
-      request.state.description === original.record.description
-        ? original.record.english
-        : false
-    );
-  const record = createMediaRecord({
-    id: original.record.id,
-    path: original.record.path,
-    description: request.state.description,
-    english,
-  });
-  if (!record.ok) {
-    return {
-      ok: false,
-      stage: "metadata",
-      issues: record.issues,
-    };
   }
 
   const persisted = await updateMediaVaultAsset(

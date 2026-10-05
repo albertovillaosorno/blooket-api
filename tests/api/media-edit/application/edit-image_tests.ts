@@ -34,6 +34,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -272,6 +273,30 @@ test("unknown upload limits fail before original loading", async () => {
     ok: false,
     stage: "policy",
     code: "unverified-image-upload-limits",
+  });
+});
+
+test("invalid edited metadata fails before source admission", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importFixture(directory, "card");
+    await writeFile(
+      join(directory, "originals", "card.png"),
+      Uint8Array.from([1, 2, 3]),
+    );
+
+    const result = await editImage({
+      vaultDirectory: directory,
+      id: "card",
+      state: editorState("card", ""),
+      capabilities,
+      localSafety,
+      blurSigma: 1,
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.stage, "metadata");
+    }
   });
 });
 
