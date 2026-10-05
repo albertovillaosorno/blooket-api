@@ -163,6 +163,21 @@ test("imports publish assets before canonical metadata", async () => {
   });
 });
 
+test("original read limits fail before filesystem access", async () => {
+  assert.deepEqual(
+    await loadMediaVaultOriginal(
+      "/path/that/must/not/be/read",
+      "sun",
+      0,
+    ),
+    {
+      ok: false,
+      kind: "invalid",
+      code: "media-read-limit-invalid",
+    },
+  );
+});
+
 test("original loading resolves one indexed immutable source", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importMediaVaultAsset(directory, firstImport);

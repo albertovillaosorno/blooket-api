@@ -276,6 +276,31 @@ test("unknown upload limits fail before original loading", async () => {
   });
 });
 
+test("original content-format tampering fails before rendering", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importFixture(directory, "card");
+    await writeFile(
+      join(directory, "originals", "card.png"),
+      GIF_2_FRAME_1X1,
+    );
+
+    const result = await editImage({
+      vaultDirectory: directory,
+      id: "card",
+      state: editorState("card", "An edited description."),
+      capabilities,
+      localSafety,
+      blurSigma: 1,
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "source",
+      code: "original-format-mismatch",
+    });
+  });
+});
+
 test("source byte ceilings stop oversized original reads", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importFixture(directory, "card");
