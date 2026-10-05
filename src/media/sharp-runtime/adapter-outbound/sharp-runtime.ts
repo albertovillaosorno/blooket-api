@@ -49,7 +49,7 @@ export interface SharpMetadata {
 export interface SharpResizeOptions {
   readonly width: number;
   readonly height: number;
-  readonly fit: "cover" | "contain";
+  readonly fit: "cover" | "contain" | "fill";
   readonly background?: {
     readonly r: number;
     readonly g: number;
@@ -58,11 +58,27 @@ export interface SharpResizeOptions {
   };
 }
 
+export interface SharpRegion {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface SharpPipeline {
   metadata(): Promise<SharpMetadata>;
   raw(): SharpPipeline;
   rotate(): SharpPipeline;
+  ensureAlpha(alpha?: number): SharpPipeline;
+  extract(region: SharpRegion): SharpPipeline;
   resize(options: SharpResizeOptions): SharpPipeline;
+  linear(
+    multiplier: number | readonly number[],
+    offset: number | readonly number[],
+  ): SharpPipeline;
+  modulate(options: {
+    readonly saturation?: number;
+  }): SharpPipeline;
   blur(sigma: number): SharpPipeline;
   png(): SharpPipeline;
   gif(options: {
@@ -71,7 +87,23 @@ export interface SharpPipeline {
     readonly keepDuplicateFrames: boolean;
   }): SharpPipeline;
   composite(images: readonly {
-    readonly input: Uint8Array;
+    readonly input:
+      | Uint8Array
+      | {
+          readonly create: {
+            readonly width: number;
+            readonly height: number;
+            readonly channels: 4;
+            readonly background: {
+              readonly r: number;
+              readonly g: number;
+              readonly b: number;
+              readonly alpha: number;
+            };
+          };
+        };
+    readonly top?: number;
+    readonly left?: number;
   }[]): SharpPipeline;
   toBuffer(): Promise<Uint8Array>;
 }
