@@ -405,6 +405,19 @@ test("animated output pixel limits count every frame", async () => {
   );
 });
 
+test("animated output byte limits apply after final GIF encode", async () => {
+  assert.deepEqual(
+    await renderEditedImageRendition(
+      GIF_2_FRAME_2X2,
+      state(),
+      { width: 2, height: 2 },
+      { ...LIMITS, maxOutputBytes: 1 },
+      { blurSigma: 1 },
+    ),
+    { ok: false, code: "rendition-byte-limit-exceeded" },
+  );
+});
+
 test("editor output pixel and byte limits fail closed", async () => {
   assert.deepEqual(
     await renderEditedImageRendition(
