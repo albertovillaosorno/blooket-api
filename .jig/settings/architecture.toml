@@ -17,7 +17,7 @@ depends_on = ["cli"]
 depends_on = ["ir"]
 
 [component.platforms]
-depends_on = ["security", "settings"]
+depends_on = ["projects", "security", "settings"]
 
 [component.projects]
 depends_on = ["ir", "media"]

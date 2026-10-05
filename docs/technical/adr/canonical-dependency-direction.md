@@ -32,9 +32,10 @@ mode. It must not import API or domain internals. Localhost HTTP belongs to the
 API component and lowers requests into the same command executor rather than
 implementing separate semantics.
 
-Platform adapters may depend on existing security or settings contracts but may
-not reverse the dependency direction. Desktop and extension surfaces may depend
-on their admitted UI/API layers and must not acquire Blooket semantics.
+Platform adapters may depend on existing owning-domain contracts, including
+project, security, or settings contracts, but may not reverse the dependency
+direction. Desktop and extension surfaces may depend on their admitted UI/API
+layers and must not acquire Blooket semantics.
 
 ## Consequences
 

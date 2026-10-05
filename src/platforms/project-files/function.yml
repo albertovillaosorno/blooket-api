@@ -1,0 +1,9 @@
+identity:
+  id: function:project-files
+  name: project-files
+  path: src/platforms/project-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
