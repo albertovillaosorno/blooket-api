@@ -1,0 +1,9 @@
+identity:
+  id: function:settings-files
+  name: settings-files
+  path: src/platforms/settings-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
