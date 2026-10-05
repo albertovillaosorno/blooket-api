@@ -45,6 +45,14 @@ const PNG_2X1 = Buffer.from(
   "base64",
 );
 
+const ANIMATED_WEBP_2_FRAME_1X1 = Buffer.from(
+  "UklGRpQAAABXRUJQVlA4WAoAAAACAAAAAAAAAAAAQU5JTQYAAAD/////AQBBTk1G"
+    + "MAAAAAAAAAAAAAAAAAAAAGQAAAJWUDggGAAAADABAJ0BKgEAAQABQCYlpAADcAD+"
+    + "/PQAAEFOTUYwAAAAAAAAAAAAAAAAAAAAeAAAAFZQOCAYAAAANAEAnQEqAQABAAAA"
+    + "JiWkAANwAP79NmgA",
+  "base64",
+);
+
 const GIF_2_FRAME_1X1 = Buffer.from(
   "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwALAAAAAABAAEAAAIBTAA7",
   "base64",
@@ -110,6 +118,20 @@ test("animated GIF renditions preserve frames and timing", async () => {
     assert.equal(decoded.value.loopCount, 1);
   }
 });
+
+test(
+  "animated WebP fails closed until rendition preservation exists",
+  async () => {
+    assert.deepEqual(
+      await renderImageRendition(
+        ANIMATED_WEBP_2_FRAME_1X1,
+        { width: 2, height: 2 },
+        LIMITS,
+      ),
+      { ok: false, code: "animated-rendition-unsupported" },
+    );
+  },
+);
 
 test("rendition output pixel and byte ceilings fail closed", async () => {
   assert.deepEqual(

@@ -35,6 +35,44 @@ import test from "node:test";
 import { decodeSourceImage } from
   "../../../../src/media/image-decoding/adapter-outbound/sharp-image.ts";
 
+const JPEG_1X1 = Buffer.from(
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsj"
+    + "HBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgo"
+    + "KCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAAR"
+    + "CAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAA"
+    + "AAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAUEQEAAAAAAAAA"
+    + "AAAAAAAAAAAA/9oADAMBAAIRAxEAPwCfAFEB/9k=",
+  "base64",
+);
+
+const WEBP_1X1 = Buffer.from(
+  "UklGRjAAAABXRUJQVlA4ICQAAABQAQCdASoBAAEAAUAmJQBOgC6gAP77LkvF3Yjj"
+    + "J4dVU9ffoAA=",
+  "base64",
+);
+
+const AVIF_1X1 = Buffer.from(
+  "AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAAXBtZXRhAAAAAAAAACFoZGxy"
+    + "AAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAADRpbG9jAAAAAERAAAIAAQAAAAABlAAB"
+    + "AAAAAAAAACEAAgAAAAABtQABAAAAAAAAABQAAAA4aWluZgAAAAAAAgAAABVpbmZlAgAA"
+    + "AAABAABhdjAxAAAAABVpbmZlAgAAAAACAABhdjAxAAAAAA5waXRtAAAAAAABAAAAr2lw"
+    + "cnAAAACKaXBjbwAAAAxhdjFDgSACAAAAABRpc3BlAAAAAAAAAAEAAAABAAAAEHBpeGkA"
+    + "AAAAAwgICAAAAAxhdjFDgQAcAAAAAA5waXhpAAAAAAEIAAAAOGF1eEMAAAAAdXJuOm1w"
+    + "ZWc6bXBlZ0I6Y2ljcDpzeXN0ZW1zOmF1eGlsaWFyeTphbHBoYQAAAAAdaXBtYQAAAAAA"
+    + "AAACAAEDgQIDAAIEhAIFhgAAABppcmVmAAAAAAAAAA5hdXhsAAIAAQABAAAAPW1kYXQS"
+    + "AAoHOAAGkBDQaTIUGUJjBMAANAAAkEDJHGFCJoLojb0SAAoEGAAGFTIKGAAAAQACIRuj"
+    + "YA==",
+  "base64",
+);
+
+const ANIMATED_WEBP_2_FRAME_1X1 = Buffer.from(
+  "UklGRpQAAABXRUJQVlA4WAoAAAACAAAAAAAAAAAAQU5JTQYAAAD/////AQBBTk1G"
+    + "MAAAAAAAAAAAAAAAAAAAAGQAAAJWUDggGAAAADABAJ0BKgEAAQABQCYlpAADcAD+"
+    + "/PQAAEFOTUYwAAAAAAAAAAAAAAAAAAAAeAAAAFZQOCAYAAAANAEAnQEqAQABAAAA"
+    + "JiWkAANwAP79NmgA",
+  "base64",
+);
+
 const PNG_1X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPo"
     + "AAAD6AG1e1JrAAAADUlEQVQImWP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
@@ -69,6 +107,46 @@ test("static PNG bytes are fully decoded with canonical metadata", async () => {
     },
   });
 });
+
+test("JPEG WebP and AVIF sources fully decode by content", async () => {
+  const fixtures = [
+    [JPEG_1X1, "jpeg"],
+    [WEBP_1X1, "webp"],
+    [AVIF_1X1, "avif"],
+  ] as const;
+
+  for (const [bytes, expectedFormat] of fixtures) {
+    const decoded = await decodeSourceImage(bytes, 1);
+    assert.equal(decoded.ok, true, expectedFormat);
+    if (decoded.ok) {
+      assert.equal(decoded.value.format.format, expectedFormat);
+      assert.equal(decoded.value.frameWidth, 1);
+      assert.equal(decoded.value.frameHeight, 1);
+      assert.equal(decoded.value.frameCount, 1);
+      assert.equal(decoded.value.animated, false);
+    }
+  }
+});
+
+test(
+  "animated WebP exposes frame timing without losing format identity",
+  async () => {
+    const decoded = await decodeSourceImage(
+      ANIMATED_WEBP_2_FRAME_1X1,
+      2,
+    );
+    assert.equal(decoded.ok, true);
+    if (decoded.ok) {
+      assert.equal(decoded.value.format.format, "webp");
+      assert.equal(decoded.value.frameWidth, 1);
+      assert.equal(decoded.value.frameHeight, 1);
+      assert.equal(decoded.value.frameCount, 2);
+      assert.equal(decoded.value.animated, true);
+      assert.deepEqual(decoded.value.frameDelaysMs, [100, 120]);
+      assert.equal(decoded.value.loopCount, 1);
+    }
+  },
+);
 
 test(
   "animated GIF metadata retains frame count delays and loop state",
