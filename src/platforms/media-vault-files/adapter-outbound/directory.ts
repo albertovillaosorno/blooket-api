@@ -91,6 +91,7 @@ export type MediaVaultIoCode =
   | "media-vault-locked"
   | "media-vault-unsafe"
   | "media-vault-unreadable"
+  | "media-vault-source-too-large"
   | "media-vault-write-failed"
   | "media-vault-recovery-failed"
   | "media-vault-lock-failed";
@@ -98,6 +99,7 @@ export type MediaVaultIoCode =
 export type MediaVaultInvalidCode =
   | "media-import-invalid"
   | "media-update-invalid"
+  | "media-read-limit-invalid"
   | "media-record-invalid"
   | "media-record-missing"
   | "media-path-mismatch"
@@ -125,7 +127,10 @@ export type MediaVaultOriginalResult =
   | {
       readonly ok: false;
       readonly kind: "invalid";
-      readonly code: "media-record-missing" | "media-index-invalid";
+      readonly code:
+        | "media-record-missing"
+        | "media-index-invalid"
+        | "media-read-limit-invalid";
     };
 
 export type MediaVaultLoadResult =
@@ -264,7 +269,15 @@ export async function loadMediaVault(
 export async function loadMediaVaultOriginal(
   directory: string,
   mediaId: string,
+  maxSourceBytes: number,
 ): Promise<MediaVaultOriginalResult> {
+  if (
+    !Number.isSafeInteger(maxSourceBytes)
+    || maxSourceBytes < 1
+  ) {
+    return invalidFailure("media-read-limit-invalid");
+  }
+
   const root = await safeDirectoryState(directory);
   if (root === "unsafe") {
     return ioFailure("media-vault-unsafe");
@@ -280,7 +293,11 @@ export async function loadMediaVaultOriginal(
 
   let result: MediaVaultOriginalResult;
   try {
-    result = await loadMediaVaultOriginalLocked(directory, mediaId);
+    result = await loadMediaVaultOriginalLocked(
+      directory,
+      mediaId,
+      maxSourceBytes,
+    );
   } catch {
     result = ioFailure("media-vault-unreadable");
   }
@@ -448,6 +465,7 @@ async function loadMediaVaultLocked(
 async function loadMediaVaultOriginalLocked(
   directory: string,
   mediaId: string,
+  maxSourceBytes: number,
 ): Promise<MediaVaultOriginalResult> {
   if (!await safeVaultDirectories(directory)) {
     return ioFailure("media-vault-unsafe");
@@ -496,7 +514,13 @@ async function loadMediaVaultOriginalLocked(
     readonly bytes: Uint8Array;
   }> = [];
   for (const candidate of candidates) {
-    const source = await readOwnedBinaryFile(candidate.path);
+    const source = await readOwnedBinaryFile(
+      candidate.path,
+      maxSourceBytes,
+    );
+    if (source.kind === "too-large") {
+      return ioFailure("media-vault-source-too-large");
+    }
     if (source.kind === "unsafe") {
       return ioFailure("media-vault-unsafe");
     }
@@ -1301,16 +1325,26 @@ async function readOwnedTextFile(path: string): Promise<
   }
 }
 
-async function readOwnedBinaryFile(path: string): Promise<
+async function readOwnedBinaryFile(
+  path: string,
+  maxBytes?: number,
+): Promise<
   | { readonly kind: "bytes"; readonly value: Uint8Array }
   | { readonly kind: "missing" }
   | { readonly kind: "unsafe" }
   | { readonly kind: "unreadable" }
+  | { readonly kind: "too-large" }
 > {
   try {
     const metadata = await lstat(path);
     if (metadata.isSymbolicLink() || !metadata.isFile()) {
       return { kind: "unsafe" };
+    }
+    if (
+      maxBytes !== undefined
+      && metadata.size > maxBytes
+    ) {
+      return { kind: "too-large" };
     }
     return { kind: "bytes", value: await readFile(path) };
   } catch (error: unknown) {

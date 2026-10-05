@@ -168,7 +168,7 @@ test("original loading resolves one indexed immutable source", async () => {
     await importMediaVaultAsset(directory, firstImport);
 
     assert.deepEqual(
-      await loadMediaVaultOriginal(directory, "sun"),
+      await loadMediaVaultOriginal(directory, "sun", 1024),
       {
         ok: true,
         record: firstRecord,
@@ -178,11 +178,26 @@ test("original loading resolves one indexed immutable source", async () => {
       },
     );
     assert.deepEqual(
-      await loadMediaVaultOriginal(directory, "missing"),
+      await loadMediaVaultOriginal(directory, "missing", 1024),
       {
         ok: false,
         kind: "invalid",
         code: "media-record-missing",
+      },
+    );
+  });
+});
+
+test("original loading rejects oversized files before reads", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+
+    assert.deepEqual(
+      await loadMediaVaultOriginal(directory, "sun", 2),
+      {
+        ok: false,
+        kind: "io",
+        code: "media-vault-source-too-large",
       },
     );
   });
@@ -197,7 +212,7 @@ test("original loading rejects ambiguous or unsafe source paths", async () => {
     );
 
     assert.deepEqual(
-      await loadMediaVaultOriginal(directory, "sun"),
+      await loadMediaVaultOriginal(directory, "sun", 1024),
       {
         ok: false,
         kind: "io",
@@ -215,7 +230,7 @@ test("original loading rejects ambiguous or unsafe source paths", async () => {
     );
 
     assert.deepEqual(
-      await loadMediaVaultOriginal(directory, "sun"),
+      await loadMediaVaultOriginal(directory, "sun", 1024),
       {
         ok: false,
         kind: "io",

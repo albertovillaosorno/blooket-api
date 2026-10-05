@@ -276,6 +276,31 @@ test("unknown upload limits fail before original loading", async () => {
   });
 });
 
+test("source byte ceilings stop oversized original reads", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importFixture(directory, "card");
+
+    const result = await editImage({
+      vaultDirectory: directory,
+      id: "card",
+      state: editorState("card", "An edited description."),
+      capabilities,
+      localSafety: {
+        ...localSafety,
+        maxSourceBytes: PNG_2X1.byteLength - 1,
+      },
+      blurSigma: 1,
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "source",
+      code: "source-image-too-large",
+      message: "Source image exceeds the configured byte limit.",
+    });
+  });
+});
+
 test("invalid edited metadata fails before source admission", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importFixture(directory, "card");

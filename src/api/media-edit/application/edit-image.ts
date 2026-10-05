@@ -134,8 +134,17 @@ export async function editImage(
   const original = await loadMediaVaultOriginal(
     request.vaultDirectory,
     request.id,
+    policy.value.maxSourceBytes,
   );
   if (!original.ok) {
+    if (original.code === "media-vault-source-too-large") {
+      return {
+        ok: false,
+        stage: "source",
+        code: "source-image-too-large",
+        message: "Source image exceeds the configured byte limit.",
+      };
+    }
     return { ...original, stage: "original" };
   }
 
