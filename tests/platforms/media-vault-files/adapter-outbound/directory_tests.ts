@@ -30,6 +30,7 @@
 //   - Test state lives only beneath the operating-system temp directory.
 //
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   link,
   lstat,
@@ -48,7 +49,9 @@ import test from "node:test";
 import {
   importMediaVaultAsset,
   loadMediaVault,
+  updateMediaVaultAsset,
   type MediaVaultImport,
+  type MediaVaultUpdate,
 } from
   "../../../../src/platforms/media-vault-files/adapter-outbound/directory.ts";
 import { tryAcquireFileLock } from
@@ -68,6 +71,17 @@ const firstImport: MediaVaultImport = {
   originalBytes: Uint8Array.from([1, 2, 3]),
   renditionBytes: Uint8Array.from([4, 5, 6]),
 };
+const updatedFirstRecord = {
+  ...firstRecord,
+  description: "A warm edited sun.",
+  english: false,
+} as const;
+const firstUpdate: MediaVaultUpdate = {
+  record: updatedFirstRecord,
+  renditionFormat: "png",
+  renditionBytes: Uint8Array.from([40, 50, 60]),
+};
+
 const secondRecord = {
   id: "horse",
   path: "media/horse.png",
@@ -142,6 +156,207 @@ test("imports publish assets before canonical metadata", async () => {
     assert.equal(
       await pathExists(join(directory, ".blooket-api-media-import.json")),
       false,
+    );
+  });
+});
+
+test("edits replace rendition and metadata, not originals", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    const originalBefore = await readFile(
+      join(directory, "originals", "sun.jpg"),
+    );
+
+    assert.deepEqual(
+      await updateMediaVaultAsset(directory, firstUpdate),
+      { ok: true, record: updatedFirstRecord },
+    );
+    assert.deepEqual(
+      await readFile(join(directory, "originals", "sun.jpg")),
+      originalBefore,
+    );
+    assert.deepEqual(
+      await readFile(join(directory, "media", "sun.png")),
+      Buffer.from(firstUpdate.renditionBytes),
+    );
+    assert.deepEqual(
+      await readFile(join(directory, "media", "sun.png.bak")),
+      Buffer.from(firstImport.renditionBytes),
+    );
+    assert.equal(
+      await readFile(join(directory, "media.jsonl"), "utf8"),
+      JSON.stringify(updatedFirstRecord) + "\n",
+    );
+    assert.equal(
+      await readFile(join(directory, "media.jsonl.bak"), "utf8"),
+      JSON.stringify(firstRecord) + "\n",
+    );
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-edit.json")),
+      false,
+    );
+  });
+});
+
+test("identical edits are idempotent without creating backups", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    const identical: MediaVaultUpdate = {
+      record: firstRecord,
+      renditionFormat: "png",
+      renditionBytes: firstImport.renditionBytes,
+    };
+
+    assert.deepEqual(
+      await updateMediaVaultAsset(directory, identical),
+      { ok: true, record: firstRecord },
+    );
+    assert.equal(
+      await pathExists(join(directory, "media", "sun.png.bak")),
+      false,
+    );
+  });
+});
+
+test("edits require an existing canonical media record", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+
+    assert.deepEqual(
+      await updateMediaVaultAsset(directory, {
+        record: secondRecord,
+        renditionFormat: "png",
+        renditionBytes: Uint8Array.from([99]),
+      }),
+      {
+        ok: false,
+        kind: "invalid",
+        code: "media-record-missing",
+      },
+    );
+    assert.deepEqual(
+      await updateMediaVaultAsset(directory, {
+        ...firstUpdate,
+        record: {
+          ...updatedFirstRecord,
+          path: "media/sun.gif",
+        },
+      }),
+      {
+        ok: false,
+        kind: "invalid",
+        code: "media-path-mismatch",
+      },
+    );
+  });
+});
+
+test("vault edits fail while another writer holds the lock", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    const held = await tryAcquireFileLock(
+      join(directory, ".blooket-api-media-vault.lock"),
+    );
+    assert.equal(held.ok, true);
+    if (!held.ok) {
+      return;
+    }
+    try {
+      assert.deepEqual(
+        await updateMediaVaultAsset(directory, firstUpdate),
+        {
+          ok: false,
+          kind: "io",
+          code: "media-vault-locked",
+        },
+      );
+    } finally {
+      await held.lock.release();
+    }
+  });
+});
+
+test("load rolls back an interrupted rendition-first edit", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    await createInterruptedEdit(directory, false);
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: true,
+      records: [firstRecord],
+    });
+    assert.deepEqual(
+      await readFile(join(directory, "media", "sun.png")),
+      Buffer.from(firstImport.renditionBytes),
+    );
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-edit.json")),
+      false,
+    );
+  });
+});
+
+test("load completes cleanup after edited metadata commits", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    await createInterruptedEdit(directory, true);
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: true,
+      records: [updatedFirstRecord],
+    });
+    assert.deepEqual(
+      await readFile(join(directory, "media", "sun.png")),
+      Buffer.from(firstUpdate.renditionBytes),
+    );
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-edit.json")),
+      false,
+    );
+  });
+});
+
+test("unknown edited rendition state fails recovery", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    await createInterruptedEdit(directory, false);
+    const rendition = join(directory, "media", "sun.png");
+    await writeFile(rendition, Uint8Array.from([70, 80, 90]));
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: false,
+      kind: "io",
+      code: "media-vault-recovery-failed",
+    });
+    assert.deepEqual(
+      await readFile(rendition),
+      Buffer.from([70, 80, 90]),
+    );
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-edit.json")),
+      true,
+    );
+  });
+});
+
+test("simultaneous import and edit markers fail closed", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    await createInterruptedEdit(directory, false);
+    await writeMarker(directory);
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: false,
+      kind: "io",
+      code: "media-vault-recovery-failed",
+    });
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-edit.json")),
+      true,
+    );
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-import.json")),
+      true,
     );
   });
 });
@@ -397,6 +612,47 @@ test("symbolic vault asset directories are refused", async () => {
     );
   });
 });
+
+async function createInterruptedEdit(
+  directory: string,
+  committed: boolean,
+): Promise<void> {
+  const previousIndex = JSON.stringify(firstRecord) + "\n";
+  const nextIndex = JSON.stringify(updatedFirstRecord) + "\n";
+  const previousRendition = Buffer.from(firstImport.renditionBytes);
+  const nextRendition = Buffer.from(firstUpdate.renditionBytes);
+  const marker = {
+    version: 1,
+    id: firstRecord.id,
+    renditionFormat: "png",
+    previousRecord: firstRecord,
+    nextRecord: updatedFirstRecord,
+    previousIndexSha256: sha256(previousIndex),
+    nextIndexSha256: sha256(nextIndex),
+    previousRenditionSha256: sha256(previousRendition),
+    nextRenditionSha256: sha256(nextRendition),
+  } as const;
+
+  await writeFile(
+    join(directory, "media", "sun.png.bak"),
+    previousRendition,
+  );
+  await writeFile(
+    join(directory, ".blooket-api-media-edit.json"),
+    JSON.stringify(marker) + "\n",
+  );
+  await writeFile(
+    join(directory, "media", "sun.png"),
+    nextRendition,
+  );
+  if (committed) {
+    await writeFile(join(directory, "media.jsonl"), nextIndex);
+  }
+}
+
+function sha256(value: string | Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 async function writeMarker(directory: string): Promise<void> {
   const marker = {

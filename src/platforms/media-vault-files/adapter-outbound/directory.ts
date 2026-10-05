@@ -9,13 +9,13 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Durable media-vault loading, import publication, and crash recovery.
+//   - Durable media-vault loading, import/edit publication, and recovery.
 // - Must-Not:
 //   - Decode images, choose product limits, or accept arbitrary asset paths.
 // - Allows:
 //   - Inputs: Trusted vault roots, records, formats, and prepared bytes.
-//   - Outputs: Loaded records, durable imports, or stable failures.
-//   - Side effects: Vault locks, staging files, hard links, index replacement.
+//   - Outputs: Loaded records, durable imports/edits, or stable failures.
+//   - Side effects: Vault locks, staged assets, backups, and replacements.
 // - Split-When:
 //   - Host filesystem semantics require a non-POSIX vault implementation.
 // - Merge-When:
@@ -29,7 +29,7 @@
 // - Defaults:
 //   - Originals are immutable; the index retains one previous-value backup.
 //
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   lstat,
   readFile,
@@ -45,6 +45,7 @@ import {
   type MediaRecord,
 } from "../../../media/media-records/domain/media-record.ts";
 import {
+  mediaRenditionPath,
   mediaVaultPaths,
   type RenditionImageFormat,
 } from "../../../media/vault-layout/domain/layout.ts";
@@ -62,6 +63,7 @@ import { tryAcquireFileLock } from
 const INDEX_FILE = "media.jsonl";
 const INDEX_BACKUP = "media.jsonl.bak";
 const IMPORT_MARKER = ".blooket-api-media-import.json";
+const EDIT_MARKER = ".blooket-api-media-edit.json";
 const VAULT_LOCK = ".blooket-api-media-vault.lock";
 const UUID = new RegExp(
   "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-"
@@ -77,6 +79,12 @@ export interface MediaVaultImport {
   readonly renditionBytes: Uint8Array;
 }
 
+export interface MediaVaultUpdate {
+  readonly record: MediaRecord;
+  readonly renditionFormat: RenditionImageFormat;
+  readonly renditionBytes: Uint8Array;
+}
+
 export type MediaVaultIoCode =
   | "media-vault-locked"
   | "media-vault-unsafe"
@@ -87,7 +95,9 @@ export type MediaVaultIoCode =
 
 export type MediaVaultInvalidCode =
   | "media-import-invalid"
+  | "media-update-invalid"
   | "media-record-invalid"
+  | "media-record-missing"
   | "media-path-mismatch"
   | "media-index-invalid";
 
@@ -134,6 +144,22 @@ export type MediaVaultImportResult =
       readonly code: MediaVaultConflictCode;
     };
 
+export type MediaVaultUpdateResult =
+  | {
+      readonly ok: true;
+      readonly record: MediaRecord;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "io";
+      readonly code: MediaVaultIoCode;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "invalid";
+      readonly code: MediaVaultInvalidCode;
+    };
+
 interface ImportMarker {
   readonly version: 1;
   readonly id: string;
@@ -144,12 +170,25 @@ interface ImportMarker {
   readonly token: string;
 }
 
+interface EditMarker {
+  readonly version: 1;
+  readonly id: string;
+  readonly renditionFormat: RenditionImageFormat;
+  readonly previousRecord: MediaRecord;
+  readonly nextRecord: MediaRecord;
+  readonly previousIndexSha256: string;
+  readonly nextIndexSha256: string;
+  readonly previousRenditionSha256: string;
+  readonly nextRenditionSha256: string;
+}
+
 type RecoveryOutcome = "none" | "committed" | "rolled-back" | "failed";
 
 type IndexReadResult =
   | {
       readonly kind: "records";
       readonly records: readonly MediaRecord[];
+      readonly source: string;
     }
   | { readonly kind: "invalid" }
   | { readonly kind: "unsafe" }
@@ -254,6 +293,60 @@ export async function importMediaVaultAsset(
   return result;
 }
 
+export async function updateMediaVaultAsset(
+  directory: string,
+  input: MediaVaultUpdate,
+): Promise<MediaVaultUpdateResult> {
+  if (
+    !isRenditionFormat(input.renditionFormat)
+    || !(input.renditionBytes instanceof Uint8Array)
+    || input.renditionBytes.byteLength === 0
+  ) {
+    return invalidFailure("media-update-invalid");
+  }
+
+  const validated = decodeMediaRecord(input.record);
+  if (!validated.ok) {
+    return invalidFailure("media-record-invalid");
+  }
+  const renditionPath = mediaRenditionPath(
+    validated.value.id,
+    input.renditionFormat,
+  );
+  if (
+    renditionPath === undefined
+    || validated.value.path !== renditionPath
+  ) {
+    return invalidFailure("media-path-mismatch");
+  }
+
+  if (await safeDirectoryState(directory) === "unsafe") {
+    return ioFailure("media-vault-unsafe");
+  }
+
+  const acquired = await tryAcquireFileLock(join(directory, VAULT_LOCK));
+  if (!acquired.ok) {
+    return ioFailure(lockFailureCode(acquired.reason));
+  }
+
+  let result: MediaVaultUpdateResult;
+  try {
+    result = await updateMediaVaultAssetLocked(
+      directory,
+      { ...input, record: validated.value },
+    );
+  } catch {
+    result = ioFailure("media-vault-write-failed");
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return ioFailure("media-vault-lock-failed");
+  }
+  return result;
+}
+
 async function loadMediaVaultLocked(
   directory: string,
 ): Promise<MediaVaultLoadResult> {
@@ -261,7 +354,7 @@ async function loadMediaVaultLocked(
     return ioFailure("media-vault-unsafe");
   }
 
-  const recovery = await recoverInterruptedImport(directory);
+  const recovery = await recoverPendingVaultTransaction(directory);
   if (recovery === "failed") {
     return ioFailure("media-vault-recovery-failed");
   }
@@ -279,6 +372,129 @@ async function loadMediaVaultLocked(
   return { ok: true, records: index.records };
 }
 
+async function updateMediaVaultAssetLocked(
+  directory: string,
+  input: MediaVaultUpdate,
+): Promise<MediaVaultUpdateResult> {
+  if (!await safeVaultDirectories(directory)) {
+    return ioFailure("media-vault-unsafe");
+  }
+  if (!await isOwnedRegularOrMissing(join(directory, INDEX_BACKUP))) {
+    return ioFailure("media-vault-unsafe");
+  }
+
+  const recovery = await recoverPendingVaultTransaction(directory);
+  if (recovery === "failed") {
+    return ioFailure("media-vault-recovery-failed");
+  }
+
+  const index = await readIndex(directory);
+  if (index.kind === "unsafe") {
+    return ioFailure("media-vault-unsafe");
+  }
+  if (index.kind === "unreadable") {
+    return ioFailure("media-vault-unreadable");
+  }
+  if (index.kind === "invalid") {
+    return invalidFailure("media-index-invalid");
+  }
+
+  const previous = index.records.find(
+    (record) => record.id === input.record.id,
+  );
+  if (previous === undefined) {
+    return invalidFailure("media-record-missing");
+  }
+  if (
+    previous.path !== input.record.path
+    || previous.id !== input.record.id
+  ) {
+    return invalidFailure("media-path-mismatch");
+  }
+
+  const relativeRendition = mediaRenditionPath(
+    input.record.id,
+    input.renditionFormat,
+  );
+  if (
+    relativeRendition === undefined
+    || relativeRendition !== previous.path
+  ) {
+    return invalidFailure("media-path-mismatch");
+  }
+
+  const renditionPath = join(directory, relativeRendition);
+  const backupPath = renditionPath + ".bak";
+  const candidateStates = await Promise.all([
+    fileState(renditionPath),
+    fileState(backupPath),
+    fileState(join(directory, EDIT_MARKER)),
+  ]);
+  if (candidateStates.some((state) => state.kind === "unsafe")) {
+    return ioFailure("media-vault-unsafe");
+  }
+  if (candidateStates[0]?.kind !== "file") {
+    return ioFailure("media-vault-unreadable");
+  }
+  if (candidateStates[2]?.kind === "file") {
+    return ioFailure("media-vault-recovery-failed");
+  }
+
+  const previousRendition = await readOwnedBinaryFile(renditionPath);
+  if (previousRendition.kind !== "bytes") {
+    return previousRendition.kind === "unsafe"
+      ? ioFailure("media-vault-unsafe")
+      : ioFailure("media-vault-unreadable");
+  }
+
+  const nextRecords = index.records.map((record) => {
+    return record.id === input.record.id ? input.record : record;
+  });
+  const nextIndex = serializeMediaJsonLines(nextRecords);
+  if (!decodeMediaJsonLines(nextIndex).ok) {
+    return invalidFailure("media-index-invalid");
+  }
+
+  if (
+    sameRecord(previous, input.record)
+    && sha256(previousRendition.value) === sha256(input.renditionBytes)
+  ) {
+    return { ok: true, record: input.record };
+  }
+
+  await writeAtomicFile(backupPath, previousRendition.value);
+  const marker = createEditMarker(
+    input,
+    previous,
+    index.source,
+    nextIndex,
+    previousRendition.value,
+  );
+
+  try {
+    await writeAtomicFile(
+      join(directory, EDIT_MARKER),
+      JSON.stringify(marker) + "\n",
+    );
+    await writeAtomicFile(renditionPath, input.renditionBytes);
+    await writeAtomicFile(
+      join(directory, INDEX_FILE),
+      nextIndex,
+      { backupPath: join(directory, INDEX_BACKUP) },
+    );
+    await removeDurableFile(join(directory, EDIT_MARKER));
+    return { ok: true, record: input.record };
+  } catch {
+    const recovered = await recoverInterruptedEdit(directory);
+    if (recovered === "committed") {
+      return { ok: true, record: input.record };
+    }
+    return recovered === "rolled-back" || recovered === "none"
+      ? ioFailure("media-vault-write-failed")
+      : ioFailure("media-vault-recovery-failed");
+  }
+}
+
 async function importMediaVaultAssetLocked(
   directory: string,
   input: MediaVaultImport,
@@ -290,7 +506,7 @@ async function importMediaVaultAssetLocked(
     return ioFailure("media-vault-unsafe");
   }
 
-  const recovery = await recoverInterruptedImport(directory);
+  const recovery = await recoverPendingVaultTransaction(directory);
   if (recovery === "failed") {
     return ioFailure("media-vault-recovery-failed");
   }
@@ -435,6 +651,114 @@ async function recoverConflict(
   return conflictFailure("media-asset-conflict");
 }
 
+async function recoverPendingVaultTransaction(
+  directory: string,
+): Promise<RecoveryOutcome> {
+  const [importMarker, editMarker] = await Promise.all([
+    fileState(join(directory, IMPORT_MARKER)),
+    fileState(join(directory, EDIT_MARKER)),
+  ]);
+  if (
+    importMarker.kind === "unsafe"
+    || editMarker.kind === "unsafe"
+    || (
+      importMarker.kind === "file"
+      && editMarker.kind === "file"
+    )
+  ) {
+    return "failed";
+  }
+  if (importMarker.kind === "file") {
+    return await recoverInterruptedImport(directory);
+  }
+  if (editMarker.kind === "file") {
+    return await recoverInterruptedEdit(directory);
+  }
+  return "none";
+}
+
+async function recoverInterruptedEdit(
+  directory: string,
+): Promise<RecoveryOutcome> {
+  const markerFile = await readOwnedTextFile(join(directory, EDIT_MARKER));
+  if (markerFile.kind === "missing") {
+    return "none";
+  }
+  if (markerFile.kind !== "text") {
+    return "failed";
+  }
+
+  const marker = decodeEditMarker(markerFile.value);
+  if (marker === undefined) {
+    return "failed";
+  }
+
+  const index = await readIndex(directory);
+  if (index.kind !== "records") {
+    return "failed";
+  }
+  const rendition = mediaRenditionPath(
+    marker.id,
+    marker.renditionFormat,
+  );
+  if (rendition === undefined) {
+    return "failed";
+  }
+  const renditionPath = join(directory, rendition);
+  const backupPath = renditionPath + ".bak";
+  const [current, backup] = await Promise.all([
+    readOwnedBinaryFile(renditionPath),
+    readOwnedBinaryFile(backupPath),
+  ]);
+  if (current.kind !== "bytes" || backup.kind !== "bytes") {
+    return "failed";
+  }
+
+  const currentIndexHash = sha256(index.source);
+  const currentRenditionHash = sha256(current.value);
+  const backupHash = sha256(backup.value);
+  const indexed = index.records.find((record) => record.id === marker.id);
+
+  if (currentIndexHash === marker.nextIndexSha256) {
+    if (
+      currentRenditionHash !== marker.nextRenditionSha256
+      || indexed === undefined
+      || !sameRecord(indexed, marker.nextRecord)
+    ) {
+      return "failed";
+    }
+    try {
+      await removeDurableFile(join(directory, EDIT_MARKER));
+      return "committed";
+    } catch {
+      return "failed";
+    }
+  }
+
+  if (
+    currentIndexHash !== marker.previousIndexSha256
+    || (
+      currentRenditionHash !== marker.previousRenditionSha256
+      && currentRenditionHash !== marker.nextRenditionSha256
+    )
+    || backupHash !== marker.previousRenditionSha256
+    || indexed === undefined
+    || !sameRecord(indexed, marker.previousRecord)
+  ) {
+    return "failed";
+  }
+
+  try {
+    if (currentRenditionHash === marker.nextRenditionSha256) {
+      await writeAtomicFile(renditionPath, backup.value);
+    }
+    await removeDurableFile(join(directory, EDIT_MARKER));
+    return "rolled-back";
+  } catch {
+    return "failed";
+  }
+}
+
 async function recoverInterruptedImport(
   directory: string,
 ): Promise<RecoveryOutcome> {
@@ -565,6 +889,90 @@ async function expectCreated(
   }
 }
 
+function createEditMarker(
+  input: MediaVaultUpdate,
+  previousRecord: MediaRecord,
+  previousIndex: string,
+  nextIndex: string,
+  previousRendition: Uint8Array,
+): EditMarker {
+  return {
+    version: 1,
+    id: input.record.id,
+    renditionFormat: input.renditionFormat,
+    previousRecord,
+    nextRecord: input.record,
+    previousIndexSha256: sha256(previousIndex),
+    nextIndexSha256: sha256(nextIndex),
+    previousRenditionSha256: sha256(previousRendition),
+    nextRenditionSha256: sha256(input.renditionBytes),
+  };
+}
+
+function decodeEditMarker(source: string): EditMarker | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    return undefined;
+  }
+  if (
+    typeof value !== "object"
+    || value === null
+    || Array.isArray(value)
+  ) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort().join(",");
+  if (
+    keys !== "id,nextIndexSha256,nextRecord,nextRenditionSha256,"
+      + "previousIndexSha256,previousRecord,previousRenditionSha256,"
+      + "renditionFormat,version"
+    || record["version"] !== 1
+    || typeof record["id"] !== "string"
+    || !isRenditionFormat(record["renditionFormat"])
+    || !isSha256(record["previousIndexSha256"])
+    || !isSha256(record["nextIndexSha256"])
+    || !isSha256(record["previousRenditionSha256"])
+    || !isSha256(record["nextRenditionSha256"])
+  ) {
+    return undefined;
+  }
+
+  const previousRecord = decodeMediaRecord(record["previousRecord"]);
+  const nextRecord = decodeMediaRecord(record["nextRecord"]);
+  if (!previousRecord.ok || !nextRecord.ok) {
+    return undefined;
+  }
+  const expectedPath = mediaRenditionPath(
+    record["id"],
+    record["renditionFormat"],
+  );
+  if (
+    expectedPath === undefined
+    || previousRecord.value.id !== record["id"]
+    || nextRecord.value.id !== record["id"]
+    || previousRecord.value.path !== expectedPath
+    || nextRecord.value.path !== expectedPath
+  ) {
+    return undefined;
+  }
+
+  return {
+    version: 1,
+    id: record["id"],
+    renditionFormat: record["renditionFormat"],
+    previousRecord: previousRecord.value,
+    nextRecord: nextRecord.value,
+    previousIndexSha256: record["previousIndexSha256"],
+    nextIndexSha256: record["nextIndexSha256"],
+    previousRenditionSha256: record["previousRenditionSha256"],
+    nextRenditionSha256: record["nextRenditionSha256"],
+  };
+}
+
 function createImportMarker(input: MediaVaultImport): ImportMarker {
   return {
     version: 1,
@@ -690,14 +1098,14 @@ function transactionPaths(
 async function readIndex(directory: string): Promise<IndexReadResult> {
   const source = await readOwnedTextFile(join(directory, INDEX_FILE));
   if (source.kind === "missing") {
-    return { kind: "records", records: [] };
+    return { kind: "records", records: [], source: "" };
   }
   if (source.kind === "unsafe" || source.kind === "unreadable") {
     return source;
   }
   const decoded = decodeMediaJsonLines(source.value);
   return decoded.ok
-    ? { kind: "records", records: decoded.value }
+    ? { kind: "records", records: decoded.value, source: source.value }
     : { kind: "invalid" };
 }
 
@@ -713,6 +1121,26 @@ async function readOwnedTextFile(path: string): Promise<
       return { kind: "unsafe" };
     }
     return { kind: "text", value: await readFile(path, "utf8") };
+  } catch (error: unknown) {
+    if (isMissingPathError(error)) {
+      return { kind: "missing" };
+    }
+    return { kind: "unreadable" };
+  }
+}
+
+async function readOwnedBinaryFile(path: string): Promise<
+  | { readonly kind: "bytes"; readonly value: Uint8Array }
+  | { readonly kind: "missing" }
+  | { readonly kind: "unsafe" }
+  | { readonly kind: "unreadable" }
+> {
+  try {
+    const metadata = await lstat(path);
+    if (metadata.isSymbolicLink() || !metadata.isFile()) {
+      return { kind: "unsafe" };
+    }
+    return { kind: "bytes", value: await readFile(path) };
   } catch (error: unknown) {
     if (isMissingPathError(error)) {
       return { kind: "missing" };
@@ -830,6 +1258,15 @@ function conflictFailure(code: MediaVaultConflictCode): {
   readonly code: MediaVaultConflictCode;
 } {
   return { ok: false, kind: "conflict", code };
+}
+
+function sha256(value: string | Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string"
+    && /^[0-9a-f]{64}$/u.test(value);
 }
 
 function isMissingPathError(error: unknown): boolean {
