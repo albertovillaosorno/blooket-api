@@ -33,6 +33,14 @@ export interface SharpInputOptions {
   readonly animated?: boolean;
   readonly failOn?: "warning";
   readonly limitInputPixels?: number | boolean;
+  readonly page?: number;
+  readonly pages?: number;
+  readonly raw?: {
+    readonly width: number;
+    readonly height: number;
+    readonly channels: 4;
+    readonly pageHeight?: number;
+  };
 }
 
 export interface SharpMetadata {
@@ -69,6 +77,7 @@ export interface SharpPipeline {
   metadata(): Promise<SharpMetadata>;
   raw(): SharpPipeline;
   rotate(): SharpPipeline;
+  toColourspace(colourspace: string): SharpPipeline;
   ensureAlpha(alpha?: number): SharpPipeline;
   extract(region: SharpRegion): SharpPipeline;
   resize(options: SharpResizeOptions): SharpPipeline;

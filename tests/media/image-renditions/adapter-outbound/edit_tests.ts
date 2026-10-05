@@ -60,6 +60,13 @@ const GIF_2_FRAME_1X1 = Buffer.from(
   "base64",
 );
 
+const GIF_2_FRAME_2X2 = Buffer.from(
+  "R0lGODlhAgACAIIAAExpcQD/AP8AAP///wAA/wAAAAAAAAAAACH/C05FVFNDQVBF"
+    + "Mi4wAwEBAAAh+QQFCAAAACwAAAAAAgACAAADAyhBkwAh+QQFDgAAACwAAAAAAg"
+    + "ACAIJMaXH//wAAAAAA////AP8AAAAAAAAAAAADAygxlAA7",
+  "base64",
+);
+
 const LIMITS = {
   maxInputPixels: 128,
   maxOutputPixels: 128,
@@ -298,16 +305,103 @@ test("one-pixel blur regions remain valid bounded operations", async () => {
   assert.equal(rendered.ok, true);
 });
 
-test("animated editor rendering fails before flattening frames", async () => {
+test("animated GIF edits preserve frame timing and loop state", async () => {
+  const rendered = await renderEditedImageRendition(
+    GIF_2_FRAME_2X2,
+    state({}, [{
+      id: "top-left",
+      mode: "redact",
+      x: 0,
+      y: 0,
+      width: 0.5,
+      height: 0.5,
+    }]),
+    { width: 2, height: 2 },
+    LIMITS,
+    { blurSigma: 1 },
+  );
+  assert.equal(rendered.ok, true);
+  if (!rendered.ok) {
+    return;
+  }
+
+  assert.deepEqual(
+    {
+      format: rendered.value.format,
+      mediaType: rendered.value.mediaType,
+      frameCount: rendered.value.frameCount,
+      animated: rendered.value.animated,
+    },
+    {
+      format: "gif",
+      mediaType: "image/gif",
+      frameCount: 2,
+      animated: true,
+    },
+  );
+
+  const sharp = await loadSharp();
+  const metadata = await sharp(
+    rendered.value.bytes,
+    { animated: true },
+  ).metadata();
+  assert.equal(metadata.pages, 2);
+  assert.equal(metadata.pageHeight, 2);
+  assert.deepEqual(metadata.delay, [80, 140]);
+  assert.equal(metadata.loop, 2);
+
+  const raw = await sharp(
+    rendered.value.bytes,
+    { animated: true },
+  )
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  const frameBytes = 2 * 2 * 4;
+  assert.deepEqual([...raw.slice(0, 4)], [0, 0, 0, 255]);
+  assert.deepEqual(
+    [...raw.slice(frameBytes, frameBytes + 4)],
+    [0, 0, 0, 255],
+  );
+  assert.notDeepEqual(
+    [...raw.slice(0, frameBytes)],
+    [...raw.slice(frameBytes)],
+  );
+});
+
+test("animated GIF edits preserve duplicate frames", async () => {
+  const rendered = await renderEditedImageRendition(
+    GIF_2_FRAME_1X1,
+    state(),
+    { width: 1, height: 1 },
+    LIMITS,
+    { blurSigma: 1 },
+  );
+  assert.equal(rendered.ok, true);
+  if (!rendered.ok) {
+    return;
+  }
+
+  const sharp = await loadSharp();
+  const metadata = await sharp(
+    rendered.value.bytes,
+    { animated: true },
+  ).metadata();
+  assert.equal(metadata.pages, 2);
+  assert.deepEqual(metadata.delay, [100, 100]);
+  assert.equal(metadata.loop, 1);
+});
+
+test("animated output pixel limits count every frame", async () => {
   assert.deepEqual(
     await renderEditedImageRendition(
-      GIF_2_FRAME_1X1,
+      GIF_2_FRAME_2X2,
       state(),
       { width: 2, height: 2 },
-      LIMITS,
+      { ...LIMITS, maxOutputPixels: 7 },
       { blurSigma: 1 },
     ),
-    { ok: false, code: "editor-animation-unsupported" },
+    { ok: false, code: "rendition-pixel-limit-exceeded" },
   );
 });
 

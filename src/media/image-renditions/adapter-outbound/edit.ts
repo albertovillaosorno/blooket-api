@@ -9,23 +9,23 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Bounded static PNG rendering from immutable media-editor state.
+//   - Bounded static PNG and animated GIF rendering from media-editor state.
 // - Must-Not:
-//   - Mutate originals, invent product limits, or flatten animated sources.
+//   - Mutate originals, invent product limits, or collapse animation timing.
 // - Allows:
 //   - Inputs: Source bytes, editor state, canvas, limits, and blur strength.
 //   - Outputs: Edited PNG bytes or stable fail-closed rendering failures.
 //   - Side effects: Native Sharp decode, transform, and encode work.
 // - Split-When:
-//   - Animated editor rendering gains independently reviewed semantics.
+//   - Another animated output format requires different frame semantics.
 // - Merge-When:
 //   - Base and edited rendition pipelines can share all transformation rules.
 // - Summary:
-//   - Applies pan, zoom, contrast, saturation, blur, and redaction to statics.
+//   - Applies editor transforms to static images and each GIF frame.
 // - Description:
 //   - Source cropping precedes resize so extreme zoom stays canvas-bounded.
 // - Usage:
-//   - Render edited static media before transactional rendition replacement.
+//   - Render edited media before transactional rendition replacement.
 // - Defaults:
 //   - Redaction is opaque black; blur sigma is always caller-supplied.
 //
@@ -86,17 +86,6 @@ export async function renderEditedImageRendition(
     return { ok: false, code: "invalid-editor-rendition" };
   }
 
-  if (
-    exceedsPixelLimit(
-      canvas.width,
-      canvas.height,
-      1,
-      limits.maxOutputPixels,
-    )
-  ) {
-    return { ok: false, code: "rendition-pixel-limit-exceeded" };
-  }
-
   const decoded = await decodeSourceImage(source, limits.maxInputPixels);
   if (!decoded.ok) {
     return {
@@ -105,49 +94,47 @@ export async function renderEditedImageRendition(
       sourceCode: decoded.code,
     };
   }
-  if (decoded.value.animated) {
+  if (
+    exceedsPixelLimit(
+      canvas.width,
+      canvas.height,
+      decoded.value.frameCount,
+      limits.maxOutputPixels,
+    )
+  ) {
+    return { ok: false, code: "rendition-pixel-limit-exceeded" };
+  }
+  if (
+    decoded.value.animated
+    && decoded.value.format.format !== "gif"
+  ) {
     return { ok: false, code: "editor-animation-unsupported" };
   }
 
   try {
-    const adjusted = await adjustSource(
-      source,
-      state,
-      limits.maxInputPixels,
-    );
-    const adjustedDecoded = await decodeSourceImage(
-      adjusted,
-      limits.maxInputPixels,
-    );
-    if (!adjustedDecoded.ok || adjustedDecoded.value.animated) {
-      return { ok: false, code: "rendition-failed" };
-    }
-
-    const sample = resolveForegroundRasterSample(
-      {
-        width: adjustedDecoded.value.frameWidth,
-        height: adjustedDecoded.value.frameHeight,
-      },
-      canvas,
-      state.transform,
-    );
-    if (!sample.ok) {
-      return { ok: false, code: "invalid-editor-rendition" };
-    }
-
-    let rendered = await renderStaticBase(
-      adjusted,
-      canvas,
-      limits,
-      sample.value,
-    );
-    rendered = await applyRegions(
-      rendered,
-      state.regions,
-      canvas,
-      limits.maxOutputPixels,
-      options.blurSigma,
-    );
+    const animated = decoded.value.animated;
+    const rendered = animated
+      ? await renderAnimatedGif(
+        source,
+        state,
+        canvas,
+        limits,
+        options.blurSigma,
+        {
+          frameCount: decoded.value.frameCount,
+          frameDelaysMs: decoded.value.frameDelaysMs,
+          ...(decoded.value.loopCount === undefined
+            ? {}
+            : { loopCount: decoded.value.loopCount }),
+        },
+      )
+      : await renderFrame(
+        source,
+        state,
+        canvas,
+        limits,
+        options.blurSigma,
+      );
 
     if (rendered.byteLength > limits.maxOutputBytes) {
       return { ok: false, code: "rendition-byte-limit-exceeded" };
@@ -157,12 +144,12 @@ export async function renderEditedImageRendition(
       ok: true,
       value: {
         bytes: rendered,
-        format: "png",
-        mediaType: "image/png",
+        format: animated ? "gif" : "png",
+        mediaType: animated ? "image/gif" : "image/png",
         width: canvas.width,
         height: canvas.height,
-        frameCount: 1,
-        animated: false,
+        frameCount: decoded.value.frameCount,
+        animated,
       },
     };
   } catch {
@@ -170,21 +157,169 @@ export async function renderEditedImageRendition(
   }
 }
 
+async function renderFrame(
+  source: Uint8Array,
+  state: MediaEditorState,
+  canvas: RenditionCanvas,
+  limits: RenditionLimits,
+  blurSigma: number,
+  page?: number,
+): Promise<Uint8Array> {
+  const adjusted = await adjustSource(
+    source,
+    state,
+    limits.maxInputPixels,
+    page,
+  );
+  const adjustedDecoded = await decodeSourceImage(
+    adjusted,
+    limits.maxInputPixels,
+  );
+  if (!adjustedDecoded.ok || adjustedDecoded.value.animated) {
+    throw new Error("Expected one decoded editor frame.");
+  }
+
+  const sample = resolveForegroundRasterSample(
+    {
+      width: adjustedDecoded.value.frameWidth,
+      height: adjustedDecoded.value.frameHeight,
+    },
+    canvas,
+    state.transform,
+  );
+  if (!sample.ok) {
+    throw new Error("Invalid editor frame layout.");
+  }
+
+  const base = await renderStaticBase(
+    adjusted,
+    canvas,
+    limits,
+    sample.value,
+  );
+  return await applyRegions(
+    base,
+    state.regions,
+    canvas,
+    limits.maxOutputPixels,
+    blurSigma,
+  );
+}
+
+async function renderAnimatedGif(
+  source: Uint8Array,
+  state: MediaEditorState,
+  canvas: RenditionCanvas,
+  limits: RenditionLimits,
+  blurSigma: number,
+  decoded: {
+    readonly frameCount: number;
+    readonly frameDelaysMs: readonly number[];
+    readonly loopCount?: number;
+  },
+): Promise<Uint8Array> {
+  const rawFrames: Uint8Array[] = [];
+  for (let page = 0; page < decoded.frameCount; page += 1) {
+    const rendered = await renderFrame(
+      source,
+      state,
+      canvas,
+      limits,
+      blurSigma,
+      page,
+    );
+    rawFrames.push(
+      await renderedFrameToRgba(
+        rendered,
+        canvas,
+        limits.maxOutputPixels,
+      ),
+    );
+  }
+
+  const sharp = await loadSharp();
+  return await sharp(
+    concatenate(rawFrames),
+    {
+      failOn: "warning",
+      limitInputPixels: limits.maxOutputPixels,
+      raw: {
+        width: canvas.width,
+        height: canvas.height * decoded.frameCount,
+        channels: 4,
+        pageHeight: canvas.height,
+      },
+    },
+  )
+    .gif({
+      loop: decoded.loopCount ?? 0,
+      delay: decoded.frameDelaysMs,
+      keepDuplicateFrames: true,
+    })
+    .toBuffer();
+}
+
+async function renderedFrameToRgba(
+  frame: Uint8Array,
+  canvas: RenditionCanvas,
+  maxOutputPixels: number,
+): Promise<Uint8Array> {
+  const sharp = await loadSharp();
+  const raw = await sharp(frame, {
+    failOn: "warning",
+    limitInputPixels: maxOutputPixels,
+  })
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  const expected = canvas.width * canvas.height * 4;
+  if (raw.byteLength !== expected) {
+    throw new Error("Rendered editor frame has unexpected raw dimensions.");
+  }
+  return raw;
+}
+
+function concatenate(frames: readonly Uint8Array[]): Uint8Array {
+  const byteLength = frames.reduce(
+    (total, frame) => total + frame.byteLength,
+    0,
+  );
+  const output = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const frame of frames) {
+    output.set(frame, offset);
+    offset += frame.byteLength;
+  }
+  return output;
+}
+
 async function adjustSource(
   source: Uint8Array,
   state: MediaEditorState,
   maxInputPixels: number,
+  page?: number,
 ): Promise<Uint8Array> {
   const sharp = await loadSharp();
   const contrast = state.transform.contrast;
   const offset = 128 * (1 - contrast);
 
-  return await sharp(source, {
+  const normalized = await sharp(source, {
+    failOn: "warning",
+    limitInputPixels: maxInputPixels,
+    ...(page === undefined
+      ? {}
+      : { page, pages: 1 }),
+  })
+    .rotate()
+    .toColourspace("srgb")
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+
+  return await sharp(normalized, {
     failOn: "warning",
     limitInputPixels: maxInputPixels,
   })
-    .rotate()
-    .ensureAlpha()
     .linear(
       [contrast, contrast, contrast, 1],
       [offset, offset, offset, 0],
