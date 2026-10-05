@@ -14,11 +14,6 @@ atomic-replace rules needed to guarantee interruption-safe local state.
 
 ## P1 — Projects, settings, security, and media
 
-### TODO - Implement project persistence
-
-Implement versioned `project.json` loading, validation, migration boundaries,
-stable question identities, media requests, and media references.
-
 ### TODO - Implement media import and rendition pipeline
 
 Accept paste, drag-and-drop, files, and browser-extension intake; preserve

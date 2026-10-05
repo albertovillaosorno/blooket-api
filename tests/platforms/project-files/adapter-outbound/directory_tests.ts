@@ -257,6 +257,30 @@ test("recovery fails closed when a required backup is missing", async () => {
   });
 });
 
+test(
+  "unsupported project versions fail at the migration boundary",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await writeFile(
+      join(directory, "project.json"),
+      `${JSON.stringify({ ...firstProject, schemaVersion: 2 })}\n`,
+    );
+    await writeFile(
+      join(directory, "media.jsonl"),
+      `${JSON.stringify(firstMedia)}\n`,
+    );
+
+    const loaded = await loadProjectDirectory(directory);
+
+    assert.equal(loaded.ok, false);
+    if (!loaded.ok && loaded.kind === "invalid") {
+      assert.equal(loaded.issues[0]?.path, "$.project.schemaVersion");
+      assert.equal(loaded.issues[0]?.code, "unsupported-version");
+    }
+    });
+  },
+);
+
 test("symbolic project files are refused instead of followed", async () => {
   await withTemporaryDirectory(async (directory) => {
     const outside = join(directory, "outside.json");
