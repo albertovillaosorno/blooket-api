@@ -21,7 +21,7 @@
 // - Merge-When:
 //   - Local persistence no longer uses explicit writer locks.
 // - Summary:
-//   - Verifies live exclusion, stale recovery, and unsafe lock refusal.
+//   - Verifies exclusion, serialized stale recovery, and unsafe refusal.
 // - Description:
 //   - Exercises the POSIX hard-link lock protocol on the development host.
 // - Usage:
@@ -91,6 +91,58 @@ test("dead PID locks are reclaimed before acquisition", async () => {
     if (acquired.ok) {
       await acquired.lock.release();
     }
+  });
+});
+
+test("concurrent dead-lock reclaim elects only one writer", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "project.lock");
+    await writeFile(
+      path,
+      '{"version":1,"pid":2147483647,"token":"stale"}\n',
+      { mode: 0o600 },
+    );
+
+    const results = await Promise.all([
+      tryAcquireFileLock(path),
+      tryAcquireFileLock(path),
+    ]);
+    const acquired = results.filter((result) => result.ok);
+    const refused = results.filter((result) => !result.ok);
+
+    assert.equal(acquired.length, 1);
+    assert.equal(refused.length, 1);
+    assert.equal(refused[0]?.ok, false);
+    if (refused[0] !== undefined && !refused[0].ok) {
+      assert.equal(refused[0].reason, "busy");
+    }
+    if (acquired[0]?.ok) {
+      await acquired[0].lock.release();
+    }
+    assert.deepEqual(await readdir(directory), []);
+  });
+});
+
+test("an existing recovery guard prevents stale lock removal", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "project.lock");
+    const stale = '{"version":1,"pid":2147483647,"token":"stale"}\n';
+    await writeFile(path, stale, { mode: 0o600 });
+    await writeFile(
+      path + ".reclaim",
+      JSON.stringify({
+        version: 1,
+        pid: process.pid,
+        token: "active-reclaimer",
+      }) + "\n",
+      { mode: 0o600 },
+    );
+
+    assert.deepEqual(await tryAcquireFileLock(path), {
+      ok: false,
+      reason: "busy",
+    });
+    assert.equal(await readFile(path, "utf8"), stale);
   });
 });
 

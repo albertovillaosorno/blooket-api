@@ -15,7 +15,7 @@
 // - Allows:
 //   - Inputs: Trusted lock-file paths selected by persistence adapters.
 //   - Outputs: An acquired lock handle or a stable refusal reason.
-//   - Side effects: Same-directory owner files, hard links, and cleanup.
+//   - Side effects: Owner files, hard links, recovery guards, and cleanup.
 // - Split-When:
 //   - Windows support requires a different native locking strategy.
 // - Merge-When:
@@ -23,11 +23,11 @@
 // - Summary:
 //   - Serializes local persistence writers without third-party dependencies.
 // - Description:
-//   - Publishes complete owner metadata atomically and reclaims dead PID locks.
+//   - Publishes owner metadata atomically and serializes dead-lock recovery.
 // - Usage:
 //   - Hold one aggregate lock around recovery, snapshot, and replacement.
 // - Defaults:
-//   - Unknown or unverifiable lock owners fail closed as busy or unsafe.
+//   - Unknown owners and occupied recovery guards fail closed.
 //
 import { randomUUID } from "node:crypto";
 import {
@@ -72,6 +72,7 @@ export async function tryAcquireFileLock(
     directory,
     "." + basename(lockPath) + "." + token + ".owner.tmp",
   );
+  const reclaimPath = lockPath + ".reclaim";
 
   try {
     await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -104,12 +105,14 @@ export async function tryAcquireFileLock(
         return { ok: false, reason: "busy" };
       }
 
-      try {
-        await rm(lockPath);
-      } catch (error: unknown) {
-        if (!isCode(error, "ENOENT")) {
-          return { ok: false, reason: "io" };
-        }
+      const reclaimed = await reclaimDeadLock(
+        lockPath,
+        reclaimPath,
+        ownerPath,
+        owner,
+      );
+      if (reclaimed !== "retry") {
+        return { ok: false, reason: reclaimed };
       }
     }
 
@@ -119,6 +122,56 @@ export async function tryAcquireFileLock(
   } finally {
     await rm(ownerPath, { force: true }).catch(() => undefined);
   }
+}
+
+async function reclaimDeadLock(
+  lockPath: string,
+  reclaimPath: string,
+  ownerPath: string,
+  owner: LockOwner,
+): Promise<"retry" | "busy" | "unsafe" | "io"> {
+  try {
+    await link(ownerPath, reclaimPath);
+  } catch (error: unknown) {
+    if (!isCode(error, "EEXIST")) {
+      return "io";
+    }
+
+    const guard = await readLockOwner(reclaimPath);
+    if (guard.kind === "unsafe") {
+      return "unsafe";
+    }
+    if (guard.kind === "unreadable") {
+      return "io";
+    }
+    return "busy";
+  }
+
+  let result: "retry" | "busy" | "unsafe" | "io";
+  try {
+    const current = await readLockOwner(lockPath);
+    if (current.kind === "missing") {
+      result = "retry";
+    } else if (current.kind === "unsafe") {
+      result = "unsafe";
+    } else if (current.kind === "unreadable") {
+      result = "io";
+    } else if (isProcessAlive(current.owner.pid)) {
+      result = "busy";
+    } else {
+      await rm(lockPath);
+      result = "retry";
+    }
+  } catch {
+    result = "io";
+  }
+
+  try {
+    await removeOwnedLockPath(reclaimPath, owner);
+  } catch {
+    return "io";
+  }
+  return result;
 }
 
 async function writeOwnerFile(
@@ -143,23 +196,29 @@ function createFileLock(lockPath: string, owner: LockOwner): FileLock {
         return;
       }
 
-      const current = await readLockOwner(lockPath);
-      if (current.kind === "missing") {
-        released = true;
-        return;
-      }
-      if (
-        current.kind !== "owner"
-        || current.owner.pid !== owner.pid
-        || current.owner.token !== owner.token
-      ) {
-        throw new Error("Refusing to release a lock owned by another writer.");
-      }
-
-      await rm(lockPath);
+      await removeOwnedLockPath(lockPath, owner);
       released = true;
     },
   };
+}
+
+async function removeOwnedLockPath(
+  path: string,
+  owner: LockOwner,
+): Promise<void> {
+  const current = await readLockOwner(path);
+  if (current.kind === "missing") {
+    return;
+  }
+  if (
+    current.kind !== "owner"
+    || current.owner.pid !== owner.pid
+    || current.owner.token !== owner.token
+  ) {
+    throw new Error("Refusing to remove a lock owned by another writer.");
+  }
+
+  await rm(path);
 }
 
 async function readLockOwner(path: string): Promise<

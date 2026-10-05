@@ -52,9 +52,15 @@ The POSIX lock adapter publishes complete owner metadata with a same-directory
 hard link. A visible lock therefore never depends on a partially written owner
 record. A lock owned by a live PID is never stolen.
 
-A recorded PID that is definitely absent may be reclaimed. Malformed,
-symbolic, otherwise unverifiable locks fail closed. PID reuse can cause a false
-result, which is safer than stealing another writer's lock.
+A recorded PID that is definitely absent may be reclaimed. Dead-lock
+reclamation is serialized through a sibling recovery guard so two reclaimers
+cannot remove each other's newly acquired lock. An existing, malformed,
+symbolic, or otherwise unverifiable recovery guard fails closed rather than
+being recursively reclaimed.
+
+Malformed, symbolic, or otherwise unverifiable primary locks also fail closed.
+PID reuse can cause a false busy result, which is safer than stealing another
+writer's lock.
 
 Project replacement is a recoverable multi-file transaction. Before publishing
 a marker, any existing valid `project.json` and `media.jsonl` are snapshotted
