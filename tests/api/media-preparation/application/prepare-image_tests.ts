@@ -41,6 +41,19 @@ const PNG_2X1 = Buffer.from(
   "base64",
 );
 
+const GIF_2_FRAME_1X1 = Buffer.from(
+  "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwALAAAAAABAAEAAAIBTAA7",
+  "base64",
+);
+
+const ANIMATED_WEBP_2_FRAME_1X1 = Buffer.from(
+  "UklGRpQAAABXRUJQVlA4WAoAAAACAAAAAAAAAAAAQU5JTQYAAAD/////AQBBTk1G"
+    + "MAAAAAAAAAAAAAAAAAAAAGQAAAJWUDggGAAAADABAJ0BKgEAAQABQCYlpAADcAD+"
+    + "/PQAAEFOTUYwAAAAAAAAAAAAAAAAAAAAeAAAAFZQOCAYAAAANAEAnQEqAQABAAAA"
+    + "JiWkAANwAP79NmgA",
+  "base64",
+);
+
 const LIMITS = {
   maxInputPixels: 16,
   maxOutputPixels: 64,
@@ -64,6 +77,41 @@ test(
       assert.equal(result.value.rendition.height, 4);
       assert.equal(result.value.rendition.format, "png");
     }
+  },
+);
+
+test("shared intake preserves animated GIF rendition facts", async () => {
+  const result = await prepareImage({
+    bytes: GIF_2_FRAME_1X1,
+    maxSourceBytes: GIF_2_FRAME_1X1.byteLength,
+    canvas: { width: 2, height: 2 },
+    renditionLimits: LIMITS,
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.source.format.format, "gif");
+    assert.equal(result.value.rendition.format, "gif");
+    assert.equal(result.value.rendition.animated, true);
+    assert.equal(result.value.rendition.frameCount, 2);
+  }
+});
+
+test(
+  "animated WebP reaches rendition policy after source admission",
+  async () => {
+    assert.deepEqual(
+      await prepareImage({
+        bytes: ANIMATED_WEBP_2_FRAME_1X1,
+        maxSourceBytes: ANIMATED_WEBP_2_FRAME_1X1.byteLength,
+        canvas: { width: 2, height: 2 },
+        renditionLimits: LIMITS,
+      }),
+      {
+        ok: false,
+        stage: "rendition",
+        code: "animated-rendition-unsupported",
+      },
+    );
   },
 );
 
