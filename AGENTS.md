@@ -35,6 +35,9 @@ Before product changes:
 
 Do not commit, push, tag, publish, or create releases unless the human
 explicitly asks for that action. Validation does not imply permission to commit.
+When commits are authorized, every commit must use DCO signoff
+(`git commit -s`).
+Jig requires the `Signed-off-by` trailer and the hook must never be bypassed.
 
 ## Architecture rules
 

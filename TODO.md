@@ -7,12 +7,6 @@ horizon.
 
 ## P0 — Repository and contracts
 
-### TODO - Complete Jig onboarding and repository policy
-
-Finish the repository-specific Jig policy, install the required local
-integrations, and make the baseline validation gate exhaustive before product
-commits are permitted.
-
 ### TODO - Freeze dependency direction
 
 Document and test the allowed package graph: MCP executes CLI; CLI and localhost

@@ -116,7 +116,11 @@ contract is intentionally versioned from the first byte:
 {
   "schemaVersion": 1,
   "title": "Lesson 5",
+  "description": "Vocabulary review for lesson 5.",
   "quizLanguage": "English",
+  "visibility": "private",
+  "mediaIndex": "media.jsonl",
+  "coverImage": null,
   "questions": []
 }
 ```
@@ -133,8 +137,8 @@ can be represented in a simple JSON Lines index so an agent can inspect many
 assets cheaply:
 
 ```jsonl
-{"id":"sun","path":"sun.jpg","description":"A yellow sun.","english":false}
-{"id":"horse","path":"horse.jpg","description":"A brown horse.","english":false}
+{"id":"sun","path":"media/sun.jpg","description":"A sun.","english":false}
+{"id":"horse","path":"media/horse.jpg","description":"A horse.","english":false}
 ```
 
 The canonical `description` is English even when the teacher, source page, file
