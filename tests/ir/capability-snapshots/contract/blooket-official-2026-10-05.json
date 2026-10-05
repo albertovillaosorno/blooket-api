@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "verifiedOn": "2026-10-05",
+  "evidence": [
+    {
+      "kind": "official-doc",
+      "reference": "Blooket Question Types Explained (retrieved 2026-10-05)"
+    },
+    {
+      "kind": "official-doc",
+      "reference": "Blooket How to Create a Question Set (retrieved 2026-10-05)"
+    }
+  ],
+  "questionTypes": {
+    "multipleChoice": {
+      "availability": "supported",
+      "minAnswers": 2,
+      "maxAnswers": 4,
+      "requiresQuestionText": true,
+      "allowsMultipleCorrect": true
+    },
+    "typingAnswer": {
+      "availability": "supported",
+      "matchModes": [
+        "exact",
+        "contains"
+      ]
+    }
+  },
+  "features": {
+    "questionImages": "supported",
+    "answerImages": "account-dependent",
+    "audio": "account-dependent"
+  },
+  "setMetadata": {
+    "titleRequired": null,
+    "descriptionRequired": null,
+    "coverImageOptional": true,
+    "visibility": [
+      "public",
+      "private"
+    ]
+  },
+  "upload": {
+    "maxBytes": null,
+    "canvasWidth": null,
+    "canvasHeight": null,
+    "maxPixels": null
+  }
+}

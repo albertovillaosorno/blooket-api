@@ -30,6 +30,7 @@
 //   - Unknown upload limits remain null.
 //
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -78,6 +79,28 @@ const verified = {
     maxPixels: null,
   },
 } as const;
+
+test("official fixture preserves unknown upload limits", async () => {
+  const fixtureUrl = new URL(
+    "./blooket-official-2026-10-05.json",
+    import.meta.url,
+  );
+  const source = await readFile(fixtureUrl, "utf8");
+  const result = decodeBlooketCapabilitySnapshot(JSON.parse(source));
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.verifiedOn, "2026-10-05");
+    assert.equal(result.value.features.questionImages, "supported");
+    assert.equal(result.value.features.answerImages, "account-dependent");
+    assert.deepEqual(result.value.upload, {
+      maxBytes: null,
+      canvasWidth: null,
+      canvasHeight: null,
+      maxPixels: null,
+    });
+  }
+});
 
 test("version-one upload capabilities migrate unknown image limits", () => {
   const legacy = {
