@@ -7,13 +7,11 @@ horizon.
 
 ## P1 — Projects, settings, security, and media
 
-### TODO - Complete media intake and durable vault publication
+### TODO - Wire media intake surfaces and verified limits
 
-Wire paste, drag-and-drop, file, and browser-extension intake into the shared
-image-preparation operation. Publish immutable originals and bounded renditions
-transactionally with vault metadata, stable conflict handling, and recovery.
-Bind canvas, pixel, and upload-byte limits from verified capability data rather
-than hard-coding unverified Blooket values.
+Connect paste, drag-and-drop, file, and browser-extension intake to the shared
+durable image-import operation. Bind canvas, pixel, and upload-byte limits from
+verified capability data rather than hard-coding unverified Blooket values.
 
 ### TODO - Implement media editor operations
 

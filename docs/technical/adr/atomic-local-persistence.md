@@ -44,9 +44,9 @@ completed commit because the marker could reappear after a crash.
 Writers serialize at the smallest aggregate that must remain coherent. Settings
 use a lock adjacent to the settings file. A lesson project uses one lock for the
 whole directory because `project.json`, `media.jsonl`, their backups, and the
-transaction marker form one persistence aggregate. Media-vault implementation
-must use one vault-level metadata lock for index mutations and narrower
-per-asset locks only when an operation cannot change shared metadata.
+transaction marker form one persistence aggregate. The media vault uses one
+vault-level metadata lock for index mutations; a future operation may use a
+narrower per-asset lock only when it cannot change shared metadata.
 
 The POSIX lock adapter publishes complete owner metadata with a same-directory
 hard link. A visible lock therefore never depends on a partially written owner
@@ -78,13 +78,27 @@ are recovery material, not history; version history belongs in a different
 future capability.
 
 Media-vault originals are immutable after a stable media identity is committed.
-Import first writes and flushes a same-directory temporary original, validates
-the decoded media before publication, and then atomically publishes the stable
-asset path. Renditions may be replaced through the atomic-file primitive.
+An import derives `originals/<id>.<source>` and `media/<id>.<rendition>` from
+validated identity and formats; callers never select those relative paths.
 
-Shared vault metadata is published only after every referenced asset required
-by that metadata is durable. Failed imports must leave no metadata reference to
-a missing or partial asset.
+The vault writes transaction-specific staging files in each asset directory and
+durably hard-links them to the final no-clobber paths. Staging links remain
+until `media.jsonl` is atomically replaced, making the metadata replacement the
+commit point. The index retains one previous-value `media.jsonl.bak`.
+
+A strict marker records only validated metadata, formats, and a transaction
+UUID.
+If an interrupted import has no committed metadata, recovery removes a final
+asset only when its staging path still proves the same filesystem device and
+inode. A different inode is preserved, and a final file without sufficient
+ownership evidence fails recovery closed. If exact metadata is already present,
+both final assets must exist before recovery removes staging links and the
+marker.
+
+Shared vault metadata is therefore published only after every referenced asset
+required by that metadata is durable. Failed imports leave no metadata reference
+to a missing or partial asset, and recovery never guesses ownership from a path
+name alone.
 
 Temporary names, lock names, transaction markers, and backup names are
 repository-owned implementation details. Product decoders never interpret them

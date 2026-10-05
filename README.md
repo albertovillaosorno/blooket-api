@@ -137,8 +137,8 @@ can be represented in a simple JSON Lines index so an agent can inspect many
 assets cheaply:
 
 ```jsonl
-{"id":"sun","path":"media/sun.jpg","description":"A sun.","english":false}
-{"id":"horse","path":"media/horse.jpg","description":"A horse.","english":false}
+{"id":"sun","path":"media/sun.png","description":"A sun.","english":false}
+{"id":"horse","path":"media/horse.png","description":"A horse.","english":false}
 ```
 
 The canonical `description` is English even when the teacher, source page, file
@@ -149,7 +149,9 @@ verification.
 
 Origin URLs are not required metadata. The durable minimum is stable identity,
 local path, canonical English description, and the verification state of that
-description.
+description. Immutable source bytes live separately under
+`originals/<id>.<source-extension>`; the searchable record points at the
+prepared rendition under `media/<id>.<rendition-extension>`.
 
 A question may contain an unresolved image request before a concrete asset has
 been selected:
