@@ -57,11 +57,14 @@ import {
   "../../../../src/platforms/media-vault-files/adapter-outbound/directory.ts";
 import { tryAcquireFileLock } from
   "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
+import { serializeMediaJsonLines } from
+  "../../../../src/media/media-index/domain/json-lines.ts";
 
 const TOKEN = "12345678-1234-4234-8234-123456789abc";
 const firstRecord = {
   id: "sun",
   path: "media/sun.png",
+  name: "sun",
   description: "A bright yellow sun.",
   english: true,
 } as const;
@@ -88,6 +91,7 @@ const firstUpdate: MediaVaultUpdate = {
 const secondRecord = {
   id: "horse",
   path: "media/horse.png",
+  name: "horse",
   description: "A brown horse.",
   english: false,
 } as const;
@@ -142,7 +146,7 @@ test("imports publish assets before canonical metadata", async () => {
     );
     assert.equal(
       await readFile(join(directory, "media.jsonl"), "utf8"),
-      JSON.stringify(firstRecord) + "\n",
+      serializeMediaJsonLines([firstRecord]),
     );
     assert.equal(
       (await lstat(join(directory, "originals", "sun.jpg"))).mode & 0o777,
@@ -255,6 +259,62 @@ test("original loading rejects ambiguous or unsafe source paths", async () => {
   });
 });
 
+test("legacy vault loads migrate names without rewriting", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const legacy = {
+      id: "sun",
+      path: "media/sun.png",
+      description: "A bright yellow sun.",
+      english: true,
+    };
+    const legacyJsonl = JSON.stringify(legacy) + "\n";
+    await mkdir(join(directory, "media"));
+    await mkdir(join(directory, "originals"));
+    await writeFile(join(directory, "media.jsonl"), legacyJsonl);
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: true,
+      records: [{
+        ...legacy,
+        name: "sun",
+      }],
+    });
+    assert.equal(
+      await readFile(join(directory, "media.jsonl"), "utf8"),
+      legacyJsonl,
+    );
+  });
+});
+
+test("name-only updates keep stable media identity", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    const renamed = {
+      ...firstRecord,
+      name: "Bright Sun",
+    };
+
+    assert.deepEqual(
+      await updateMediaVaultAsset(directory, {
+        expectedRecord: firstRecord,
+        expectedRenditionSha256: sha256(firstImport.renditionBytes),
+        record: renamed,
+        renditionFormat: "png",
+        renditionBytes: firstImport.renditionBytes,
+      }),
+      { ok: true, record: renamed },
+    );
+    assert.equal(
+      await readFile(join(directory, "media.jsonl"), "utf8"),
+      serializeMediaJsonLines([renamed]),
+    );
+    assert.deepEqual(
+      await readFile(join(directory, "originals", "sun.jpg")),
+      Buffer.from(firstImport.originalBytes),
+    );
+  });
+});
+
 test("edits replace rendition and metadata, not originals", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importMediaVaultAsset(directory, firstImport);
@@ -280,11 +340,11 @@ test("edits replace rendition and metadata, not originals", async () => {
     );
     assert.equal(
       await readFile(join(directory, "media.jsonl"), "utf8"),
-      JSON.stringify(updatedFirstRecord) + "\n",
+      serializeMediaJsonLines([updatedFirstRecord]),
     );
     assert.equal(
       await readFile(join(directory, "media.jsonl.bak"), "utf8"),
-      JSON.stringify(firstRecord) + "\n",
+      serializeMediaJsonLines([firstRecord]),
     );
     assert.equal(
       await pathExists(join(directory, ".blooket-api-media-edit.json")),
@@ -376,7 +436,7 @@ test("stale edit preconditions prevent lost updates", async () => {
     );
     assert.equal(
       await readFile(join(directory, "media.jsonl"), "utf8"),
-      JSON.stringify(updatedFirstRecord) + "\n",
+      serializeMediaJsonLines([updatedFirstRecord]),
     );
     assert.deepEqual(
       await readFile(join(directory, "media", "sun.png")),
@@ -503,14 +563,14 @@ test("later imports retain one previous canonical index backup", async () => {
 
     assert.equal(
       await readFile(join(directory, "media.jsonl.bak"), "utf8"),
-      JSON.stringify(firstRecord) + "\n",
+      serializeMediaJsonLines([firstRecord]),
     );
     assert.equal(
       await readFile(join(directory, "media.jsonl"), "utf8"),
-      JSON.stringify(firstRecord)
-        + "\n"
-        + JSON.stringify(secondRecord)
-        + "\n",
+      serializeMediaJsonLines([
+        firstRecord,
+        secondRecord,
+      ]),
     );
   });
 });
@@ -657,7 +717,7 @@ test("committed metadata with missing assets fails recovery", async () => {
     await writeMarker(directory);
     await writeFile(
       join(directory, "media.jsonl"),
-      JSON.stringify(firstRecord) + "\n",
+      serializeMediaJsonLines([firstRecord]),
     );
 
     assert.deepEqual(await loadMediaVault(directory), {
@@ -751,8 +811,8 @@ async function createInterruptedEdit(
   directory: string,
   committed: boolean,
 ): Promise<void> {
-  const previousIndex = JSON.stringify(firstRecord) + "\n";
-  const nextIndex = JSON.stringify(updatedFirstRecord) + "\n";
+  const previousIndex = serializeMediaJsonLines([firstRecord]);
+  const nextIndex = serializeMediaJsonLines([updatedFirstRecord]);
   const previousRendition = Buffer.from(firstImport.renditionBytes);
   const nextRendition = Buffer.from(firstUpdate.renditionBytes);
   const marker = {
@@ -856,7 +916,7 @@ async function createInterruptedFixture(
   if (committed) {
     await writeFile(
       join(directory, "media.jsonl"),
-      JSON.stringify(firstRecord) + "\n",
+      serializeMediaJsonLines([firstRecord]),
     );
   }
 

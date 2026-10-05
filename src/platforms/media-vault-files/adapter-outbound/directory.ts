@@ -193,8 +193,9 @@ export type MediaVaultUpdateResult =
     };
 
 interface ImportMarker {
-  readonly version: 1;
+  readonly version: 1 | 2;
   readonly id: string;
+  readonly name: string;
   readonly description: string;
   readonly english: boolean;
   readonly sourceFormat: ImageFormat;
@@ -1171,8 +1172,9 @@ function decodeEditMarker(source: string): EditMarker | undefined {
 
 function createImportMarker(input: MediaVaultImport): ImportMarker {
   return {
-    version: 1,
+    version: 2,
     id: input.record.id,
+    name: input.record.name,
     description: input.record.description,
     english: input.record.english,
     sourceFormat: input.sourceFormat,
@@ -1198,10 +1200,19 @@ function decodeImportMarker(source: string): ImportMarker | undefined {
 
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record).sort().join(",");
+  const version = record["version"];
+  const versionOneKeys =
+    "description,english,id,renditionFormat,sourceFormat,token,version";
+  const versionTwoKeys =
+    "description,english,id,name,renditionFormat,sourceFormat,token,version";
   if (
-    keys !== "description,english,id,renditionFormat,sourceFormat,token,version"
-    || record["version"] !== 1
+    (version !== 1 && version !== 2)
+    || keys !== (version === 1 ? versionOneKeys : versionTwoKeys)
     || typeof record["id"] !== "string"
+    || (
+      version === 2
+      && typeof record["name"] !== "string"
+    )
     || typeof record["description"] !== "string"
     || typeof record["english"] !== "boolean"
     || !isImageFormat(record["sourceFormat"])
@@ -1211,6 +1222,9 @@ function decodeImportMarker(source: string): ImportMarker | undefined {
   ) {
     return undefined;
   }
+  const name = version === 1
+    ? record["id"]
+    : record["name"];
 
   const paths = mediaVaultPaths(
     record["id"],
@@ -1223,6 +1237,7 @@ function decodeImportMarker(source: string): ImportMarker | undefined {
   const decoded = decodeMediaRecord({
     id: record["id"],
     path: paths.rendition,
+    name,
     description: record["description"],
     english: record["english"],
   });
@@ -1231,10 +1246,11 @@ function decodeImportMarker(source: string): ImportMarker | undefined {
   }
 
   return {
-    version: 1,
-    id: record["id"],
-    description: record["description"],
-    english: record["english"],
+    version,
+    id: decoded.value.id,
+    name: decoded.value.name,
+    description: decoded.value.description,
+    english: decoded.value.english,
     sourceFormat: record["sourceFormat"],
     renditionFormat: record["renditionFormat"],
     token: record["token"],
@@ -1253,6 +1269,7 @@ function expectedRecord(marker: ImportMarker): MediaRecord {
   return {
     id: marker.id,
     path: paths.rendition,
+    name: marker.name,
     description: marker.description,
     english: marker.english,
   };
@@ -1413,6 +1430,7 @@ async function isOwnedRegularOrMissing(path: string): Promise<boolean> {
 function sameRecord(left: MediaRecord, right: MediaRecord): boolean {
   return left.id === right.id
     && left.path === right.path
+    && left.name === right.name
     && left.description === right.description
     && left.english === right.english;
 }

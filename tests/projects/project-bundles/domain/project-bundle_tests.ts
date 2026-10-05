@@ -62,7 +62,10 @@ test("project bundles validate both persisted documents together", () => {
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.value.project.title, "Vocabulary");
-    assert.deepEqual(result.value.media, [media]);
+    assert.deepEqual(result.value.media, [{
+      ...media,
+      name: "sun",
+    }]);
   }
 });
 

@@ -35,7 +35,8 @@ import {
   type ValidationIssue,
 } from "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
-  decodeMediaRecord,
+  decodePersistedMediaRecord,
+  MEDIA_RECORD_SCHEMA_VERSION,
   type MediaRecord,
 } from "../../media-records/domain/media-record.ts";
 
@@ -76,7 +77,7 @@ export function decodeMediaJsonLines(
       continue;
     }
 
-    const decoded = decodeMediaRecord(parsed.value);
+    const decoded = decodePersistedMediaRecord(parsed.value);
     if (!decoded.ok) {
       issues.push(
         ...decoded.issues.map((issue) => ({
@@ -105,8 +106,10 @@ export function serializeMediaJsonLines(
 
   const lines = records.map((record) => {
     return JSON.stringify({
+      schemaVersion: MEDIA_RECORD_SCHEMA_VERSION,
       id: record.id,
       path: record.path,
+      name: record.name,
       description: record.description,
       english: record.english,
     });

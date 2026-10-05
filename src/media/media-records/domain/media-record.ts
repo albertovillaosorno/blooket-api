@@ -9,26 +9,25 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Exact persisted metadata for one local media-vault asset.
+//   - Exact runtime metadata and versioned persistence for one media asset.
 // - Must-Not:
 //   - Store source URLs, image bytes, or infer English verification.
 // - Allows:
-//   - Inputs: Unknown runtime media-record candidates.
-//   - Outputs: Strict media records or structured validation failures.
+//   - Inputs: Runtime records or persisted version-one/version-two candidates.
+//   - Outputs: Canonical media records or structured validation failures.
 //   - Side effects: None.
 // - Split-When:
 //   - Rendition metadata needs an independently versioned record.
 // - Merge-When:
 //   - Media metadata is no longer persisted separately from projects.
 // - Summary:
-//   - Defines the minimal searchable media metadata contract.
+//   - Keeps stable IDs separate from editable human display names.
 // - Description:
-//   - Keeps IDs, local paths, English descriptions, and verification state.
+//   - Legacy unversioned records migrate display names from their stable IDs.
 // - Usage:
-//   - Decode each JSONL line before admitting it to the media vault.
+//   - Decode runtime records and each persisted JSONL line at trust boundaries.
 // - Defaults:
-//   - New records default English verification to false; persisted input is
-//     explicit.
+//   - New records default name to ID and English verification to false.
 //
 import {
   decodeFailure,
@@ -43,9 +42,12 @@ import {
 import { decodeMediaId } from
   "../../media-identifiers/domain/media-id.ts";
 
+export const MEDIA_RECORD_SCHEMA_VERSION = 2 as const;
+
 export interface MediaRecord {
   readonly id: string;
   readonly path: string;
+  readonly name: string;
   readonly description: string;
   readonly english: boolean;
 }
@@ -53,17 +55,36 @@ export interface MediaRecord {
 export interface MediaRecordInput {
   readonly id: string;
   readonly path: string;
+  readonly name?: string;
   readonly description: string;
   readonly english?: boolean;
 }
 
-const MEDIA_KEYS = new Set(["id", "path", "description", "english"]);
+const RUNTIME_KEYS = new Set([
+  "id",
+  "path",
+  "name",
+  "description",
+  "english",
+]);
+const LEGACY_KEYS = new Set([
+  "id",
+  "path",
+  "description",
+  "english",
+]);
+const VERSION_TWO_KEYS = new Set([
+  "schemaVersion",
+  ...RUNTIME_KEYS,
+]);
+
 export function createMediaRecord(
   input: MediaRecordInput,
 ): DecodeResult<MediaRecord> {
   return decodeMediaRecord({
     id: input.id,
     path: input.path,
+    name: input.name ?? input.id,
     description: input.description,
     english: input.english ?? false,
   });
@@ -74,11 +95,43 @@ export function decodeMediaRecord(value: unknown): DecodeResult<MediaRecord> {
     return decodeFailure("$", "expected-object", "Expected a media record.");
   }
 
+  if (value["name"] === undefined) {
+    return decodeKnownRecord(value, LEGACY_KEYS, value["id"]);
+  }
+  return decodeKnownRecord(value, RUNTIME_KEYS, value["name"]);
+}
+
+export function decodePersistedMediaRecord(
+  value: unknown,
+): DecodeResult<MediaRecord> {
+  if (!isRecord(value)) {
+    return decodeFailure("$", "expected-object", "Expected a media record.");
+  }
+
+  if (value["schemaVersion"] === undefined) {
+    return decodeKnownRecord(value, LEGACY_KEYS, value["id"]);
+  }
+  if (value["schemaVersion"] === MEDIA_RECORD_SCHEMA_VERSION) {
+    return decodeKnownRecord(value, VERSION_TWO_KEYS, value["name"]);
+  }
+  return decodeFailure(
+    "$.schemaVersion",
+    "unsupported-version",
+    "Expected media record schema version 2 or a legacy unversioned record.",
+  );
+}
+
+function decodeKnownRecord(
+  value: Readonly<Record<string, unknown>>,
+  keys: ReadonlySet<string>,
+  nameValue: unknown,
+): DecodeResult<MediaRecord> {
   const issues: ValidationIssue[] = [
-    ...unknownFieldIssues(value, MEDIA_KEYS, "$"),
+    ...unknownFieldIssues(value, keys, "$"),
   ];
   const id = requiredString(value["id"], "$.id", issues);
   const path = requiredString(value["path"], "$.path", issues);
+  const name = requiredString(nameValue, "$.name", issues);
   const description = requiredString(
     value["description"],
     "$.description",
@@ -114,6 +167,7 @@ export function decodeMediaRecord(value: unknown): DecodeResult<MediaRecord> {
   if (
     id === undefined
     || path === undefined
+    || name === undefined
     || description === undefined
     || typeof english !== "boolean"
   ) {
@@ -122,7 +176,7 @@ export function decodeMediaRecord(value: unknown): DecodeResult<MediaRecord> {
 
   return {
     ok: true,
-    value: { id, path, description, english },
+    value: { id, path, name, description, english },
   };
 }
 
