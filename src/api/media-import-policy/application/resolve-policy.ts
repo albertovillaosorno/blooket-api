@@ -23,7 +23,7 @@
 // - Summary:
 //   - Binds rendition limits only from verified Blooket capability data.
 // - Description:
-//   - Keeps source-resource limits local while target limits remain evidence-led.
+//   - Keeps source limits local while target limits remain evidence-led.
 // - Usage:
 //   - Resolve before invoking the durable image-import application operation.
 // - Defaults:
