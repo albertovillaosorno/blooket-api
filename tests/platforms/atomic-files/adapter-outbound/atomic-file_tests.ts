@@ -158,15 +158,15 @@ test("atomic replacement leaves no generated temporary files", async () => {
 test(
   "durable removal deletes regular files and tolerates missing paths",
   async () => {
-  await withTemporaryDirectory(async (directory) => {
-    const target = join(directory, "project.json");
-    await writeFile(target, "value", { mode: 0o600 });
+    await withTemporaryDirectory(async (directory) => {
+      const target = join(directory, "project.json");
+      await writeFile(target, "value", { mode: 0o600 });
 
-    await removeDurableFile(target);
-    await removeDurableFile(target);
+      await removeDurableFile(target);
+      await removeDurableFile(target);
 
-    await assert.rejects(readFile(target, "utf8"));
-  });
+      await assert.rejects(readFile(target, "utf8"));
+    });
   },
 );
 
