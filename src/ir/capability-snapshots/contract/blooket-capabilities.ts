@@ -9,7 +9,7 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Version-one snapshots of verified Blooket and account capabilities.
+//   - Current snapshots plus explicit legacy capability migration.
 // - Must-Not:
 //   - Probe Blooket, infer account tier, or invent unknown capability values.
 // - Allows:
@@ -41,7 +41,8 @@ import {
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 
-export const BLOOKET_CAPABILITIES_VERSION = 1 as const;
+export const BLOOKET_CAPABILITIES_VERSION = 2 as const;
+const LEGACY_BLOOKET_CAPABILITIES_VERSION = 1 as const;
 
 export type CapabilityAvailability =
   | "supported"
@@ -84,6 +85,9 @@ export interface BlooketCapabilitySnapshot {
   };
   readonly upload: {
     readonly maxBytes: number | null;
+    readonly canvasWidth: number | null;
+    readonly canvasHeight: number | null;
+    readonly maxPixels: number | null;
   };
 }
 
@@ -113,7 +117,13 @@ const SET_METADATA_KEYS = new Set([
   "coverImageOptional",
   "visibility",
 ]);
-const UPLOAD_KEYS = new Set(["maxBytes"]);
+const LEGACY_UPLOAD_KEYS = new Set(["maxBytes"]);
+const UPLOAD_KEYS = new Set([
+  "maxBytes",
+  "canvasWidth",
+  "canvasHeight",
+  "maxPixels",
+]);
 
 export function decodeBlooketCapabilitySnapshot(
   value: unknown,
@@ -129,11 +139,15 @@ export function decodeBlooketCapabilitySnapshot(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, ROOT_KEYS, "$"),
   ];
-  if (value["schemaVersion"] !== BLOOKET_CAPABILITIES_VERSION) {
+  const inputVersion = value["schemaVersion"];
+  if (
+    inputVersion !== LEGACY_BLOOKET_CAPABILITIES_VERSION
+    && inputVersion !== BLOOKET_CAPABILITIES_VERSION
+  ) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
-      message: "Expected Blooket capability schema version 1.",
+      message: "Expected Blooket capability schema version 1 or 2.",
     });
   }
 
@@ -142,7 +156,11 @@ export function decodeBlooketCapabilitySnapshot(
   const questionTypes = decodeQuestionTypes(value["questionTypes"], issues);
   const features = decodeFeatures(value["features"], issues);
   const setMetadata = decodeSetMetadata(value["setMetadata"], issues);
-  const upload = decodeUpload(value["upload"], issues);
+  const upload = decodeUpload(
+    value["upload"],
+    inputVersion === LEGACY_BLOOKET_CAPABILITIES_VERSION ? 1 : 2,
+    issues,
+  );
 
   if (issues.length > 0) {
     return { ok: false, issues };
@@ -171,6 +189,20 @@ export function decodeBlooketCapabilitySnapshot(
       upload,
     },
   };
+}
+
+export function serializeBlooketCapabilitySnapshot(
+  snapshot: BlooketCapabilitySnapshot,
+): string {
+  return JSON.stringify({
+    schemaVersion: BLOOKET_CAPABILITIES_VERSION,
+    verifiedOn: snapshot.verifiedOn,
+    evidence: snapshot.evidence,
+    questionTypes: snapshot.questionTypes,
+    features: snapshot.features,
+    setMetadata: snapshot.setMetadata,
+    upload: snapshot.upload,
+  }) + "\n";
 }
 
 function decodeEvidence(
@@ -435,6 +467,7 @@ function decodeSetMetadata(
 
 function decodeUpload(
   value: unknown,
+  version: 1 | 2,
   issues: ValidationIssue[],
 ): BlooketCapabilitySnapshot["upload"] | undefined {
   if (!isRecord(value)) {
@@ -445,13 +478,78 @@ function decodeUpload(
     });
     return undefined;
   }
-  issues.push(...unknownFieldIssues(value, UPLOAD_KEYS, "$.upload"));
+  issues.push(
+    ...unknownFieldIssues(
+      value,
+      version === 1 ? LEGACY_UPLOAD_KEYS : UPLOAD_KEYS,
+      "$.upload",
+    ),
+  );
   const maxBytes = decodeNullablePositiveInteger(
     value["maxBytes"],
     "$.upload.maxBytes",
     issues,
   );
-  return maxBytes === undefined ? undefined : { maxBytes };
+  if (version === 1) {
+    return maxBytes === undefined
+      ? undefined
+      : {
+          maxBytes,
+          canvasWidth: null,
+          canvasHeight: null,
+          maxPixels: null,
+        };
+  }
+
+  const canvasWidth = decodeNullablePositiveInteger(
+    value["canvasWidth"],
+    "$.upload.canvasWidth",
+    issues,
+  );
+  const canvasHeight = decodeNullablePositiveInteger(
+    value["canvasHeight"],
+    "$.upload.canvasHeight",
+    issues,
+  );
+  const maxPixels = decodeNullablePositiveInteger(
+    value["maxPixels"],
+    "$.upload.maxPixels",
+    issues,
+  );
+
+  if (
+    (canvasWidth === null) !== (canvasHeight === null)
+    && canvasWidth !== undefined
+    && canvasHeight !== undefined
+  ) {
+    issues.push({
+      path: "$.upload",
+      code: "partial-image-canvas",
+      message: "Canvas width and height must both be known or both be null.",
+    });
+  }
+  if (
+    typeof canvasWidth === "number"
+    && typeof canvasHeight === "number"
+    && typeof maxPixels === "number"
+    && BigInt(canvasWidth) * BigInt(canvasHeight) > BigInt(maxPixels)
+  ) {
+    issues.push({
+      path: "$.upload.maxPixels",
+      code: "canvas-exceeds-pixel-limit",
+      message: "Canvas pixel count exceeds the verified pixel limit.",
+    });
+  }
+
+  if (
+    maxBytes === undefined
+    || canvasWidth === undefined
+    || canvasHeight === undefined
+    || maxPixels === undefined
+  ) {
+    return undefined;
+  }
+  return { maxBytes, canvasWidth, canvasHeight, maxPixels };
 }
 
 function decodeAvailability(

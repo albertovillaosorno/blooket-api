@@ -9,7 +9,7 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Behavioral tests for version-one Blooket capability snapshots.
+//   - Behavioral tests for current and legacy Blooket capability snapshots.
 // - Must-Not:
 //   - Probe Blooket or decide current account capabilities.
 // - Allows:
@@ -32,11 +32,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { decodeBlooketCapabilitySnapshot } from
+import {
+  decodeBlooketCapabilitySnapshot,
+  serializeBlooketCapabilitySnapshot,
+} from
   "../../../../src/ir/capability-snapshots/contract/blooket-capabilities.ts";
 
 const verified = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   verifiedOn: "2026-10-05",
   evidence: [
     {
@@ -70,8 +73,119 @@ const verified = {
   },
   upload: {
     maxBytes: null,
+    canvasWidth: null,
+    canvasHeight: null,
+    maxPixels: null,
   },
 } as const;
+
+test("version-one upload capabilities migrate unknown image limits", () => {
+  const legacy = {
+    ...verified,
+    schemaVersion: 1,
+    upload: {
+      maxBytes: null,
+    },
+  } as const;
+  const result = decodeBlooketCapabilitySnapshot(legacy);
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.schemaVersion, 2);
+    assert.deepEqual(result.value.upload, {
+      maxBytes: null,
+      canvasWidth: null,
+      canvasHeight: null,
+      maxPixels: null,
+    });
+    const serialized = serializeBlooketCapabilitySnapshot(result.value);
+    assert.equal(
+      JSON.parse(serialized).schemaVersion,
+      2,
+    );
+  }
+});
+
+test("version-one snapshots reject version-two upload fields", () => {
+  const result = decodeBlooketCapabilitySnapshot({
+    ...verified,
+    schemaVersion: 1,
+    upload: {
+      maxBytes: null,
+      canvasWidth: null,
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some((issue) => issue.code === "unknown-field"),
+      true,
+    );
+  }
+});
+
+test("version-two upload capabilities admit verified image limits", () => {
+  const result = decodeBlooketCapabilitySnapshot({
+    ...verified,
+    upload: {
+      maxBytes: 2_000_000,
+      canvasWidth: 800,
+      canvasHeight: 600,
+      maxPixels: 1_000_000,
+    },
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.value.upload, {
+      maxBytes: 2_000_000,
+      canvasWidth: 800,
+      canvasHeight: 600,
+      maxPixels: 1_000_000,
+    });
+  }
+});
+
+test("version-two canvas dimensions must become known together", () => {
+  const result = decodeBlooketCapabilitySnapshot({
+    ...verified,
+    upload: {
+      ...verified.upload,
+      canvasWidth: 800,
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some((issue) => issue.code === "partial-image-canvas"),
+      true,
+    );
+  }
+});
+
+test("verified canvas area cannot exceed the pixel limit", () => {
+  const result = decodeBlooketCapabilitySnapshot({
+    ...verified,
+    upload: {
+      maxBytes: 2_000_000,
+      canvasWidth: 800,
+      canvasHeight: 600,
+      maxPixels: 100_000,
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some(
+        (issue) => issue.code === "canvas-exceeds-pixel-limit",
+      ),
+      true,
+    );
+  }
+});
 
 test("capability snapshots accept verified facts and explicit unknowns", () => {
   const result = decodeBlooketCapabilitySnapshot(verified);
