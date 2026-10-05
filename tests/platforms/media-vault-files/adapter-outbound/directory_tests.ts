@@ -680,6 +680,31 @@ test("load rolls back inode-proven interrupted asset publication", async () => {
   });
 });
 
+test("named v2 import recovery preserves the display name", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const fixture = await createInterruptedFixture(
+      directory,
+      true,
+      {
+        markerVersion: 2,
+        name: "Bright Sun",
+      },
+    );
+    const loaded = await loadMediaVault(directory);
+
+    assert.deepEqual(loaded, {
+      ok: true,
+      records: [{
+        ...firstRecord,
+        name: "Bright Sun",
+      }],
+    });
+    assert.equal(await pathExists(fixture.original), true);
+    assert.equal(await pathExists(fixture.rendition), true);
+    assert.equal(await pathExists(fixture.markerPath), false);
+  });
+});
+
 test("load cleans staging after metadata commits", async () => {
   await withTemporaryDirectory(async (directory) => {
     const fixture = await createInterruptedFixture(directory, true);
@@ -870,6 +895,8 @@ async function createInterruptedFixture(
   options: {
     readonly linkOriginal?: boolean;
     readonly linkRendition?: boolean;
+    readonly markerVersion?: 1 | 2;
+    readonly name?: string;
   } = {},
 ): Promise<{
   readonly markerPath: string;
@@ -879,15 +906,30 @@ async function createInterruptedFixture(
   readonly renditionStage: string;
   readonly transactionPaths: readonly string[];
 }> {
-  const marker = {
-    version: 1,
-    id: firstRecord.id,
-    description: firstRecord.description,
-    english: firstRecord.english,
-    sourceFormat: firstImport.sourceFormat,
-    renditionFormat: firstImport.renditionFormat,
-    token: TOKEN,
-  } as const;
+  const record = {
+    ...firstRecord,
+    name: options.name ?? firstRecord.name,
+  };
+  const marker = options.markerVersion === 2
+    ? {
+        version: 2 as const,
+        id: record.id,
+        name: record.name,
+        description: record.description,
+        english: record.english,
+        sourceFormat: firstImport.sourceFormat,
+        renditionFormat: firstImport.renditionFormat,
+        token: TOKEN,
+      }
+    : {
+        version: 1 as const,
+        id: record.id,
+        description: record.description,
+        english: record.english,
+        sourceFormat: firstImport.sourceFormat,
+        renditionFormat: firstImport.renditionFormat,
+        token: TOKEN,
+      };
   const markerPath = join(directory, ".blooket-api-media-import.json");
   const original = join(directory, "originals", "sun.jpg");
   const rendition = join(directory, "media", "sun.png");
@@ -916,7 +958,7 @@ async function createInterruptedFixture(
   if (committed) {
     await writeFile(
       join(directory, "media.jsonl"),
-      serializeMediaJsonLines([firstRecord]),
+      serializeMediaJsonLines([record]),
     );
   }
 
