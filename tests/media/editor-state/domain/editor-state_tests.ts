@@ -281,17 +281,41 @@ test("history bound drops oldest edits and new edits clear redo", () => {
   }
 });
 
+test("stored redaction regions do not retain caller object identity", () => {
+  const start = initial();
+  const region = {
+    id: "face",
+    mode: "blur" as const,
+    x: 0.1,
+    y: 0.1,
+    width: 0.2,
+    height: 0.2,
+  };
+  const result = applyMediaEditorAction(start, {
+    type: "add-region",
+    region,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+
+  region.x = 0.7;
+  assert.equal(result.value.present.regions[0]?.x, 0.1);
+});
+
 test("no-op edits do not consume undo history", () => {
   const start = initial();
-  const result = applyMediaEditorAction(start, {
-    type: "set-zoom",
-    value: 1,
-  });
-
-  assert.equal(result.ok, true);
-  if (result.ok) {
-    assert.equal(result.value, start);
-    assert.equal(result.value.past.length, 0);
+  for (const action of [
+    { type: "set-zoom", value: 1 },
+    { type: "nudge-pan", dx: 0, dy: 0 },
+  ] as const) {
+    const result = applyMediaEditorAction(start, action);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.value, start);
+      assert.equal(result.value.past.length, 0);
+    }
   }
 });
 

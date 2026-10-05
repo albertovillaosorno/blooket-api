@@ -204,6 +204,12 @@ function editState(
       if (!finite(panX) || !finite(panY)) {
         return invalidAction();
       }
+      if (
+        panX === state.transform.panX
+        && panY === state.transform.panY
+      ) {
+        return { ok: true, value: state };
+      }
       return transform(state, { panX, panY });
     }
     case "set-zoom":
@@ -257,7 +263,7 @@ function editState(
         ok: true,
         value: {
           ...state,
-          regions: [...state.regions, action.region],
+          regions: [...state.regions, { ...action.region }],
         },
       };
     case "remove-region": {
