@@ -1,0 +1,9 @@
+identity:
+  id: function:capability-snapshots
+  name: capability-snapshots
+  path: src/ir/capability-snapshots
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract
