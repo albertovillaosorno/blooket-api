@@ -1,0 +1,9 @@
+identity:
+  id: function:media-import-policy
+  name: media-import-policy
+  path: src/api/media-import-policy
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
