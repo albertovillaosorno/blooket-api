@@ -14,12 +14,6 @@ capability-bound durable image-import operation once the localhost boundary is
 available. Populate the version-two canvas, pixel, and upload-byte fields only
 from verified Blooket evidence; unknown values continue to fail closed.
 
-### TODO - Complete animated and named media editing
-
-Define persisted display names through a versioned media-record contract without
-renaming stable media IDs. Add animation-preserving editor rendering before
-allowing animated edit persistence; animated edits currently fail closed.
-
 ### TODO - Implement host secret storage
 
 Use macOS Keychain for the product-quality target and a standard Linux secret

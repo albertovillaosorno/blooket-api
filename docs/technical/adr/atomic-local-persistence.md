@@ -84,11 +84,16 @@ validated identity and formats; callers never select those relative paths.
 The vault writes both transaction-specific staging files first. It then
 publishes a strict marker containing only validated metadata, formats, and a
 transaction UUID before durably hard-linking staging files to final no-clobber
-paths. A visible marker therefore refers only to staging files that this writer
-successfully created.
+paths. Import-marker version two also carries the editable display name; legacy
+version-one markers recover with the stable ID as their display name. A visible
+marker therefore refers only to staging files that this writer successfully
+created.
 
 Staging links remain until `media.jsonl` is atomically replaced, making the
-metadata replacement the commit point. The index retains one previous-value
+metadata replacement the commit point. Canonical media JSONL records use schema
+version two and store display names separately from stable IDs. Legacy
+unversioned lines migrate in memory without mutating the file on read; later
+writes use canonical version two. The index retains one previous-value
 `media.jsonl.bak`.
 
 If an interrupted import has no committed metadata, recovery removes a final

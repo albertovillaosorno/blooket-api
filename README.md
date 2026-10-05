@@ -283,22 +283,31 @@ one means neutral contain scaling. Pan coordinates are fractions of the canvas:
 pan X of one shifts the foreground center by one full canvas width, and pan Y
 uses the corresponding canvas height.
 
-Static editor rendering reopens the immutable vault original and applies bounded
-pan, zoom, contrast, saturation, rectangular blur, and opaque-black redaction.
+Editor rendering reopens the immutable vault original and applies bounded pan,
+zoom, contrast, saturation, rectangular blur, and opaque-black redaction.
 Source cropping happens before resize so extreme zoom cannot create an
-unbounded native intermediate. Edited renditions and metadata replace one
-another transactionally while the original is never modified.
+unbounded native intermediate. Animated GIFs run the same bounded operation
+independently for every frame, then preserve frame delays, loop state, and
+duplicate frames when reassembled. Animated WebP rendition remains fail-closed
+until equivalent preservation semantics are implemented and tested.
 
-Each edit is conditional on the media record and rendition hash loaded before
-rendering. A concurrent edit therefore returns a stable conflict instead of
-silently overwriting newer work. Changing a description resets its English
-verification to false unless the caller explicitly re-verifies the new text.
+Edited renditions and metadata replace one another transactionally while the
+original is never modified. Each edit is conditional on the media record and
+rendition hash loaded before rendering. A concurrent edit therefore returns a
+stable conflict instead of silently overwriting newer work. Changing a
+description resets its English verification to false unless the caller
+explicitly re-verifies the new text.
+
+Media-record persistence is versioned independently of stable media identity.
+Canonical version-two JSONL lines store an editable display name separately from
+the stable ID used by project references and vault paths. Legacy unversioned
+records migrate in memory with their ID as the display name and are not
+rewritten merely by reading them. New writes serialize the canonical
+version-two form.
 
 The first editor surface is intentionally small: pan, zoom, keyboard nudging,
 contrast, saturation, simple rectangular blur/redaction, naming, description,
-and undo/redo. Generative fill is not part of the initial contract. Animated
-editing remains fail-closed, and persisted display names still need a versioned
-schema separate from the stable media ID.
+and undo/redo. Generative fill is not part of the initial contract.
 
 ## Reliability and operating-system behavior
 
