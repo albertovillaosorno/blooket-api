@@ -51,6 +51,7 @@ import { type ValidationIssue } from
 export interface ImportImageRequest extends PrepareImageRequest {
   readonly vaultDirectory: string;
   readonly id: string;
+  readonly name?: string;
   readonly description: string;
   readonly english?: boolean;
 }
@@ -93,6 +94,7 @@ export async function importImage(
     return metadataFailure(createMediaRecord({
       id: request.id,
       path: "media/invalid.png",
+      ...(request.name === undefined ? {} : { name: request.name }),
       description: request.description,
       ...(request.english === undefined
         ? {}
@@ -103,6 +105,7 @@ export async function importImage(
   const preliminaryRecord = createMediaRecord({
     id: request.id,
     path: preliminaryPaths.rendition,
+    ...(request.name === undefined ? {} : { name: request.name }),
     description: request.description,
     ...(request.english === undefined
       ? {}

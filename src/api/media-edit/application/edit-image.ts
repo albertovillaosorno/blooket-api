@@ -27,7 +27,7 @@
 // - Usage:
 //   - Desktop and extension editor surfaces call this shared operation.
 // - Defaults:
-//   - Editor names equal stable IDs until display names gain persistence.
+//   - Stable IDs never change when editable display names change.
 //
 import {
   resolveImageImportPolicy,
@@ -94,11 +94,6 @@ export type EditImageResult =
   | {
       readonly ok: false;
       readonly stage: "metadata";
-      readonly code: "media-name-change-unsupported";
-    }
-  | {
-      readonly ok: false;
-      readonly stage: "metadata";
       readonly issues: readonly ValidationIssue[];
     }
   | (PolicyFailure & { readonly stage: "policy" })
@@ -115,14 +110,6 @@ export type EditImageResult =
 export async function editImage(
   request: EditImageRequest,
 ): Promise<EditImageResult> {
-  if (request.state.name !== request.id) {
-    return {
-      ok: false,
-      stage: "metadata",
-      code: "media-name-change-unsupported",
-    };
-  }
-
   const policy = resolveImageImportPolicy(
     request.capabilities,
     request.localSafety,
@@ -157,6 +144,7 @@ export async function editImage(
   const record = createMediaRecord({
     id: original.record.id,
     path: original.record.path,
+    name: request.state.name,
     description: request.state.description,
     english,
   });

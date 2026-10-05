@@ -86,6 +86,7 @@ test("image import durably publishes one vault record", async () => {
     const result = await importImage({
       vaultDirectory: directory,
       id: "green-card",
+      name: "Green Card",
       description: "A small green card.",
       bytes: PNG_2X1,
       maxSourceBytes: PNG_2X1.byteLength,
@@ -101,6 +102,7 @@ test("image import durably publishes one vault record", async () => {
       record: {
         id: "green-card",
         path: "media/green-card.png",
+        name: "Green Card",
         description: "A small green card.",
         english: false,
       },
@@ -140,6 +142,7 @@ test("animated GIF import preserves GIF vault paths", async () => {
       record: {
         id: "timer",
         path: "media/timer.gif",
+        name: "timer",
         description: "A two-frame timer animation.",
         english: true,
       },

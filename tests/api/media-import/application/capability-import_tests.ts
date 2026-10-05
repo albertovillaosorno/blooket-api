@@ -104,6 +104,7 @@ test("verified capabilities drive durable rendition constraints", async () => {
     const result = await importImageForCapabilities({
       vaultDirectory: directory,
       id: "green-card",
+      name: "Green Card",
       description: "A small green card.",
       bytes: PNG_2X1,
       capabilities,
@@ -118,6 +119,7 @@ test("verified capabilities drive durable rendition constraints", async () => {
       record: {
         id: "green-card",
         path: "media/green-card.png",
+        name: "Green Card",
         description: "A small green card.",
         english: false,
       },

@@ -174,6 +174,7 @@ test("static edits preserve originals during replacement", async () => {
       record: {
         id: "card",
         path: "media/card.png",
+        name: "card",
         description: "An edited description.",
         english: false,
       },
@@ -236,20 +237,36 @@ test("unchanged descriptions preserve prior verification", async () => {
   });
 });
 
-test("editor display-name changes fail before vault reads", async () => {
-  const result = await editImage({
-    vaultDirectory: "/path/that/must/not/be/read",
-    id: "card",
-    state: editorState("renamed", "An edited description."),
-    capabilities,
-    localSafety,
-    blurSigma: 1,
-  });
+test("display-name edits preserve stable IDs and vault paths", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importFixture(directory, "card");
+    const originalBefore = await readFile(
+      join(directory, "originals", "card.png"),
+    );
 
-  assert.deepEqual(result, {
-    ok: false,
-    stage: "metadata",
-    code: "media-name-change-unsupported",
+    const result = await editImage({
+      vaultDirectory: directory,
+      id: "card",
+      state: editorState("Renamed Card", "An edited description."),
+      capabilities,
+      localSafety,
+      blurSigma: 1,
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      record: {
+        id: "card",
+        path: "media/card.png",
+        name: "Renamed Card",
+        description: "An edited description.",
+        english: false,
+      },
+    });
+    assert.deepEqual(
+      await readFile(join(directory, "originals", "card.png")),
+      originalBefore,
+    );
   });
 });
 
@@ -376,6 +393,7 @@ test("animated GIF edits persist without mutating originals", async () => {
       record: {
         id: "timer",
         path: "media/timer.gif",
+        name: "timer",
         description: "An edited timer.",
         english: false,
       },

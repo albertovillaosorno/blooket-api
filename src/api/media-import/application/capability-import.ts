@@ -42,6 +42,7 @@ import {
 export interface CapabilityBoundImageImportRequest {
   readonly vaultDirectory: string;
   readonly id: string;
+  readonly name?: string;
   readonly description: string;
   readonly english?: boolean;
   readonly bytes: Uint8Array;
@@ -80,6 +81,7 @@ export async function importImageForCapabilities(
   return await importImage({
     vaultDirectory: request.vaultDirectory,
     id: request.id,
+    ...(request.name === undefined ? {} : { name: request.name }),
     description: request.description,
     ...(request.english === undefined
       ? {}
