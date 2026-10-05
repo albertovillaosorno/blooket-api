@@ -87,6 +87,36 @@ export async function writeDurableFileIfAbsent(
   }
 }
 
+export async function linkDurableFileIfAbsent(
+  sourcePath: string,
+  targetPath: string,
+): Promise<DurableCreateResult> {
+  if (await regularFileState(sourcePath) !== "file") {
+    throw new Error("Durable link source must be a regular file.");
+  }
+
+  const directory = dirname(targetPath);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const existing = await regularFileState(targetPath);
+  if (existing === "file") {
+    return "exists";
+  }
+
+  try {
+    await link(sourcePath, targetPath);
+  } catch (error: unknown) {
+    if (!isCode(error, "EEXIST")) {
+      throw error;
+    }
+    if (await regularFileState(targetPath) === "file") {
+      return "exists";
+    }
+    throw error;
+  }
+  await syncDirectory(directory);
+  return "created";
+}
+
 export async function removeDurableFile(targetPath: string): Promise<void> {
   const directory = dirname(targetPath);
   await refuseSymbolicTarget(targetPath);

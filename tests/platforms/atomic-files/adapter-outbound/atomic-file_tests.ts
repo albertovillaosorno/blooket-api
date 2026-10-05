@@ -44,6 +44,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  linkDurableFileIfAbsent,
   removeDurableFile,
   writeAtomicFile,
   writeDurableFileIfAbsent,
@@ -102,6 +103,52 @@ test(
     });
   },
 );
+
+test(
+  "durable hard links publish the staged inode without clobbering",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const staged = join(directory, ".asset.staged");
+      const target = join(directory, "asset.bin");
+      await writeDurableFileIfAbsent(staged, "first");
+
+      assert.equal(
+        await linkDurableFileIfAbsent(staged, target),
+        "created",
+      );
+      const stagedMetadata = await lstat(staged);
+      const targetMetadata = await lstat(target);
+      assert.equal(stagedMetadata.dev, targetMetadata.dev);
+      assert.equal(stagedMetadata.ino, targetMetadata.ino);
+
+      assert.equal(
+        await linkDurableFileIfAbsent(staged, target),
+        "exists",
+      );
+      assert.equal(await readFile(target, "utf8"), "first");
+    });
+  },
+);
+
+test("durable hard links refuse symbolic sources and targets", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const real = join(directory, "real.bin");
+    const sourceLink = join(directory, "source-link.bin");
+    const targetLink = join(directory, "target-link.bin");
+    await writeFile(real, "value");
+    await symlink(real, sourceLink);
+    await symlink(real, targetLink);
+
+    await assert.rejects(
+      linkDurableFileIfAbsent(sourceLink, join(directory, "new.bin")),
+      /non-regular file target/,
+    );
+    await assert.rejects(
+      linkDurableFileIfAbsent(real, targetLink),
+      /non-regular file target/,
+    );
+  });
+});
 
 test("durable create refuses symbolic and non-file targets", async () => {
   await withTemporaryDirectory(async (directory) => {
