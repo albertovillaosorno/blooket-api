@@ -1,0 +1,9 @@
+identity:
+  id: function:diagnostic-redaction
+  name: diagnostic-redaction
+  path: src/security/diagnostic-redaction
+classification:
+  repository: blooket-api
+  domain: security
+architecture:
+  kind: domain
