@@ -284,7 +284,10 @@ forking application logic.
 Durable files use write-new, validate, flush, and atomic-replace patterns rather
 than editing important JSON in place. Interrupted writes must leave the previous
 valid state recoverable. Destructive operations require explicit targets and
-must not recursively infer broader paths from LLM-provided text.
+must not recursively infer broader paths from LLM-provided text. The exact
+lock, backup, temporary-file, flush, and recovery invariants are recorded in
+the atomic local persistence ADR:
+`docs/technical/adr/atomic-local-persistence.md`.
 
 Autostart is opt-in, visible in settings, reversible, and implemented
 through the normal platform mechanism. The application must not hide processes,

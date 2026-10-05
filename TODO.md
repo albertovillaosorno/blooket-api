@@ -5,13 +5,6 @@ later layers may depend on earlier layers, while foundations must not depend on
 unfinished presentation or integration layers. P0 is the current foundation
 horizon.
 
-## P0 — Repository and contracts
-
-### TODO - Establish atomic local persistence
-
-Define the project, settings, vault, temporary-file, lock, backup, flush, and
-atomic-replace rules needed to guarantee interruption-safe local state.
-
 ## P1 — Projects, settings, security, and media
 
 ### TODO - Implement media import and rendition pipeline
