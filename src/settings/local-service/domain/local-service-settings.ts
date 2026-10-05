@@ -9,25 +9,25 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Version-one settings for the local service and desktop startup behavior.
+//   - Current local-service settings and the version-one migration boundary.
 // - Must-Not:
-//   - Bind sockets, select a new port, or expose the API beyond loopback.
+//   - Bind sockets, select a new port, persist files, or expose network access.
 // - Allows:
-//   - Inputs: Unknown runtime settings candidates.
-//   - Outputs: Strict local-service settings or validation failures.
+//   - Inputs: Unknown version-one or version-two settings candidates.
+//   - Outputs: Strict current settings or structured validation failures.
 //   - Side effects: None.
 // - Split-When:
 //   - Desktop lifecycle and local network settings evolve independently.
 // - Merge-When:
 //   - Local service configuration ceases to be persisted.
 // - Summary:
-//   - Defines safe configurable loopback service settings.
+//   - Defines safe loopback settings with explicit schema migration.
 // - Description:
-//   - Keeps preferred port, collision policy, and startup preferences explicit.
+//   - Version two adds theme behavior while preserving version-one settings.
 // - Usage:
 //   - Decode settings before any platform or service adapter consumes them.
 // - Defaults:
-//   - The service starts on 127.0.0.1:2607 in fixed-port mode.
+//   - The service uses 127.0.0.1:2607 and follows the operating-system theme.
 //
 import {
   decodeFailure,
@@ -39,9 +39,11 @@ import {
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
 
-export const SETTINGS_SCHEMA_VERSION = 1 as const;
+export const SETTINGS_SCHEMA_VERSION = 2 as const;
 export const DEFAULT_BIND_ADDRESS = "127.0.0.1" as const;
 export const DEFAULT_PORT = 2607 as const;
+
+export type ThemePreference = "system" | "light" | "dark";
 
 export interface LocalServiceSettings {
   readonly schemaVersion: typeof SETTINGS_SCHEMA_VERSION;
@@ -51,9 +53,10 @@ export interface LocalServiceSettings {
   readonly launchAtLogin: boolean;
   readonly startMinimized: boolean;
   readonly startServiceOnLaunch: boolean;
+  readonly theme: ThemePreference;
 }
 
-const SETTINGS_KEYS = new Set([
+const VERSION_ONE_KEYS = new Set([
   "schemaVersion",
   "bindAddress",
   "port",
@@ -62,6 +65,7 @@ const SETTINGS_KEYS = new Set([
   "startMinimized",
   "startServiceOnLaunch",
 ]);
+const VERSION_TWO_KEYS = new Set([...VERSION_ONE_KEYS, "theme"]);
 
 export function defaultLocalServiceSettings(): LocalServiceSettings {
   return {
@@ -72,6 +76,7 @@ export function defaultLocalServiceSettings(): LocalServiceSettings {
     launchAtLogin: false,
     startMinimized: false,
     startServiceOnLaunch: true,
+    theme: "system",
   };
 }
 
@@ -82,8 +87,27 @@ export function decodeLocalServiceSettings(
     return decodeFailure("$", "expected-object", "Expected settings object.");
   }
 
+  if (value["schemaVersion"] === 1) {
+    return decodeKnownVersion(value, VERSION_ONE_KEYS, "system");
+  }
+  if (value["schemaVersion"] === SETTINGS_SCHEMA_VERSION) {
+    return decodeKnownVersion(value, VERSION_TWO_KEYS, value["theme"]);
+  }
+
+  return decodeFailure(
+    "$.schemaVersion",
+    "unsupported-version",
+    "Expected settings schema version 1 or 2.",
+  );
+}
+
+function decodeKnownVersion(
+  value: Readonly<Record<string, unknown>>,
+  keys: ReadonlySet<string>,
+  themeValue: unknown,
+): DecodeResult<LocalServiceSettings> {
   const issues: ValidationIssue[] = [
-    ...unknownFieldIssues(value, SETTINGS_KEYS, "$"),
+    ...unknownFieldIssues(value, keys, "$"),
   ];
   const bindAddress = value["bindAddress"];
   const port = value["port"];
@@ -91,14 +115,7 @@ export function decodeLocalServiceSettings(
   const launchAtLogin = value["launchAtLogin"];
   const startMinimized = value["startMinimized"];
   const startServiceOnLaunch = value["startServiceOnLaunch"];
-
-  if (value["schemaVersion"] !== SETTINGS_SCHEMA_VERSION) {
-    issues.push({
-      path: "$.schemaVersion",
-      code: "unsupported-version",
-      message: "Expected settings schema version 1.",
-    });
-  }
+  const theme = decodeTheme(themeValue, issues);
 
   if (typeof bindAddress !== "string" || !isLoopbackAddress(bindAddress)) {
     issues.push({
@@ -107,7 +124,6 @@ export function decodeLocalServiceSettings(
       message: "Expected an IPv4 or IPv6 loopback address.",
     });
   }
-
   if (!isPort(port)) {
     issues.push({
       path: "$.port",
@@ -115,7 +131,6 @@ export function decodeLocalServiceSettings(
       message: "Expected an integer TCP port from 1 through 65535.",
     });
   }
-
   if (portMode !== "fixed" && portMode !== "automatic") {
     issues.push({
       path: "$.portMode",
@@ -131,7 +146,6 @@ export function decodeLocalServiceSettings(
   if (issues.length > 0) {
     return { ok: false, issues };
   }
-
   if (
     typeof bindAddress !== "string"
     || typeof port !== "number"
@@ -139,6 +153,7 @@ export function decodeLocalServiceSettings(
     || typeof launchAtLogin !== "boolean"
     || typeof startMinimized !== "boolean"
     || typeof startServiceOnLaunch !== "boolean"
+    || theme === undefined
   ) {
     return decodeFailure("$", "decoder-invariant", "Decoder invariant failed.");
   }
@@ -153,6 +168,7 @@ export function decodeLocalServiceSettings(
       launchAtLogin,
       startMinimized,
       startServiceOnLaunch,
+      theme,
     },
   };
 }
@@ -161,12 +177,10 @@ export function isLoopbackAddress(value: string): boolean {
   if (value === "::1") {
     return true;
   }
-
   const octets = value.split(".");
   if (octets.length !== 4) {
     return false;
   }
-
   const numbers = octets.map(parseIpv4Octet);
   return numbers.every((octet) => octet !== undefined)
     && numbers[0] === 127;
@@ -177,6 +191,21 @@ export function isPort(value: unknown): value is number {
     && Number.isSafeInteger(value)
     && value >= 1
     && value <= 65535;
+}
+
+function decodeTheme(
+  value: unknown,
+  issues: ValidationIssue[],
+): ThemePreference | undefined {
+  if (value === "system" || value === "light" || value === "dark") {
+    return value;
+  }
+  issues.push({
+    path: "$.theme",
+    code: "invalid-theme",
+    message: 'Expected "system", "light", or "dark".',
+  });
+  return undefined;
 }
 
 function parseIpv4Octet(value: string): number | undefined {
