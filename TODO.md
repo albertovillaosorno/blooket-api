@@ -7,18 +7,6 @@ horizon.
 
 ## P0 — Repository and contracts
 
-### TODO - Version the command and document IR
-
-Define stable command envelopes, result envelopes, identifiers, structured
-validation diagnostics, project schema versions, capability snapshots, and the
-compatibility rules for evolving them.
-
-### TODO - Implement strict runtime JSON decoders
-
-Use native `JSON.parse` for syntax and repository-owned runtime decoders for the
-exact project, question, media, settings, command, and result contracts. Reject
-unknown fields and coercions unless a versioned schema explicitly admits them.
-
 ### TODO - Establish atomic local persistence
 
 Define the project, settings, vault, temporary-file, lock, backup, flush, and
