@@ -122,9 +122,11 @@ test("version-one upload capabilities migrate unknown image limits", () => {
       maxPixels: null,
     });
     const serialized = serializeBlooketCapabilitySnapshot(result.value);
-    assert.equal(
-      JSON.parse(serialized).schemaVersion,
-      2,
+    assert.equal(serialized.endsWith("\n"), true);
+    assert.deepEqual(JSON.parse(serialized), result.value);
+    assert.deepEqual(
+      decodeBlooketCapabilitySnapshot(JSON.parse(serialized)),
+      { ok: true, value: result.value },
     );
   }
 });
