@@ -7,12 +7,6 @@ horizon.
 
 ## P0 — Repository and contracts
 
-### TODO - Freeze dependency direction
-
-Document and test the allowed package graph: MCP executes CLI; CLI and localhost
-API lower into the same IR and executor; platform adapters call existing domain
-capabilities; UI packages contain no Blooket semantics.
-
 ### TODO - Version the command and document IR
 
 Define stable command envelopes, result envelopes, identifiers, structured
