@@ -9,7 +9,7 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Capability-bound rendering and durable persistence of one static edit.
+//   - Capability-bound rendering and durable persistence of one image edit.
 // - Must-Not:
 //   - Accept caller-owned original bytes, rename stable IDs, or guess limits.
 // - Allows:
@@ -17,11 +17,11 @@
 //   - Outputs: Updated records or staged policy/source/render/vault failures.
 //   - Side effects: Trusted reads, native rendering, transactional writes.
 // - Split-When:
-//   - Animated editor persistence gains independently reviewed semantics.
+//   - Another media class needs independently reviewed edit semantics.
 // - Merge-When:
 //   - Import and edit share one application lifecycle.
 // - Summary:
-//   - Reopens immutable originals and persists edited static renditions safely.
+//   - Reopens immutable originals and safely persists edited renditions.
 // - Description:
 //   - Changed descriptions lose prior English verification unless re-verified.
 // - Usage:

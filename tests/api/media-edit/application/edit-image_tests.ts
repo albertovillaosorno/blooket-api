@@ -48,6 +48,8 @@ import { loadMediaVault } from
   "../../../../src/platforms/media-vault-files/adapter-outbound/directory.ts";
 import { type MediaEditorState } from
   "../../../../src/media/editor-state/domain/editor-state.ts";
+import { decodeSourceImage } from
+  "../../../../src/media/image-decoding/adapter-outbound/sharp-image.ts";
 
 const PNG_2X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAACXBIWXMAAAPo"
@@ -350,12 +352,11 @@ test("invalid edited metadata fails before source admission", async () => {
   });
 });
 
-test("animated sources refuse edits without vault changes", async () => {
+test("animated GIF edits persist without mutating originals", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importFixture(directory, "timer", GIF_2_FRAME_1X1);
-    const indexBefore = await readFile(
-      join(directory, "media.jsonl"),
-      "utf8",
+    const originalBefore = await readFile(
+      join(directory, "originals", "timer.gif"),
     );
     const renditionBefore = await readFile(
       join(directory, "media", "timer.gif"),
@@ -371,17 +372,30 @@ test("animated sources refuse edits without vault changes", async () => {
     });
 
     assert.deepEqual(result, {
-      ok: false,
-      stage: "rendition",
-      code: "editor-animation-unsupported",
+      ok: true,
+      record: {
+        id: "timer",
+        path: "media/timer.gif",
+        description: "An edited timer.",
+        english: false,
+      },
     });
-    assert.equal(
-      await readFile(join(directory, "media.jsonl"), "utf8"),
-      indexBefore,
-    );
     assert.deepEqual(
-      await readFile(join(directory, "media", "timer.gif")),
-      renditionBefore,
+      await readFile(join(directory, "originals", "timer.gif")),
+      originalBefore,
     );
+    const renditionAfter = await readFile(
+      join(directory, "media", "timer.gif"),
+    );
+    assert.notDeepEqual(renditionAfter, renditionBefore);
+
+    const decoded = await decodeSourceImage(renditionAfter, 128);
+    assert.equal(decoded.ok, true);
+    if (decoded.ok) {
+      assert.equal(decoded.value.frameCount, 2);
+      assert.equal(decoded.value.animated, true);
+      assert.deepEqual(decoded.value.frameDelaysMs, [100, 100]);
+      assert.equal(decoded.value.loopCount, 1);
+    }
   });
 });
