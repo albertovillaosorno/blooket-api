@@ -116,8 +116,27 @@ test("fully panned-off foregrounds have zero visible area", () => {
   );
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.value.visible.width, 0);
-    assert.equal(result.value.visible.height, 8);
+    assert.deepEqual(result.value.visible, {
+      left: 8,
+      top: 0,
+      width: 0,
+      height: 8,
+    });
+  }
+
+  const opposite = resolveForegroundLayout(
+    { width: 1, height: 1 },
+    { width: 8, height: 8 },
+    { panX: -2, panY: 0, zoom: 1 },
+  );
+  assert.equal(opposite.ok, true);
+  if (opposite.ok) {
+    assert.deepEqual(opposite.value.visible, {
+      left: 0,
+      top: 0,
+      width: 0,
+      height: 8,
+    });
   }
 });
 

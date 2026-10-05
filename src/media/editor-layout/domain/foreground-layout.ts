@@ -93,10 +93,10 @@ export function resolveForegroundLayout(
     return { ok: false, code: "invalid-editor-layout" };
   }
 
-  const visibleLeft = Math.max(0, left);
-  const visibleTop = Math.max(0, top);
-  const visibleRight = Math.min(canvas.width, left + width);
-  const visibleBottom = Math.min(canvas.height, top + height);
+  const visibleLeft = Math.min(canvas.width, Math.max(0, left));
+  const visibleTop = Math.min(canvas.height, Math.max(0, top));
+  const visibleRight = Math.max(0, Math.min(canvas.width, left + width));
+  const visibleBottom = Math.max(0, Math.min(canvas.height, top + height));
 
   return {
     ok: true,
