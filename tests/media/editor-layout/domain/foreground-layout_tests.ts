@@ -140,6 +140,42 @@ test("fully panned-off foregrounds have zero visible area", () => {
   }
 });
 
+test("visible rectangles stay inside the canvas at extremes", () => {
+  const sources = [
+    { width: 1, height: 1 },
+    { width: 16, height: 9 },
+    { width: 9, height: 16 },
+  ];
+  const pans = [-3, -1, -0.25, 0, 0.25, 1, 3];
+  const zooms = [0.1, 1, 2, 10];
+
+  for (const source of sources) {
+    for (const panX of pans) {
+      for (const panY of pans) {
+        for (const zoom of zooms) {
+          const result = resolveForegroundLayout(
+            source,
+            { width: 320, height: 180 },
+            { panX, panY, zoom },
+          );
+          assert.equal(result.ok, true);
+          if (!result.ok) {
+            continue;
+          }
+
+          const visible = result.value.visible;
+          assert.equal(visible.left >= 0 && visible.left <= 320, true);
+          assert.equal(visible.top >= 0 && visible.top <= 180, true);
+          assert.equal(visible.width >= 0, true);
+          assert.equal(visible.height >= 0, true);
+          assert.equal(visible.left + visible.width <= 320, true);
+          assert.equal(visible.top + visible.height <= 180, true);
+        }
+      }
+    }
+  }
+});
+
 test("invalid dimensions and non-finite transforms fail closed", () => {
   assert.deepEqual(
     resolveForegroundLayout(
