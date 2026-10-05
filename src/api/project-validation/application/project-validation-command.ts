@@ -29,7 +29,6 @@
 // - Defaults:
 //   - Unresolved image requests are reported in the success summary.
 //
-import { parseJson } from "../../../ir/json-syntax/domain/json.ts";
 import type { ValidationIssue } from
   "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
@@ -40,14 +39,9 @@ import type { CommandEnvelope } from
   "../../../ir/wire-envelopes/contract/command-envelope.ts";
 import type { ResultEnvelope } from
   "../../../ir/wire-envelopes/contract/result-envelope.ts";
-import { decodeMediaJsonLines } from
-  "../../../media/media-index/domain/json-lines.ts";
-import { decodeProjectDocument } from
-  "../../../projects/project-documents/domain/project.ts";
-import {
-  countUnresolvedProjectImages,
-  validateProjectMediaReferences,
-} from
+import { decodeProjectBundle } from
+  "../../../projects/project-bundles/domain/project-bundle.ts";
+import { countUnresolvedProjectImages } from
   "../../../projects/project-validation/domain/media-references.ts";
 import { commandFailure, commandSuccess } from
   "../../command-execution/application/result.ts";
@@ -62,41 +56,17 @@ export function executeProjectValidationCommand(
     return commandFailure(command.operationId, payload.issues);
   }
 
-  const parsedProject = parseJson(payload.projectJson);
-  if (!parsedProject.ok) {
-    return commandFailure(command.operationId, [
-      {
-        path: "$.project",
-        code: "invalid-json",
-        message: parsedProject.message,
-      },
-    ]);
-  }
-
-  const project = decodeProjectDocument(parsedProject.value);
-  if (!project.ok) {
-    return commandFailure(command.operationId, project.issues);
-  }
-
-  const media = decodeMediaJsonLines(payload.mediaJsonl);
-  if (!media.ok) {
-    return commandFailure(command.operationId, media.issues);
-  }
-
-  const referenceIssues = validateProjectMediaReferences(
-    project.value,
-    media.value,
-  );
-  if (referenceIssues.length > 0) {
-    return commandFailure(command.operationId, referenceIssues);
+  const bundle = decodeProjectBundle(payload.projectJson, payload.mediaJsonl);
+  if (!bundle.ok) {
+    return commandFailure(command.operationId, bundle.issues);
   }
 
   return commandSuccess(command.operationId, {
-    title: project.value.title,
-    visibility: project.value.visibility,
-    questionCount: project.value.questions.length,
-    mediaCount: media.value.length,
-    unresolvedImageCount: countUnresolvedProjectImages(project.value),
+    title: bundle.value.project.title,
+    visibility: bundle.value.project.visibility,
+    questionCount: bundle.value.project.questions.length,
+    mediaCount: bundle.value.media.length,
+    unresolvedImageCount: countUnresolvedProjectImages(bundle.value.project),
   });
 }
 

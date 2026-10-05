@@ -1,0 +1,9 @@
+identity:
+  id: function:project-bundles
+  name: project-bundles
+  path: src/projects/project-bundles
+classification:
+  repository: blooket-api
+  domain: projects
+architecture:
+  kind: domain
