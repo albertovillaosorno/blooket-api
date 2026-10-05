@@ -78,6 +78,8 @@ const updatedFirstRecord = {
   english: false,
 } as const;
 const firstUpdate: MediaVaultUpdate = {
+  expectedRecord: firstRecord,
+  expectedRenditionSha256: sha256(firstImport.renditionBytes),
   record: updatedFirstRecord,
   renditionFormat: "png",
   renditionBytes: Uint8Array.from([40, 50, 60]),
@@ -172,6 +174,7 @@ test("original loading resolves one indexed immutable source", async () => {
         record: firstRecord,
         sourceFormat: "jpeg",
         bytes: Buffer.from(firstImport.originalBytes),
+        renditionSha256: sha256(firstImport.renditionBytes),
       },
     );
     assert.deepEqual(
@@ -264,6 +267,8 @@ test("identical edits are idempotent without creating backups", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importMediaVaultAsset(directory, firstImport);
     const identical: MediaVaultUpdate = {
+      expectedRecord: firstRecord,
+      expectedRenditionSha256: sha256(firstImport.renditionBytes),
       record: firstRecord,
       renditionFormat: "png",
       renditionBytes: firstImport.renditionBytes,
@@ -286,6 +291,8 @@ test("edits require an existing canonical media record", async () => {
 
     assert.deepEqual(
       await updateMediaVaultAsset(directory, {
+        expectedRecord: secondRecord,
+        expectedRenditionSha256: sha256(Uint8Array.from([99])),
         record: secondRecord,
         renditionFormat: "png",
         renditionBytes: Uint8Array.from([99]),
@@ -309,6 +316,41 @@ test("edits require an existing canonical media record", async () => {
         kind: "invalid",
         code: "media-path-mismatch",
       },
+    );
+  });
+});
+
+test("stale edit preconditions prevent lost updates", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await importMediaVaultAsset(directory, firstImport);
+    const stale = { ...firstUpdate };
+
+    assert.equal(
+      (await updateMediaVaultAsset(directory, firstUpdate)).ok,
+      true,
+    );
+    assert.deepEqual(
+      await updateMediaVaultAsset(directory, {
+        ...stale,
+        record: {
+          ...updatedFirstRecord,
+          description: "A stale overwrite.",
+        },
+        renditionBytes: Uint8Array.from([90, 91, 92]),
+      }),
+      {
+        ok: false,
+        kind: "conflict",
+        code: "media-edit-conflict",
+      },
+    );
+    assert.equal(
+      await readFile(join(directory, "media.jsonl"), "utf8"),
+      JSON.stringify(updatedFirstRecord) + "\n",
+    );
+    assert.deepEqual(
+      await readFile(join(directory, "media", "sun.png")),
+      Buffer.from(firstUpdate.renditionBytes),
     );
   });
 });

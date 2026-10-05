@@ -188,6 +188,8 @@ export async function editImage(
   const persisted = await updateMediaVaultAsset(
     request.vaultDirectory,
     {
+      expectedRecord: original.record,
+      expectedRenditionSha256: original.renditionSha256,
       record: record.value,
       renditionFormat: rendered.value.format,
       renditionBytes: rendered.value.bytes,

@@ -80,6 +80,8 @@ export interface MediaVaultImport {
 }
 
 export interface MediaVaultUpdate {
+  readonly expectedRecord: MediaRecord;
+  readonly expectedRenditionSha256: string;
   readonly record: MediaRecord;
   readonly renditionFormat: RenditionImageFormat;
   readonly renditionBytes: Uint8Array;
@@ -104,7 +106,8 @@ export type MediaVaultInvalidCode =
 export type MediaVaultConflictCode =
   | "media-id-conflict"
   | "media-path-conflict"
-  | "media-asset-conflict";
+  | "media-asset-conflict"
+  | "media-edit-conflict";
 
 export type MediaVaultOriginalResult =
   | {
@@ -112,6 +115,7 @@ export type MediaVaultOriginalResult =
       readonly record: MediaRecord;
       readonly sourceFormat: ImageFormat;
       readonly bytes: Uint8Array;
+      readonly renditionSha256: string;
     }
   | {
       readonly ok: false;
@@ -176,6 +180,11 @@ export type MediaVaultUpdateResult =
       readonly ok: false;
       readonly kind: "invalid";
       readonly code: MediaVaultInvalidCode;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "conflict";
+      readonly code: "media-edit-conflict";
     };
 
 interface ImportMarker {
@@ -356,8 +365,18 @@ export async function updateMediaVaultAsset(
   }
 
   const validated = decodeMediaRecord(input.record);
-  if (!validated.ok) {
+  const expected = decodeMediaRecord(input.expectedRecord);
+  if (!validated.ok || !expected.ok) {
     return invalidFailure("media-record-invalid");
+  }
+  if (!isSha256(input.expectedRenditionSha256)) {
+    return invalidFailure("media-update-invalid");
+  }
+  if (
+    expected.value.id !== validated.value.id
+    || expected.value.path !== validated.value.path
+  ) {
+    return invalidFailure("media-path-mismatch");
   }
   const renditionPath = mediaRenditionPath(
     validated.value.id,
@@ -383,7 +402,11 @@ export async function updateMediaVaultAsset(
   try {
     result = await updateMediaVaultAssetLocked(
       directory,
-      { ...input, record: validated.value },
+      {
+        ...input,
+        expectedRecord: expected.value,
+        record: validated.value,
+      },
     );
   } catch {
     result = ioFailure("media-vault-write-failed");
@@ -491,11 +514,23 @@ async function loadMediaVaultOriginalLocked(
   if (matches.length !== 1) {
     return ioFailure("media-vault-recovery-failed");
   }
+
+  const rendition = await readOwnedBinaryFile(
+    join(directory, record.path),
+  );
+  if (rendition.kind === "unsafe") {
+    return ioFailure("media-vault-unsafe");
+  }
+  if (rendition.kind !== "bytes") {
+    return ioFailure("media-vault-unreadable");
+  }
+
   return {
     ok: true,
     record,
     sourceFormat: matches[0]!.format,
     bytes: matches[0]!.bytes,
+    renditionSha256: sha256(rendition.value),
   };
 }
 
@@ -572,6 +607,16 @@ async function updateMediaVaultAssetLocked(
     return previousRendition.kind === "unsafe"
       ? ioFailure("media-vault-unsafe")
       : ioFailure("media-vault-unreadable");
+  }
+  if (
+    !sameRecord(previous, input.expectedRecord)
+    || sha256(previousRendition.value) !== input.expectedRenditionSha256
+  ) {
+    return {
+      ok: false,
+      kind: "conflict",
+      code: "media-edit-conflict",
+    };
   }
 
   const nextRecords = index.records.map((record) => {
