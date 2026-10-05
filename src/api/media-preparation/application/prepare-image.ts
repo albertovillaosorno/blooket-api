@@ -32,12 +32,14 @@
 import {
   renderImageRendition,
   type ImageRendition,
+  type ImageRenditionResult,
   type RenditionCanvas,
   type RenditionLimits,
 } from "../../../media/image-renditions/adapter-outbound/sharp-rendition.ts";
 import {
   admitSourceImage,
   type AdmittedSourceImage,
+  type SourceImageAdmissionResult,
 } from "../../../media/source-images/domain/source-image.ts";
 
 export interface PrepareImageRequest {
@@ -52,13 +54,28 @@ export interface PreparedImage {
   readonly rendition: ImageRendition;
 }
 
+type SourceFailure = Extract<
+  SourceImageAdmissionResult,
+  { readonly ok: false }
+>;
+
+type RenditionFailure = Extract<
+  ImageRenditionResult,
+  { readonly ok: false }
+>;
+
 export type PrepareImageResult =
   | { readonly ok: true; readonly value: PreparedImage }
   | {
       readonly ok: false;
-      readonly stage: "source" | "rendition";
-      readonly code: string;
-      readonly sourceCode?: string;
+      readonly stage: "source";
+      readonly code: SourceFailure["code"];
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "rendition";
+      readonly code: RenditionFailure["code"];
+      readonly sourceCode?: NonNullable<RenditionFailure["sourceCode"]>;
     };
 
 export async function prepareImage(
