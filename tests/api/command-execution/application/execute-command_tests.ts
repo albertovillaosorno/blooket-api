@@ -76,6 +76,39 @@ test("media.search returns deterministic matches", async () => {
   }
 });
 
+test("media.search can target persisted display names", async () => {
+  const namedMedia = JSON.stringify({
+    schemaVersion: 2,
+    id: "sun",
+    path: "media/sun.avif",
+    name: "Solar Star",
+    description: "A bright yellow sun in a clear blue sky.",
+    english: true,
+  }) + "\n";
+  const result = await executeCommand({
+    version: 1,
+    operationId: "test:media-name-search",
+    command: "media.search",
+    payload: {
+      mediaJsonl: namedMedia,
+      query: "solar star",
+      fields: ["name"],
+    },
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    const value = result.value as {
+      matches: readonly {
+        readonly media: { readonly id: string };
+        readonly matchedFields: readonly string[];
+      }[];
+    };
+    assert.equal(value.matches[0]?.media.id, "sun");
+    assert.deepEqual(value.matches[0]?.matchedFields, ["name"]);
+  }
+});
+
 test("project.validate composes all local project validators", async () => {
   const result = await executeCommand({
     version: 1,

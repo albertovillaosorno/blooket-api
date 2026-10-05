@@ -71,6 +71,27 @@ test("media search accepts repeatable fields and machine output", () => {
   }
 });
 
+test("media search accepts the display-name field", () => {
+  const result = parseCliArguments([
+    "media",
+    "search",
+    "bright sun",
+    "--field",
+    "name",
+  ]);
+
+  assert.deepEqual(result, {
+    ok: true,
+    invocation: {
+      kind: "media-search",
+      mediaPath: "media.jsonl",
+      query: "bright sun",
+      fields: ["name"],
+      json: false,
+    },
+  });
+});
+
 test("project validation accepts an explicit media index path", () => {
   const result = parseCliArguments([
     "project",

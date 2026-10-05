@@ -63,6 +63,7 @@ export type CliParseResult =
 
 const FIELD_VALUES = new Set<MediaSearchField>([
   "description",
+  "name",
   "id",
   "path",
 ]);

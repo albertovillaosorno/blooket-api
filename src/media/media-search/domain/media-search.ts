@@ -37,7 +37,7 @@ import {
 import type { MediaRecord } from
   "../../media-records/domain/media-record.ts";
 
-export type MediaSearchField = "description" | "id" | "path";
+export type MediaSearchField = "description" | "name" | "id" | "path";
 export type MediaSearchMode = "literal" | "regex";
 
 export interface MediaSearchRequest {

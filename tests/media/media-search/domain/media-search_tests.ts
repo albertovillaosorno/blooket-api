@@ -39,12 +39,14 @@ const records = [
   {
     id: "sun",
     path: "media/sun.avif",
+    name: "Bright Sun",
     description: "A bright yellow sun in a clear blue sky.",
     english: true,
   },
   {
     id: "stage-lm",
     path: "media/luis-miguel.gif",
+    name: "Concert Singer",
     description: "Luis Miguel singing on a concert stage.",
     english: false,
   },
@@ -66,6 +68,19 @@ test("description search does not accidentally match file paths", () => {
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.value.length, 0);
+  }
+});
+
+test("callers may explicitly search display names", () => {
+  const result = searchMedia(records, {
+    query: "concert singer",
+    fields: ["name"],
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.value[0]?.matchedFields, ["name"]);
+    assert.equal(result.value[0]?.media.id, "stage-lm");
   }
 });
 

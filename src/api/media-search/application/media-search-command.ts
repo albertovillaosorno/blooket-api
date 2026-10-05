@@ -61,6 +61,7 @@ const PAYLOAD_KEYS = new Set([
 ]);
 const SEARCH_FIELDS = new Set<MediaSearchField>([
   "description",
+  "name",
   "id",
   "path",
 ]);
@@ -177,7 +178,7 @@ function decodeFields(
       issues.push({
         path: `$.payload.fields[${index}]`,
         code: "invalid-search-field",
-        message: 'Expected "description", "id", or "path".',
+        message: 'Expected "description", "name", "id", or "path".',
       });
       continue;
     }

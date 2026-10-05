@@ -62,7 +62,8 @@ Usage:
 
 Media search options:
   --media <media.jsonl>          Override the current media.jsonl path.
-  --field <description|id|path>  Search one field; may be repeated.
+  --field <description|name|id|path>
+                               Search one field; may be repeated.
   --regex                        Interpret the query as a regular expression.
   --case-sensitive               Preserve case during matching.
   --limit <count>                Limit returned matches.
