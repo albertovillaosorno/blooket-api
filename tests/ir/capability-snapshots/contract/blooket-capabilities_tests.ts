@@ -131,6 +131,21 @@ test("version-one upload capabilities migrate unknown image limits", () => {
   }
 });
 
+test("future capability versions fail closed instead of migrating", () => {
+  const result = decodeBlooketCapabilitySnapshot({
+    ...verified,
+    schemaVersion: 3,
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some((issue) => issue.code === "unsupported-version"),
+      true,
+    );
+  }
+});
+
 test("version-one snapshots reject version-two upload fields", () => {
   const result = decodeBlooketCapabilitySnapshot({
     ...verified,
