@@ -158,8 +158,8 @@ type IndexReadResult =
 type FileState =
   | {
       readonly kind: "file";
-      readonly dev: number;
-      readonly ino: number;
+      readonly dev: bigint;
+      readonly ino: bigint;
     }
   | { readonly kind: "missing" }
   | { readonly kind: "unsafe" };
@@ -336,18 +336,22 @@ async function importMediaVaultAssetLocked(
     return conflictFailure("media-asset-conflict");
   }
 
+  let originalStaged = false;
+  let renditionStaged = false;
   try {
-    await writeAtomicFile(
-      join(directory, IMPORT_MARKER),
-      JSON.stringify(marker) + "\n",
-    );
     await expectCreated(
       paths.originalStage,
       input.originalBytes,
     );
+    originalStaged = true;
     await expectCreated(
       paths.renditionStage,
       input.renditionBytes,
+    );
+    renditionStaged = true;
+    await writeAtomicFile(
+      join(directory, IMPORT_MARKER),
+      JSON.stringify(marker) + "\n",
     );
 
     if (
@@ -399,9 +403,23 @@ async function importMediaVaultAssetLocked(
         originalPath: relativePaths.original,
       };
     }
-    return recovered === "rolled-back" || recovered === "none"
-      ? ioFailure("media-vault-write-failed")
-      : ioFailure("media-vault-recovery-failed");
+    if (recovered === "rolled-back") {
+      return ioFailure("media-vault-write-failed");
+    }
+    if (recovered === "none") {
+      try {
+        if (originalStaged) {
+          await removeDurableFile(paths.originalStage);
+        }
+        if (renditionStaged) {
+          await removeDurableFile(paths.renditionStage);
+        }
+        return ioFailure("media-vault-write-failed");
+      } catch {
+        return ioFailure("media-vault-recovery-failed");
+      }
+    }
+    return ioFailure("media-vault-recovery-failed");
   }
 }
 
@@ -705,7 +723,7 @@ async function readOwnedTextFile(path: string): Promise<
 
 async function fileState(path: string): Promise<FileState> {
   try {
-    const metadata = await lstat(path);
+    const metadata = await lstat(path, { bigint: true });
     if (metadata.isSymbolicLink() || !metadata.isFile()) {
       return { kind: "unsafe" };
     }
