@@ -1,0 +1,9 @@
+identity:
+  id: function:local-service
+  name: local-service
+  path: src/settings/local-service
+classification:
+  repository: blooket-api
+  domain: settings
+architecture:
+  kind: domain

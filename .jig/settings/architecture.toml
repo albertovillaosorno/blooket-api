@@ -26,7 +26,7 @@ depends_on = ["ir", "media"]
 depends_on = []
 
 [component.settings]
-depends_on = []
+depends_on = ["ir"]
 
 [component.ui_desktop]
 depends_on = ["api", "ui_general"]

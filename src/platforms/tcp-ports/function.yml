@@ -1,0 +1,9 @@
+identity:
+  id: function:tcp-ports
+  name: tcp-ports
+  path: src/platforms/tcp-ports
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
