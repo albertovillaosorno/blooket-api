@@ -79,6 +79,30 @@ test("durable create publishes once without overwriting", async () => {
   });
 });
 
+test(
+  "concurrent durable creates publish exactly one complete value",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const target = join(directory, "original.bin");
+      const first = Uint8Array.from([1, 2, 3, 4]);
+      const second = Uint8Array.from([5, 6, 7, 8]);
+
+      const results = await Promise.all([
+        writeDurableFileIfAbsent(target, first),
+        writeDurableFileIfAbsent(target, second),
+      ]);
+
+      assert.deepEqual(results.sort(), ["created", "exists"]);
+      const stored = await readFile(target);
+      assert.equal(
+        stored.equals(Buffer.from(first)) || stored.equals(Buffer.from(second)),
+        true,
+      );
+      assert.deepEqual(await readdir(directory), ["original.bin"]);
+    });
+  },
+);
+
 test("durable create refuses symbolic and non-file targets", async () => {
   await withTemporaryDirectory(async (directory) => {
     const realTarget = join(directory, "real.bin");
