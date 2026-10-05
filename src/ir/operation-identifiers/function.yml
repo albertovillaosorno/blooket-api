@@ -1,0 +1,9 @@
+identity:
+  id: function:operation-identifiers
+  name: operation-identifiers
+  path: src/ir/operation-identifiers
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: domain

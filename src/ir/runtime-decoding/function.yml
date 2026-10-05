@@ -1,0 +1,9 @@
+identity:
+  id: function:runtime-decoding
+  name: runtime-decoding
+  path: src/ir/runtime-decoding
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: domain

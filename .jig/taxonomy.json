@@ -3,6 +3,7 @@
   "version": 1,
   "architecture": {
     "kinds": {
+      "contract": {},
       "domain": {}
     }
   },

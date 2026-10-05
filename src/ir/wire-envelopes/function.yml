@@ -1,0 +1,9 @@
+identity:
+  id: function:wire-envelopes
+  name: wire-envelopes
+  path: src/ir/wire-envelopes
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract
