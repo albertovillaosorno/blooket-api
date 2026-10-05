@@ -2,7 +2,7 @@
 
 Only unfinished work belongs here. The roadmap is ordered by dependency depth:
 later layers may depend on earlier layers, while foundations must not depend on
-unfinished presentation or integration layers. P0 is the current foundation
+unfinished presentation or integration layers. P1 is the current implementation
 horizon.
 
 ## P1 — Projects, settings, security, and media
