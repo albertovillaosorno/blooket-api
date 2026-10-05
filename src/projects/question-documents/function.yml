@@ -1,0 +1,9 @@
+identity:
+  id: function:question-documents
+  name: question-documents
+  path: src/projects/question-documents
+classification:
+  repository: blooket-api
+  domain: projects
+architecture:
+  kind: domain

@@ -1,0 +1,9 @@
+identity:
+  id: function:project-documents
+  name: project-documents
+  path: src/projects/project-documents
+classification:
+  repository: blooket-api
+  domain: projects
+architecture:
+  kind: domain

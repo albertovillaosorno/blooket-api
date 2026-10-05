@@ -1,0 +1,9 @@
+identity:
+  id: function:image-requests
+  name: image-requests
+  path: src/projects/image-requests
+classification:
+  repository: blooket-api
+  domain: projects
+architecture:
+  kind: domain
