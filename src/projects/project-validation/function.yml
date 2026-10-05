@@ -1,0 +1,9 @@
+identity:
+  id: function:project-validation
+  name: project-validation
+  path: src/projects/project-validation
+classification:
+  repository: blooket-api
+  domain: projects
+architecture:
+  kind: domain
