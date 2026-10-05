@@ -1,0 +1,9 @@
+identity:
+  id: function:media-preparation
+  name: media-preparation
+  path: src/api/media-preparation
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
