@@ -1,9 +1,0 @@
-identity:
-  id: function:parser
-  name: parser
-  path: src/projects/parser
-classification:
-  repository: blooket-api
-  domain: projects
-architecture:
-  kind: domain

@@ -1,0 +1,9 @@
+identity:
+  id: function:json-syntax
+  name: json-syntax
+  path: src/ir/json-syntax
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: domain

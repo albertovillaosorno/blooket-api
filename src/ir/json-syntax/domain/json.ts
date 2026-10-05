@@ -9,9 +9,9 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - JSON syntax parsing for project documents.
+//   - JSON syntax parsing for untrusted documents.
 // - Must-Not:
-//   - Validate project semantics or repair malformed model output.
+//   - Validate document semantics or repair malformed model output.
 // - Allows:
 //   - Inputs: One UTF-8 JSON source string.
 //   - Outputs: One parsed unknown value or one syntax failure.
@@ -19,14 +19,14 @@
 // - Split-When:
 //   - Parsing acquires format-specific behavior beyond JSON syntax.
 // - Merge-When:
-//   - Project persistence becomes the sole owner of syntax parsing.
+//   - One transport becomes the sole owner of syntax parsing.
 // - Summary:
-//   - Parses untrusted project JSON without semantic coercion.
+//   - Parses untrusted untrusted JSON without semantic coercion.
 // - Description:
 //   - Uses the JavaScript runtime parser and preserves schema validation as a
 //     separate step.
 // - Usage:
-//   - Parse first, then pass the unknown value to a versioned project decoder.
+//   - Parse first, then pass the unknown value to a versioned runtime decoder.
 // - Defaults:
 //   - Malformed JSON fails without recovery guesses.
 //

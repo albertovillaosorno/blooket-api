@@ -74,8 +74,8 @@ The `<kind>` segment is the hexagonal role, such as `domain`, `application`,
 capability being implemented. Do not swap function and kind.
 
 Tests mirror source paths under `tests/` and use `_tests.ts`. For example,
-`src/projects/parser/domain/json.ts` is tested by
-`tests/projects/parser/domain/json_tests.ts`. Do not create loose catch-all test
+`src/ir/json-syntax/domain/json.ts` is tested by
+`tests/ir/json-syntax/domain/json_tests.ts`. Do not create loose catch-all test
 files such as `tests/json_validator_tests.ts` for code owned by a source path.
 
 ## JSON and LLM input

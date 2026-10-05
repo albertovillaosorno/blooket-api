@@ -9,9 +9,9 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Behavioral tests for project JSON syntax parsing.
+//   - Behavioral tests for untrusted JSON syntax parsing.
 // - Must-Not:
-//   - Test unrelated project schemas or Blooket behavior.
+//   - Test unrelated document schemas or Blooket behavior.
 // - Allows:
 //   - Inputs: Fixed JSON syntax fixtures.
 //   - Outputs: Deterministic Node test verdicts.
@@ -19,11 +19,11 @@
 // - Split-When:
 //   - Another parser contract gains independent fixtures.
 // - Merge-When:
-//   - JSON syntax parsing no longer exists as a separate project boundary.
+//   - JSON syntax parsing no longer exists as a separate runtime boundary.
 // - Summary:
 //   - Verifies valid parsing and fail-closed malformed JSON behavior.
 // - Description:
-//   - Mirrors src/projects/parser/domain/json.ts exactly.
+//   - Mirrors src/ir/json-syntax/domain/json.ts exactly.
 // - Usage:
 //   - Run through the repository Node test command.
 // - Defaults:
@@ -32,7 +32,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseJson } from "../../../../src/projects/parser/domain/json.ts";
+import { parseJson } from "../../../../src/ir/json-syntax/domain/json.ts";
 
 test("parseJson preserves valid JSON values", () => {
   const result = parseJson("{\"title\":\"Lesson 5\",\"questions\":[]}");
