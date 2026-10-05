@@ -7,11 +7,13 @@ horizon.
 
 ## P1 — Projects, settings, security, and media
 
-### TODO - Implement media import and rendition pipeline
+### TODO - Complete media intake and durable vault publication
 
-Accept paste, drag-and-drop, files, and browser-extension intake; preserve
-originals; decode supported static and animated formats; produce the fixed
-Blooket canvas; enforce byte limits; and retain GIF animation where supported.
+Wire paste, drag-and-drop, file, and browser-extension intake into the shared
+image-preparation operation. Publish immutable originals and bounded renditions
+transactionally with vault metadata, stable conflict handling, and recovery.
+Bind canvas, pixel, and upload-byte limits from verified capability data rather
+than hard-coding unverified Blooket values.
 
 ### TODO - Implement media editor operations
 
