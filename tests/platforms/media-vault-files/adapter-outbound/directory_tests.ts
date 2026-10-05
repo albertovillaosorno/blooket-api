@@ -483,10 +483,8 @@ test("legacy edit markers recover against legacy JSONL", async () => {
       description: "A warm edited sun.",
       english: false,
     };
-    const previousIndex = JSON.stringify(previousRecord) + "
-";
-    const nextIndex = JSON.stringify(nextRecord) + "
-";
+    const previousIndex = JSON.stringify(previousRecord) + "\n";
+    const nextIndex = JSON.stringify(nextRecord) + "\n";
     const previousRendition = Buffer.from(firstImport.renditionBytes);
     const nextRendition = Buffer.from(firstUpdate.renditionBytes);
     const marker = {
@@ -513,8 +511,7 @@ test("legacy edit markers recover against legacy JSONL", async () => {
     );
     await writeFile(
       join(directory, ".blooket-api-media-edit.json"),
-      JSON.stringify(marker) + "
-",
+      JSON.stringify(marker) + "\n",
     );
 
     assert.deepEqual(await loadMediaVault(directory), {
