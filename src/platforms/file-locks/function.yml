@@ -1,0 +1,9 @@
+identity:
+  id: function:file-locks
+  name: file-locks
+  path: src/platforms/file-locks
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
