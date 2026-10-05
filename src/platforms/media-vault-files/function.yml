@@ -1,0 +1,9 @@
+identity:
+  id: function:media-vault-files
+  name: media-vault-files
+  path: src/platforms/media-vault-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
