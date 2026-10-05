@@ -10,6 +10,30 @@ kind = "tool"
 target = "git"
 template = "{version}"
 
+[authority.node-types]
+current = "24.19.1"
+stable = "26.6.4"
+
+[authority.node-types.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/@types%2fnode/latest"
+
+[authority.node-types.projection.package]
+kind = "package"
+target = "@types/node"
+template = "{version}"
+
+[authority.node-types.skip.node_24_runtime]
+evidence = "docs/technical/adr/node-24-type-compatibility.md"
+expires_on = "2027-01-05"
+owner = "repository-maintainers"
+reason = "Node 24 runtime requires matching Node 24 declarations."
+review_state = "approved"
+scope = ["package"]
+version = "26.6.4"
+
 [authority.pnpm]
 current = "12.9.1"
 stable = "12.9.1"

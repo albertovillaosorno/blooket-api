@@ -4,3 +4,13 @@ paragraph_sentence_limit = 4
 path_style = "lower-kebab"
 required_paths = []
 roots = ["docs/"]
+
+[profile.blooket-technical-adr]
+decision_id = "required"
+decision_id_prefix = "blooket-api"
+decision_id_section = "Decision ID"
+decision_id_style = "dotted-lower-kebab"
+kind = "adr"
+paths = ["docs/technical/adr/"]
+section_mode = "exact"
+sections = ["Status", "Decision ID", "Context", "Decision", "Consequences", "Rejected Alternatives", "Verification"]

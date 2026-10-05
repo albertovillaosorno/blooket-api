@@ -3,6 +3,7 @@
   "version": 1,
   "architecture": {
     "kinds": {
+      "adapter-outbound": {},
       "contract": {},
       "domain": {}
     }

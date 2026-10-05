@@ -1,0 +1,9 @@
+identity:
+  id: function:atomic-files
+  name: atomic-files
+  path: src/platforms/atomic-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
