@@ -1,0 +1,9 @@
+identity:
+  id: function:image-renditions
+  name: image-renditions
+  path: src/media/image-renditions
+classification:
+  repository: blooket-api
+  domain: media
+architecture:
+  kind: adapter-outbound

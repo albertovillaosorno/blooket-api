@@ -35,35 +35,9 @@ import {
   type ImageFormatInfo,
 } from "../../image-formats/domain/image-format.ts";
 
-interface SharpInputOptions {
-  readonly animated: boolean;
-  readonly failOn: "warning";
-  readonly limitInputPixels: number | boolean;
-}
-
-interface SharpMetadata {
-  readonly format?: string;
-  readonly compression?: string;
-  readonly width?: number;
-  readonly height?: number;
-  readonly pages?: number;
-  readonly pageHeight?: number;
-  readonly loop?: number;
-  readonly delay?: readonly number[];
-}
-
-interface SharpPipeline {
-  metadata(): Promise<SharpMetadata>;
-  raw(): SharpPipeline;
-  toBuffer(): Promise<Uint8Array>;
-}
-
-type SharpFactory = (
-  input: Uint8Array,
-  options: SharpInputOptions,
-) => SharpPipeline;
-
-let sharpFactory: SharpFactory | undefined;
+import {
+  loadSharp,
+} from "../../sharp-runtime/adapter-outbound/sharp-runtime.ts";
 
 export interface DecodedSourceImage {
   readonly format: ImageFormatInfo;
@@ -170,22 +144,6 @@ export async function decodeSourceImage(
   } catch {
     return { ok: false, code: "image-decode-failed" };
   }
-}
-
-async function loadSharp(): Promise<SharpFactory> {
-  if (sharpFactory !== undefined) {
-    return sharpFactory;
-  }
-
-  const moduleUrl = new URL(
-    "../../../../.dependencies/pnpm/node_modules/sharp/dist/index.mjs",
-    import.meta.url,
-  );
-  const loaded = await import(moduleUrl.href) as {
-    readonly default: SharpFactory;
-  };
-  sharpFactory = loaded.default;
-  return sharpFactory;
 }
 
 function normalizeDecoderFormat(
