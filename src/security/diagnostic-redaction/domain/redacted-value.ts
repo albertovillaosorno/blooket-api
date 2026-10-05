@@ -78,17 +78,29 @@ export function isSensitiveDiagnosticKey(key: string): boolean {
   return SENSITIVE_KEY_MARKERS.some((marker) => normalized.includes(marker));
 }
 
+export function containsSensitiveDiagnosticText(value: string): boolean {
+  const credentialAssignment =
+    /\b(?:authorization|cookie|password|passwd)\b\s*[:=]/iu;
+  const secretAssignment = /\b(?:session|secret|token)\b\s*[:=]/iu;
+  const apiKeyAssignment = /\bapi[ _-]?key\b\s*[:=]/iu;
+  const bearer = /\bbearer\s+[a-z0-9._~+/=-]{4,}/iu;
+  return credentialAssignment.test(value)
+    || secretAssignment.test(value)
+    || apiKeyAssignment.test(value)
+    || bearer.test(value);
+}
+
 function redact(
   value: unknown,
   depth: number,
   seen: WeakSet<object>,
 ): RedactedDiagnosticValue {
-  if (
-    value === null
-    || typeof value === "boolean"
-    || typeof value === "string"
-  ) {
+  if (value === null || typeof value === "boolean") {
     return value;
+  }
+
+  if (typeof value === "string") {
+    return containsSensitiveDiagnosticText(value) ? REDACTED : value;
   }
 
   if (typeof value === "number") {

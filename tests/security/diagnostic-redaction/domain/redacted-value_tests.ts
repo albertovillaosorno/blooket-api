@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  containsSensitiveDiagnosticText,
   isSensitiveDiagnosticKey,
   redactDiagnosticValue,
 } from "../../../../src/security/diagnostic-redaction/domain/redacted-value.ts";
@@ -92,4 +93,20 @@ test("diagnostics replace cycles instead of traversing them", () => {
   assert.deepEqual(redactDiagnosticValue(source), {
     self: "[CIRCULAR]",
   });
+});
+
+
+test("secret-looking free text is redacted even under safe keys", () => {
+  const value = redactDiagnosticValue({
+    detail: "request failed: authorization=Bearer secret-token",
+    note: "ordinary diagnostic text",
+  });
+
+  assert.deepEqual(value, {
+    detail: "[REDACTED]",
+    note: "ordinary diagnostic text",
+  });
+  assert.equal(containsSensitiveDiagnosticText("Bearer abcdef"), true);
+  assert.equal(containsSensitiveDiagnosticText("session=abcdef"), true);
+  assert.equal(containsSensitiveDiagnosticText("question failed"), false);
 });

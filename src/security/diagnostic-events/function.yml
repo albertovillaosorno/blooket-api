@@ -1,0 +1,9 @@
+identity:
+  id: function:diagnostic-events
+  name: diagnostic-events
+  path: src/security/diagnostic-events
+classification:
+  repository: blooket-api
+  domain: security
+architecture:
+  kind: domain

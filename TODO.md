@@ -24,12 +24,6 @@ unknown fields and coercions unless a versioned schema explicitly admits them.
 Define the project, settings, vault, temporary-file, lock, backup, flush, and
 atomic-replace rules needed to guarantee interruption-safe local state.
 
-### TODO - Establish no-secret observability
-
-Define structured diagnostics and logging with explicit secret redaction so
-credentials, cookies, authorization material, and sensitive browser state can
-never cross an observability boundary.
-
 ## P1 — Projects, settings, security, and media
 
 ### TODO - Implement project persistence

@@ -23,7 +23,7 @@ depends_on = ["security", "settings"]
 depends_on = ["ir", "media"]
 
 [component.security]
-depends_on = []
+depends_on = ["ir"]
 
 [component.settings]
 depends_on = ["ir"]
