@@ -1,0 +1,9 @@
+identity:
+  id: function:argument-parsing
+  name: argument-parsing
+  path: src/cli/argument-parsing
+classification:
+  repository: blooket-api
+  domain: cli
+architecture:
+  kind: adapter-inbound

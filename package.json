@@ -6,7 +6,8 @@
   "scripts": {
     "check": ".dependencies/pnpm/node_modules/.bin/tsc -p tsconfig.json",
     "test": "node --test $(find tests -type f -name '*_tests.ts' -print)",
-    "validate": "pnpm run check && pnpm run test && jig validate --root ."
+    "validate": "pnpm run check && pnpm run test && jig validate --root .",
+    "blooket": "node src/cli/executable/adapter-inbound/blooket.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

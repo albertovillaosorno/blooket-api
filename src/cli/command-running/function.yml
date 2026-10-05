@@ -1,0 +1,9 @@
+identity:
+  id: function:command-running
+  name: command-running
+  path: src/cli/command-running
+classification:
+  repository: blooket-api
+  domain: cli
+architecture:
+  kind: adapter-inbound

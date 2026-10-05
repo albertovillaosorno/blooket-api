@@ -1,0 +1,9 @@
+identity:
+  id: function:command-execution
+  name: command-execution
+  path: src/api/command-execution
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application

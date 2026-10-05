@@ -1,0 +1,9 @@
+identity:
+  id: function:media-search
+  name: media-search
+  path: src/api/media-search
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application

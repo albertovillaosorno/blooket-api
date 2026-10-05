@@ -3,7 +3,9 @@
   "version": 1,
   "architecture": {
     "kinds": {
+      "adapter-inbound": {},
       "adapter-outbound": {},
+      "application": {},
       "contract": {},
       "domain": {}
     }

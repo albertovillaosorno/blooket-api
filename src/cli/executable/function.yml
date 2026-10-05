@@ -1,0 +1,9 @@
+identity:
+  id: function:executable
+  name: executable
+  path: src/cli/executable
+classification:
+  repository: blooket-api
+  domain: cli
+architecture:
+  kind: adapter-inbound
