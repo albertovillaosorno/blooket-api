@@ -39,6 +39,8 @@ import {
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
+import { decodeMediaId } from
+  "../../media-identifiers/domain/media-id.ts";
 
 export interface MediaRecord {
   readonly id: string;
@@ -48,8 +50,6 @@ export interface MediaRecord {
 }
 
 const MEDIA_KEYS = new Set(["id", "path", "description", "english"]);
-const MEDIA_ID = /^[a-z0-9](?:[a-z0-9._-]{0,127})$/u;
-
 export function decodeMediaRecord(value: unknown): DecodeResult<MediaRecord> {
   if (!isRecord(value)) {
     return decodeFailure("$", "expected-object", "Expected a media record.");
@@ -67,12 +67,9 @@ export function decodeMediaRecord(value: unknown): DecodeResult<MediaRecord> {
   );
   const english = value["english"];
 
-  if (id !== undefined && !MEDIA_ID.test(id)) {
-    issues.push({
-      path: "$.id",
-      code: "invalid-media-id",
-      message: "Expected a lowercase stable media identifier.",
-    });
+  const mediaId = decodeMediaId(id, "$.id");
+  if (!mediaId.ok) {
+    issues.push(...mediaId.issues);
   }
 
   if (path !== undefined && !isLocalMediaPath(path)) {
