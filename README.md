@@ -274,7 +274,14 @@ Sharp/libvips adapter before durable publication.
 The media pipeline keeps the original and creates a fixed-dimension Blooket
 rendition separately. Static images use an automatic blurred-background fill
 when aspect ratios do not match, with pan and zoom controlling the foreground
-crop.
+crop. Capability snapshot version two carries nullable canvas, output-pixel, and
+upload-byte limits; legacy version-one snapshots migrate those facts to unknown
+instead of guessing values.
+
+Editor state is immutable and uses an explicit bounded undo/redo history. Zoom
+one means neutral contain scaling. Pan coordinates are fractions of the canvas:
+pan X of one shifts the foreground center by one full canvas width, and pan Y
+uses the corresponding canvas height.
 
 The first editor surface is intentionally small: pan, zoom, keyboard nudging,
 contrast, saturation, simple rectangular blur/redaction, naming, description,

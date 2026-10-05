@@ -7,17 +7,18 @@ horizon.
 
 ## P1 — Projects, settings, security, and media
 
-### TODO - Wire media intake surfaces and verified limits
+### TODO - Wire media intake surfaces and capture verified limits
 
-Connect paste, drag-and-drop, file, and browser-extension intake to the shared
-durable image-import operation. Bind canvas, pixel, and upload-byte limits from
-verified capability data rather than hard-coding unverified Blooket values.
+Connect paste, drag-and-drop, file, and browser-extension host adapters to the
+capability-bound durable image-import operation once the localhost boundary is
+available. Populate the version-two canvas, pixel, and upload-byte fields only
+from verified Blooket evidence; unknown values continue to fail closed.
 
-### TODO - Implement media editor operations
+### TODO - Render and persist media editor operations
 
-Implement pan, zoom, keyboard nudging, contrast, saturation, rectangular
-blur/redaction, naming, description editing, and undo/redo without generative
-fill.
+Apply the existing editor state/history and pan/zoom geometry to bounded Sharp
+rendering for pan, zoom, contrast, saturation, and rectangular blur/redaction.
+Persist edited metadata and renditions without mutating immutable originals.
 
 ### TODO - Implement host secret storage
 
@@ -27,11 +28,11 @@ Manager can be added later without changing callers.
 
 ## P2 — Blooket execution boundary
 
-### TODO - Define verified Blooket capabilities
+### TODO - Complete verified Blooket capabilities
 
-Record the currently observed question types, answer counts, media availability,
-account-dependent features, upload constraints, navigation states, and other
-facts as explicit capability data with fixtures and verification dates.
+Extend the dated official-document fixture with authenticated browser
+observations for upload constraints, account-dependent behavior, navigation
+states, and other facts that official documentation does not establish.
 
 ### TODO - Implement Blooket navigation state machine
 

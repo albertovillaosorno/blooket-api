@@ -45,6 +45,11 @@ account-dependent facts remain explicit values until fresh evidence supports a
 more specific state. Project validation may reject a capability-dependent write
 without mutating the project document.
 
+Blooket capability snapshot version two adds image canvas dimensions, maximum
+pixels, and upload bytes. Version-one snapshots migrate those added facts to
+null; only version-two evidence may make them concrete. Media import keeps local
+source-resource ceilings separate from these Blooket-facing constraints.
+
 ## Consequences
 
 - Old data fails predictably or migrates through a tested path.
