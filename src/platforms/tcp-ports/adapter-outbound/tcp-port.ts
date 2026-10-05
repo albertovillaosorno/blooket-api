@@ -32,10 +32,48 @@
 //
 import { createServer } from "node:net";
 
+import type { LocalServiceSettings } from
+  "../../../settings/local-service/domain/local-service-settings.ts";
+
 export type PortProbeResult =
   | { readonly kind: "available" }
   | { readonly kind: "in-use" }
   | { readonly kind: "unavailable"; readonly code: string };
+
+export type ConfiguredPortResolution =
+  | {
+      readonly ok: true;
+      readonly settings: LocalServiceSettings;
+      readonly changed: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly code: "configured-port-in-use" | "port-allocation-failed";
+    };
+
+export async function resolveConfiguredTcpPort(
+  settings: LocalServiceSettings,
+): Promise<ConfiguredPortResolution> {
+  const probe = await probeTcpPort(settings.bindAddress, settings.port);
+  if (probe.kind === "available") {
+    return { ok: true, settings, changed: false };
+  }
+
+  if (settings.portMode === "fixed") {
+    return { ok: false, code: "configured-port-in-use" };
+  }
+
+  try {
+    const port = await chooseAutomaticTcpPort(settings.bindAddress);
+    return {
+      ok: true,
+      settings: { ...settings, port },
+      changed: port !== settings.port,
+    };
+  } catch {
+    return { ok: false, code: "port-allocation-failed" };
+  }
+}
 
 export async function probeTcpPort(
   bindAddress: string,

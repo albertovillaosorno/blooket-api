@@ -31,12 +31,6 @@ Implement pan, zoom, keyboard nudging, contrast, saturation, rectangular
 blur/redaction, naming, description editing, and undo/redo without generative
 fill.
 
-### TODO - Implement settings and port collision handling
-
-Persist loopback address, preferred port, startup preferences, theme behavior,
-and other user settings. Detect occupied ports before bind and support explicit
-or automatically persisted alternatives.
-
 ### TODO - Implement host secret storage
 
 Use macOS Keychain for the product-quality target and a standard Linux secret

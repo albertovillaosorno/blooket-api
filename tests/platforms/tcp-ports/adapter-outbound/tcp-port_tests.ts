@@ -36,6 +36,7 @@ import test from "node:test";
 import {
   chooseAutomaticTcpPort,
   probeTcpPort,
+  resolveConfiguredTcpPort,
 } from "../../../../src/platforms/tcp-ports/adapter-outbound/tcp-port.ts";
 
 const LOOPBACK = "127.0.0.1";
@@ -90,3 +91,62 @@ function close(server: Server): Promise<void> {
     });
   });
 }
+
+
+test("fixed mode reports an occupied configured port", async () => {
+  const server = await listenOnAutomaticPort();
+  try {
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("test server did not expose a TCP address");
+    }
+    const result = await resolveConfiguredTcpPort({
+      schemaVersion: 2,
+      bindAddress: LOOPBACK,
+      port: address.port,
+      portMode: "fixed",
+      launchAtLogin: false,
+      startMinimized: false,
+      startServiceOnLaunch: true,
+      theme: "system",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "configured-port-in-use",
+    });
+  } finally {
+    await close(server);
+  }
+});
+
+test("automatic mode selects a new concrete port after collision", async () => {
+  const server = await listenOnAutomaticPort();
+  try {
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("test server did not expose a TCP address");
+    }
+    const result = await resolveConfiguredTcpPort({
+      schemaVersion: 2,
+      bindAddress: LOOPBACK,
+      port: address.port,
+      portMode: "automatic",
+      launchAtLogin: false,
+      startMinimized: false,
+      startServiceOnLaunch: true,
+      theme: "system",
+    });
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.changed, true);
+      assert.notEqual(result.settings.port, address.port);
+      assert.deepEqual(await probeTcpPort(LOOPBACK, result.settings.port), {
+        kind: "available",
+      });
+    }
+  } finally {
+    await close(server);
+  }
+});
