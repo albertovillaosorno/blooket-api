@@ -270,6 +270,65 @@ test("rollback preserves a final file with a different inode", async () => {
   });
 });
 
+test("committed metadata with missing assets fails recovery", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await writeMarker(directory);
+    await writeFile(
+      join(directory, "media.jsonl"),
+      JSON.stringify(firstRecord) + "\n",
+    );
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: false,
+      kind: "io",
+      code: "media-vault-recovery-failed",
+    });
+    assert.equal(
+      await pathExists(join(directory, ".blooket-api-media-import.json")),
+      true,
+    );
+  });
+});
+
+test("unproven orphan finals survive failed recovery", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await mkdir(join(directory, "originals"), { recursive: true });
+    await writeMarker(directory);
+    const original = join(directory, "originals", "sun.jpg");
+    await writeFile(original, "unproven");
+
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: false,
+      kind: "io",
+      code: "media-vault-recovery-failed",
+    });
+    assert.equal(await readFile(original, "utf8"), "unproven");
+  });
+});
+
+test("invalid indexes reject imports before asset publication", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    await writeFile(join(directory, "media.jsonl"), "{invalid\n");
+
+    assert.deepEqual(
+      await importMediaVaultAsset(directory, firstImport),
+      {
+        ok: false,
+        kind: "invalid",
+        code: "media-index-invalid",
+      },
+    );
+    assert.equal(
+      await pathExists(join(directory, "originals", "sun.jpg")),
+      false,
+    );
+    assert.equal(
+      await pathExists(join(directory, "media", "sun.png")),
+      false,
+    );
+  });
+});
+
 test("corrupt markers fail closed without deleting assets", async () => {
   await withTemporaryDirectory(async (directory) => {
     await mkdir(join(directory, "originals"), { recursive: true });
@@ -305,6 +364,22 @@ test("symbolic vault asset directories are refused", async () => {
     );
   });
 });
+
+async function writeMarker(directory: string): Promise<void> {
+  const marker = {
+    version: 1,
+    id: firstRecord.id,
+    description: firstRecord.description,
+    english: firstRecord.english,
+    sourceFormat: firstImport.sourceFormat,
+    renditionFormat: firstImport.renditionFormat,
+    token: TOKEN,
+  } as const;
+  await writeFile(
+    join(directory, ".blooket-api-media-import.json"),
+    JSON.stringify(marker) + "\n",
+  );
+}
 
 async function createInterruptedFixture(
   directory: string,
