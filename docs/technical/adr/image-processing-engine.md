@@ -61,6 +61,8 @@ until equivalent preservation behavior is implemented and covered by tests.
 - Native package updates require normal Jig version review and regression tests.
 - Packaging must include the platform-specific Sharp/libvips artifacts selected
   by pnpm for the target host.
+- Distribution packaging must preserve applicable third-party license notices
+  and satisfy the LGPL terms reported by the prebuilt libvips package.
 
 ## Rejected Alternatives
 
