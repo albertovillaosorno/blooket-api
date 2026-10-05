@@ -46,6 +46,7 @@ import test from "node:test";
 import {
   removeDurableFile,
   writeAtomicFile,
+  writeDurableFileIfAbsent,
 } from "../../../../src/platforms/atomic-files/adapter-outbound/atomic-file.ts";
 
 async function withTemporaryDirectory(
@@ -58,6 +59,43 @@ async function withTemporaryDirectory(
     await rm(directory, { recursive: true, force: true });
   }
 }
+
+test("durable create publishes once without overwriting", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const target = join(directory, "original.png");
+
+    assert.equal(
+      await writeDurableFileIfAbsent(target, Uint8Array.from([1, 2, 3])),
+      "created",
+    );
+    assert.equal(
+      await writeDurableFileIfAbsent(target, Uint8Array.from([9, 9, 9])),
+      "exists",
+    );
+
+    assert.deepEqual(await readFile(target), Buffer.from([1, 2, 3]));
+    assert.equal((await lstat(target)).mode & 0o777, 0o600);
+    assert.deepEqual(await readdir(directory), ["original.png"]);
+  });
+});
+
+test("durable create refuses symbolic and non-file targets", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const realTarget = join(directory, "real.bin");
+    const symbolicTarget = join(directory, "symbolic.bin");
+    await writeFile(realTarget, "safe", { mode: 0o600 });
+    await symlink(realTarget, symbolicTarget);
+
+    await assert.rejects(
+      writeDurableFileIfAbsent(symbolicTarget, "unsafe"),
+    );
+    assert.equal(await readFile(realTarget, "utf8"), "safe");
+
+    await assert.rejects(
+      writeDurableFileIfAbsent(directory, "unsafe"),
+    );
+  });
+});
 
 test("atomic writes create an owner-only file", async () => {
   await withTemporaryDirectory(async (directory) => {

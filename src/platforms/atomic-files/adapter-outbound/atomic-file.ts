@@ -9,21 +9,21 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Crash-resistant replacement of one local file on supported hosts.
+//   - Crash-resistant publication, replacement, and removal of local files.
 // - Must-Not:
 //   - Choose product paths, serialize domain values, or accept LLM path text.
 // - Allows:
 //   - Inputs: Trusted target paths, validated bytes, and backup preferences.
-//   - Outputs: Atomically replaced files and optional previous-value backups.
-//   - Side effects: Local filesystem writes, renames, syncs, and cleanup.
+//   - Outputs: Durable published/replaced files and previous-value backups.
+//   - Side effects: Local filesystem writes, publication, syncs, and cleanup.
 // - Split-When:
 //   - Windows replacement semantics need a distinct host implementation.
 // - Merge-When:
 //   - All supported hosts share one proven replacement primitive.
 // - Summary:
-//   - Implements durable same-directory atomic file replacement.
+//   - Implements durable same-directory file publication and replacement.
 // - Description:
-//   - Syncs new bytes before rename and the containing directory afterward.
+//   - Syncs new bytes before publication and the containing directory after.
 // - Usage:
 //   - Call only after the owning domain validates content and selects the path.
 // - Defaults:
@@ -32,6 +32,7 @@
 import { randomUUID } from "node:crypto";
 import {
   copyFile,
+  link,
   lstat,
   mkdir,
   open,
@@ -43,6 +44,47 @@ import { basename, dirname, join } from "node:path";
 export interface AtomicWriteOptions {
   readonly backupPath?: string;
   readonly mode?: number;
+}
+
+export type DurableCreateResult = "created" | "exists";
+
+export async function writeDurableFileIfAbsent(
+  targetPath: string,
+  contents: string | Uint8Array,
+  mode = 0o600,
+): Promise<DurableCreateResult> {
+  const directory = dirname(targetPath);
+  const targetName = basename(targetPath);
+  const token = randomUUID();
+  const temporaryPath = join(
+    directory,
+    "." + targetName + "." + token + ".tmp",
+  );
+
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const existing = await regularFileState(targetPath);
+  if (existing === "file") {
+    return "exists";
+  }
+
+  try {
+    await writeSyncedFile(temporaryPath, contents, mode);
+    try {
+      await link(temporaryPath, targetPath);
+    } catch (error: unknown) {
+      if (!isCode(error, "EEXIST")) {
+        throw error;
+      }
+      if (await regularFileState(targetPath) === "file") {
+        return "exists";
+      }
+      throw error;
+    }
+    await syncDirectory(directory);
+    return "created";
+  } finally {
+    await removeIfPresent(temporaryPath);
+  }
 }
 
 export async function removeDurableFile(targetPath: string): Promise<void> {
@@ -147,6 +189,23 @@ async function refuseSymbolicTarget(path: string): Promise<void> {
   }
 }
 
+async function regularFileState(
+  path: string,
+): Promise<"file" | "missing"> {
+  try {
+    const metadata = await lstat(path);
+    if (metadata.isSymbolicLink() || !metadata.isFile()) {
+      throw new Error("Refusing non-regular file target: " + path);
+    }
+    return "file";
+  } catch (error: unknown) {
+    if (isMissingPathError(error)) {
+      return "missing";
+    }
+    throw error;
+  }
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await lstat(path);
@@ -173,7 +232,11 @@ async function removeIfPresent(path: string): Promise<void> {
 }
 
 function isMissingPathError(error: unknown): boolean {
+  return isCode(error, "ENOENT");
+}
+
+function isCode(error: unknown, code: string): boolean {
   return error instanceof Error
     && "code" in error
-    && error.code === "ENOENT";
+    && error.code === code;
 }
