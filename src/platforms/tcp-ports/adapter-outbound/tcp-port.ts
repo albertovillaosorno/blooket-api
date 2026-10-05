@@ -48,7 +48,10 @@ export type ConfiguredPortResolution =
     }
   | {
       readonly ok: false;
-      readonly code: "configured-port-in-use" | "port-allocation-failed";
+      readonly code:
+        | "configured-port-in-use"
+        | "configured-port-unavailable"
+        | "port-allocation-failed";
     };
 
 export async function resolveConfiguredTcpPort(
@@ -60,7 +63,12 @@ export async function resolveConfiguredTcpPort(
   }
 
   if (settings.portMode === "fixed") {
-    return { ok: false, code: "configured-port-in-use" };
+    return {
+      ok: false,
+      code: probe.kind === "in-use"
+        ? "configured-port-in-use"
+        : "configured-port-unavailable",
+    };
   }
 
   try {

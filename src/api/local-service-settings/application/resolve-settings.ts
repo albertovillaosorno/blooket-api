@@ -45,6 +45,7 @@ export type ResolvedLocalServiceSettings =
       readonly code:
         | "settings-load-failed"
         | "configured-port-in-use"
+        | "configured-port-unavailable"
         | "port-allocation-failed"
         | "settings-save-failed";
     };
