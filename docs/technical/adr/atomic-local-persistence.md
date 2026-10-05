@@ -81,13 +81,16 @@ Media-vault originals are immutable after a stable media identity is committed.
 An import derives `originals/<id>.<source>` and `media/<id>.<rendition>` from
 validated identity and formats; callers never select those relative paths.
 
-The vault writes transaction-specific staging files in each asset directory and
-durably hard-links them to the final no-clobber paths. Staging links remain
-until `media.jsonl` is atomically replaced, making the metadata replacement the
-commit point. The index retains one previous-value `media.jsonl.bak`.
+The vault writes both transaction-specific staging files first. It then
+publishes a strict marker containing only validated metadata, formats, and a
+transaction UUID before durably hard-linking staging files to final no-clobber
+paths. A visible marker therefore refers only to staging files that this writer
+successfully created.
 
-A strict marker records only validated metadata, formats, and a transaction
-UUID.
+Staging links remain until `media.jsonl` is atomically replaced, making the
+metadata replacement the commit point. The index retains one previous-value
+`media.jsonl.bak`.
+
 If an interrupted import has no committed metadata, recovery removes a final
 asset only when its staging path still proves the same filesystem device and
 inode. A different inode is preserved, and a final file without sufficient
