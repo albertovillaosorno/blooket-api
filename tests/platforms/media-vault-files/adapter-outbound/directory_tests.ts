@@ -166,6 +166,39 @@ test("later imports retain one previous canonical index backup", async () => {
   });
 });
 
+test("concurrent distinct imports preserve both metadata updates", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const results = await Promise.all([
+      importMediaVaultAsset(directory, firstImport),
+      importMediaVaultAsset(directory, secondImport),
+    ]);
+
+    assert.equal(results.filter((result) => result.ok).length, 1);
+    assert.equal(
+      results.filter(
+        (result) => !result.ok
+          && result.kind === "io"
+          && result.code === "media-vault-locked",
+      ).length,
+      1,
+    );
+
+    const retry = results[0]?.ok
+      ? await importMediaVaultAsset(directory, secondImport)
+      : await importMediaVaultAsset(directory, firstImport);
+    assert.equal(retry.ok, true);
+
+    const loaded = await loadMediaVault(directory);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok) {
+      assert.deepEqual(
+        [...loaded.records].map((record) => record.id).sort(),
+        ["horse", "sun"],
+      );
+    }
+  });
+});
+
 test("duplicate IDs conflict without replacing durable assets", async () => {
   await withTemporaryDirectory(async (directory) => {
     await importMediaVaultAsset(directory, firstImport);
