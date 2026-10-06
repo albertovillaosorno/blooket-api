@@ -91,6 +91,30 @@ test("set list failures preserve the exact item path", () => {
   }
 });
 
+test("set lists reject duplicate opaque IDs", () => {
+  const result = decodeBlooketSetList([
+    {
+      schemaVersion: 1,
+      id: "same-id",
+      title: "First",
+    },
+    {
+      schemaVersion: 1,
+      id: "same-id",
+      title: "Second",
+    },
+  ]);
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.deepEqual(result.issues[0], {
+      path: "$[1].id",
+      code: "duplicate-set-id",
+      message: "Remote set ID appears more than once.",
+    });
+  }
+});
+
 test("set details accept only verified metadata fields", () => {
   assert.deepEqual(decodeBlooketSetDetail({
     schemaVersion: 1,

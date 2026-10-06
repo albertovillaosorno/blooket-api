@@ -141,15 +141,23 @@ export function decodeBlooketSetList(
 
   const items: BlooketSetSummary[] = [];
   const issues: ValidationIssue[] = [];
+  const seenIds = new Set<string>();
   for (const [index, candidate] of value.entries()) {
-    const decoded = decodeBlooketSetSummary(
-      candidate,
-      "$[" + String(index) + "]",
-    );
+    const path = "$[" + String(index) + "]";
+    const decoded = decodeBlooketSetSummary(candidate, path);
     if (!decoded.ok) {
       issues.push(...decoded.issues);
       continue;
     }
+    if (seenIds.has(decoded.value.id)) {
+      issues.push({
+        path: path + ".id",
+        code: "duplicate-set-id",
+        message: "Remote set ID appears more than once.",
+      });
+      continue;
+    }
+    seenIds.add(decoded.value.id);
     items.push(decoded.value);
   }
   if (issues.length > 0) {
