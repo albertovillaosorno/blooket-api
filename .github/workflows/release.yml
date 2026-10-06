@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags: ["v20*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.18.0
+      - name: Validate quarterly CalVer and manual release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node src/platforms/distribution/adapter-inbound/release-tag.ts \
+            "$RELEASE_TAG"
+          test -s "docs/releases/$RELEASE_TAG.md"
+  verify:
+    needs: tag
+    uses: ./.github/workflows/verify.yml
+    with:
+      release: true
+  publish:
+    needs: [tag, verify]
+    if: needs.tag.result == 'success' && needs.verify.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: package-*
+          path: .temp/release-assets
+          merge-multiple: true
+      - name: Publish only verified assets with manually written notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          INCLUDE_LINUX: ${{ vars.RELEASE_INCLUDE_LINUX }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(.temp/release-assets/darwin-arm64.zip
+                  .temp/release-assets/darwin-x64.zip)
+          if [[ "$INCLUDE_LINUX" == true ]]; then
+            assets+=(.temp/release-assets/linux-x64.tar.gz)
+          fi
+          for asset in "${assets[@]}"; do test -s "$asset"; done
+          for asset in "${assets[@]}"; do
+            digest=$(sha256sum "$asset")
+            printf '%s  %s\n' "${digest%% *}" "${asset##*/}"
+          done > .temp/release-assets/SHA256SUMS
+          if draft=$(gh release view "$RELEASE_TAG" \
+            --json isDraft --jq .isDraft 2>/dev/null); then
+            [[ "$draft" == true ]]
+            gh release edit "$RELEASE_TAG" --draft \
+              --title "$RELEASE_TAG" \
+              --notes-file "docs/releases/$RELEASE_TAG.md"
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "$RELEASE_TAG" \
+              --notes-file "docs/releases/$RELEASE_TAG.md"
+          fi
+          gh release upload "$RELEASE_TAG" "${assets[@]}" \
+            .temp/release-assets/SHA256SUMS --clobber
+          gh release edit "$RELEASE_TAG" --draft=false

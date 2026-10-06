@@ -1,0 +1,271 @@
+// Copyright:
+//   - Copyright © 2026 Alberto Villa Osorno.
+// SPDX-License-Identifier:
+//   - MIT
+// Confidential:
+//   - false
+// License-File:
+//   - LICENSE-MIT
+//
+// Boundary-Contract:
+// - Owns:
+//   - Native smoke verification of an extracted distribution archive.
+// - Must-Not:
+//   - Use production data, credentials, or a live Blooket account.
+// - Allows:
+//   - Inputs: One admitted native target and explicit release verification.
+//   - Outputs: A passing smoke result or a failing process exit.
+//   - Side effects: Temporary extraction and a synthetic local service.
+// - Split-When:
+//   - Another distribution format needs independent acceptance.
+// - Merge-When:
+//   - Package verification no longer requires native execution.
+// - Summary:
+//   - Tests the archive that would be delivered rather than repository imports.
+// - Description:
+//   - Exercises launch, native media, canonical CLI, and owned shutdown.
+// - Usage:
+//   - Run on the matching native host after assembly.
+// - Defaults:
+//   - Failed checks block release and cleanup only the owned fixture.
+//
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import {
+  mkdtemp,
+  readFile,
+  writeFile,
+  rm,
+  access,
+  readdir,
+} from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { defaultTeacherPreferences } from
+  "../../../settings/teacher-preferences/domain/preferences.ts";
+import { decodeServiceRuntime } from
+  "../../service-lifecycle/adapter-outbound/runtime.ts";
+import { TARGETS, type DistributionTarget } from "./build.ts";
+
+const execute = promisify(execFile);
+export async function verifyDistribution(
+  target: DistributionTarget,
+  release = false,
+): Promise<void> {
+  assert.ok(TARGETS.includes(target));
+  assert.equal(target, process.platform + "-" + process.arch);
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const root = await mkdtemp(join(repo, ".temp/package verification "));
+  const mac = target.startsWith("darwin-");
+  const resources = mac
+    ? join(root, "Blooket Studio.app/Contents/Resources")
+    : root;
+  const launcher = mac
+    ? join(root, "Blooket Studio.app/Contents/MacOS/Blooket Studio")
+    : join(root, "blooket-studio");
+  const data = join(root, "test data");
+  const env = {
+    PATH: process.env["PATH"],
+    HOME: process.env["HOME"],
+    BLOOKET_DATA_HOME: data,
+    DBUS_SESSION_BUS_ADDRESS: process.env["DBUS_SESSION_BUS_ADDRESS"],
+    XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
+  };
+  let started = false;
+  const launch = (args: string[]) =>
+    execute(launcher, args, {
+      env,
+      timeout: 40_000,
+      maxBuffer: 1_000_000,
+    });
+  try {
+    if (mac)
+      await execute("unzip", [
+        "-q",
+        join(repo, ".temp/distributions", target + ".zip"),
+        "-d",
+        root,
+      ]);
+    else
+      await execute("tar", [
+        "-xzf",
+        join(repo, ".temp/distributions", target + ".tar.gz"),
+        "-C",
+        root,
+      ]);
+    const manifest = JSON.parse(
+      await readFile(join(resources, "distribution.json"), "utf8"),
+    ) as {
+      target: unknown;
+      sourceDirty: unknown;
+      sourceRevision: unknown;
+    };
+    assert.equal(manifest.target, target);
+    if (release) assert.equal(manifest.sourceDirty, false);
+    const { stdout: revision } = await execute("git", ["rev-parse", "HEAD"], {
+      cwd: repo,
+    });
+    assert.equal(manifest.sourceRevision, revision.trim());
+    const app = join(resources, "app");
+    const names = await readdir(app);
+    assert.ok(!names.includes(".env") && !names.includes("reference"));
+    await assert.rejects(access(join(app, "docs/agents/developer")));
+    if (mac && release) {
+      const plugins = join(root, "Blooket Studio.app/Contents/PlugIns");
+      const extensions = (await readdir(plugins)).filter((name) =>
+        name.endsWith(".appex"),
+      );
+      assert.equal(extensions.length, 1, "Safari extension must be packaged");
+      await execute("codesign", [
+        "--verify",
+        "--deep",
+        "--strict",
+        join(root, "Blooket Studio.app"),
+      ]);
+      await execute("spctl", [
+        "--assess",
+        "--type",
+        "execute",
+        join(root, "Blooket Studio.app"),
+      ]);
+    }
+    // Setup uses ordinary preferences only; all exercised code is packaged.
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(data, { mode: 0o700 });
+    const settings = defaultTeacherPreferences(join(data, "media"));
+    await writeFile(
+      join(data, "settings.json"),
+      JSON.stringify({
+        ...settings,
+        service: { ...settings.service, portMode: "automatic", port: 1 },
+      }),
+      { mode: 0o600 },
+    );
+    const first = await launch(["--no-open"]);
+    started = true;
+    const runtime = decodeServiceRuntime(
+      JSON.parse(await readFile(join(data, "service-runtime.json"), "utf8")),
+    );
+    assert.equal(first.stdout.trim(), runtime.origin);
+    assert.equal((await launch(["--no-open"])).stdout.trim(), runtime.origin);
+    const runtimeAfter = decodeServiceRuntime(
+      JSON.parse(await readFile(join(data, "service-runtime.json"), "utf8")),
+    );
+    assert.equal(runtimeAfter.instance, runtime.instance);
+    const request = async (path: string, options?: RequestInit) =>
+      fetch(runtime.origin + path, {
+        ...options,
+        signal: AbortSignal.timeout(30_000),
+        redirect: "error",
+      });
+    assert.equal((await request("/")).status, 200);
+    const bootstrap = (await (await request("/api/bootstrap")).json()) as {
+      csrf: string;
+    };
+    const post = async (path: string, value: unknown) => {
+      const response = await request(path, {
+        method: "POST",
+        headers: {
+          Origin: runtime.origin,
+          "Content-Type": "application/json",
+          "X-CSRF-Token": bootstrap.csrf,
+        },
+        body: JSON.stringify(value),
+      });
+      assert.equal(response.status, 200);
+      return (await response.json()) as Record<string, unknown>;
+    };
+    const source =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBI" +
+      "WXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfy" +
+      "TAAAAABJRU5ErkJggg==";
+    const imported = await post("/api/import", {
+      filename: "Fixture.png",
+      name: "Package fixture",
+      description: "Synthetic image",
+      language: "en",
+      topics: ["test"],
+      base64: source,
+    });
+    assert.equal(typeof imported["id"], "string");
+    const prepared = await post("/api/prepare", { id: imported["id"] });
+    const rendition = prepared["prepared"] as { bytes: number };
+    assert.ok(rendition.bytes > 0 && rendition.bytes < 2_500_000);
+    const download = await request(
+      "/media/" +
+        String(imported["id"]) +
+        "?variant=prepared&revision=" +
+        String(prepared["revision"]),
+    );
+    assert.equal(download.status, 200);
+    assert.equal((await download.arrayBuffer()).byteLength, rendition.bytes);
+    const denied = await request("/api/service-stop", {
+      method: "POST",
+      headers: {
+        Origin: "https://example.invalid",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    assert.equal(denied.status, 403);
+    const node = join(resources, "runtime/node");
+    // Exercise the real JSON CLI subprocess, including the bundled profile.
+    const cli = execFile(
+      node,
+      [
+        join(app, "src/cli/executable/adapter-inbound/blooket.ts"),
+        "command",
+        "--json",
+      ],
+      { env, timeout: 30_000, maxBuffer: 1_000_000 },
+    );
+    const result = new Promise<string>((resolve, reject) => {
+      let stdout = "";
+      cli.stdout!.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+      cli.once("error", reject);
+      cli.once("close", (code) =>
+        code === 0 ? resolve(stdout) : reject(new Error("packaged-cli-failed")),
+      );
+    });
+    cli.stdin!.on("error", () => undefined);
+    cli.stdin!.end(
+      JSON.stringify({
+        version: 1,
+        operationId: "test:package",
+        command: "profile.get",
+        payload: {},
+      }),
+    );
+    const response = JSON.parse(await result) as {
+      ok: unknown;
+      operationId: unknown;
+    };
+    assert.equal(response.ok, true);
+    assert.equal(response.operationId, "test:package");
+    await launch(["--stop"]);
+    for (let attempt = 0; attempt < 50; attempt++) {
+      if ((await launch(["--status"])).stdout.trim() === "Service offline.")
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(
+      (await launch(["--status"])).stdout.trim(),
+      "Service offline.",
+    );
+    await assert.rejects(access(join(data, "service-runtime.json")));
+    started = false;
+  } finally {
+    if (started) {
+      await launch(["--stop"]);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(
+        (await launch(["--status"])).stdout.trim(),
+        "Service offline.",
+      );
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+}

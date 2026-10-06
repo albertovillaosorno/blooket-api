@@ -17,6 +17,11 @@ implementations and useful tests remain; no domain rewrite is implied.
 
 ## Context
 
+The user restored Safari packaging via GitHub Actions macOS runners on
+2026-10-06. Chrome is tested directly on Linux and macOS; Safari conversion and
+native acceptance use macOS. Releases use vYYYY.Q.PATCH quarterly CalVer tags.
+Mac ARM64 and Intel are default release assets, with optional Linux delivery.
+
 The initial recipient is one teacher with a Mac who wants to create quizzes
 quickly with ChatGPT. A browser interface keeps review and editing in the same
 daily workflow. Online AI access is essential to that workflow, not an optional
@@ -82,13 +87,15 @@ explicit recoverable state rather than claiming successful setup.
 
 ### Packaging and first-use verification
 
-ARM64 is the provisional target. Confirm the chip, OS version, and browser from
-About This Mac before choosing final packaging inputs. Add x86-64 only if the
-recipient's Mac needs it.
+The delivery scope changed on 2026-10-06: prepare separate ARM64 and x86-64
+macOS applications and a Linux x64 package for developer testing. The Mac app
+opens the local workspace on launch; settings expose extension setup and
+visible service controls. Confirm macOS 13.5 or later before installation.
+Linux acceptance cannot establish Keychain, Safari, or macOS signing behavior.
 
 Include the runtime, native Sharp/libvips dependencies, UI assets, CLI, and the
 selected cloudflared delivery mechanism. Do not require Metal acceleration or a
-Linux/Windows build.
+Windows build. A Linux x64 test package is now required.
 
 Development can proceed without a VM or macOS host. Portable tests on Fedora
 remain useful and do not establish macOS integration correctness. An Intel VM
@@ -191,8 +198,8 @@ and actual-client verification in `TODO.md`.
 
 - A native desktop window is deferred because the browser meets the initial UI
   need and avoids another presentation host.
-- Linux distribution and host/browser gates are removed from initial scope
-  because the recipient uses a Mac. Existing portable test coverage remains.
+- Linux as the teacher's target remains outside scope; Linux x64 delivery is now
+  required for developer testing of the same service and Chrome extension.
 - VM provisioning is excluded from the prototype plan; it is not required to
   prepare the service or collect a first-use diagnostic.
 - A public general API is rejected because only the approved MCP tools need
@@ -208,8 +215,9 @@ the actual online AI account can execute an authenticated MCP read. Quiz
 publication additionally needs an approved end-to-end create/read-back and
 interruption/recovery exercise through the same canonical executor.
 
-Linux host/browser checks, Linux distribution, and VM provisioning are not
-release gates. Existing portable test failures must still be reported; changing
+Linux x64 package and Chrome checks are development delivery gates. Native Mac
+acceptance remains separate. VM provisioning is not a release gate. Existing
+portable test failures must still be reported; changing
 product scope is not permission to delete or weaken working coverage.
 
 ### Sources

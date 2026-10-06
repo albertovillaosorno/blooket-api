@@ -9,6 +9,9 @@ unknown_paths = "deny"
 [role.assets]
 paths = ["assets/"]
 
+[role.automation]
+paths = [".github/"]
+
 [role.api]
 paths = ["src/api/"]
 

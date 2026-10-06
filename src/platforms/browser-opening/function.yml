@@ -1,0 +1,9 @@
+identity:
+  id: function:browser-opening
+  name: browser-opening
+  path: src/platforms/browser-opening
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

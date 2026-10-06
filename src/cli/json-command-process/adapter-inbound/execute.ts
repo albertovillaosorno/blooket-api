@@ -49,7 +49,12 @@ export async function executeJsonCommand(
   );
   return await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [executable, "command", "--json"], {
-      env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: dataRoot },
+      env: {
+        PATH: process.env["PATH"],
+        DBUS_SESSION_BUS_ADDRESS: process.env["DBUS_SESSION_BUS_ADDRESS"],
+        XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
+        BLOOKET_DATA_HOME: dataRoot,
+      },
       stdio: ["pipe", "pipe", "ignore"],
     });
     const chunks: Buffer[] = [];

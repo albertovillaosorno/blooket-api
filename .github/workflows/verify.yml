@@ -1,0 +1,89 @@
+name: Verify source and native packages
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.18.0
+      - run: pnpm install --frozen-lockfile
+      - run: npm run check
+      - run: npm test
+      - run: node --check src/ui/teacher-workspace/adapter-inbound/app.js
+      - name: Install verified repository validator
+        env:
+          JIG_URL: ${{ vars.CI_JIG_LINUX_URL }}
+          JIG_SHA256: ${{ vars.CI_JIG_LINUX_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$JIG_URL" == https://* ]]
+          [[ "$JIG_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          mkdir -p .temp/ci-tools
+          curl --fail --location --proto '=https' --proto-redir '=https' \
+            "$JIG_URL" --output .temp/ci-tools/jig
+          printf '%s  %s\n' "$JIG_SHA256" .temp/ci-tools/jig | sha256sum -c -
+          chmod 755 .temp/ci-tools/jig
+      - run: .temp/ci-tools/jig validate --root .
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-15
+          - target: darwin-x64
+            runner: macos-15-intel
+          - target: linux-x64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.18.0
+      - run: pnpm install --frozen-lockfile
+      - run: npm run check
+      - run: npm test
+      - name: Assemble native package
+        env:
+          PACKAGE_TARGET: ${{ matrix.target }}
+        run: npm run package -- "$PACKAGE_TARGET"
+      - name: Test the extracted package
+        env:
+          PACKAGE_TARGET: ${{ matrix.target }}
+        run: npm run package:verify -- "$PACKAGE_TARGET"
+      - name: Require Safari and trusted macOS signing for release
+        if: inputs.release && startsWith(matrix.target, 'darwin-')
+        env:
+          PACKAGE_TARGET: ${{ matrix.target }}
+        run: npm run package:verify -- "$PACKAGE_TARGET" --release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: package-${{ matrix.target }}
+          path: |
+            .temp/distributions/${{ matrix.target }}.zip
+            .temp/distributions/${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: true

@@ -1,0 +1,9 @@
+identity:
+  id: function:desktop-launcher
+  name: desktop-launcher
+  path: src/service/desktop-launcher
+classification:
+  repository: blooket-api
+  domain: service
+architecture:
+  kind: adapter-outbound

@@ -194,3 +194,59 @@ test(
     }
   },
 );
+
+test("tunnel stop failure still closes the authenticated gateway", async () => {
+  const root = await mkdtemp(join(tmpdir(), "online-stop-failure-"));
+  const verifier = await createOwnerPasswordVerifier("owner-fixture");
+  let gateway: Awaited<ReturnType<typeof startMcpGateway>> | undefined;
+  const controller = createOnlineConnection(
+    root,
+    {
+      read: async (name) =>
+        name === "mcp.owner-verifier"
+          ? { ok: true, kind: "found", secret: verifier }
+          : { ok: true, kind: "found", secret: "synthetic-tunnel-token" },
+      write: async () => ({ ok: true }),
+      delete: async () => ({ ok: true }),
+    },
+    {
+      startGateway: async (options) => {
+        gateway = await startMcpGateway({ ...options, port: 0 });
+        return gateway;
+      },
+      startTunnel: (_token, update) => {
+        update("connected");
+        return {
+          stop: async () => {
+            throw new Error("synthetic-tunnel-stop-failure");
+          },
+        };
+      },
+    },
+  );
+  try {
+    const preferences = await loadPreferences(root);
+    await savePreferences(root, {
+      ...preferences,
+      online: {
+        ...preferences.online,
+        enabled: true,
+        publicUrl: "https://teacher.example/mcp",
+      },
+    });
+    await controller.reload(35200);
+    assert.ok(gateway?.server.listening);
+    await assert.rejects(
+      controller.stop(),
+      /synthetic-tunnel-stop-failure/u,
+    );
+    assert.equal(gateway.server.listening, false);
+    assert.equal(
+      (controller.status() as { state: string }).state,
+      "disabled",
+    );
+  } finally {
+    await controller.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});

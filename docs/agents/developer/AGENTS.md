@@ -65,6 +65,15 @@ When commits are authorized, every commit must use DCO signoff
 (`git commit -s`). Jig requires the `Signed-off-by` trailer and the hook must
 never be bypassed.
 
+Releases use quarterly CalVer tags `vYYYY.Q.PATCH`, with three-month quarters.
+Publish only when CI/CD and native package checks for the tagged commit all
+succeed.
+
+Failed, canceled, or skipped required checks block release; preserve
+that dependency in GitHub Actions. Release notes are handwritten, with no
+automated changelog or generated notes. Both Mac architectures are required;
+Linux packaging/tests remain required even when its release asset is omitted.
+
 ## Architecture rules
 
 There is no generic application `core` package.
@@ -86,7 +95,8 @@ There is no generic application `core` package.
   extension. Browser UI hosts contain presentation and transport behavior only;
   they must not import server secrets or implement Blooket semantics.
 - Declare the web host in the Jig component graph before adding its source. A
-  native desktop window is outside the initial product scope.
+  native editor window is outside the initial product scope; a small launcher
+  may open the local page and expose lifecycle/install controls.
 
 If two transports return different semantic results for the same IR operation,
 fix the shared behavior or the adapter. Do not preserve the divergence.
@@ -200,15 +210,21 @@ and online MCP ADR for scope.
 
 ## Platform priority
 
-macOS is the only product target. The user interface is a localhost web page
-with shared extension behavior; Safari is the initial browser target. A local
-background service owns files, settings, secrets, and browser execution.
+macOS is the teacher product target. Linux x64 packaging and host checks are
+required so the developer can test the same service locally. The user interface
+is a localhost web page with shared extension behavior; Chrome is the directly
+testable browser target.
+
+Safari packaging uses a GitHub Actions macOS runner, as authorized on
+2026-10-06. A local background service owns files, settings, secrets, and
+browser execution.
 Authenticated online MCP access through Cloudflare Tunnel is required for the
 initial usable release, not a deferred enterprise feature.
 
-ARM64 is the provisional packaging target until the recipient confirms the chip
-and macOS version in About This Mac. Appearance, Touch ID, and an apparent OS
-version do not identify the CPU. Add x86-64 packaging only if that Mac needs it.
+Package both macOS ARM64 and x86-64 builds. Confirm the OS in About This Mac
+before installation; the bundled Node 24 runtime requires macOS 13.5 or later.
+Appearance, Touch ID, and an apparent OS version do not identify the CPU. Linux
+tests do not establish native macOS acceptance.
 
 Do not provision a VM for the initial workflow. Fedora tests cover portable
 logic; macOS integration stays unverified until it runs on the recipient's Mac.
@@ -218,9 +234,11 @@ local failure log, plus manual rerun.
 Do not replace it with the full test suite or a Blooket mutation. Metal
 acceleration is outside the initial requirements.
 
-Linux may run inexpensive portable logic tests during development, but Linux
-binaries, host integration, browser behavior, and distribution are not release
-requirements. Keep existing useful tests and adapters; do not delete working
+Linux x64 must have a runnable package for development acceptance of the shared
+service, browser UI, and Chrome extension. This does not make Linux a substitute
+for macOS Keychain, signing, or target-host acceptance.
+
+Keep existing useful tests and adapters; do not delete working
 coverage merely to reduce the supported product scope. Windows is out of scope.
 macOS adapters must keep shared domain behavior outside platform code.
 

@@ -1,0 +1,9 @@
+identity:
+  id: function:service-lifecycle
+  name: service-lifecycle
+  path: src/platforms/service-lifecycle
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
