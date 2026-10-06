@@ -223,17 +223,19 @@ does not itself publish a release.
 
 **A release is published only after all required CI/CD checks and native package
 tests pass for that exact tagged commit.** Failure, cancellation, or a skipped
-required job blocks publication. The release workflow reuses the CI verification
-workflow, then requires successful results before its publishing job can run.
+required job blocks publication. Release verification reruns the same TypeScript
+and test gate, then adds native package checks before its publishing job can
+run.
 There are no ignored failures or unconditional publication steps.
 
-CI checks strict TypeScript, the full test suite, browser-script syntax, and
-Jig.
-It also builds and extracts packages on native Mac ARM64, Mac Intel, and Linux
-x64 runners. Package checks execute the delivered launcher and CLI, prepare and
-download synthetic media through the native worker, reject a foreign-origin
-shutdown, reuse the running service, and verify owned shutdown. They use
-disposable data without development credentials or Blooket mutations.
+CI on branches and pull requests checks only strict TypeScript and the full test
+suite. Release verification separately builds and extracts packages on native
+Mac ARM64, Mac Intel, and Linux x64 runners. Package checks execute the
+delivered launcher and CLI, prepare and download synthetic media through the
+native worker,
+reject a foreign-origin shutdown, reuse the running service, and verify owned
+shutdown. They use disposable data without development credentials or Blooket
+mutations.
 
 macOS release checks additionally require the packaged Safari extension and
 successful code-signature and Gatekeeper assessment. These checks are mandatory;
@@ -253,9 +255,7 @@ built and tested; include it in releases only by setting the repository variable
 `RELEASE_INCLUDE_LINUX` to `true`. The Linux test requirement remains in place
 when its archive is omitted from the release.
 
-CI invokes the repository Jig Action directly, so validation no longer depends
-on separately configured Jig download variables. A Jig failure still blocks
-publication; the known local validator evidence gap is not suppressed. Apple
+Jig is a local repository validator and is not part of GitHub Actions. Apple
 signing and Safari build setup remain tracked in task 14.
 
 To build and verify a local package on the matching host:
