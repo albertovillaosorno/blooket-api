@@ -1,0 +1,9 @@
+identity:
+  id: function:host-secret-store
+  name: host-secret-store
+  path: src/platforms/host-secret-store
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
