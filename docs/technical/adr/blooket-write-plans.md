@@ -73,7 +73,10 @@ automatically. If the checkpoint already contains that confirmed advancement,
 recovery clears the redundant valid journal.
 
 Persisted execution serializes the full recovery-to-cleanup transaction with an
-exclusive execution lock. It reuses the canonical executor as explicit
+exclusive execution lock. Standalone recovery acquires that same lock, whose
+path is derived by the attempt-journal adapter, so recovery cannot race a remote
+write using the same journal. The persisted path reuses the canonical executor
+as explicit
 prepare/attempt/complete phases: session readiness is established first, the
 `attempting` journal is created immediately before the remote attempt, and
 `confirmed` is persisted immediately after remote success. Only then may the
