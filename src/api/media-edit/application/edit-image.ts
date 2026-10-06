@@ -43,9 +43,9 @@ import {
   type SourceImageAdmissionResult,
 } from "../../../media/source-images/domain/source-image.ts";
 import {
-  renderEditedImageRendition,
-  type EditorRenditionResult,
-} from "../../../media/image-renditions/adapter-outbound/edit.ts";
+  renderEditorIsolated,
+  type NativeRenditionResult,
+} from "../../../platforms/native-media/adapter-outbound/process.ts";
 import { type MediaEditorState } from
   "../../../media/editor-state/domain/editor-state.ts";
 import {
@@ -53,8 +53,7 @@ import {
   updateMediaVaultAsset,
   type MediaVaultOriginalResult,
   type MediaVaultUpdateResult,
-} from
-  "../../../platforms/media-vault-files/adapter-outbound/directory.ts";
+} from "../../../platforms/media-vault-files/adapter-outbound/directory.ts";
 import { type ValidationIssue } from
   "../../../ir/runtime-decoding/domain/decode-result.ts";
 
@@ -80,14 +79,8 @@ type OriginalFailure = Extract<
   MediaVaultOriginalResult,
   { readonly ok: false }
 >;
-type RenditionFailure = Extract<
-  EditorRenditionResult,
-  { readonly ok: false }
->;
-type VaultFailure = Extract<
-  MediaVaultUpdateResult,
-  { readonly ok: false }
->;
+type RenditionFailure = Extract<NativeRenditionResult, { readonly ok: false }>;
+type VaultFailure = Extract<MediaVaultUpdateResult, { readonly ok: false }>;
 
 export type EditImageResult =
   | { readonly ok: true; readonly record: MediaRecord }
@@ -135,12 +128,11 @@ export async function editImage(
     return { ...original, stage: "original" };
   }
 
-  const english = request.english
-    ?? (
-      request.state.description === original.record.description
-        ? original.record.english
-        : false
-    );
+  const english =
+    request.english ??
+    (request.state.description === original.record.description
+      ? original.record.english
+      : false);
   const record = createMediaRecord({
     id: original.record.id,
     path: original.record.path,
@@ -171,7 +163,7 @@ export async function editImage(
     };
   }
 
-  const rendered = await renderEditedImageRendition(
+  const rendered = await renderEditorIsolated(
     original.bytes,
     request.state,
     policy.value.canvas,
@@ -182,16 +174,13 @@ export async function editImage(
     return { ...rendered, stage: "rendition" };
   }
 
-  const persisted = await updateMediaVaultAsset(
-    request.vaultDirectory,
-    {
-      expectedRecord: original.record,
-      expectedRenditionSha256: original.renditionSha256,
-      record: record.value,
-      renditionFormat: rendered.value.format,
-      renditionBytes: rendered.value.bytes,
-    },
-  );
+  const persisted = await updateMediaVaultAsset(request.vaultDirectory, {
+    expectedRecord: original.record,
+    expectedRenditionSha256: original.renditionSha256,
+    record: record.value,
+    renditionFormat: rendered.value.format,
+    renditionBytes: rendered.value.bytes,
+  });
   if (!persisted.ok) {
     return { ...persisted, stage: "vault" };
   }

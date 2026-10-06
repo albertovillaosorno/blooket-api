@@ -123,10 +123,11 @@ export interface SharpPipeline {
   toBuffer(): Promise<Uint8Array>;
 }
 
-export type SharpFactory = (
-  input: Uint8Array,
-  options?: SharpInputOptions,
-) => SharpPipeline;
+export interface SharpFactory {
+  (input: Uint8Array, options?: SharpInputOptions): SharpPipeline;
+  concurrency(threads: number): number;
+  cache(enabled: false): unknown;
+}
 
 let sharpFactory: SharpFactory | undefined;
 

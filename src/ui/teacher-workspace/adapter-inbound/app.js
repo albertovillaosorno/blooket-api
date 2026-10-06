@@ -1,6 +1,7 @@
 const words = {
   es: {
     library: "Biblioteca",
+    save: "Guardar",
     migrateLibrary: "Importar la biblioteca anterior",
     migrationConfirm:
       "Importar los archivos anteriores de esta carpeta? " +
@@ -99,6 +100,12 @@ const words = {
     failed: "Falló",
     unconfigured: "Sin configurar",
     unverified: "Sin comprobar",
+    nativeTimeout:
+      "La imagen tardó demasiado. Reduce las dimensiones o usa " +
+      "un GIF más corto y vuelve a intentarlo.",
+    gifLimits:
+      "El GIF supera los límites de duración o cuadros. Usa un clip " +
+      "más corto o reduce los FPS de exportación.",
     sourceTooLarge: "El original supera 25 MB. Elige una copia más pequeña.",
     invalidImage: "No se pudo decodificar la imagen. Revisa el archivo.",
     stalePrepared: "La imagen cambió. Vuelve a guardarla y prepararla.",
@@ -167,6 +174,7 @@ const words = {
   },
   en: {
     library: "Library",
+    save: "Save",
     migrateLibrary: "Import the previous library",
     migrationConfirm:
       "Import previous files from this folder? " +
@@ -264,6 +272,12 @@ const words = {
     failed: "Failed",
     unconfigured: "Unconfigured",
     unverified: "Unverified",
+    nativeTimeout:
+      "Image processing took too long. Reduce dimensions or use " +
+      "a shorter GIF and try again.",
+    gifLimits:
+      "The GIF exceeds duration or frame limits. Use a shorter clip " +
+      "or reduce export FPS.",
     sourceTooLarge: "The original exceeds 25 MB. Choose a smaller copy.",
     invalidImage: "The image could not be decoded. Check the source file.",
     stalePrepared: "The image changed. Save and prepare it again.",
@@ -332,6 +346,7 @@ let locale = "es",
   records = [],
   selected,
   sourceFile;
+let editorBusy = false;
 let history = [],
   future = [],
   picking = false;
@@ -339,6 +354,14 @@ const t = (key) => words[locale][key] ?? key;
 const field = (form, name) => form.elements.namedItem(name);
 const settingsForm = $("#settingsForm"),
   editForm = $("#editForm");
+function setEditorBusy(value) {
+  editorBusy = value;
+  Array.from(editForm.elements).forEach((control) => {
+    control.disabled = value;
+  });
+  if (value) $("#canvas").setAttribute("aria-disabled", "true");
+  else $("#canvas").removeAttribute("aria-disabled");
+}
 function translate() {
   document.documentElement.lang = locale;
   $("#locale").value = locale;
@@ -372,6 +395,10 @@ function report(error) {
     "revision-conflict": "conflict",
     "filename-already-exists": "collision",
     "source-too-large": "sourceTooLarge",
+    "native-media-timeout": "nativeTimeout",
+    "migration-preflight-timeout": "nativeTimeout",
+    "image-frame-limit-exceeded": "gifLimits",
+    "invalid-editor-rendition": "gifLimits",
     "invalid-or-oversized-library-file": "tooLarge",
     "prepared-revision-conflict": "stalePrepared",
     "prepared-media-invalid": "invalidImage",
@@ -440,8 +467,10 @@ $("#renameImage").addEventListener("click", () => {
 });
 $("#renameForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (editorBusy) return;
   const button = $("#renameForm").querySelector("[type=submit]");
   button.disabled = true;
+  setEditorBusy(true);
   try {
     const updated = await api("/api/media-rename", {
       id: selected.id,
@@ -458,6 +487,7 @@ $("#renameForm").addEventListener("submit", async (event) => {
     report(error);
   } finally {
     button.disabled = false;
+    setEditorBusy(false);
   }
 });
 function renderGallery() {
@@ -574,6 +604,10 @@ $("#importForm").addEventListener("submit", async (event) => {
   }
 });
 function openEditor(record) {
+  if (editorBusy) {
+    toast(t("exportBusy"));
+    return;
+  }
   selected = structuredClone(record);
   history = [];
   future = [];
@@ -659,6 +693,7 @@ function invalidate() {
 }
 let recipeGesture;
 editForm.addEventListener("input", (event) => {
+  if (editorBusy) return;
   const name = event.target.name;
   const recipeField =
     name in selected.edit || ["background", "color"].includes(name);
@@ -683,6 +718,7 @@ editForm.addEventListener("focusout", () => {
   recipeGesture = undefined;
 });
 $("#canvas").addEventListener("keydown", (event) => {
+  if (editorBusy) return;
   const step = event.shiftKey ? 0.1 : 0.01;
   const moves = {
     ArrowLeft: [-step, 0],
@@ -742,6 +778,7 @@ $("#redo").addEventListener("click", () => {
 });
 let drag;
 $("#foreground").addEventListener("pointerdown", (event) => {
+  if (editorBusy) return;
   if (picking) {
     const image = event.target,
       bounds = image.getBoundingClientRect(),
@@ -812,6 +849,7 @@ for (const name of ["pointerup", "pointercancel"])
 $("#canvas").addEventListener(
   "wheel",
   (event) => {
+    if (editorBusy) return;
     event.preventDefault();
     remember();
     selected.edit.zoom = Math.max(
@@ -824,9 +862,12 @@ $("#canvas").addEventListener(
   { passive: false },
 );
 $("#eyedropper").addEventListener("click", async () => {
+  if (editorBusy) return;
+  const target = selected;
   if (window.EyeDropper) {
     try {
       const result = await new window.EyeDropper().open();
+      if (editorBusy || selected !== target || !$("#editor").open) return;
       remember();
       selected.edit.background = { mode: "solid", color: result.sRGBHex };
       syncRecipe();
@@ -839,8 +880,9 @@ $("#eyedropper").addEventListener("click", async () => {
 });
 editForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const button = editForm.querySelector("[type=submit]");
-  button.disabled = true;
+  if (editorBusy) return;
+  setEditorBusy(true);
+  drag = undefined;
   $("#download").hidden = true;
   try {
     selected = await api("/api/edit", {
@@ -865,7 +907,7 @@ editForm.addEventListener("submit", async (event) => {
     await refresh().catch(() => {});
     report(error);
   } finally {
-    button.disabled = false;
+    setEditorBusy(false);
   }
 });
 function fillSettings() {

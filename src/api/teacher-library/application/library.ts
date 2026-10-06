@@ -46,10 +46,10 @@ import {
   decodeEditRecipe,
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
-import { renderEditedImageRendition } from
-  "../../../media/image-renditions/adapter-outbound/edit.ts";
-import { decodeSourceImage } from
-  "../../../media/image-decoding/adapter-outbound/sharp-image.ts";
+import {
+  decodeImageIsolated,
+  renderImageIsolated,
+} from "../../../platforms/native-media/adapter-outbound/process.ts";
 import {
   initializeLibrary,
   listLibrary,
@@ -285,7 +285,7 @@ export async function importLibraryImage(
     bytes.toString("base64") !== request["base64"]
   )
     throw new Error("invalid-source-bytes");
-  const decoded = await decodeSourceImage(bytes, 40_000_000);
+  const decoded = await decodeImageIsolated(bytes, 40_000_000);
   if (!decoded.ok) throw new Error(decoded.code);
   const extension = extname(request["filename"]).toLowerCase();
   const actual = decoded.value.format.format;
@@ -392,28 +392,11 @@ export async function prepareLibraryImage(
     const originalPath = await safeLibraryPath(library, record.asset);
     if ((await lstat(originalPath)).size > 25_000_000)
       throw new Error("source-too-large");
-    const rendered = await renderEditedImageRendition(
-      await readFile(originalPath),
-      {
-        name: record.original.name,
-        description: record.original.description,
-        regions: [],
-        transform: record.edit,
-      },
+    const rendered = await renderImageIsolated(
+      await boundedBytes(originalPath, 25_000_000),
       record.edit,
-      {
-        maxInputPixels: 40_000_000,
-        maxOutputPixels: 80_000_000,
-        maxOutputBytes: 2_499_999,
-      },
-      {
-        blurSigma: 20,
-        gifFps: record.edit.gifFps,
-        background: record.edit.background,
-        compression: record.edit.compression,
-      },
     );
-    if (!rendered.ok) throw new Error(rendered.code);
+    if (!rendered.ok) throw new Error(rendered.sourceCode ?? rendered.code);
     const file =
       "renditions/" + id + "/" + record.revision + "." + rendered.value.format;
     await writeAtomicFile(
@@ -465,7 +448,7 @@ export async function readPreparedLibraryImage(
     );
     if (bytes.length !== prepared.bytes)
       throw new Error("prepared-media-invalid");
-    const decoded = await decodeSourceImage(bytes, 80_000_000);
+    const decoded = await decodeImageIsolated(bytes, 80_000_000);
     if (
       !decoded.ok ||
       decoded.value.frameWidth !== record.edit.width ||

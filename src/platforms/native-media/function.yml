@@ -1,0 +1,9 @@
+identity:
+  id: function:native-media
+  name: native-media
+  path: src/platforms/native-media
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

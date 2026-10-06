@@ -58,8 +58,8 @@ import { writeAtomicFile } from
   "../../../platforms/atomic-files/adapter-outbound/atomic-file.ts";
 import { loadSharp } from
   "../../../media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
-import { decodeSourceImage } from
-  "../../../media/image-decoding/adapter-outbound/sharp-image.ts";
+import { decodeImageIsolated } from
+  "../../../platforms/native-media/adapter-outbound/process.ts";
 import { safeCode } from "../../teacher-library/application/library.ts";
 import {
   createOwnerPasswordVerifier,
@@ -290,7 +290,7 @@ export async function runFirstUseDiagnostics(root: string, rerun = false) {
     })
       .png()
       .toBuffer();
-    const decoded = await decodeSourceImage(png, 16);
+    const decoded = await decodeImageIsolated(png, 16);
     checks.push({
       name: "native-image",
       status: decoded.ok ? "passed" : "failed",

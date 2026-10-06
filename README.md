@@ -22,6 +22,7 @@ endorsed by the platform.
   blurred or solid backgrounds, color picking, undo/redo, and prepared exports.
 - Explicit GIF export FPS, defaulting to 10, with bounded duration, frames,
   pixels, and output size. Prepared files must be below 2,500,000 bytes.
+  Native media jobs run in isolated workers with a 20-second deadline.
 - Local configuration for email, masked credential replacement, port, media
   folder, online connection, and export defaults.
 - Personal skills and recoverable quiz drafts with revision checks. Startup
@@ -161,6 +162,10 @@ the exact index as `media.jsonl.migrated`, and creates mirrored YAML. Migrated
 schema-2 records retain historical English verification and its source revision;
 an unspecified original language stays empty.
 
+For the old vault layout, the
+immutable original is selected instead of its prepared working image. Missing
+or conflicting originals stop migration before any records are published.
+
 Interrupted transfers resume under the library lock on startup. Changed sources
 or metadata stop recovery with the journal intact; repair the conflict before
 continuing. Never delete a pending journal to force the library open.
@@ -170,8 +175,8 @@ verifier belong in macOS Keychain. The owner password stays separate from the
 Blooket password and tunnel credential; its plaintext is not saved.
 
 The host adapter sends secret payloads through stdin, verifies writes, and
-returns only
-configured/missing status. `.env` is ignored development configuration, not
+returns only configured/missing status. `.env` is ignored development
+configuration, not
 production secret storage. Partial configuration saves report which secret
 replacements succeeded before a failure.
 

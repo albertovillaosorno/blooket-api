@@ -15,7 +15,7 @@
 // - Allows:
 //   - Inputs: Explicit bounded capability requests.
 //   - Outputs: Validated values or stable failure codes.
-//   - ide effects: Journal and replay transfers under the selected
+//   - Side effects: Journal and replay transfers under the selected
 //     library root.
 // - Split-When:
 //   - Another capability requires independent lifecycle or authority.
@@ -39,8 +39,8 @@ import {
   exact,
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
-import { decodeSourceImage } from
-  "../../../media/image-decoding/adapter-outbound/sharp-image.ts";
+import { decodeImageIsolated } from
+  "../../../platforms/native-media/adapter-outbound/process.ts";
 import { loadPreferences } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
 import {
@@ -56,92 +56,140 @@ import {
   type LibraryTransfer,
 } from "../../../platforms/user-library/adapter-outbound/files.ts";
 
+import { withLegacyMediaVaultLock } from
+  "../../../platforms/media-vault-files/adapter-outbound/directory.ts";
+import {
+  mediaVaultPaths,
+  mediaRenditionPath,
+} from "../../../media/vault-layout/domain/layout.ts";
+
 export async function migrateLegacyLibrary(root: string) {
   const preferences = await loadPreferences(root);
   const library = preferences.mediaRoot;
   await initializeLibrary(library);
-  return await withLibraryLock(library, async () => {
-    const index = await safeLibraryPath(library, "media.jsonl");
-    if (!(await exists(index))) return { migrated: 0, alreadyMigrated: true };
-    const indexBytes = await boundedBytes(index, 16_000_000);
-    const indexDigest = digest(indexBytes);
-    const archive = await safeLibraryPath(library, "media.jsonl.migrated");
-    if (await exists(archive)) throw new Error("legacy-archive-conflict");
-    const decoded = decodeMediaJsonLines(indexBytes.toString("utf8"));
-    if (!decoded.ok) throw new Error("invalid-legacy-media-index");
-    if (decoded.value.length > 10_000) throw new Error("library-record-limit");
-    const current = await listLibrary(library);
-    const ids = new Set(current.map((record) => record.id));
-    const assets = new Set(current.map((record) => record.asset));
-    const transfers: LibraryTransfer[] = [];
-    let bytesTotal = 0;
-    for (const record of decoded.value) {
-      if (!safeRelativeImage(record.path))
-        throw new Error("invalid-legacy-source-path");
-      const asset = record.path.startsWith("photos/")
-        ? record.path
-        : "photos/" + record.path;
-      if (ids.has(record.id) || assets.has(asset))
-        throw new Error("metadata-identity-conflict");
-      const source = await safeLibraryPath(library, record.path);
-      const target = await safeLibraryPath(library, asset);
-      if (source !== target && (await exists(target)))
-        throw new Error("filename-already-exists");
-      if (await exists(await safeLibraryPath(library, metadataPath(asset))))
-        throw new Error("metadata-identity-conflict");
-      const bytes = await boundedBytes(source, 25_000_000);
-      bytesTotal += bytes.length;
-      if (bytesTotal > 256_000_000)
-        throw new Error("library-transfer-byte-limit");
-      await validateImageExtension(bytes, record.path);
-      const after: LibraryMetadata = {
-        schemaVersion: 2,
-        id: record.id,
-        asset,
-        revision: 1,
-        original: {
+  return await withLibraryLock(library, () =>
+    withLegacyMediaVaultLock(library, async () => {
+      const index = await safeLibraryPath(library, "media.jsonl");
+      if (!(await exists(index))) return { migrated: 0, alreadyMigrated: true };
+      const indexBytes = await boundedBytes(index, 16_000_000);
+      const indexDigest = digest(indexBytes);
+      const archive = await safeLibraryPath(library, "media.jsonl.migrated");
+      if (await exists(archive)) throw new Error("legacy-archive-conflict");
+      const decoded = decodeMediaJsonLines(indexBytes.toString("utf8"));
+      if (!decoded.ok) throw new Error("invalid-legacy-media-index");
+      if (decoded.value.length > 10_000)
+        throw new Error("library-record-limit");
+      const current = await listLibrary(library);
+      const ids = new Set(current.map((record) => record.id));
+      const assets = new Set(current.map((record) => record.asset));
+      const transfers: LibraryTransfer[] = [];
+      let bytesTotal = 0;
+      const deadline = performance.now() + 120_000;
+      for (const record of decoded.value) {
+        if (!safeRelativeImage(record.path))
+          throw new Error("invalid-legacy-source-path");
+        let sourcePath = record.path;
+        if (
+          [
+            mediaRenditionPath(record.id, "png"),
+            mediaRenditionPath(record.id, "gif"),
+          ].includes(record.path)
+        ) {
+          const candidates: string[] = [];
+          for (const format of [
+            "jpeg",
+            "png",
+            "webp",
+            "avif",
+            "gif",
+          ] as const) {
+            const candidate = mediaVaultPaths(
+              record.id,
+              format,
+              "png",
+            )!.original;
+            if (await exists(await safeLibraryPath(library, candidate)))
+              candidates.push(candidate);
+          }
+          if (candidates.length !== 1)
+            throw new Error("legacy-original-missing-or-conflicting");
+          sourcePath = candidates[0]!;
+        }
+        const asset = sourcePath.startsWith("photos/")
+          ? sourcePath
+          : "photos/" + sourcePath;
+        if (ids.has(record.id) || assets.has(asset))
+          throw new Error("metadata-identity-conflict");
+        const source = await safeLibraryPath(library, sourcePath);
+        const target = await safeLibraryPath(library, asset);
+        if (source !== target && (await exists(target)))
+          throw new Error("filename-already-exists");
+        if (await exists(await safeLibraryPath(library, metadataPath(asset))))
+          throw new Error("metadata-identity-conflict");
+        const bytes = await boundedBytes(source, 25_000_000);
+        bytesTotal += bytes.length;
+        if (bytesTotal > 256_000_000)
+          throw new Error("library-transfer-byte-limit");
+        const remaining = Math.floor(deadline - performance.now());
+        if (remaining < 1) throw new Error("migration-preflight-timeout");
+        await validateImageExtension(
+          bytes,
+          sourcePath,
+          Math.min(20_000, remaining),
+        );
+        const after: LibraryMetadata = {
+          schemaVersion: 2,
+          id: record.id,
+          asset,
           revision: 1,
-          name: record.name,
-          description: record.description,
-          language: "",
-        },
-        topics: [],
-        generatedEnglish: null,
-        edit: {
-          ...preferences.defaults,
-          panX: 0,
-          panY: 0,
-          zoom: 1,
-          contrast: 1,
-          saturation: 1,
-          background: { mode: "blur", color: "#ffffff" },
-        },
-        prepared: null,
-        legacy: {
-          englishVerified: record.english,
-          sourceRevision: 1,
-          sourcePath: record.path,
+          original: {
+            revision: 1,
+            name: record.name,
+            description: record.description,
+            language: "",
+          },
+          topics: [],
+          generatedEnglish: null,
+          edit: {
+            ...preferences.defaults,
+            panX: 0,
+            panY: 0,
+            zoom: 1,
+            contrast: 1,
+            saturation: 1,
+            background: { mode: "blur", color: "#ffffff" },
+          },
+          prepared: null,
+          legacy: {
+            englishVerified: record.english,
+            sourceRevision: 1,
+            sourcePath,
+            indexDigest,
+          },
+        };
+        transfers.push({
+          source: sourcePath,
+          digest: digest(bytes),
+          bytes: bytes.length,
+          before: null,
+          after,
+        });
+        ids.add(record.id);
+        assets.add(asset);
+      }
+      await commitLibraryTransaction(
+        library,
+        {
+          version: 1,
+          kind: "migrate",
           indexDigest,
+          transfers,
         },
-      };
-      transfers.push({
-        source: record.path,
-        digest: digest(bytes),
-        bytes: bytes.length,
-        before: null,
-        after,
-      });
-      ids.add(record.id);
-      assets.add(asset);
-    }
-    await commitLibraryTransaction(library, {
-      version: 1,
-      kind: "migrate",
-      indexDigest,
-      transfers,
-    });
-    return { migrated: transfers.length, alreadyMigrated: false };
-  });
+        true,
+      );
+      return { migrated: transfers.length, alreadyMigrated: false };
+    }),
+  );
 }
 export async function renameLibraryImage(root: string, input: unknown) {
   const request = object(input);
@@ -194,8 +242,12 @@ export async function renameLibraryImage(root: string, input: unknown) {
     return after;
   });
 }
-async function validateImageExtension(bytes: Uint8Array, path: string) {
-  const decoded = await decodeSourceImage(bytes, 40_000_000);
+async function validateImageExtension(
+  bytes: Uint8Array,
+  path: string,
+  timeoutMs = 20_000,
+) {
+  const decoded = await decodeImageIsolated(bytes, 40_000_000, { timeoutMs });
   if (!decoded.ok) throw new Error(decoded.code);
   const extension = extname(path).toLowerCase();
   const actual = decoded.value.format.format;

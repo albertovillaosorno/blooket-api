@@ -30,7 +30,6 @@
 //   - No product dimensions or upload ceilings are guessed here.
 //
 import {
-  renderImageRendition,
   type ImageRendition,
   type ImageRenditionResult,
   type RenditionCanvas,
@@ -41,6 +40,9 @@ import {
   type AdmittedSourceImage,
   type SourceImageAdmissionResult,
 } from "../../../media/source-images/domain/source-image.ts";
+
+import { renderEditorIsolated } from
+  "../../../platforms/native-media/adapter-outbound/process.ts";
 
 export interface PrepareImageRequest {
   readonly bytes: Uint8Array;
@@ -59,10 +61,7 @@ type SourceFailure = Extract<
   { readonly ok: false }
 >;
 
-type RenditionFailure = Extract<
-  ImageRenditionResult,
-  { readonly ok: false }
->;
+type RenditionFailure = Extract<ImageRenditionResult, { readonly ok: false }>;
 
 export type PrepareImageResult =
   | { readonly ok: true; readonly value: PreparedImage }
@@ -81,10 +80,7 @@ export type PrepareImageResult =
 export async function prepareImage(
   request: PrepareImageRequest,
 ): Promise<PrepareImageResult> {
-  const admitted = admitSourceImage(
-    request.bytes,
-    request.maxSourceBytes,
-  );
+  const admitted = admitSourceImage(request.bytes, request.maxSourceBytes);
   if (!admitted.ok) {
     return {
       ok: false,
@@ -93,17 +89,30 @@ export async function prepareImage(
     };
   }
 
-  const rendered = await renderImageRendition(
+  const result = await renderEditorIsolated(
     request.bytes,
+    {
+      name: "",
+      description: "",
+      regions: [],
+      transform: { panX: 0, panY: 0, zoom: 1, contrast: 1, saturation: 1 },
+    },
     request.canvas,
     request.renditionLimits,
+    { blurSigma: 20 },
   );
+  const rendered =
+    !result.ok && result.code === "invalid-editor-rendition"
+      ? { ok: false as const, code: "invalid-rendition-limits" }
+      : !result.ok && result.code === "editor-animation-unsupported"
+        ? { ok: false as const, code: "animated-rendition-unsupported" }
+        : result;
   if (!rendered.ok) {
     return {
       ok: false,
       stage: "rendition",
       code: rendered.code,
-      ...(rendered.sourceCode === undefined
+      ...(!("sourceCode" in rendered) || rendered.sourceCode === undefined
         ? {}
         : { sourceCode: rendered.sourceCode }),
     };
