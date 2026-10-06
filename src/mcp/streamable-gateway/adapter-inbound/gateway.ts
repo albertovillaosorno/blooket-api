@@ -283,6 +283,9 @@ export async function startMcpGateway(options: {
     server,
     pending: auth.pending,
     approve: auth.approve,
+    reject: auth.reject,
+    connections: auth.connections,
+    revoke: auth.revoke,
     revokeAll: auth.revokeAll,
   };
 }

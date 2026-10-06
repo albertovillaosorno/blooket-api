@@ -45,7 +45,11 @@ Different nonempty values for a canonical name and its legacy alias fail before
 writes. Change only the example/documentation when improving naming; the user
 owns their actual credentials and local file.
 
-`MCP_OWNER_PASSWORD` is reserved and currently ignored; enforcement is task 04.
+`MCP_OWNER_PASSWORD` enables additional local connection approval. The explicit
+development entrypoint derives a salted verifier in memory; it accepts the
+legacy `MCP_PASSWORD` alias with conflict detection. Production UI replacement
+saves the verifier through Keychain, never plaintext in JSON.
+
 `MCP_DISPLAY_NAME`, `MCP_DISPLAY_DESCRIPTION`, and `MCP_ICON_PATH` are optional
 decorative metadata, also currently unused. Manual AI-client presentation is
 sufficient; these fields neither authorize requests nor grant filesystem access.
@@ -184,17 +188,52 @@ Keychain/folder tests as pending until they actually run on macOS.
 
 ### TODO 04 - Finish OAuth and additional owner-password approval
 
+Portable authorization implementation was completed on 2026-10-06. Online
+startup requires a configured owner verifier; local approval checks the owner
+password before issuing a code. Development retains the verifier only in
+memory. Production configuration writes a fixed-parameter salted scrypt
+verifier through the host store and exposes only configured/missing status.
+
+The local UI shows the exact connection ID, client registration ID, untrusted
+name, redirect URL, and requested scope. It supports rejection and individual
+revocation of access and refresh tokens. Password attempts share a five-per-
+minute budget and one in-flight verification; polling preserves typed input.
+Owner replacement reloads/revokes existing access even after a partial settings
+save.
+
+OAuth does not replace the local password check.
+
+Token issuance now preserves approved scope and creates refresh tokens only
+for requested `offline_access`. Single-use codes, expiry, duplicate parameter
+rejection, exact resource/redirect binding, refresh rotation, and individual
+revocation have regression coverage. Repeated approval cannot replace a code.
+Unused client registrations expire after 15 minutes instead of permanently
+exhausting capacity.
+
+Shutdown is serialized with reload and prevents later
+restart through a racing request.
+
+All 503 portable tests, strict TypeScript, and browser-script syntax pass. The
+composition test exercises wrong/correct passwords through a real local gateway
+with an in-memory tunnel double; no real credentials or public connection are
+used. Native Keychain and actual ChatGPT compatibility are not established.
+
+**External blocker:** acceptance still needs the recipient's Mac and actual
+ChatGPT client. The chosen restart policy is to clear all in-memory clients,
+codes, and tokens and require new registration/consent. Verify that client can
+reauthorize after restart, sleep, and tunnel interruption before completing this
+task. Continue independent library work in task 05 meanwhile.
+
 The user prefers an additional password because a client could present a
 misleading name or domain. Preserve OAuth/PKCE for client compatibility and
 require the configured owner password as an additional approval check in the
 local UI. Do not replace OAuth with a password in URLs, tool arguments, or an
 assumed custom header that ChatGPT may not support.
 
-Support `MCP_OWNER_PASSWORD` only in the explicit development entrypoint. In
-production, store a salted, bounded password verifier in Keychain through the
-secret-storage boundary. Add a masked local configuration field and replacement
-workflow; never return the password or verifier through UI/API/CLI/MCP results.
-Keep this credential separate from Blooket and the tunnel token.
+Keep development owner overrides behind the explicit entrypoint. Preserve the
+masked local replacement workflow and Keychain verifier boundary; never return
+the password or verifier through UI/API/CLI/MCP results. Keep this credential
+separate from Blooket and the tunnel token.
 
 Treat registered client names and redirect domains as untrusted input, not proof
 of identity. Show the exact client, redirect, requested access, and matching
@@ -208,14 +247,11 @@ wrong passwords, and bounded attempts. A password alone does not prevent a
 phishing page from asking for it. Retain HTTPS, exact origin checks, local
 consent, and private settings isolation.
 
-Fix the current scope behavior: token issuance always grants `offline_access`
-and a refresh token even if only `teacher` was requested. Require the admitted
-scope and issue only requested/approved access. Review repeated approval and
-registration capacity/expiry so unauthenticated requests cannot permanently
-exhaust the registry; add connection rejection and revocation controls.
+Preserve the implemented scope, expiry, single-approval, and revocation guards.
+No broader access may be inferred from a client display name or redirect.
 
-Decide how restart/reconnection works for the recipient: current clients, codes,
-and tokens live only in memory. Test actual ChatGPT reauthorization after
+Current clients, codes, and tokens live only in memory. Test actual ChatGPT
+reauthorization after
 service restart, Mac sleep, and tunnel interruption. Do not replay ambiguous
 Blooket writes on reconnection.
 
@@ -473,7 +509,8 @@ Test that first-use runs once, failed attempts remain repairable, logs are
 bounded, and the recipient sees useful translated failures. Existing macOS
 status remains unverified until the actual Mac runs it.
 
-Serialize shutdown with tunnel reload so they cannot race. Preserve useful
+Shutdown/reload serialization and terminal stop were implemented and tested in
+task 04. Preserve useful
 `cloudflared-unavailable`/timeout failure codes instead of overwriting them with
 a generic close/offline state. Test disablement, restart, early exit, missing
 executable/token, sleep/offline behavior, and process cleanup.

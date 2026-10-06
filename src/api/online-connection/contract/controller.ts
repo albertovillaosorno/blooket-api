@@ -32,7 +32,10 @@
 export interface OnlineConnectionController {
   status(): unknown;
   pending(): unknown;
-  approve(id: string): void;
+  connections(): unknown;
+  approve(id: string, password: string): Promise<void>;
+  reject(id: string): void;
+  revoke(id: string): void;
   reload(localPort?: number): Promise<void>;
   stop(): Promise<void>;
 }

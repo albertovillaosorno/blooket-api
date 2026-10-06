@@ -61,22 +61,28 @@ import { loadSharp } from
 import { decodeSourceImage } from
   "../../../media/image-decoding/adapter-outbound/sharp-image.ts";
 import { safeCode } from "../../teacher-library/application/library.ts";
+import {
+  createOwnerPasswordVerifier,
+  OWNER_VERIFIER_SECRET,
+} from "../../../security/owner-password/domain/verifier.ts";
 
 export async function configurationStatus(
   root: string,
   secrets: HostSecretStore = createHostSecretStore(),
 ) {
   const preferences = await loadPreferences(root);
-  const [password, tunnel] = await Promise.all([
+  const [password, tunnel, owner] = await Promise.all([
     secrets.read("blooket.password"),
     secrets.read("cloudflare-tunnel"),
+    secrets.read(OWNER_VERIFIER_SECRET),
   ]);
   return {
     preferences,
     secrets: {
       passwordConfigured: password.ok && password.kind === "found",
       tunnelConfigured: tunnel.ok && tunnel.kind === "found",
-      storeAvailable: password.ok && tunnel.ok,
+      ownerPasswordConfigured: owner.ok && owner.kind === "found",
+      storeAvailable: password.ok && tunnel.ok && owner.ok,
     },
   };
 }
@@ -86,11 +92,18 @@ export async function saveConfiguration(
   secrets: HostSecretStore = createHostSecretStore(),
 ) {
   const request = object(input);
-  exact(request, ["preferences", "password", "tunnelToken"]);
+  exact(request, [
+    "preferences",
+    "password",
+    "tunnelToken",
+    ...("ownerPassword" in request ? ["ownerPassword"] : []),
+  ]);
+  if ("ownerPassword" in request && !text(request["ownerPassword"], 2048))
+    throw new Error("invalid-secret-replacement");
   if (!text(request["password"], 2048) || !text(request["tunnelToken"], 2048))
     throw new Error("invalid-secret-replacement");
-  for (const field of ["password", "tunnelToken"] as const) {
-    const value = request[field] as string;
+  for (const field of ["password", "tunnelToken", "ownerPassword"] as const) {
+    const value = (request[field] ?? "") as string;
     if (value !== "" && !validateHostSecretValue(value).ok)
       throw new Error("invalid-secret-replacement");
   }
@@ -134,6 +147,21 @@ async function saveValidatedConfiguration(
     };
   }
   const written: string[] = [];
+  let ownerVerifier: string | undefined;
+  if (request["ownerPassword"]) {
+    try {
+      ownerVerifier = await createOwnerPasswordVerifier(
+        request["ownerPassword"] as string,
+      );
+    } catch {
+      return {
+        ok: false,
+        code: "owner-verifier-failed",
+        secretsSaved: written,
+        settingsSaved: false,
+      };
+    }
+  }
   for (const [field, key] of [
     ["password", "blooket.password"],
     ["tunnelToken", "cloudflare-tunnel"],
@@ -153,6 +181,22 @@ async function saveValidatedConfiguration(
         };
       written.push(field);
     }
+  }
+  if (ownerVerifier) {
+    const saved = await secrets
+      .write(OWNER_VERIFIER_SECRET, ownerVerifier)
+      .catch(() => ({
+        ok: false as const,
+        code: "host-secret-store-failed" as const,
+      }));
+    if (!saved.ok)
+      return {
+        ok: false,
+        code: saved.code,
+        secretsSaved: written,
+        settingsSaved: false,
+      };
+    written.push("ownerPassword");
   }
   try {
     await savePreferences(root, preferences);

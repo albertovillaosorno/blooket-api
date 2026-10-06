@@ -34,7 +34,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { parseEnv } from "node:util";
 import { developmentConfiguration } from
-  // jig-ignore-next-line: TypeScript module specifier is indivisible.
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/development-environment/adapter-outbound/environment.ts";
 import { defaultTeacherPreferences } from
   "../../../../src/settings/teacher-preferences/domain/preferences.ts";
@@ -62,7 +62,7 @@ function hostStore() {
 }
 test("development configuration keeps credentials ephemeral", async () => {
   const host = hostStore();
-  const config = developmentConfiguration(
+  const config = await developmentConfiguration(
     defaults,
     {
       EMAIL: "teacher@example.com",
@@ -92,7 +92,10 @@ test("development configuration keeps credentials ephemeral", async () => {
     "read:cloudflare-tunnel",
   ]);
 });
-test("misspelled tokens and invalid port/domain fail before writes", () => {
+test(
+  "misspelled tokens and invalid port/domain " +
+    "fail before writes",
+  async () => {
   for (const environment of [
     { CLOUDLFARE_TOKEN: "typo" },
     { LOCAL_PORT: "2607garbage" },
@@ -102,16 +105,16 @@ test("misspelled tokens and invalid port/domain fail before writes", () => {
     { ONLINE_DOMAIN: "https://example.com/" },
   ]) {
     const host = hostStore();
-    assert.throws(() =>
+    await assert.rejects(() =>
       developmentConfiguration(defaults, environment, host.secrets),
     );
     assert.deepEqual(host.calls, []);
   }
 });
-test("absent development values preserve saved configuration", () => {
+test("absent development values preserve saved configuration", async () => {
   const host = hostStore();
   assert.deepEqual(
-    developmentConfiguration(defaults, {}, host.secrets).preferences,
+    (await developmentConfiguration(defaults, {}, host.secrets)).preferences,
     defaults,
   );
 });
@@ -130,7 +133,7 @@ test(
         'MCP_DISPLAY_NAME="Blooket"',
       ].join("\n"),
     );
-    const config = developmentConfiguration(
+    const config = await developmentConfiguration(
       defaults,
       environment,
       host.secrets,
@@ -152,7 +155,10 @@ test(
     assert.deepEqual(host.calls, []);
   },
 );
-test("conflicting canonical and legacy settings fail before writes", () => {
+test(
+  "conflicting canonical and legacy settings " +
+    "fail before writes",
+  async () => {
   for (const environment of [
     { BLOOKET_EMAIL: "one@example.com", EMAIL: "two@example.com" },
     { BLOOKET_PASSWORD: "new", PASSWORD: "old" },
@@ -164,7 +170,7 @@ test("conflicting canonical and legacy settings fail before writes", () => {
     { CLOUDFLARE_TUNNEL_TOKEN: "new", CLOUDFLARE_TOKEN: "old" },
   ]) {
     const host = hostStore();
-    assert.throws(
+    await assert.rejects(
       () => developmentConfiguration(defaults, environment, host.secrets),
       /conflicting-development-setting/u,
     );
@@ -176,11 +182,43 @@ test("the empty example parses and keeps online access disabled", async () => {
     new URL("../../../../.env.example", import.meta.url),
     "utf8",
   );
-  const config = developmentConfiguration(
+  const config = await developmentConfiguration(
     defaults,
     parseEnv(example),
     hostStore().secrets,
   );
   assert.equal(config.preferences.online.enabled, false);
   assert.equal(config.preferences.service.port, 2607);
+});
+
+test(
+  "development owner passwords produce only an " +
+    "ephemeral salted verifier",
+  async () => {
+  const host = hostStore();
+  const config = await developmentConfiguration(
+    defaults,
+    {
+      MCP_OWNER_PASSWORD: "owner-fixture",
+      MCP_PASSWORD: "owner-fixture",
+    },
+    host.secrets,
+  );
+  const stored = await config.secrets.read("mcp.owner-verifier");
+  assert.ok(stored.ok && stored.kind === "found");
+  assert.match(stored.secret, /^scrypt-v1\$/u);
+  assert.equal(stored.secret.includes("owner-fixture"), false);
+  assert.equal(JSON.stringify(config.preferences).includes("owner-"), false);
+  assert.deepEqual(host.calls, []);
+  await assert.rejects(
+    developmentConfiguration(
+      defaults,
+      {
+        MCP_OWNER_PASSWORD: "one",
+        MCP_PASSWORD: "two",
+      },
+      host.secrets,
+    ),
+    /conflicting-development-setting/u,
+  );
 });

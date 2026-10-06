@@ -41,18 +41,29 @@ import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import { loadPreferences } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
+import { OWNER_VERIFIER_SECRET } from
+  "../../../security/owner-password/domain/verifier.ts";
+import { createOwnerApprovalGuard } from
+  "../../../api/teacher-configuration/application/owner-approval.ts";
 
 export function createOnlineConnection(
   root: string,
   secrets: HostSecretStore = createHostSecretStore(),
+  dependencies: {
+    startGateway?: typeof startMcpGateway;
+    startTunnel?: typeof startCloudflareTunnel;
+    now?: () => number;
+  } = {},
 ): OnlineConnectionController {
   let gateway: Awaited<ReturnType<typeof startMcpGateway>> | undefined;
   let tunnel: ReturnType<typeof startCloudflareTunnel> | undefined;
   let state = "disabled",
     gatewayPort = 2608;
   let serial: Promise<void> = Promise.resolve();
+  let stopped = false;
   let runningLocalPort: number | undefined;
-  async function stop(): Promise<void> {
+  const verifyApproval = createOwnerApprovalGuard(secrets, dependencies.now);
+  async function stopCurrent(): Promise<void> {
     await tunnel?.stop();
     tunnel = undefined;
     gateway?.revokeAll();
@@ -71,17 +82,33 @@ export function createOnlineConnection(
       productVerification: "recipient-mac-and-chatgpt-pending",
     }),
     pending: () => gateway?.pending() ?? [],
-    approve: (id) => {
+    connections: () => gateway?.connections() ?? [],
+    approve: async (id, password) => {
       if (!gateway) throw new Error("online-disabled");
-      gateway.approve(id);
+      const approving = gateway;
+      await verifyApproval(password);
+      if (gateway !== approving) throw new Error("authorization-expired");
+      approving.approve(id);
     },
-    stop,
+    reject: (id) => gateway?.reject(id),
+    revoke: (id) => gateway?.revoke(id),
+    stop: async () => {
+      stopped = true;
+      serial = serial.then(stopCurrent, stopCurrent);
+      await serial;
+    },
     reload: async (localPort) => {
+      if (stopped) return;
       if (localPort !== undefined) runningLocalPort = localPort;
       const run = async () => {
-        await stop();
+        await stopCurrent();
         const preferences = await loadPreferences(root);
         if (!preferences.online.enabled) return;
+        const owner = await secrets.read(OWNER_VERIFIER_SECRET);
+        if (!owner.ok || owner.kind !== "found") {
+          state = "owner-password-missing";
+          return;
+        }
         const token = await secrets.read("cloudflare-tunnel");
         if (!token.ok || token.kind !== "found") {
           state = "tunnel-token-missing";
@@ -93,7 +120,7 @@ export function createOnlineConnection(
           return;
         }
         try {
-          gateway = await startMcpGateway({
+          gateway = await (dependencies.startGateway ?? startMcpGateway)({
             publicUrl: preferences.online.publicUrl,
             dataRoot: root,
             port: gatewayPort,
@@ -102,9 +129,12 @@ export function createOnlineConnection(
           state = "gateway-start-failed";
           return;
         }
-        tunnel = startCloudflareTunnel(token.secret, (next) => {
-          state = next;
-        });
+        tunnel = (dependencies.startTunnel ?? startCloudflareTunnel)(
+          token.secret,
+          (next) => {
+            state = next;
+          },
+        );
       };
       serial = serial.then(run, run);
       await serial;

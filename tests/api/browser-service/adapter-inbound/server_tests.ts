@@ -45,7 +45,8 @@ import {
 } from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 
 test(
-  "fixed collisions stop; automatic ports honor and persist loopback",
+  "fixed collisions stop; automatic ports honor " +
+    "and persist loopback",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "browser-port-"));
   const occupied = createServer();
@@ -80,7 +81,10 @@ test(
       online: {
         status: () => ({ state: "disabled" }),
         pending: () => [],
-        approve: () => {},
+        approve: async () => {},
+        connections: () => [],
+        reject: () => {},
+        revoke: () => {},
         stop: async () => {},
         reload: async (port) => {
           gatewayLocalPort = port!;

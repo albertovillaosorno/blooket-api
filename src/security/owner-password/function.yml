@@ -1,0 +1,9 @@
+identity:
+  id: function:owner-password
+  name: owner-password
+  path: src/security/owner-password
+classification:
+  repository: blooket-api
+  domain: security
+architecture:
+  kind: domain

@@ -52,7 +52,7 @@ const root = userDataRoot();
 let secrets = createHostSecretStore();
 if (process.argv.includes("--development")) {
   try {
-    const development = developmentConfiguration(
+    const development = await developmentConfiguration(
       await loadPreferences(root),
       await readDevelopmentEnvironment(
         fileURLToPath(new URL("../../../../.env", import.meta.url)),

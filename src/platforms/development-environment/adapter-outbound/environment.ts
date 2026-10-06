@@ -39,12 +39,16 @@ import {
   validateHostSecretValue,
   type HostSecretStore,
 } from "../../../security/host-secrets/domain/host-secret.ts";
+import {
+  createOwnerPasswordVerifier,
+  OWNER_VERIFIER_SECRET,
+} from "../../../security/owner-password/domain/verifier.ts";
 
-export function developmentConfiguration(
+export async function developmentConfiguration(
   preferences: TeacherPreferences,
   environment: Readonly<Record<string, string | undefined>>,
   host: HostSecretStore,
-): { preferences: TeacherPreferences; secrets: HostSecretStore } {
+): Promise<{ preferences: TeacherPreferences; secrets: HostSecretStore }> {
   if (environment["CLOUDLFARE_TOKEN"])
     throw new Error("misspelled-cloudflare-token");
   const email =
@@ -85,6 +89,16 @@ export function developmentConfiguration(
     },
     preferences.mediaRoot,
   );
+  const ownerPassword = setting(
+    environment,
+    "MCP_OWNER_PASSWORD",
+    "MCP_PASSWORD",
+  );
+  if (ownerPassword)
+    ephemeral.set(
+      OWNER_VERIFIER_SECRET,
+      await createOwnerPasswordVerifier(ownerPassword),
+    );
   return {
     preferences: decoded,
     secrets: {
