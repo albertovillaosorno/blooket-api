@@ -1,470 +1,211 @@
 # blooket-api
 
-> Project started: October 5, 2026
-
-**A local-first TypeScript toolkit for teachers who want to build, validate,
-prepare, and publish Blooket question sets without turning lesson authoring into
-browser busywork.**
-
-The initial product serves one teacher using a Mac: prepare a quiz with ChatGPT,
-review it in the browser, and publish it to Blooket. Lesson projects, media,
-settings, credentials, and browser execution remain on that Mac.
-
-One local background service serves the browser UI and localhost API. The
-optional Safari extension shares UI behavior and adds convenient media intake. A
-native desktop window and permanent Dock icon are outside the initial scope.
-
-The canonical `blooket` CLI remains the execution interface for MCP. Online MCP
-access through an authenticated Cloudflare Tunnel is required for the first
-usable release; online AI clients must be able to reach the local workflow.
-
-macOS is the only product target. ARM64 is provisional until the recipient
-confirms the chip and macOS version in About This Mac; x86-64 packaging is
-needed only if that Mac is Intel. Linux can run portable development tests, but
-no Linux binary or host/browser integration is required. Windows is out of
-scope.
-
-This project is not affiliated with or endorsed by Blooket. Blooket automation
-is an unsupported integration boundary. The application must preserve local
-projects when that boundary changes, stop for security challenges it does not
-understand, and never expose credentials to an LLM, MCP caller, browser page, or
-diagnostic output.
-
-## Non-negotiable properties
-
-- Never corrupt a teacher's project, settings, or media vault.
-- Never disclose stored credentials through CLI, API, MCP, logs, or UI state.
-- Never duplicate product logic in operating-system adapters.
-- Never maintain separate semantic implementations for CLI, HTTP, and MCP.
-- Never bypass a CAPTCHA, security challenge, or unknown authentication state.
-- Never silently coerce malformed LLM output into a different question set.
-- Never install hidden persistence or behave like unwanted background software.
-- Bind local services to loopback and expose only the authenticated MCP gateway
-  through the configured tunnel; keep the local UI and general API private.
-- Prefer JavaScript and operating-system primitives over dependencies that do
-  not have a compelling reliability or maintenance case.
-
-## Repository layout
-
-```text
-blooket-api/
-└── src/
-    ├── api/          Local orchestration and localhost HTTP boundary
-    ├── cli/          Canonical `blooket` command-line interface
-    ├── ir/           Typed commands, results, and strict runtime contracts
-    ├── mcp/          MCP facade that executes the canonical CLI
-    ├── media/        Media vault, metadata, transforms, search, and renditions
-    ├── platforms/    macOS host integration over existing capabilities
-    ├── projects/     Lesson projects, question documents, and media references
-    ├── security/     Credential and secret-storage contracts
-    ├── settings/     User configuration, ports, startup behavior, and defaults
-    └── ui/
-        ├── extension/Optional Safari extension host
-        └── general/  Browser UI behavior shared by the local page and extension
-```
-
-There is deliberately no generic `core` package. Responsibilities are named for
-the problem they own. The repository has exactly one top-level `src/`; domain
-packages never contain another `src/`. Product source follows Jig's canonical
-`src/<domain>/<function>/<kind>/<part>` route; `kind` is the hexagonal role and
-`function` names the capability being implemented.
-
-`src/platforms/` is not a second implementation of the application. It
-translates already-defined capabilities into Keychain, Secret Service,
-launch-at-login, filesystem, notification, browser, and other host behavior. If
-a rule can live outside `src/platforms/`, it must not be copied into per-OS
-code.
-
-## One behavior, several transports
-
-`src/ir/` defines canonical commands, results, identifiers, and validation
-errors. `src/api/` composes the owning domains and executes those contracts.
-`src/cli/` parses command-line input into the same IR and calls the same
-application executor.
-
-MCP intentionally does not link another semantic implementation. MCP tools
-execute the installed `blooket` CLI in machine-readable mode and decode its
-result. That extra process boundary is intentional: an MCP action and the exact
-CLI command it represents must be observable as the same operation.
-
-The localhost service serves the browser UI and its HTTP API from the same
-origin. HTTP requests decode into the same IR before execution and do not own
-separate Blooket behavior. The web host must be declared in the Jig component
-graph before UI source is added; the earlier desktop component declaration does
-not require a native desktop implementation.
-
-```text
-Local browser UI / Safari extension
-            |
-            v
-      localhost API
-            |
-            v
-           api
-            ^
-            |
-CLI --------+-------- canonical IR + executor
- ^
- |
-MCP executes CLI
-```
-
-Parity tests will exercise equivalent fixtures through direct IR execution, CLI
-JSON mode, localhost HTTP, and MCP-to-CLI projection. A transport-specific
-semantic result is a defect.
-
-## Required online MCP access
-
-ChatGPT reaches a dedicated local MCP gateway through a stable HTTPS hostname
-served by Cloudflare Tunnel. The gateway uses Streamable HTTP and invokes the
-canonical CLI in JSON mode. The tunnel provides connectivity, while an
-MCP-compatible OAuth flow authorizes access to the configured teacher's tools.
-
-The user provisions the domain, tunnel, and remote-client setup. The gateway
-integrates that authorization setup; a tunnel token is not an MCP access token.
-Verify the actual account's custom-MCP access and complete a real authenticated
-tool call before claiming the integration works.
-
-Only approved MCP routes and required authorization/discovery endpoints are
-published. The browser UI, general API, settings, credentials, and arbitrary
-local files remain private. Remote writes obey the same validation, teacher
-review, confirmation, persisted execution, and recovery rules as local writes.
-The Mac must be awake with the service and tunnel running; a lost connection
-must not trigger a blind replay of a quiz mutation.
-
-These are product decisions and roadmap requirements, not implemented features.
-See [the architecture decision][browser-mcp-adr] for platform verification,
-configuration ownership, and integration checks.
-
-## Project documents
-
-The teacher's online request drives quiz preparation and changes. Local
-`project.json` remains a versioned, recoverable draft and execution record for
-metadata, questions, and stable media references. The UI and MCP manage it
-automatically; the teacher does not need to edit JSON files.
-
-Fresh Blooket reads and confirmed remote receipts establish online state. Detect
-stale remote content before applying a new plan rather than silently letting a
-local draft overwrite it. The current local contract is:
-
-```json
-{
-  "schemaVersion": 1,
-  "title": "Lesson 5",
-  "description": "Vocabulary review for lesson 5.",
-  "quizLanguage": "English",
-  "visibility": "private",
-  "mediaIndex": "media.jsonl",
-  "coverImage": null,
-  "questions": []
-}
-```
-
-`quizLanguage` describes the material students should see. It is independent of
-the language used by the teacher to communicate with an agent or the local
-browser interface.
-
-## User media library and descriptions
-
-The target user-data root is `~/Library/Application Support/blooket-api/` for
-the non-sandboxed macOS service, resolved from the current user at runtime.
-`settings.json`, personal `skills/`, drafts, execution state, and logs live
-there. The media root defaults to `media/` beside settings and can be changed
-locally.
-
-User-named immutable photo/GIF sources live in `media/photos/`. Their YAML
-metadata mirrors the relative folders under `media/metadata/`; append `.yaml` to
-the complete filename to distinguish the same stem across formats.
-
-```text
-media/photos/animals/Mi gato.gif
-media/metadata/animals/Mi gato.gif.yaml
-```
-
-She chooses filenames and can write names/descriptions in any language. The AI
-uses stable asset IDs and YAML metadata, adds generated English text and topics,
-and never renames files or overwrites originals. Translation and verification
-remain distinct states; changing original text invalidates stale enrichment.
-
-```yaml
-schemaVersion: 1
-id: asset-001
-asset: photos/animals/Mi gato.gif
-original:
-  revision: 1
-  name: Mi gato
-  description: Un gato naranja mirando por la ventana.
-  language: es
-topics:
-  - animals
-  - pets
-generatedEnglish:
-  name: My cat
-  description: An orange cat looking through a window.
-  generatedBy: ai
-  sourceRevision: 1
-  verified: false
-```
-
-This example describes the accepted target, not the current runtime schema.
-Existing version-two JSONL records and stable-ID source paths require a tested,
-recoverable migration. A future search index is derived from canonical YAML.
-
-### Agent media and personal skills
-
-Search original/generated text and topics through field-aware CLI/MCP tools,
-then use the returned stable IDs in quizzes. AI metadata writes are decoded and
-admit only enrichment fields; file lifecycle and originals remain user-owned.
-Binary media is stored locally and prepared separately for Blooket.
-
-Personal skills live under the user-data `skills/` directory and can be listed,
-read, and updated through authorized logical-ID tools. Verify the actual ChatGPT
-connection can retrieve those skills and deliver an image attachment; neither
-local files nor chat attachments arrive at MCP automatically.
-
-See [the teacher settings and library decision][teacher-library-adr] for
-storage, metadata ownership, explicit GIF FPS, and migration requirements.
-
-## Strict LLM JSON validation
-
-LLM output is untrusted input. TypeScript types do not validate runtime values,
-so parsing and semantic validation are separate operations.
-
-JSON syntax is parsed with the JavaScript runtime's native `JSON.parse`. The
-project does not carry a third-party JSON parser. Repository-owned decoders in
-`src/ir/` then validates the exact versioned contract and returns structured
-failures with JSON paths.
-
-Before any Blooket write, validation is fail-closed and proceeds through these
-layers:
-
-1. **JSON syntax** — malformed JSON is rejected without recovery guesses.
-2. **Envelope** — schema version, document kind, and required top-level fields
-   must be exact; unknown fields are rejected unless that schema version
-   explicitly admits them.
-3. **Primitive types** — strings, booleans, arrays, integers, nullability, and
-   enumerations must match exactly. Numeric strings are not coerced.
-4. **Question structure** — every question must match one supported question
-   variant and contain the exact fields admitted for that variant.
-5. **Blooket rules** — multiple-choice questions require primary question text,
-   between two and four answer options, and at least one correct option. Typing
-   answers carry an admitted matching mode and the required answer data. These
-   rules track verified platform capabilities instead of model assumptions.
-6. **Media references** — referenced media IDs must exist, resolve to a local
-   asset, and have a prepared rendition satisfying the currently verified
-   Blooket media capability before upload.
-7. **Account capabilities** — features such as answer media are admitted only
-   when the current account capability snapshot says they are available.
-8. **Cross-field semantics** — mutually exclusive modes, impossible correct
-   answer indexes, invalid True/False randomization policies, duplicate stable
-   IDs, and other contradictions are rejected before side effects.
-9. **Write plan** — decoded bundles, resolved media, and verified account
-   capabilities are lowered into an explicit remote-neutral write plan. Plan and
-   operation IDs are deterministic from execution-relevant desired state, and a
-   versioned sequential checkpoint resumes only against the exact plan. A
-   confirmed Create Set receipt durably binds later question operations to one
-   opaque remote set ID. Optional verification captures only a pre-attempt item
-   count and SHA-256 digest, never raw provider content.
-
-   The Blooket adapter receives the plan, never raw LLM JSON. Stop states and
-   ambiguous outcomes preserve progress and recovery data.
-
-Current official Blooket documentation describes two question types: Multiple
-Choice and Typing Answer. Multiple Choice currently requires 2–4 answer options
-and at least one correct answer. Question images are documented generally, while
-answer media is documented under Plus users; the dated official capability
-fixture therefore keeps answer images account-dependent until the active account
-is inspected.
-
-The authenticated dashboard build verifies a 2,500,000-byte image-upload
-ceiling, a 75-character set title limit, and a 300-character description limit.
-Canvas dimensions and pixel ceilings remain unknown. These browser-observed
-facts stay capability data because Blooket may change them independently of this
-repository and the public guides do not publish those numeric limits.
-
-Validation never performs a "helpful" semantic rewrite. An invalid quiz returns
-precise diagnostics that the teacher or agent can fix and resubmit.
-
-## Authentication and browser automation
-
-Production credentials are managed locally through the host security capability.
-macOS uses Keychain generic-password items. The background service reads needed
-secret values internally; UI, CLI, API, and MCP responses never reveal stored
-credentials. Tunnel credentials and MCP authorization tokens remain separate
-from Blooket credentials and ordinary settings.
-
-Secret values are sent to host tools through stdin rather than process
-arguments, command stderr is never retained as diagnostic data, and successful
-writes are read back before they are reported as durable. The existing Linux
-Secret Service adapter remains development infrastructure, not a supported
-product integration.
-
-Development-only environment variables may exist for local testing, but
-production credentials do not live in project files or ordinary settings.
-
-Automation operates from the teacher's computer and uses the teacher's own
-confirmed session. The browser adapter may behave at normal interactive pacing,
-but it is not a CAPTCHA bypass or anti-bot evasion mechanism. A CAPTCHA,
-unrecognized login page, unexpected account challenge, or ambiguous destructive
-state stops the operation and requests human action.
-
-Blooket navigation uses an explicit state machine rather than an assumed URL
-sequence. Browser observations override the state callers expected. Signed-out
-and expired sessions request authentication, rate limiting waits without a
-guessed retry duration, and dashboard/create/edit states may continue.
-
-The known Blooket organization-selection prompt, security challenges, unexpected
-pages, and explicit escalation all require human action. The organization form
-must not be filled or submitted automatically.
-
-Session health inspection performs one browser observation and never reads
-credentials. Session establishment reuses dashboard/create/edit states and reads
-the security-domain Blooket credentials only after observing signed-out or
-expired-session. Credentials are passed directly to the browser-session port and
-are never included in session results.
-
-Authenticated capability and set reads treat browser-adapter output as
-untrusted. Capability observations must decode through the versioned capability
-snapshot. Set lists currently expose only an opaque non-empty remote ID and
-title; detail adds description and public/private visibility. No remote-ID
-grammar, question payload shape, cover read shape, or additional set metadata is
-invented without verified browser evidence.
-
-## Configuration and user storage
-
-The UI has English/Spanish i18n, independent of quiz and original-description
-language. Configuration includes Blooket email, masked password, local port,
-media-folder selection, and an Online MCP toggle. The public HTTPS MCP URL and
-masked Cloudflare tunnel token controls are enabled only with Online MCP.
-
-The user configures the Cloudflare hostname/tunnel and supplies a URL such as
-`https://blooket.albertovilla.com/mcp`. Cloudflare Tunnel is the sole online
-provider. Disabling online access preserves configuration and stops the tunnel.
-
-Save atomically persists ordinary JSON settings and updates changed secrets
-through the Keychain boundary. Settings contain email, paths, preferences, and
-secret references; password and token values stay in Keychain. UI responses show
-configured/missing status rather than returning saved secrets.
-
-The local service defaults to `127.0.0.1:2607`; the port remains configurable.
-Detect collisions and allow an explicit fixed or automatically selected port.
-The local page and extension discover that configured endpoint without
-hardcoding it across clients.
-
-### Advanced settings and first-use diagnostics
-
-Advanced settings define the GIF rendition rate, default 10 FPS, plus validated
-editor defaults. Persist the chosen rate explicitly rather than preserving
-arbitrary source FPS. FPS changes rebuild affected prepared renditions.
-
-A bounded diagnostic runs once on first launch. It records check version,
-outcome, timestamp, stable failure codes, and log reference in settings. Missing
-configuration is separate from dependency failure; logs are sanitized and a
-manual rerun is available after repair.
-
-The diagnostic does not change Blooket or run the full repository suite.
-Configuration UI, new settings fields, and this startup check are roadmap work.
-
-## Shared photo and GIF editor
-
-Drag-and-drop imports a source, then the teacher chooses its name, description,
-and topics. A visible zoom slider with minus/plus buttons and foreground
-dragging controls framing; mouse-wheel zoom remains an optional equivalent.
-Static photos and GIFs share saturation, contrast, preview, and undo/redo.
-
-Background fill is either blurred or a solid chosen color. Provide a color input
-and an eyedropper, with a canvas pixel picker when the browser lacks the native
-API. Save edits as a render recipe and prepared rendition; originals remain
-intact.
-
-Prepared GIFs use the explicitly configured FPS, default 10, so 10 FPS means 100
-ms per output frame. Resample the source timeline while preserving loop behavior
-and duration within one output frame interval. The current native renderer
-preserves source delays and needs a versioned change for this target.
-
-Static and animated renditions share a verified target canvas/aspect ratio.
-Unknown Blooket dimensions stay unknown. Bound native work, frames, duration,
-pixels, and output bytes; optimize within the verified upload ceiling and show
-an actionable failure if a requested animation cannot fit.
-
-The existing Sharp/libvips pipeline and immutable-source editing are reusable.
-New controls, solid fills, YAML metadata, and explicit-rate GIF rendering are
-accepted roadmap requirements, not completed UI claims.
-
-## Reliability and operating-system behavior
-
-macOS is the only product target. Portable logic tests may run on the
-development host, including Fedora, without creating a Linux release gate.
-
-macOS-specific behavior still calls shared domain operations. There is no VM
-provisioning requirement.
-
-macOS integration remains unverified until first use on the recipient's Mac;
-Fedora tests do not validate ARM64 packaging. Metal acceleration is not required
-for the initial workflow.
-
-Durable files use write-new, validate, flush, and atomic-replace patterns rather
-than editing important JSON in place. Interrupted writes must leave the previous
-valid state recoverable. Destructive operations require explicit targets and
-must not recursively infer broader paths from LLM-provided text. The exact lock,
-backup, temporary-file, flush, and recovery invariants are recorded in the
-atomic local persistence ADR: `docs/technical/adr/atomic-local-persistence.md`.
-
-Autostart is opt-in, visible in settings, reversible, and implemented through
-the normal platform mechanism. The application must not hide processes, disguise
-network listeners, install unrelated startup entries, or recreate disabled
-persistence.
-
-## Development
-
-A repository-root `.env` may be used for development and tests only. It is
-ignored by Git and is not part of end-user configuration. The supported
-development variables are `BLOOKET_EMAIL`, `BLOOKET_PASSWORD`,
-`LOCAL_HTTP_PORT`, `MCP_PUBLIC_URL`, and `CLOUDFLARE_TUNNEL_TOKEN`. See
-`.env.example` for quoted fields and a full URL example.
-
-Run `pnpm run dev` to read this file explicitly; normal `pnpm start` does not
-load it.
-
-Development credentials are held only in memory. Ordinary development values
-initialize saved preferences at each development startup; subsequent local UI
-saves remain effective until another startup. Production credentials use the
-host secret store.
-
-For a local UI on port 2607, configure the Cloudflare hostname with service
-`http://127.0.0.1:2608` and leave its Path filter empty. The gateway needs
-`/mcp`, `/.well-known/` discovery, and `/oauth/` authorization routes. It
-rejects local UI, settings, and general API routes.
-
-`MCP_PUBLIC_URL` is the full public HTTPS MCP URL, such as
-`https://your-host.example/mcp`; it is not the tunnel origin. Providing both
-this URL and a development tunnel token enables the gateway. The user provisions
-the hostname and tunnel; this service creates neither.
-
-The repository uses a pnpm workspace and strict TypeScript. Dependencies belong
-at the narrowest owning package and require a concrete reason to exist.
+A local-first TypeScript toolkit for a teacher who wants AI to help create
+Blooket quizzes without spending the afternoon uploading and formatting media.
+
+The intended workflow is simple: ask an AI for a quiz, review it in the browser,
+and publish it to Blooket. A background service on the teacher's Mac owns the
+files, credentials, media preparation, and execution. An optional Cloudflare
+Tunnel connects online AI clients to its authenticated MCP gateway.
+
+**This is a working development prototype. Automatic Blooket publication,
+macOS packaging, and acceptance with the recipient's ChatGPT account remain
+unfinished.** It is independent of Blooket and is neither affiliated with nor
+endorsed by the platform.
+
+## What works today
+
+- A localhost browser workspace with English and Spanish interfaces.
+- A photo/GIF library with immutable, user-named originals and mirrored YAML
+  metadata. AI-generated English text is separate from original descriptions.
+- An editor with zoom buttons and slider, dragging, saturation, contrast,
+  blurred or solid backgrounds, color picking, undo/redo, and prepared exports.
+- Explicit GIF export FPS, defaulting to 10, with bounded duration, frames,
+  pixels, and output size. Prepared files must be below 2,500,000 bytes.
+- Local configuration for email, masked credential replacement, port, media
+  folder, online connection, and export defaults.
+- Personal skills and recoverable quiz drafts with revision checks.
+- A Streamable HTTP MCP gateway with OAuth/PKCE and approval in the local UI.
+  Its tools execute the canonical CLI rather than a separate implementation.
+- A lightweight first-use diagnostic, saved locally, with a manual rerun.
+
+Current MCP tools retrieve teacher instructions, search/read/enrich media, and
+list/read/write skills and drafts. **Saving a draft does not publish a quiz.**
+A browser extension, native installer, launch-at-login integration, and
+additional owner-password approval are roadmap work.
+
+See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
+cannot establish Safari, Keychain, or native macOS compatibility.
+
+## Run the development workspace
+
+Use Node.js 24 or newer and the pnpm version declared in `package.json`.
+Dependencies are installed under `.dependencies/`, not root `node_modules/`.
 
 ```sh
 pnpm install
-pnpm run check
-pnpm run test
+```
+
+If `.env` does not exist, copy [.env.example](.env.example) to `.env` and fill
+values between the quotes. Keep an existing `.env`; it may already contain
+credentials. Leave online fields empty for a local-only session.
+
+```sh
+BLOOKET_DATA_HOME="$PWD/.temp/dev-data" npm run dev
+```
+
+Open the local URL printed at startup. The default is
+`http://127.0.0.1:2607`. The data-root override keeps disposable development
+settings, media, skills, drafts, and logs under `.temp/`.
+
+`npm run dev` explicitly reads the repository `.env`. Development secrets stay
+in memory; ordinary values initialize saved preferences on each development
+startup. Local UI changes remain saved, but supplied development values are
+applied again on the next development startup.
+
+`npm start` uses saved preferences and the host secret store without reading
+`.env`. It is the normal service entrypoint, not a finished macOS installer.
+
+The current workstation's pnpm launcher has a documented external failure;
+npm scripts work with installed dependencies. See task 02 in [TODO.md](TODO.md)
+before changing dependency layout or validators.
+
+## Use the local workspace
+
+1. Open configuration, choose the UI language and media folder, and save any
+   replacement credentials. Saved secrets are never returned to the page.
+2. Import a photo or GIF and choose its filename, name, original description,
+   language, and topics. The AI uses asset IDs, not filesystem names.
+3. Edit framing, adjustments, and background. Export defaults initialize new
+   recipes; each image keeps its own settings.
+4. Prepare and review/download the rendition. Oversized output or a stale
+   recipe cannot be offered as a valid prepared download.
+5. Use skills and draft tools to prepare material. The current draft view is
+   read-only; publication is still being connected to safe execution.
+
+The 1280-by-720 default canvas is an application choice, not a verified Blooket
+requirement. GIF FPS controls timing, not a guaranteed file size.
+
+## Connect an online AI client
+
+Cloudflare Tunnel is the supported provider. The user provisions the hostname
+and tunnel; this application does not create them. The computer must remain
+awake with the service, network, and tunnel running.
+
+In local configuration, enable Online MCP and provide the public URL and tunnel
+token. For development, the corresponding fields are:
+
+```dotenv
+LOCAL_HTTP_PORT="2607"
+MCP_PUBLIC_URL="https://your-host.example/mcp"
+CLOUDFLARE_TUNNEL_TOKEN=""
+```
+
+The public URL must include `https://` and end in `/mcp`. Bare hostnames,
+embedded credentials, other paths, query parameters, and fragments are rejected.
+
+For local port 2607, configure Cloudflare's origin as
+`http://127.0.0.1:2608` and leave the hostname **Path filter empty**. OAuth and
+discovery need `/oauth/` and `/.well-known/` routes in addition to `/mcp`.
+
+Configure the AI client manually with the public MCP URL. Complete its OAuth
+flow and approve the matching connection in the local workspace. The tunnel
+token authorizes Cloudflare connectivity; it is not an MCP access token.
+
+Only MCP and authorization routes are public. The browser UI, settings, general
+API, and arbitrary files remain private. Unauthenticated `/mcp` returns 401;
+private UI/API routes return 404 at the public gateway.
+
+The configured tunnel passed a synthetic OAuth/PKCE and MCP tool-call test.
+Actual ChatGPT authorization, attachment delivery, restart behavior, revocation
+controls, and additional owner-password enforcement still require completion.
+A tunnel does not remove AI usage limits. Chat attachments and local files do
+not automatically become accessible to MCP.
+
+## Files and credentials
+
+Normal macOS data lives in `~/Library/Application Support/blooket-api/`:
+
+```text
+settings.json       Ordinary preferences; no passwords or tunnel tokens
+diagnostics.json    First-use check results
+logs/               Sanitized local diagnostic records
+skills/             Personal authoring guidance
+drafts/             Recoverable local quiz documents
+media/              Default media root; selectable in local configuration
+  photos/           Immutable sources with user-chosen filenames
+  metadata/         Mirrored YAML metadata
+  renditions/       Derived export files
+```
+
+For example, `photos/animals/My cat.gif` has metadata at
+`metadata/animals/My cat.gif.yaml`. Original names/descriptions remain intact;
+English enrichment records its source revision and verification status. Legacy
+library migration and user rename/move recovery remain pending.
+
+Production passwords and tunnel tokens belong in macOS Keychain. The host
+adapter sends secret payloads through stdin, verifies writes, and returns only
+configured/missing status. `.env` is ignored development configuration, not
+production secret storage. Partial configuration saves report which secret
+replacements succeeded before a failure.
+
+## Execution and integration boundaries
+
+`src/ir/` owns strict runtime contracts. `src/api/` composes domain operations;
+CLI and localhost HTTP share that executor. `src/mcp/` invokes the canonical CLI
+in JSON mode.
+
+Media, projects, settings, and security own their domain behavior;
+`src/platforms/` adapts filesystem and host capabilities. `src/service/` hosts
+the background process, and `src/ui/teacher-workspace/` serves the browser UI.
+
+Untrusted JSON passes exact decoders and semantic checks before becoming a
+write plan. Remote execution uses journals, checkpoints, receipts, and
+reconciliation. Ambiguous mutations must not be blindly retried or immediately
+sent through another transport.
+
+Blooket integration is unsupported and may change. Recovered client references
+and observed HTTP actions are evidence, not a stable public API. Their response
+contracts and concrete browser adapters need verification before activation.
+Client form limits alone do not prove server constraints.
+
+CAPTCHAs, organization selection, unfamiliar login challenges, and unknown
+security states stop execution for human action. Normal interaction pacing is
+planned; challenge bypass and anti-bot evasion are outside the design.
+
+macOS is the sole product target. ARM64 is provisional until the recipient's
+chip and OS are confirmed. Linux runs portable development tests, but is not a
+binary release target. No VM or Metal requirement is part of the initial plan.
+
+## Develop and verify
+
+```sh
+npm run check
+npm test
+node --check src/ui/teacher-workspace/adapter-inbound/app.js
 jig validate --root .
 ```
 
-Repository documentation, code, identifiers, diagnostics, and commit messages
-are written in English. Human communication follows the human's language. An
-agent must distinguish that communication language from the requested quiz
-language and ask for the quiz language only when it cannot be inferred safely.
+Source, documentation, diagnostics, and commits use English. Product UI
+language, quiz language, and original-media language are independent.
 
-See [TODO.md](TODO.md) for implementation order and [AGENTS.md](AGENTS.md) for
-agent working rules.
+Read [AGENTS.md](AGENTS.md) for instruction routing, the
+[developer profile](docs/agents/developer/AGENTS.md) for repository rules,
+and the
+[user profile](docs/agents/user/AGENTS.md) for admitted teacher workflows.
+Continue [TODO.md](TODO.md) in order and record actual verification instead of
+marking externally blocked tasks complete.
 
-[browser-mcp-adr]: docs/technical/adr/macos-browser-ui-and-online-mcp.md
-[teacher-library-adr]: docs/technical/adr/teacher-settings-and-media-library.md
+Architecture decisions cover [browser hosting and online MCP][browser-mcp],
+[settings and the media library][library], and
+[atomic persistence][persistence].
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE-MIT).
+[MIT](LICENSE-MIT). See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for
+third-party trademarks, assets, and dependency notices.
 
-For third-party trademarks, brand assets (such as Blooket logos), and dependency
- notices, see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[browser-mcp]: docs/technical/adr/macos-browser-ui-and-online-mcp.md
+[library]: docs/technical/adr/teacher-settings-and-media-library.md
+[persistence]: docs/technical/adr/atomic-local-persistence.md
