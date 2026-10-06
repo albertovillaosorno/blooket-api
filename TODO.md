@@ -27,8 +27,9 @@ Normal `npm start` uses saved settings and host secrets without loading `.env`.
 BLOOKET_DATA_HOME="$PWD/.temp/service-test" npm run dev
 ```
 
-The existing sample library is in `.temp/service-test`. The local UI uses port
-2607; the separate MCP gateway normally uses the local port plus one, 2608.
+That data root is disposable; create/import fixtures if prior temporary data
+has been cleaned. The local UI defaults to port 2607; the separate MCP gateway
+uses the running local port plus one, normally 2608.
 Point the Cloudflare hostname to `http://127.0.0.1:2608` with its Path filter
 empty so MCP, OAuth, and discovery routes can be reached.
 
@@ -61,8 +62,7 @@ available. No launch-at-login setup exists yet.
 The compact root `AGENTS.md` selects between two instruction profiles. The
 developer profile lives in `docs/agents/developer/AGENTS.md` and the
 product-user profile lives in `docs/agents/user/AGENTS.md`. The split preserves
-the repository
-rules while separating their audiences.
+the repository rules while separating their audiences.
 
 The **developer** profile is for repository work: architecture, source and
 reference inspection, `.env` development setup, secret boundaries, tests,
@@ -82,8 +82,8 @@ the existing registered CLI/MCP boundary; do not bypass it with application
 imports or expose developer material through a generic filesystem tool.
 
 Completed on 2026-10-06. The compact root router preserves the complete
-developer
-profile under `docs/agents/developer/AGENTS.md` and keeps the teacher profile in
+developer profile under `docs/agents/developer/AGENTS.md` and keeps the teacher
+profile in
 `docs/agents/user/AGENTS.md`. The admitted read-only `instructions_get` MCP tool
 loads only that teacher profile through the canonical CLI command path; personal
 skills remain separate `skills_list`/`skills_get` calls. The authenticated
@@ -136,15 +136,41 @@ external `JIG-RULE-GAP-001` evidence gap documented above.
 Schema-3 preferences, local Save, EN/ES controls, masked secret replacement,
 online enablement, public MCP URL, media-root selection, and export defaults are
 implemented. Password configuration uses the canonical `blooket.password` secret
-key; connect ordinary email to the existing login-credential boundary without
-exposing it or changing unrelated legacy secret contracts silently.
+key; the configured session boundary supplies saved email without exposing
+credentials or changing unrelated legacy secret contracts.
 
-Test native Keychain read/write, partial secret/settings saves, folder
-selection, filesystem failures, port collisions, and library-root changes on
-macOS. Honor or explicitly migrate existing bind address, automatic-port mode,
-theme, and lifecycle preferences; current hosting always binds 127.0.0.1 and
-does not implement every preserved preference. Do not silently move an existing
-library.
+The portable configuration work was completed on 2026-10-06. Startup honors
+saved IPv4/IPv6 loopback binding and fixed/automatic port policy, handles the
+final bind race, and durably saves a selected automatic port. The online gateway
+uses the running local port even when a changed port awaits restart; port 65535
+cannot silently redirect the gateway to an unrelated default.
+
+Settings Save validates every replacement's UTF-8 byte limit before writes,
+holds an aggregate writer lock, and reports secret/settings partial failures.
+Ordinary preference writes have their own lock and recovery copy; initial
+defaults use create-if-absent instead of overwriting a concurrent save. Changing
+the library root initializes the selected location without moving old assets.
+
+The configured session entrypoint uses ordinary saved email with the canonical
+password secret. Existing callers retain their legacy login-key behavior.
+Light/dark/system themes and automatic-port controls are available in both UI
+languages. Language changes and diagnostic reruns preserve unsaved settings.
+
+Explicit startup remains a background process without automatically opening a
+browser. Preserved lifecycle flags do not install autostart; bootstrap reports
+an enabled but unimplemented launch-at-login preference. Visible native
+lifecycle implementation remains task 13.
+
+Portable checks cover byte limits, partial host/filesystem failures, concurrent
+saves, library-root preservation, URL rejection, configured login, and actual
+port collisions. Strict TypeScript and browser-script syntax pass; all 493 tests
+pass. Chrome verified saving the dark theme and changing EN/ES without losing
+an unsaved synthetic email.
+
+**External blocker:** no recipient macOS host is available. Native Keychain
+read/write, folder selection, Safari appearance, and filesystem/port behavior
+still require the actual Mac. Keep this task pending for those checks; continue
+independent authorization work in task 04 rather than claiming native coverage.
 
 Keep `MCP_PUBLIC_URL` as a full HTTPS `/mcp` URL and preserve its explanatory
 comment in the development template. Test rejection of bare hostnames,
@@ -512,10 +538,10 @@ and time persisted after reload. Request fields were observed; the action
 response body and application-driven publication were not verified.
 
 The private test quiz remains in the account; do not delete it automatically or
-commit its ID/account content. Temporary evidence is under
-`.temp/implementation/`: `tunnel-check.json`, `test-handoff.txt`, and
-`jig-handoff-final.txt`. These ignored files are disposable; the durable
-conclusions are recorded here.
+commit its ID/account content. Temporary captures and logs may be cleaned
+between sessions. The durable conclusions are recorded here; do not assume an
+ignored fixture still exists. The configuration regression log is currently
+under `.temp/readme-ui-check/full-tests.log`.
 
 ### Implementation map
 

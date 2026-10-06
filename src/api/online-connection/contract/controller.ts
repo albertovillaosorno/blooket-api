@@ -33,6 +33,6 @@ export interface OnlineConnectionController {
   status(): unknown;
   pending(): unknown;
   approve(id: string): void;
-  reload(): Promise<void>;
+  reload(localPort?: number): Promise<void>;
   stop(): Promise<void>;
 }

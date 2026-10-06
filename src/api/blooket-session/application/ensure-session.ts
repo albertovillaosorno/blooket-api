@@ -46,6 +46,8 @@ import type {
 } from "../contract/browser-session.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
+import { loadPreferences } from
+  "../../../platforms/user-storage/adapter-outbound/root.ts";
 
 export type BlooketReadyNavigationState =
   | "dashboard"
@@ -91,6 +93,7 @@ export type EnsureBlooketSessionResult =
 export async function ensureBlooketSession(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
+  loginIdentifier?: string,
 ): Promise<EnsureBlooketSessionResult> {
   const initial = await inspectBlooketSession(browser);
   if (!initial.ok) {
@@ -102,15 +105,12 @@ export async function ensureBlooketSession(
     return initialDecision;
   }
 
-  const credentials = await readBlooketCredentials(secrets);
+  const credentials = await readBlooketCredentials(secrets, loginIdentifier);
   if (!credentials.ok) {
     return credentials;
   }
 
-  const authenticated = await safeAuthenticate(
-    browser,
-    credentials.value,
-  );
+  const authenticated = await safeAuthenticate(browser, credentials.value);
   if (!authenticated.ok) {
     return authenticated;
   }
@@ -121,10 +121,21 @@ export async function ensureBlooketSession(
   }
 
   const finalDecision = classifyInspectedSession(observed, false);
-  return finalDecision ?? {
-    ok: false,
-    code: "blooket-authentication-not-established",
-  };
+  return (
+    finalDecision ?? {
+      ok: false,
+      code: "blooket-authentication-not-established",
+    }
+  );
+}
+
+export async function ensureConfiguredBlooketSession(
+  browser: BlooketBrowserSessionPort,
+  root: string,
+  secrets: HostSecretStore,
+): Promise<EnsureBlooketSessionResult> {
+  const preferences = await loadPreferences(root);
+  return ensureBlooketSession(browser, secrets, preferences.email);
 }
 
 function classifyInspectedSession(
@@ -133,10 +144,10 @@ function classifyInspectedSession(
 ): EnsureBlooketSessionResult | null {
   if (session.action === "continue") {
     if (
-      session.state !== "dashboard"
-      && session.state !== "my-sets"
-      && session.state !== "create"
-      && session.state !== "edit"
+      session.state !== "dashboard" &&
+      session.state !== "my-sets" &&
+      session.state !== "create" &&
+      session.state !== "edit"
     ) {
       return {
         ok: false,
@@ -159,9 +170,9 @@ function classifyInspectedSession(
   }
   if (session.action === "human-action-required") {
     if (
-      session.state !== "organization-prompt"
-      && session.state !== "security-challenge"
-      && session.state !== "unexpected-page"
+      session.state !== "organization-prompt" &&
+      session.state !== "security-challenge" &&
+      session.state !== "unexpected-page"
     ) {
       return {
         ok: false,

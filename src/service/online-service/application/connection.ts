@@ -51,6 +51,7 @@ export function createOnlineConnection(
   let state = "disabled",
     gatewayPort = 2608;
   let serial: Promise<void> = Promise.resolve();
+  let runningLocalPort: number | undefined;
   async function stop(): Promise<void> {
     await tunnel?.stop();
     tunnel = undefined;
@@ -75,7 +76,8 @@ export function createOnlineConnection(
       gateway.approve(id);
     },
     stop,
-    reload: async () => {
+    reload: async (localPort) => {
+      if (localPort !== undefined) runningLocalPort = localPort;
       const run = async () => {
         await stop();
         const preferences = await loadPreferences(root);
@@ -85,10 +87,11 @@ export function createOnlineConnection(
           state = "tunnel-token-missing";
           return;
         }
-        gatewayPort =
-          preferences.service.port === 65535
-            ? 2608
-            : preferences.service.port + 1;
+        gatewayPort = (runningLocalPort ?? preferences.service.port) + 1;
+        if (gatewayPort > 65535) {
+          state = "gateway-port-unavailable";
+          return;
+        }
         try {
           gateway = await startMcpGateway({
             publicUrl: preferences.online.publicUrl,

@@ -34,12 +34,95 @@ import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createServer } from "node:net";
 import { startBrowserService } from
   "../../../../src/api/browser-service/adapter-inbound/server.ts";
 import { loadSharp } from
   "../../../../src/media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
-import { loadPreferences } from
-  "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
+import {
+  loadPreferences,
+  savePreferences,
+} from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
+
+test(
+  "fixed collisions stop; automatic ports honor and persist loopback",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "browser-port-"));
+  const occupied = createServer();
+  await new Promise<void>((resolve) =>
+    occupied.listen(0, "127.0.0.2", resolve),
+  );
+  const address = occupied.address();
+  assert.ok(address && typeof address !== "string");
+  let service: Awaited<ReturnType<typeof startBrowserService>> | undefined;
+  try {
+    const preferences = await loadPreferences(root);
+    const fixed = {
+      ...preferences,
+      service: {
+        ...preferences.service,
+        bindAddress: "127.0.0.2",
+        port: address.port,
+      },
+    };
+    await savePreferences(root, fixed);
+    await assert.rejects(
+      startBrowserService({ root }),
+      /configured-port-in-use/u,
+    );
+    await savePreferences(root, {
+      ...fixed,
+      service: { ...fixed.service, portMode: "automatic" },
+    });
+    let gatewayLocalPort = 0;
+    service = await startBrowserService({
+      root,
+      online: {
+        status: () => ({ state: "disabled" }),
+        pending: () => [],
+        approve: () => {},
+        stop: async () => {},
+        reload: async (port) => {
+          gatewayLocalPort = port!;
+        },
+      },
+    });
+    assert.notEqual(service.port, address.port);
+    assert.equal(service.origin, "http://127.0.0.2:" + service.port);
+    const saved = await loadPreferences(root);
+    assert.equal(saved.service.port, service.port);
+    const boot = (await (
+      await fetch(service.origin + "/api/bootstrap")
+    ).json()) as { csrf: string };
+    const response = await fetch(service.origin + "/api/settings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": boot.csrf,
+        Origin: service.origin,
+      },
+      body: JSON.stringify({
+        preferences: {
+          ...saved,
+          service: { ...saved.service, port: address.port },
+        },
+        password: "",
+        tunnelToken: "",
+      }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal(gatewayLocalPort, service.port);
+  } finally {
+    occupied.close();
+    if (service) {
+      service.server.closeAllConnections();
+      await new Promise<void>((resolve) =>
+        service!.server.close(() => resolve()),
+      );
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test(
   "same-origin UI handles image import/export and " +

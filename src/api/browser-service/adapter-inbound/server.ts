@@ -45,6 +45,7 @@ import { executeCommand } from
   "../../command-execution/application/execute-command.ts";
 import {
   loadPreferences,
+  savePreferences,
   userDataRoot,
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
 import {
@@ -68,6 +69,8 @@ import { createHostSecretStore } from
   "../../../platforms/host-secret-store/adapter-outbound/host-secret-store.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
+import { resolveConfiguredTcpPort } from
+  "../../../platforms/tcp-ports/adapter-outbound/tcp-port.ts";
 
 export async function readBody(
   request: IncomingMessage,
@@ -106,6 +109,13 @@ export async function startBrowserService(
   const root = options.root ?? userDataRoot();
   const secrets = options.secrets ?? createHostSecretStore();
   const preferences = await loadPreferences(root);
+  let selectedPort = options.port;
+  if (selectedPort === undefined) {
+    const resolved = await resolveConfiguredTcpPort(preferences.service);
+    if (!resolved.ok) throw new Error(resolved.code);
+    selectedPort = resolved.settings.port;
+  }
+  const bindAddress = preferences.service.bindAddress;
   await initializeLibrary(preferences.mediaRoot);
   const diagnostic = await runFirstUseDiagnostics(root);
   const csrf = randomBytes(32).toString("base64url");
@@ -167,6 +177,13 @@ export async function startBrowserService(
           csrf,
           ...(await configurationStatus(root, secrets)),
           diagnostic,
+          service: {
+            origin,
+            lifecycle: "explicit-background-process",
+            launchAtLogin: preferences.service.launchAtLogin
+              ? "not-implemented"
+              : "disabled",
+          },
           onlineStatus: options.online?.status() ?? {
             state: "disabled",
             gatewayPort: 2608,
@@ -248,7 +265,7 @@ export async function startBrowserService(
       );
       if (url.pathname === "/api/settings") {
         const saved = await saveConfiguration(root, body, secrets);
-        if (saved.ok) await options.online?.reload();
+        if (saved.ok) await options.online?.reload(localPort);
         json(response, 200, {
           ...saved,
           onlineStatus: options.online?.status() ?? { state: "disabled" },
@@ -323,16 +340,59 @@ export async function startBrowserService(
       active -= 1;
     }
   }
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? preferences.service.port, "127.0.0.1", () => {
-      server.removeListener("error", reject);
-      resolve();
+  async function listen(port: number): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const failed = (error: Error) => {
+        server.removeListener("listening", ready);
+        reject(error);
+      };
+      const ready = () => {
+        server.removeListener("error", failed);
+        resolve();
+      };
+      server.once("error", failed);
+      server.once("listening", ready);
+      server.listen({ port, host: bindAddress, exclusive: true });
     });
-  });
+  }
+  try {
+    await listen(selectedPort);
+  } catch (error) {
+    if (
+      options.port === undefined &&
+      preferences.service.portMode === "automatic" &&
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "EADDRINUSE"
+    )
+      await listen(0);
+    else throw new Error("configured-port-unavailable");
+  }
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("invalid-service-address");
-  origin = "http://127.0.0.1:" + address.port;
-  return { server, origin, root, operationId: () => "http:" + randomUUID() };
+  const localPort = address.port;
+  origin =
+    "http://" +
+    (bindAddress === "::1" ? "[::1]" : bindAddress) +
+    ":" +
+    localPort;
+  try {
+    if (options.port === undefined && localPort !== preferences.service.port)
+      await savePreferences(root, {
+        ...preferences,
+        service: { ...preferences.service, port: localPort },
+      });
+  } catch {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error("settings-save-failed");
+  }
+  return {
+    server,
+    origin,
+    root,
+    port: localPort,
+    operationId: () => "http:" + randomUUID(),
+  };
 }

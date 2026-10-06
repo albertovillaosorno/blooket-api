@@ -90,3 +90,41 @@ test(
       assert.throws(() => decodeTeacherPreferences(value, "/tmp/media"));
   },
 );
+
+test("MCP URLs require an exact credential-free HTTPS resource", () => {
+  const defaults = defaultTeacherPreferences("/tmp/media");
+  for (const publicUrl of [
+    "example.test",
+    "https://example.test",
+    "http://example.test/mcp",
+    "https://user:pass@example.test/mcp",
+    "https://example.test/mcp/",
+    "https://example.test/mcp?token=x",
+    "https://example.test/mcp#x",
+    "https://example.test/other",
+    "javascript:alert(1)",
+  ])
+    assert.throws(() =>
+      decodeTeacherPreferences(
+        {
+          ...defaults,
+          online: { ...defaults.online, enabled: true, publicUrl },
+        },
+        "/tmp/media",
+      ),
+    );
+  assert.equal(
+    decodeTeacherPreferences(
+      {
+        ...defaults,
+        online: {
+          ...defaults.online,
+          enabled: true,
+          publicUrl: "https://example.test/mcp",
+        },
+      },
+      "/tmp/media",
+    ).online.enabled,
+    true,
+  );
+});
