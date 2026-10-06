@@ -84,9 +84,12 @@ test("fresh checkpoints resume at the first operation", () => {
     planId: value.planId,
     nextOperationIndex: 0,
   });
-  assert.equal(
-    nextBlooketWriteOperation(value, checkpoint)?.kind,
-    "set",
+  assert.deepEqual(
+    nextBlooketWriteOperation(value, checkpoint),
+    {
+      ok: true,
+      operation: value.operations[0] ?? null,
+    },
   );
 });
 
@@ -107,9 +110,12 @@ test("confirmed operations advance exactly one step", () => {
   assert.equal(advanced.ok, true);
   if (advanced.ok) {
     assert.equal(advanced.value.nextOperationIndex, 1);
-    assert.equal(
-      nextBlooketWriteOperation(value, advanced.value)?.kind,
-      "question",
+    assert.deepEqual(
+      nextBlooketWriteOperation(value, advanced.value),
+      {
+        ok: true,
+        operation: value.operations[1] ?? null,
+      },
     );
   }
 });
@@ -149,6 +155,24 @@ test("checkpoints reject skipped or cross-plan operations", () => {
   }
 });
 
+test("next operation rejects cross-plan checkpoints", () => {
+  const value = plan();
+  const checkpoint = initialBlooketWriteCheckpoint(value);
+  const changedResult = buildBlooketWritePlan(
+    project.replace("Math review.", "Changed."),
+    "",
+  );
+  assert.equal(changedResult.ok, true);
+  if (!changedResult.ok) {
+    return;
+  }
+
+  assert.deepEqual(
+    nextBlooketWriteOperation(changedResult.value, checkpoint),
+    { ok: false, code: "write-plan-mismatch" },
+  );
+});
+
 test("completed checkpoints have no next operation", () => {
   const value = plan();
   let checkpoint = initialBlooketWriteCheckpoint(value);
@@ -165,7 +189,10 @@ test("completed checkpoints have no next operation", () => {
     checkpoint = advanced.value;
   }
 
-  assert.equal(nextBlooketWriteOperation(value, checkpoint), null);
+  assert.deepEqual(
+    nextBlooketWriteOperation(value, checkpoint),
+    { ok: true, operation: null },
+  );
   assert.deepEqual(
     advanceBlooketWriteCheckpoint(
       value,

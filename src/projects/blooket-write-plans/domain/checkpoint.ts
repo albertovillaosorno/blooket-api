@@ -146,14 +146,27 @@ export function decodeBlooketWriteCheckpoint(
   };
 }
 
+export type NextBlooketWriteOperationResult =
+  | {
+      readonly ok: true;
+      readonly operation: BlooketWriteOperation | null;
+    }
+  | {
+      readonly ok: false;
+      readonly code: "write-plan-mismatch";
+    };
+
 export function nextBlooketWriteOperation(
   plan: BlooketWritePlan,
   checkpoint: BlooketWriteCheckpoint,
-): BlooketWriteOperation | null {
+): NextBlooketWriteOperationResult {
   if (checkpoint.planId !== plan.planId) {
-    return null;
+    return { ok: false, code: "write-plan-mismatch" };
   }
-  return plan.operations[checkpoint.nextOperationIndex] ?? null;
+  return {
+    ok: true,
+    operation: plan.operations[checkpoint.nextOperationIndex] ?? null,
+  };
 }
 
 export type AdvanceBlooketWriteCheckpointResult =
