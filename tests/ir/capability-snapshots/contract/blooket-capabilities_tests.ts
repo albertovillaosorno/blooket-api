@@ -80,7 +80,9 @@ const verified = {
   },
 } as const;
 
-test("official fixture preserves unknown upload limits", async () => {
+test(
+  "official fixture combines docs with authenticated browser evidence",
+  async () => {
   const fixtureUrl = new URL(
     "./blooket-official-2026-10-05.json",
     import.meta.url,
@@ -93,14 +95,23 @@ test("official fixture preserves unknown upload limits", async () => {
     assert.equal(result.value.verifiedOn, "2026-10-05");
     assert.equal(result.value.features.questionImages, "supported");
     assert.equal(result.value.features.answerImages, "account-dependent");
+    assert.equal(result.value.setMetadata.titleRequired, true);
+    assert.equal(result.value.setMetadata.descriptionRequired, false);
+    assert.equal(
+      result.value.evidence.some(
+        (item) => item.kind === "browser-observation",
+      ),
+      true,
+    );
     assert.deepEqual(result.value.upload, {
-      maxBytes: null,
+      maxBytes: 2_500_000,
       canvasWidth: null,
       canvasHeight: null,
       maxPixels: null,
     });
   }
-});
+  },
+);
 
 test("version-one upload capabilities migrate unknown image limits", () => {
   const legacy = {

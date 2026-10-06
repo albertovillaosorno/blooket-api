@@ -9,6 +9,10 @@
     {
       "kind": "official-doc",
       "reference": "Blooket How to Create a Question Set (retrieved 2026-10-05)"
+    },
+    {
+      "kind": "browser-observation",
+      "reference": "86784c3d4c38fcd559c92f38fbadd7a160947de2"
     }
   ],
   "questionTypes": {
@@ -33,8 +37,8 @@
     "audio": "account-dependent"
   },
   "setMetadata": {
-    "titleRequired": null,
-    "descriptionRequired": null,
+    "titleRequired": true,
+    "descriptionRequired": false,
     "coverImageOptional": true,
     "visibility": [
       "public",
@@ -42,7 +46,7 @@
     ]
   },
   "upload": {
-    "maxBytes": null,
+    "maxBytes": 2500000,
     "canvasWidth": null,
     "canvasHeight": null,
     "maxPixels": null
