@@ -22,12 +22,6 @@ Extend the dated official-document fixture with authenticated browser
 observations for upload constraints, account-dependent behavior, navigation
 states, and other facts that official documentation does not establish.
 
-### TODO - Implement Blooket navigation state machine
-
-Model signed-out, authenticating, authenticated, organization-prompt,
-dashboard, create, edit, expired-session, rate-limited, security-challenge,
-unexpected-page, and human-action-required states explicitly.
-
 ### TODO - Implement session reuse and login
 
 Reuse the teacher's confirmed local browser session, obtain credentials only

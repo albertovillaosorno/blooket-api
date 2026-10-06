@@ -251,8 +251,14 @@ but it is not a CAPTCHA bypass or anti-bot evasion mechanism. A CAPTCHA,
 unrecognized login page, unexpected account challenge, or ambiguous destructive
 state stops the operation and requests human action.
 
-The known Blooket organization-selection prompt is a recognized navigation state
-that must not be filled or submitted automatically.
+Blooket navigation uses an explicit state machine rather than an assumed URL
+sequence. Browser observations override the state callers expected. Signed-out
+and expired sessions request authentication, rate limiting waits without a
+guessed retry duration, and dashboard/create/edit states may continue.
+
+The known Blooket organization-selection prompt, security challenges, unexpected
+pages, and explicit escalation all require human action. The organization form
+must not be filled or submitted automatically.
 
 ## Settings and port collisions
 
