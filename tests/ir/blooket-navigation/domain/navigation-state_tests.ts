@@ -35,6 +35,7 @@ import test from "node:test";
 
 import {
   BLOOKET_NAVIGATION_STATE_KINDS,
+  blooketNavigationDecision,
   blooketNavigationDisposition,
   initialBlooketNavigationState,
   transitionBlooketNavigationState,
@@ -172,6 +173,24 @@ test("human escalation is explicit and idempotent", () => {
       },
     );
   }
+});
+
+test("navigation decisions preserve the state for each action", () => {
+  assert.deepEqual(
+    blooketNavigationDecision({ kind: "dashboard" }),
+    { action: "continue", state: "dashboard" },
+  );
+  assert.deepEqual(
+    blooketNavigationDecision({ kind: "rate-limited" }),
+    { action: "wait", state: "rate-limited" },
+  );
+  assert.deepEqual(
+    blooketNavigationDecision({ kind: "security-challenge" }),
+    {
+      action: "human-action-required",
+      state: "security-challenge",
+    },
+  );
 });
 
 test("every navigation state has a deterministic disposition", () => {

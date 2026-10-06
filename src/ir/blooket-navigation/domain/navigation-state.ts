@@ -75,6 +75,32 @@ export type BlooketNavigationDisposition =
   | "wait"
   | "human-action-required";
 
+export type BlooketNavigationDecision =
+  | {
+      readonly action: "authenticate";
+      readonly state: "signed-out" | "expired-session";
+    }
+  | {
+      readonly action: "observe";
+      readonly state: "authenticating" | "authenticated";
+    }
+  | {
+      readonly action: "continue";
+      readonly state: "dashboard" | "create" | "edit";
+    }
+  | {
+      readonly action: "wait";
+      readonly state: "rate-limited";
+    }
+  | {
+      readonly action: "human-action-required";
+      readonly state:
+        | "organization-prompt"
+        | "security-challenge"
+        | "unexpected-page"
+        | "human-action-required";
+    };
+
 export type BlooketNavigationTransition =
   | {
       readonly ok: true;
@@ -120,30 +146,39 @@ export function transitionBlooketNavigationState(
   return { ok: true, state: { kind: "authenticated" } };
 }
 
-export function blooketNavigationDisposition(
+export function blooketNavigationDecision(
   state: BlooketNavigationState,
-): BlooketNavigationDisposition {
+): BlooketNavigationDecision {
   switch (state.kind) {
     case "signed-out":
     case "expired-session":
-      return "authenticate";
+      return { action: "authenticate", state: state.kind };
 
     case "authenticating":
     case "authenticated":
-      return "observe";
+      return { action: "observe", state: state.kind };
 
     case "dashboard":
     case "create":
     case "edit":
-      return "continue";
+      return { action: "continue", state: state.kind };
 
     case "rate-limited":
-      return "wait";
+      return { action: "wait", state: state.kind };
 
     case "organization-prompt":
     case "security-challenge":
     case "unexpected-page":
     case "human-action-required":
-      return "human-action-required";
+      return {
+        action: "human-action-required",
+        state: state.kind,
+      };
   }
+}
+
+export function blooketNavigationDisposition(
+  state: BlooketNavigationState,
+): BlooketNavigationDisposition {
+  return blooketNavigationDecision(state).action;
 }
