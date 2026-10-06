@@ -32,8 +32,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { BlooketCapabilitySnapshot } from
+import {
+  decodeBlooketCapabilitySnapshot,
+  type BlooketCapabilitySnapshot,
+} from
   "../../../../src/ir/capability-snapshots/contract/blooket-capabilities.ts";
+// jig-ignore-next-line: JSON import attributes cannot be line-wrapped.
+import officialCapabilities from "../../../ir/capability-snapshots/contract/blooket-official-2026-10-05.json" with { type: "json" };
 import { decodeProjectDocument } from
   "../../../../src/projects/project-documents/domain/project.ts";
 import { validateProjectCapabilities } from
@@ -111,6 +116,52 @@ function decodedProject() {
 test("explicit supported capabilities admit the project", () => {
   assert.deepEqual(
     validateProjectCapabilities(decodedProject(), capabilities),
+    [],
+  );
+});
+
+test("dated official evidence blocks account-dependent answer images", () => {
+  const decoded = decodeBlooketCapabilitySnapshot(officialCapabilities);
+  assert.equal(decoded.ok, true);
+  if (!decoded.ok) {
+    return;
+  }
+
+  const issues = validateProjectCapabilities(
+    decodedProject(),
+    decoded.value,
+  );
+  assert.equal(
+    issues.some((issue) => issue.code === "capability-not-supported"),
+    true,
+  );
+});
+
+test("dated official evidence admits projects not using answer images", () => {
+  const decoded = decodeBlooketCapabilitySnapshot(officialCapabilities);
+  assert.equal(decoded.ok, true);
+  if (!decoded.ok) {
+    return;
+  }
+
+  const project = decodedProject();
+  const withoutAnswerImages = {
+    ...project,
+    questions: project.questions.map((question) => {
+      if (question.type !== "multiple-choice") {
+        return question;
+      }
+      return {
+        ...question,
+        answers: question.answers.map((answer) => ({
+          ...answer,
+          image: null,
+        })),
+      };
+    }),
+  };
+  assert.deepEqual(
+    validateProjectCapabilities(withoutAnswerImages, decoded.value),
     [],
   );
 });
