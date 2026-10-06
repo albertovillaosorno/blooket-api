@@ -40,7 +40,7 @@ import {
   "../../../../src/ir/capability-snapshots/contract/blooket-capabilities.ts";
 
 const verified = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   verifiedOn: "2026-10-05",
   evidence: [
     {
@@ -69,6 +69,8 @@ const verified = {
   setMetadata: {
     titleRequired: true,
     descriptionRequired: true,
+    titleMaxLength: 75,
+    descriptionMaxLength: 300,
     coverImageOptional: true,
     visibility: ["public", "private"],
   },
@@ -97,6 +99,8 @@ test(
     assert.equal(result.value.features.answerImages, "account-dependent");
     assert.equal(result.value.setMetadata.titleRequired, true);
     assert.equal(result.value.setMetadata.descriptionRequired, false);
+    assert.equal(result.value.setMetadata.titleMaxLength, 75);
+    assert.equal(result.value.setMetadata.descriptionMaxLength, 300);
     assert.equal(
       result.value.evidence.some(
         (item) => item.kind === "browser-observation",
@@ -117,6 +121,12 @@ test("version-one upload capabilities migrate unknown image limits", () => {
   const legacy = {
     ...verified,
     schemaVersion: 1,
+    setMetadata: {
+      titleRequired: verified.setMetadata.titleRequired,
+      descriptionRequired: verified.setMetadata.descriptionRequired,
+      coverImageOptional: verified.setMetadata.coverImageOptional,
+      visibility: verified.setMetadata.visibility,
+    },
     upload: {
       maxBytes: null,
     },
@@ -125,7 +135,9 @@ test("version-one upload capabilities migrate unknown image limits", () => {
 
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.value.schemaVersion, 2);
+    assert.equal(result.value.schemaVersion, 3);
+    assert.equal(result.value.setMetadata.titleMaxLength, null);
+    assert.equal(result.value.setMetadata.descriptionMaxLength, null);
     assert.deepEqual(result.value.upload, {
       maxBytes: null,
       canvasWidth: null,
@@ -142,10 +154,31 @@ test("version-one upload capabilities migrate unknown image limits", () => {
   }
 });
 
+test("version-two snapshots migrate unknown metadata lengths", () => {
+  const legacy = {
+    ...verified,
+    schemaVersion: 2,
+    setMetadata: {
+      titleRequired: verified.setMetadata.titleRequired,
+      descriptionRequired: verified.setMetadata.descriptionRequired,
+      coverImageOptional: verified.setMetadata.coverImageOptional,
+      visibility: verified.setMetadata.visibility,
+    },
+  } as const;
+  const result = decodeBlooketCapabilitySnapshot(legacy);
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.schemaVersion, 3);
+    assert.equal(result.value.setMetadata.titleMaxLength, null);
+    assert.equal(result.value.setMetadata.descriptionMaxLength, null);
+  }
+});
+
 test("future capability versions fail closed instead of migrating", () => {
   const result = decodeBlooketCapabilitySnapshot({
     ...verified,
-    schemaVersion: 3,
+    schemaVersion: 4,
   });
 
   assert.equal(result.ok, false);
@@ -161,6 +194,12 @@ test("version-one snapshots reject version-two upload fields", () => {
   const result = decodeBlooketCapabilitySnapshot({
     ...verified,
     schemaVersion: 1,
+    setMetadata: {
+      titleRequired: verified.setMetadata.titleRequired,
+      descriptionRequired: verified.setMetadata.descriptionRequired,
+      coverImageOptional: verified.setMetadata.coverImageOptional,
+      visibility: verified.setMetadata.visibility,
+    },
     upload: {
       maxBytes: null,
       canvasWidth: null,

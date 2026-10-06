@@ -45,7 +45,7 @@ import { validateProjectCapabilities } from
   "../../../../src/projects/project-validation/domain/capabilities.ts";
 
 const capabilities: BlooketCapabilitySnapshot = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   verifiedOn: "2026-10-05",
   evidence: [{ kind: "browser-observation", reference: "fixture" }],
   questionTypes: {
@@ -67,8 +67,10 @@ const capabilities: BlooketCapabilitySnapshot = {
     audio: "unknown",
   },
   setMetadata: {
-    titleRequired: null,
-    descriptionRequired: null,
+    titleRequired: true,
+    descriptionRequired: false,
+    titleMaxLength: 75,
+    descriptionMaxLength: 300,
     coverImageOptional: true,
     visibility: ["public", "private"],
   },
@@ -163,6 +165,88 @@ test("dated official evidence admits projects not using answer images", () => {
   assert.deepEqual(
     validateProjectCapabilities(withoutAnswerImages, decoded.value),
     [],
+  );
+});
+
+test("verified metadata length limits are enforced exactly", () => {
+  const base = decodedProject();
+  const exact = {
+    ...base,
+    title: "t".repeat(75),
+    description: "d".repeat(300),
+  };
+  assert.deepEqual(
+    validateProjectCapabilities(exact, capabilities),
+    [],
+  );
+
+  const tooLong = validateProjectCapabilities({
+    ...exact,
+    title: "t".repeat(76),
+    description: "d".repeat(301),
+  }, capabilities);
+  assert.equal(
+    tooLong.some((issue) => issue.code === "title-too-long"),
+    true,
+  );
+  assert.equal(
+    tooLong.some((issue) => issue.code === "description-too-long"),
+    true,
+  );
+});
+
+test("unknown metadata length limits fail closed", () => {
+  const issues = validateProjectCapabilities(decodedProject(), {
+    ...capabilities,
+    setMetadata: {
+      ...capabilities.setMetadata,
+      titleMaxLength: null,
+      descriptionMaxLength: null,
+    },
+  });
+  assert.equal(
+    issues.some((issue) => issue.code === "unknown-title-max-length"),
+    true,
+  );
+  assert.equal(
+    issues.some(
+      (issue) => issue.code === "unknown-description-max-length",
+    ),
+    true,
+  );
+});
+
+test("empty descriptions require verified optionality", () => {
+  const project = { ...decodedProject(), description: "" };
+  assert.deepEqual(
+    validateProjectCapabilities(project, capabilities),
+    [],
+  );
+
+  const required = validateProjectCapabilities(project, {
+    ...capabilities,
+    setMetadata: {
+      ...capabilities.setMetadata,
+      descriptionRequired: true,
+    },
+  });
+  assert.equal(
+    required.some((issue) => issue.code === "description-required"),
+    true,
+  );
+
+  const unknown = validateProjectCapabilities(project, {
+    ...capabilities,
+    setMetadata: {
+      ...capabilities.setMetadata,
+      descriptionRequired: null,
+    },
+  });
+  assert.equal(
+    unknown.some(
+      (issue) => issue.code === "unknown-description-requirement",
+    ),
+    true,
   );
 });
 

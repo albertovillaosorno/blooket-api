@@ -41,8 +41,9 @@ import {
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 
-export const BLOOKET_CAPABILITIES_VERSION = 2 as const;
+export const BLOOKET_CAPABILITIES_VERSION = 3 as const;
 const LEGACY_BLOOKET_CAPABILITIES_VERSION = 1 as const;
+const LEGACY_BLOOKET_CAPABILITIES_VERSION_2 = 2 as const;
 
 export type CapabilityAvailability =
   | "supported"
@@ -80,6 +81,8 @@ export interface BlooketCapabilitySnapshot {
   readonly setMetadata: {
     readonly titleRequired: boolean | null;
     readonly descriptionRequired: boolean | null;
+    readonly titleMaxLength: number | null;
+    readonly descriptionMaxLength: number | null;
     readonly coverImageOptional: boolean | null;
     readonly visibility: readonly ("public" | "private")[];
   };
@@ -111,11 +114,16 @@ const MULTIPLE_CHOICE_KEYS = new Set([
 ]);
 const TYPING_ANSWER_KEYS = new Set(["availability", "matchModes"]);
 const FEATURE_KEYS = new Set(["questionImages", "answerImages", "audio"]);
-const SET_METADATA_KEYS = new Set([
+const LEGACY_SET_METADATA_KEYS = new Set([
   "titleRequired",
   "descriptionRequired",
   "coverImageOptional",
   "visibility",
+]);
+const SET_METADATA_KEYS = new Set([
+  ...LEGACY_SET_METADATA_KEYS,
+  "titleMaxLength",
+  "descriptionMaxLength",
 ]);
 const LEGACY_UPLOAD_KEYS = new Set(["maxBytes"]);
 const UPLOAD_KEYS = new Set([
@@ -142,12 +150,13 @@ export function decodeBlooketCapabilitySnapshot(
   const inputVersion = value["schemaVersion"];
   if (
     inputVersion !== LEGACY_BLOOKET_CAPABILITIES_VERSION
+    && inputVersion !== LEGACY_BLOOKET_CAPABILITIES_VERSION_2
     && inputVersion !== BLOOKET_CAPABILITIES_VERSION
   ) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
-      message: "Expected Blooket capability schema version 1 or 2.",
+      message: "Expected Blooket capability schema version 1, 2, or 3.",
     });
   }
 
@@ -155,7 +164,11 @@ export function decodeBlooketCapabilitySnapshot(
   const evidence = decodeEvidence(value["evidence"], issues);
   const questionTypes = decodeQuestionTypes(value["questionTypes"], issues);
   const features = decodeFeatures(value["features"], issues);
-  const setMetadata = decodeSetMetadata(value["setMetadata"], issues);
+  const setMetadata = decodeSetMetadata(
+    value["setMetadata"],
+    inputVersion === BLOOKET_CAPABILITIES_VERSION ? 3 : 2,
+    issues,
+  );
   const upload = decodeUpload(
     value["upload"],
     inputVersion === LEGACY_BLOOKET_CAPABILITIES_VERSION ? 1 : 2,
@@ -417,6 +430,7 @@ function decodeFeatures(
 
 function decodeSetMetadata(
   value: unknown,
+  version: 2 | 3,
   issues: ValidationIssue[],
 ): BlooketCapabilitySnapshot["setMetadata"] | undefined {
   if (!isRecord(value)) {
@@ -427,7 +441,13 @@ function decodeSetMetadata(
     });
     return undefined;
   }
-  issues.push(...unknownFieldIssues(value, SET_METADATA_KEYS, "$.setMetadata"));
+  issues.push(
+    ...unknownFieldIssues(
+      value,
+      version === 3 ? SET_METADATA_KEYS : LEGACY_SET_METADATA_KEYS,
+      "$.setMetadata",
+    ),
+  );
   const titleRequired = decodeNullableBoolean(
     value["titleRequired"],
     "$.setMetadata.titleRequired",
@@ -438,6 +458,20 @@ function decodeSetMetadata(
     "$.setMetadata.descriptionRequired",
     issues,
   );
+  const titleMaxLength = version === 3
+    ? decodeNullablePositiveInteger(
+        value["titleMaxLength"],
+        "$.setMetadata.titleMaxLength",
+        issues,
+      )
+    : null;
+  const descriptionMaxLength = version === 3
+    ? decodeNullablePositiveInteger(
+        value["descriptionMaxLength"],
+        "$.setMetadata.descriptionMaxLength",
+        issues,
+      )
+    : null;
   const coverImageOptional = decodeNullableBoolean(
     value["coverImageOptional"],
     "$.setMetadata.coverImageOptional",
@@ -452,6 +486,8 @@ function decodeSetMetadata(
   if (
     titleRequired === undefined
     || descriptionRequired === undefined
+    || titleMaxLength === undefined
+    || descriptionMaxLength === undefined
     || coverImageOptional === undefined
     || visibility === undefined
   ) {
@@ -460,6 +496,8 @@ function decodeSetMetadata(
   return {
     titleRequired,
     descriptionRequired,
+    titleMaxLength,
+    descriptionMaxLength,
     coverImageOptional,
     visibility,
   };

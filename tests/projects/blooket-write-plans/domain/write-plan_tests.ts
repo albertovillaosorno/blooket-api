@@ -33,7 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const capabilities = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   verifiedOn: "2026-10-05",
   evidence: [{ kind: "browser-observation", reference: "fixture" }],
   questionTypes: {
@@ -55,8 +55,10 @@ const capabilities = {
     audio: "unknown",
   },
   setMetadata: {
-    titleRequired: null,
-    descriptionRequired: null,
+    titleRequired: true,
+    descriptionRequired: false,
+    titleMaxLength: 75,
+    descriptionMaxLength: 300,
     coverImageOptional: true,
     visibility: ["public", "private"],
   },

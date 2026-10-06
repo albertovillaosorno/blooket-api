@@ -51,6 +51,35 @@ export function validateProjectCapabilities(
       message: "Project visibility is not admitted by verified capabilities.",
     });
   }
+  validateMetadataLength(
+    project.title,
+    capabilities.setMetadata.titleMaxLength,
+    "$.title",
+    "title",
+    issues,
+  );
+  validateMetadataLength(
+    project.description,
+    capabilities.setMetadata.descriptionMaxLength,
+    "$.description",
+    "description",
+    issues,
+  );
+  if (project.description.length === 0) {
+    if (capabilities.setMetadata.descriptionRequired === true) {
+      issues.push({
+        path: "$.description",
+        code: "description-required",
+        message: "Verified capabilities require a set description.",
+      });
+    } else if (capabilities.setMetadata.descriptionRequired === null) {
+      issues.push({
+        path: "$.description",
+        code: "unknown-description-requirement",
+        message: "Description optionality must be verified when omitted.",
+      });
+    }
+  }
   if (
     project.coverImage === null
     && capabilities.setMetadata.coverImageOptional !== true
@@ -136,6 +165,30 @@ export function validateProjectCapabilities(
   }
 
   return issues;
+}
+
+function validateMetadataLength(
+  value: string,
+  maxLength: number | null,
+  path: string,
+  field: "title" | "description",
+  issues: ValidationIssue[],
+): void {
+  if (maxLength === null) {
+    issues.push({
+      path,
+      code: "unknown-" + field + "-max-length",
+      message: "Verified metadata length limit is required.",
+    });
+    return;
+  }
+  if (value.length > maxLength) {
+    issues.push({
+      path,
+      code: field + "-too-long",
+      message: "Metadata exceeds the verified Blooket length limit.",
+    });
+  }
 }
 
 function requireSupported(

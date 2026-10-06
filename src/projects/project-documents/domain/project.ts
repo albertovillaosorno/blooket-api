@@ -84,7 +84,7 @@ export function decodeProjectDocument(
     ...unknownFieldIssues(value, PROJECT_KEYS, "$"),
   ];
   const title = requiredString(value["title"], "$.title", issues);
-  const description = requiredString(
+  const description = requiredStringValue(
     value["description"],
     "$.description",
     issues,
@@ -161,6 +161,22 @@ export function decodeProjectDocument(
       questions,
     },
   };
+}
+
+function requiredStringValue(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+  issues.push({
+    path,
+    code: "expected-string",
+    message: "Expected a string.",
+  });
+  return undefined;
 }
 
 function decodeCoverImage(

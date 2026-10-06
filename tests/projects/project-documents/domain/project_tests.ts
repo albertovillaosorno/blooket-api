@@ -63,6 +63,18 @@ test("project documents accept the exact version-one contract", () => {
   assert.equal(decodeProjectDocument(project).ok, true);
 });
 
+test("project descriptions may be empty local metadata", () => {
+  const result = decodeProjectDocument({
+    ...project,
+    description: "",
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.description, "");
+  }
+});
+
 test("project documents may start with no questions", () => {
   assert.equal(
     decodeProjectDocument({ ...project, questions: [] }).ok,

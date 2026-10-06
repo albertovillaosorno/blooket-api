@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "verifiedOn": "2026-10-05",
   "evidence": [
     {
@@ -39,6 +39,8 @@
   "setMetadata": {
     "titleRequired": true,
     "descriptionRequired": false,
+    "titleMaxLength": 75,
+    "descriptionMaxLength": 300,
     "coverImageOptional": true,
     "visibility": [
       "public",

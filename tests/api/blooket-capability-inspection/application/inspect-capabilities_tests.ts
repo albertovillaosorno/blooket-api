@@ -57,7 +57,7 @@ const LOGIN = "teacher@example.test";
 const PASSWORD = "fixture-password";
 
 const capabilities = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   verifiedOn: "2026-10-05",
   evidence: [{
     kind: "browser-observation",
@@ -82,8 +82,10 @@ const capabilities = {
     audio: "account-dependent",
   },
   setMetadata: {
-    titleRequired: null,
-    descriptionRequired: null,
+    titleRequired: true,
+    descriptionRequired: false,
+    titleMaxLength: 75,
+    descriptionMaxLength: 300,
     coverImageOptional: true,
     visibility: ["public", "private"],
   },
@@ -175,7 +177,7 @@ test("ready reused sessions inspect and decode capabilities", async () => {
     state: "dashboard",
     reused: true,
   });
-  assert.equal(result.value.schemaVersion, 2);
+  assert.equal(result.value.schemaVersion, 3);
   assert.deepEqual(browserCalls, ["observe"]);
   assert.deepEqual(secretReads, []);
   assert.deepEqual(probeCalls, ["inspect"]);
