@@ -61,15 +61,16 @@ jobs:
         env:
           PACKAGE_TARGET: ${{ matrix.target }}
         run: npm run package -- "$PACKAGE_TARGET"
-      - name: Test the extracted package
+      - name: Verify extracted release package
         env:
           PACKAGE_TARGET: ${{ matrix.target }}
-        run: npm run package:verify -- "$PACKAGE_TARGET"
-      - name: Require Safari and trusted macOS signing for release
-        if: startsWith(matrix.target, 'darwin-')
-        env:
-          PACKAGE_TARGET: ${{ matrix.target }}
-        run: npm run package:verify -- "$PACKAGE_TARGET" --release
+        shell: bash
+        run: |
+          if [[ "$PACKAGE_TARGET" == darwin-* ]]; then
+            npm run package:verify -- "$PACKAGE_TARGET" --release
+          else
+            npm run package:verify -- "$PACKAGE_TARGET"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: package-${{ matrix.target }}
