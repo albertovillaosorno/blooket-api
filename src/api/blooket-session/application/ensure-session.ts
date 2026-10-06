@@ -49,6 +49,7 @@ import type { HostSecretStore } from
 
 export type BlooketReadyNavigationState =
   | "dashboard"
+  | "my-sets"
   | "create"
   | "edit";
 
@@ -133,6 +134,7 @@ function classifyInspectedSession(
   if (session.action === "continue") {
     if (
       session.state !== "dashboard"
+      && session.state !== "my-sets"
       && session.state !== "create"
       && session.state !== "edit"
     ) {

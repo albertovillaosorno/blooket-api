@@ -148,7 +148,7 @@ test("ready sessions list strictly decoded set summaries", async () => {
     code: "blooket-browser-failed",
   });
   const result = await listBlooketSets(
-    browser([{ ok: true, state: "dashboard" }], calls),
+    browser([{ ok: true, state: "my-sets" }], calls),
     secretStore(calls),
     reads.port,
   );
@@ -157,7 +157,7 @@ test("ready sessions list strictly decoded set summaries", async () => {
   if (result.ok && result.kind === "sets") {
     assert.equal(result.value.length, 2);
     assert.deepEqual(result.session, {
-      state: "dashboard",
+      state: "my-sets",
       reused: true,
     });
   }

@@ -67,7 +67,7 @@ type SessionStop = Extract<
 >;
 
 interface ReadySessionSummary {
-  readonly state: "dashboard" | "create" | "edit";
+  readonly state: "dashboard" | "my-sets" | "create" | "edit";
   readonly reused: boolean;
 }
 

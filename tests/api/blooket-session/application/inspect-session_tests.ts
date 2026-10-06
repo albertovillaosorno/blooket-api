@@ -63,6 +63,7 @@ test("session inspection maps every observable state to policy", async () => {
     "signed-out": "authenticate",
     "organization-prompt": "human-action-required",
     dashboard: "continue",
+    "my-sets": "continue",
     create: "continue",
     edit: "continue",
     "expired-session": "authenticate",

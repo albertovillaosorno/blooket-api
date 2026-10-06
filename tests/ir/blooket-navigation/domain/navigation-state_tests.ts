@@ -51,6 +51,7 @@ test("the state vocabulary contains every roadmap navigation state", () => {
     "authenticated",
     "organization-prompt",
     "dashboard",
+    "my-sets",
     "create",
     "edit",
     "expired-session",
@@ -138,6 +139,7 @@ test("browser observations override expected workflow state", () => {
     "signed-out",
     "organization-prompt",
     "dashboard",
+    "my-sets",
     "create",
     "edit",
     "expired-session",
@@ -181,6 +183,10 @@ test("navigation decisions preserve the state for each action", () => {
     { action: "continue", state: "dashboard" },
   );
   assert.deepEqual(
+    blooketNavigationDecision({ kind: "my-sets" }),
+    { action: "continue", state: "my-sets" },
+  );
+  assert.deepEqual(
     blooketNavigationDecision({ kind: "rate-limited" }),
     { action: "wait", state: "rate-limited" },
   );
@@ -202,6 +208,7 @@ test("every navigation state has a deterministic disposition", () => {
     authenticated: "observe",
     "organization-prompt": "human-action-required",
     dashboard: "continue",
+    "my-sets": "continue",
     create: "continue",
     edit: "continue",
     "expired-session": "authenticate",

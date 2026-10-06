@@ -38,6 +38,7 @@ export const BLOOKET_NAVIGATION_STATE_KINDS = [
   "authenticated",
   "organization-prompt",
   "dashboard",
+  "my-sets",
   "create",
   "edit",
   "expired-session",
@@ -86,7 +87,7 @@ export type BlooketNavigationDecision =
     }
   | {
       readonly action: "continue";
-      readonly state: "dashboard" | "create" | "edit";
+      readonly state: "dashboard" | "my-sets" | "create" | "edit";
     }
   | {
       readonly action: "wait";
@@ -159,6 +160,7 @@ export function blooketNavigationDecision(
       return { action: "observe", state: state.kind };
 
     case "dashboard":
+    case "my-sets":
     case "create":
     case "edit":
       return { action: "continue", state: state.kind };

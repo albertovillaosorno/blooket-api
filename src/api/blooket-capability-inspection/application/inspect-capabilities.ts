@@ -60,7 +60,7 @@ export type InspectBlooketCapabilitiesResult =
       readonly ok: true;
       readonly kind: "capabilities";
       readonly session: {
-        readonly state: "dashboard" | "create" | "edit";
+        readonly state: "dashboard" | "my-sets" | "create" | "edit";
         readonly reused: boolean;
       };
       readonly value: BlooketCapabilitySnapshot;
