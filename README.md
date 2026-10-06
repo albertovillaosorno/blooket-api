@@ -138,9 +138,14 @@ configuration ownership, and integration checks.
 
 ## Project documents
 
-A lesson is a directory-backed project. `project.json` owns lesson metadata,
-question structure, media requests, and stable media references. The initial
-contract is intentionally versioned from the first byte:
+The teacher's online request drives quiz preparation and changes. Local
+`project.json` remains a versioned, recoverable draft and execution record for
+metadata, questions, and stable media references. The UI and MCP manage it
+automatically; the teacher does not need to edit JSON files.
+
+Fresh Blooket reads and confirmed remote receipts establish online state. Detect
+stale remote content before applying a new plan rather than silently letting a
+local draft overwrite it. The current local contract is:
 
 ```json
 {
@@ -159,62 +164,66 @@ contract is intentionally versioned from the first byte:
 the language used by the teacher to communicate with an agent or the local
 browser interface.
 
-## Media vault and descriptions
+## User media library and descriptions
 
-Binary media never needs to be encoded as text for an LLM. The vault keeps
-original assets and produces Blooket-ready renditions separately. Project media
-can be represented in a simple JSON Lines index so an agent can inspect many
-assets cheaply:
+The target user-data root is `~/Library/Application Support/blooket-api/` for
+the non-sandboxed macOS service, resolved from the current user at runtime.
+`settings.json`, personal `skills/`, drafts, execution state, and logs live
+there. The media root defaults to `media/` beside settings and can be changed
+locally.
 
-```jsonl
-{"id":"sun","path":"media/sun.png","description":"A sun.","english":false}
-{"id":"horse","path":"media/horse.png","description":"A horse.","english":false}
-```
-
-The canonical `description` is English even when the teacher, source page, file
-name, or quiz uses another language. `english` defaults to `false`. It becomes
-`true` only after the English description has been explicitly verified;
-automatic translation alone does not silently assert that verification.
-
-Origin URLs are not required metadata. The durable minimum is stable identity,
-local path, canonical English description, and the verification state of that
-description. Immutable source bytes live separately under
-`originals/<id>.<source-extension>`; the searchable record points at the
-prepared rendition under `media/<id>.<rendition-extension>`.
-
-A question may contain an unresolved image request before a concrete asset has
-been selected:
-
-```json
-{
-  "description": "A clear side view of a yellow school bus.",
-  "mediaId": null
-}
-```
-
-The description states the pedagogical visual requirement. Media resolution can
-later bind it to a vault asset without regenerating the question text.
-
-### Agent media search
-
-Agents do not need `rg` to understand the vault. `src/media/` owns a field-aware
-searcher and the CLI exposes it in machine-readable form. The intended command
-surface is:
+User-named immutable photo/GIF sources live in `media/photos/`. Their YAML
+metadata mirrors the relative folders under `media/metadata/`; append `.yaml` to
+the complete filename to distinguish the same stem across formats.
 
 ```text
-blooket media search "yellow school bus" --field description --json
-blooket media search "sun" --field id --field description --json
-blooket media search "stage" --field description --regex --json
+media/photos/animals/Mi gato.gif
+media/metadata/animals/Mi gato.gif.yaml
 ```
 
-Literal, case-insensitive search is the default. Regular expressions are an
-explicit option. Field selection is explicit so an agent can search only
-`description` without matching IDs, paths, or unrelated metadata. Results are
-returned per media asset with its stable ID and file path.
+She chooses filenames and can write names/descriptions in any language. The AI
+uses stable asset IDs and YAML metadata, adds generated English text and topics,
+and never renames files or overwrites originals. Translation and verification
+remain distinct states; changing original text invalidates stale enrichment.
 
-The index remains ordinary UTF-8 text. `rg` therefore remains useful for humans,
-diagnostics, and emergency inspection, but product behavior does not depend on
-an external ripgrep installation.
+```yaml
+schemaVersion: 1
+id: asset-001
+asset: photos/animals/Mi gato.gif
+original:
+  revision: 1
+  name: Mi gato
+  description: Un gato naranja mirando por la ventana.
+  language: es
+topics:
+  - animals
+  - pets
+generatedEnglish:
+  name: My cat
+  description: An orange cat looking through a window.
+  generatedBy: ai
+  sourceRevision: 1
+  verified: false
+```
+
+This example describes the accepted target, not the current runtime schema.
+Existing version-two JSONL records and stable-ID source paths require a tested,
+recoverable migration. A future search index is derived from canonical YAML.
+
+### Agent media and personal skills
+
+Search original/generated text and topics through field-aware CLI/MCP tools,
+then use the returned stable IDs in quizzes. AI metadata writes are decoded and
+admit only enrichment fields; file lifecycle and originals remain user-owned.
+Binary media is stored locally and prepared separately for Blooket.
+
+Personal skills live under the user-data `skills/` directory and can be listed,
+read, and updated through authorized logical-ID tools. Verify the actual ChatGPT
+connection can retrieve those skills and deliver an image attachment; neither
+local files nor chat attachments arrive at MCP automatically.
+
+See [the teacher settings and library decision][teacher-library-adr] for
+storage, metadata ownership, explicit GIF FPS, and migration requirements.
 
 ## Strict LLM JSON validation
 
@@ -321,87 +330,66 @@ title; detail adds description and public/private visibility. No remote-ID
 grammar, question payload shape, cover read shape, or additional set metadata is
 invented without verified browser evidence.
 
-## Settings and port collisions
+## Configuration and user storage
 
-The local service defaults to `127.0.0.1:2607`. Address and port are user
-settings, not constants embedded across the codebase.
+The UI has English/Spanish i18n, independent of quiz and original-description
+language. Configuration includes Blooket email, masked password, local port,
+media-folder selection, and an Online MCP toggle. The public HTTPS MCP URL and
+masked Cloudflare tunnel token controls are enabled only with Online MCP.
 
-Startup probes the configured port before binding. If it is already occupied,
-the UI reports the collision and offers either a manually chosen port or an
-automatic available-port selection. An automatically selected port is persisted
-so clients do not receive a different endpoint on every launch.
+The user configures the Cloudflare hostname/tunnel and supplies a URL such as
+`https://blooket.albertovilla.com/mcp`. Cloudflare Tunnel is the sole online
+provider. Disabling online access preserves configuration and stops the tunnel.
 
-The extension must discover the configured local endpoint through an explicit
-local contract; it must not assume that port 2607 is permanently available.
+Save atomically persists ordinary JSON settings and updates changed secrets
+through the Keychain boundary. Settings contain email, paths, preferences, and
+secret references; password and token values stay in Keychain. UI responses show
+configured/missing status rather than returning saved secrets.
 
-### Tunnel configuration and first-use diagnostics
+The local service defaults to `127.0.0.1:2607`; the port remains configurable.
+Detect collisions and allow an explicit fixed or automatically selected port.
+The local page and extension discover that configured endpoint without
+hardcoding it across clients.
 
-The local UI provides a public MCP hostname field, a masked Cloudflare tunnel
-credential field, and Save. Ordinary versioned settings keep the hostname,
-enablement, and secret references; the Keychain keeps secret values. The process
-reads both internally.
+### Advanced settings and first-use diagnostics
 
-UI responses show configured/missing state without returning saved tokens.
-Credential management is local, never an MCP tool.
+Advanced settings define the GIF rendition rate, default 10 FPS, plus validated
+editor defaults. Persist the chosen rate explicitly rather than preserving
+arbitrary source FPS. FPS changes rebuild affected prepared renditions.
 
-A lightweight check runs once on first launch and records its check version,
-outcome, timestamp, stable failure codes, and local log reference in settings.
-It checks only bounded prerequisites such as OS/architecture, settings, local
-storage, port availability, native image decoding, and configured service
-readiness. It never changes Blooket or runs the full repository test suite.
+A bounded diagnostic runs once on first launch. It records check version,
+outcome, timestamp, stable failure codes, and log reference in settings. Missing
+configuration is separate from dependency failure; logs are sanitized and a
+manual rerun is available after repair.
 
-Missing configuration is reported separately, and failures leave a sanitized
-local log for repair. A manual Run diagnostics action can repeat the check. This
-startup check is planned; it is not yet implemented.
+The diagnostic does not change Blooket or run the full repository suite.
+Configuration UI, new settings fields, and this startup check are roadmap work.
 
-## Media intake and editing
+## Shared photo and GIF editor
 
-The local browser page and extension share paste and drag-and-drop behavior. The
-Safari extension can send an image selected from a web page directly to the
-local service; it never receives Blooket credentials.
+Drag-and-drop imports a source, then the teacher chooses its name, description,
+and topics. A visible zoom slider with minus/plus buttons and foreground
+dragging controls framing; mouse-wheel zoom remains an optional equivalent.
+Static photos and GIFs share saturation, contrast, preview, and undo/redo.
 
-Static images may arrive as JPEG, PNG, WebP, AVIF, or another explicitly
-supported decoder format. Animated GIFs remain animated. Source bytes are
-checked by repository format rules and then fully decoded through the reviewed
-Sharp/libvips adapter before durable publication.
+Background fill is either blurred or a solid chosen color. Provide a color input
+and an eyedropper, with a canvas pixel picker when the browser lacks the native
+API. Save edits as a render recipe and prepared rendition; originals remain
+intact.
 
-The media pipeline keeps the original and creates a fixed-dimension Blooket
-rendition separately. Static images use an automatic blurred-background fill
-when aspect ratios do not match, with pan and zoom controlling the foreground
-crop. Capability snapshot version three carries nullable canvas, output-pixel,
-upload-byte, and set-metadata length limits. Version-one and version-two
-snapshots migrate facts they predate to unknown instead of guessing values.
+Prepared GIFs use the explicitly configured FPS, default 10, so 10 FPS means 100
+ms per output frame. Resample the source timeline while preserving loop behavior
+and duration within one output frame interval. The current native renderer
+preserves source delays and needs a versioned change for this target.
 
-Editor state is immutable and uses an explicit bounded undo/redo history. Zoom
-one means neutral contain scaling. Pan coordinates are fractions of the canvas:
-pan X of one shifts the foreground center by one full canvas width, and pan Y
-uses the corresponding canvas height.
+Static and animated renditions share a verified target canvas/aspect ratio.
+Unknown Blooket dimensions stay unknown. Bound native work, frames, duration,
+pixels, and output bytes; optimize within the verified upload ceiling and show
+an actionable failure if a requested animation cannot fit.
 
-Editor rendering reopens the immutable vault original and applies bounded pan,
-zoom, contrast, saturation, rectangular blur, and opaque-black redaction. Source
-cropping happens before resize so extreme zoom cannot create an unbounded native
-intermediate. Animated GIFs run the same bounded operation independently for
-every frame, then preserve frame delays, loop state, and duplicate frames when
-reassembled. Animated WebP rendition remains fail-closed until equivalent
-preservation semantics are implemented and tested.
-
-Edited renditions and metadata replace one another transactionally while the
-original is never modified. Each edit is conditional on the media record and
-rendition hash loaded before rendering. A concurrent edit therefore returns a
-stable conflict instead of silently overwriting newer work. Changing a
-description resets its English verification to false unless the caller
-explicitly re-verifies the new text.
-
-Media-record persistence is versioned independently of stable media identity.
-Canonical version-two JSONL lines store an editable display name separately from
-the stable ID used by project references and vault paths. Legacy unversioned
-records migrate in memory with their ID as the display name and are not
-rewritten merely by reading them. New writes serialize the canonical version-two
-form.
-
-The first editor surface is intentionally small: pan, zoom, keyboard nudging,
-contrast, saturation, simple rectangular blur/redaction, naming, description,
-and undo/redo. Generative fill is not part of the initial contract.
+The existing Sharp/libvips pipeline and immutable-source editing are reusable.
+New controls, solid fills, YAML metadata, and explicit-rate GIF rendering are
+accepted roadmap requirements, not completed UI claims.
 
 ## Reliability and operating-system behavior
 
@@ -454,3 +442,4 @@ See [TODO.md](TODO.md) for implementation order and [AGENTS.md](AGENTS.md) for
 agent working rules.
 
 [browser-mcp-adr]: docs/technical/adr/macos-browser-ui-and-online-mcp.md
+[teacher-library-adr]: docs/technical/adr/teacher-settings-and-media-library.md

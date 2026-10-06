@@ -64,9 +64,10 @@ execution state and do not automatically replay an ambiguous mutation.
 
 The local UI accepts the public hostname and a masked Cloudflare tunnel token
 with Save. The user handles external provisioning. Extend the existing settings
-schema with migration, tunnel enablement, secret references, and diagnostic
-status. Persist ordinary settings atomically and store credential values in
-Keychain through `HostSecretStore`.
+schema with migration, UI locale, email, media root, explicit GIF FPS, tunnel
+enablement, full public MCP URL, secret references, and diagnostic status.
+Persist ordinary settings atomically and store credential values in Keychain
+through `HostSecretStore`.
 
 The background process reads saved settings and secret values internally. UI
 responses expose only configured/missing status. Never return stored tokens,
@@ -125,9 +126,35 @@ service response. These observations do not prove an API is absent.
 The recovered dashboard client has internal `/api/v2/unsplash/search`,
 `/api/v2/unsplash/track`, and `/api/v2/download/image` routes in modules 90151,
 30661, and 18622. They establish media-related client paths, not a supported
-quiz creation API. Inspect actual authenticated requests and their versioned
-read/write behavior before choosing direct HTTP over browser execution. Do not
-probe guessed mutations or treat a base `/api` URL as a stable contract.
+quiz creation API. The current authenticated client inspection also confirms RSC
+dashboard reads and server-action bindings, as recorded below. Prefer verified
+HTTP operations with the existing browser execution as fallback; reconcile any
+ambiguous write before switching transports.
+
+Do not probe guessed mutations or treat a base `/api` URL as a stable contract.
+
+### Current authenticated transport inspection
+
+On 2026-10-05, inspected the active dashboard build
+`4e10e84779aaa361fd4310c02366e37ebee7b60d` through ordinary My Sets/Create
+loads. Navigation reads return `text/x-component` RSC responses; some prefetched
+reads returned 503, so do not treat prefetch status as a validated quiz read
+contract.
+
+The live Create chunk `page-dd33cffe7245f84a.js` includes module 9898 with 17
+server-action references. The create-form export `b2` binds the same action ID
+seen in the older capture, but matching IDs do not establish a durable API. The
+runtime implementation constructs a POST to the current route with `Next-Action`
+and encoded Flight arguments rather than a discovered public REST CRUD route.
+
+No create/edit action was invoked and no quiz was changed. A read attempt on the
+observed Unsplash search route was blocked by the browser client; no JSON
+response contract was recovered from that attempt. No usable beta quiz API was
+verified; absence of evidence is not evidence that no other service exists.
+
+Candidate HTTP operations still need authenticated payload/response validation
+and explicit mutation confirmation. A failed or timed-out primary mutation does
+not permit automatic browser fallback without reconciliation.
 
 ## Consequences
 

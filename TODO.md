@@ -1,205 +1,214 @@
 # blooket-api TODO
 
-Only unfinished work belongs here. The roadmap is ordered by dependency depth:
-later layers may depend on earlier layers, while foundations must not depend on
-unfinished presentation or integration layers.
+Only unfinished work belongs here. The target is one teacher using a Mac:
+ChatGPT prepares and changes quizzes, the browser UI manages configuration and
+media, and the local service publishes to Blooket through online MCP.
 
-The initial product is one teacher's macOS workflow: prepare quizzes with online
-AI, review them in the local browser UI, and publish them to Blooket. Online MCP
-is required for the first usable release. Linux distribution and host/browser
-behavior are outside scope; useful portable tests may still run on Fedora.
+The user provisions Cloudflare Tunnel and the ChatGPT connection. macOS is the
+only product target. Keep useful portable tests without requiring Linux
+packaging, host behavior, or a VM.
 
-## P1 — Projects, settings, security, and media
+## P1 — User settings, library, and skills
 
-### TODO - Wire media intake surfaces and capture verified limits
+### TODO - Define user storage and migrate settings
 
-Connect paste, drag-and-drop, file, and browser-extension host adapters to the
-capability-bound durable image-import operation once the localhost boundary is
-available. Populate remaining canvas and pixel fields only from verified Blooket
-evidence. Unknown values continue to fail closed.
+Resolve the macOS user Application Support directory and place `settings.json`,
+`skills/`, private execution state, and diagnostics under its `blooket-api/`
+subdirectory. Use a versioned, atomically persisted settings contract. Default
+media storage to `media/` beside settings and allow the teacher to select
+another library root without moving existing assets silently.
 
-### TODO - Extend settings for local service and tunnel configuration
+Settings include Blooket email, Keychain secret references, local port, UI
+locale (`en` or `es`), online MCP enablement, public MCP URL, media root, and
+advanced editor defaults. Store the password and Cloudflare tunnel token in
+Keychain, not JSON. The UI saves both kinds of values through one local
+operation and shows configured/missing status without returning stored secrets.
 
-Add a versioned, atomically persisted settings shape for the public MCP
-hostname, tunnel enablement, secret references, and first-run diagnostic status.
-The local UI accepts the hostname and Cloudflare tunnel token with a Save
-action; the user provisions the domain and tunnel. Store the token through the
-macOS Keychain capability and persist its reference, not its value, in ordinary
-settings.
+Migrate existing theme, port mode, lifecycle, and credential settings
+explicitly. Validate filesystem targets, port collisions, and partial
+secret/settings saves. Expose no remote settings or secret-management tool.
 
-Separate tunnel credentials, MCP authorization credentials, and Blooket secrets.
-Return configured/missing status without reading secret values back into the UI.
-Handle partial settings/secret saves explicitly and never report an unusable
-configuration as saved.
+### TODO - Implement configuration UI in English and Spanish
 
-Define migration from existing desktop-oriented settings without resetting
-projects, theme, port selection, or secret references.
+Provide English/Spanish i18n for labels, actions, status, and validation errors.
+Offer email, masked password, local port, media-folder selection, and an Online
+MCP toggle. Enable the public URL and masked Cloudflare token fields only when
+online MCP is enabled; accept the user's HTTPS URL including `/mcp`.
 
-## P2 — Blooket execution boundary
+Support only Cloudflare Tunnel for online connectivity. Preserve saved online
+configuration while disabled, stop the tunnel when disabled, and start it only
+from an explicitly enabled valid configuration. Show Save results and useful
+field errors in the selected UI language. UI locale does not change quiz or
+original media-description language.
 
-### TODO - Complete verified Blooket capabilities
+### TODO - Implement mirrored YAML media metadata
 
-Continue extending the dated capability fixture with authenticated browser
-observations for remaining canvas/pixel constraints, account-dependent behavior,
-navigation states, and other facts that official documentation does not
-establish. Upload bytes and set title/description limits are now observed.
+Store user-named source assets under `media/photos/` and one YAML document under
+`media/metadata/` with the same relative directories. Append `.yaml` to the full
+asset filename so `cat.jpg` and `cat.gif` cannot share a metadata path. Preserve
+source bytes and stable asset identity independently of filenames.
 
-### TODO - Implement concrete browser session adapter
+Define a versioned YAML contract with stable ID, service-owned asset reference,
+original name/description/language, topics, generated English name/description,
+source revision, and generation/verification status. Preserve original text in
+any language. AI enrichment adds English text without overwriting originals,
+renaming files, or claiming human verification.
 
-Connect the reuse-first session application to the teacher's local browser.
-Derive page classification and login-field selectors only from verified
-observations. Keep credential submission inside the trusted browser boundary and
-preserve all human-stop states. A web UI alone cannot control another origin.
+User rename/move operations update the mirrored YAML and references atomically;
+AI metadata operations address stable IDs and cannot choose filesystem paths.
+Reject filename traversal and handle collisions visibly. Migrate existing JSONL
+records without losing assets; an optional search index is derived from YAML,
+not a second authoritative metadata store. Use a reviewed YAML parser with
+bounded input and exact runtime decoding rather than a homemade YAML parser.
 
-### TODO - Complete browser read adapters and set content retrieval
+### TODO - Store and expose personal teacher skills
 
-Implement concrete probes for capabilities, My Sets, and set metadata. Extend
-retrieval to question/media content only after observations establish a
-versioned read shape. Inspect actual dashboard requests before choosing browser
-probes or HTTP-backed reads. The `/api` path by itself is not a verified public
-API; do not invent set CRUD endpoints, cookie forwarding rules, or server-action
-contracts.
+Ship initial quiz-authoring skills and store personalized skills under the
+user-data `skills/` directory. Allow authorized MCP operations to list, read,
+create, and update skill text through logical IDs with local history/recovery.
+No arbitrary shell, file paths, executable installation, or secret access is
+part of these tools.
 
-### TODO - Complete concrete create/edit execution
+Teach the AI to use the library's stable IDs, topics, original text, and
+generated English metadata. Verify how the actual ChatGPT connection supplies
+skill text; placing files on the Mac alone does not make ChatGPT discover them.
+Treat skill content as user guidance, never as permission to change access or
+leak secrets.
 
-Implement the mutation adapter and provider-specific `captureBaseline`/`verify`
-methods from observations. Preserve persisted count/digest baselines and
-explicit reconciliation. Prefer a verified usable endpoint where evidence
-establishes its authentication and behavior; otherwise use the browser boundary.
-Add normal pacing and retry classification only from verified behavior.
+## P2 — Shared image and GIF editor
 
-## P3 — Canonical CLI and localhost API
+### TODO - Add simple zoom, drag, and color controls
 
-### TODO - Complete canonical blooket CLI coverage
+Use a visible zoom slider with minus/plus buttons; mouse-wheel zoom remains an
+optional equivalent input. Dragging the image moves its foreground inside the
+shared canvas. Static images and GIFs use the same pan, zoom, saturation,
+contrast, preview, and undo/redo controls.
 
-Extend the initial CLI with remaining shared operations, predictable
-subcommands, exit codes, human output, `--json` output, and secret-free
-diagnostics.
+Offer blurred-background fill and solid-color fill with a color input and an
+eyedropper. Feature-detect browser eyedropper support and provide a canvas pixel
+picker when unavailable. Picking a color must work on the recipient's browser.
+Keep source bytes untouched and save edits as settings plus prepared renditions.
 
-### TODO - Implement localhost API and browser UI hosting
+### TODO - Normalize GIFs to an explicit frame rate
 
-Serve the local UI and its API from the same configurable loopback origin. Route
-requests to the canonical executor without a second semantic implementation.
-Keep credential configuration local, validate local request origins, and expose
-no secret-read endpoint. Keep the general API and UI outside tunnel ingress.
+Define the output frame rate in Advanced settings, defaulting to 10 FPS. Every
+prepared GIF uses that selected rate; do not implicitly preserve source timing.
+At 10 FPS, encode 100 ms per output frame and resample the source timeline so
+playback duration and loop behavior remain stable within the selected frame
+interval. Changing FPS invalidates affected cached renditions, not originals.
 
-### TODO - Implement transport parity tests
+Validate allowed FPS and resource bounds. Apply the same canvas/background/edit
+state to each output frame. Bound frame count, total pixels, duration, output
+bytes, and native work. Add meaningful tests for variable-delay input, short
+clips, loop behavior, resampling, and byte-limit failures.
 
-Run equivalent fixtures through direct execution, CLI JSON mode, and HTTP and
-compare normalized results. Treat semantic divergence as a release blocker.
+### TODO - Prepare media for verified Blooket limits
 
-## P4 — Required online MCP
+Produce a consistent target aspect ratio from verified capability dimensions for
+both static and animated media. Keep unknown Blooket canvas/pixel limits
+unknown. Optimize prepared bytes within bounded work and the verified upload
+ceiling; return an actionable failure if the selected GIF cannot fit without
+changing requested behavior. Do not promise every GIF will fit merely by using
+10 FPS.
 
-### TODO - Implement MCP facade over CLI
+## P3 — Verified Blooket transport and quiz operations
 
-Map tools to canonical commands, execute CLI JSON mode, and decode results
-without importing application internals. Add Streamable HTTP for online clients;
-local-only stdio support does not complete this requirement. Restrict tool
-execution to registered commands and admitted project/media targets.
+### TODO - Validate HTTP-first integration and browser fallback
 
-### TODO - Connect the user-provisioned Cloudflare Tunnel
+Prefer verified authenticated HTTP operations, including dashboard server
+actions where their current request/response contract is established. Keep the
+existing browser execution boundary as fallback for unsupported operations.
+Record build, route, method, arguments, authentication requirements, response
+shape, confirmation, and expiry/change behavior for each admitted operation.
 
-Run the configured tunnel against a dedicated loopback MCP gateway using the
-saved token. The user supplies the domain, tunnel, and remote-client setup; do
-not automate account provisioning or assume a new cloud deployment is needed.
-Publish only approved MCP and required authorization/discovery routes.
+Current evidence finds dashboard RSC reads, internal image API paths, and
+Next.js server-action references; it does not establish a public or beta quiz
+API. Continue from real client/network evidence instead of guessed endpoints.
+Before mutation, establish session reuse and the exact payload decoder.
 
-Keep the browser UI, settings, secrets, and general API private. Preserve the
-canonical CLI execution path and bind local listeners to loopback.
+Never fall back after an ambiguous write without reconciliation: the primary
+request may already have succeeded. Preserve remote set receipts, persisted
+baselines, checkpoints, verification, and human-stop navigation states.
 
-The gateway must authenticate and authorize actual tool calls. Integrate the
-user's MCP-compatible authorization setup; do not assume a tunnel token, an
-interactive Access page, or arbitrary custom headers authenticate ChatGPT.
-Support revocation and stopping the tunnel locally.
+### TODO - Complete capabilities, reads, create, and edit
 
-Show service/tunnel status without leaking tokens. No tunnel is started before
-the user saves and enables its configuration.
+Complete concrete session and set reads, including questions and media when
+verified. Bind account-dependent capabilities and unknown limits explicitly.
+Implement create/edit operations, admitted question types, answers, per-question
+time, media selection, and read-back confirmation from the same validated IR.
 
-### TODO - Prove the online teacher workflow
+Online requests are the teacher's active workflow, while local quiz JSON is a
+recoverable draft/cache and execution record. Keep local copies private and
+automatic; do not require the teacher to manage files or treat stale local
+content as authority over fresh verified remote state. Resolve concurrent edits
+before writes rather than silently replacing online changes.
 
-Verify the actual ChatGPT account can connect to the configured remote MCP and
-complete an authenticated read-only tool call. Then exercise an explicitly
-approved small quiz through generation, validation, local review, publication,
-and read-back. Confirm equivalent CLI/MCP results and denial of unauthorized
-calls and non-MCP routes. Test sleep/disconnect recovery without blindly
-replaying a mutation; show unavailable status when the Mac or tunnel is offline.
+## P4 — Local API, canonical CLI, and online MCP
 
-### TODO - Author teacher workflow skills
+### TODO - Complete canonical transport coverage
 
-Add English skills for age/level discovery, quiz language, distractor quality,
-image placement, difficulty, media selection, and teacher review. Skills guide
-agents; they do not own selectors or protocol implementation.
+Extend the CLI over the shared executor and serve browser UI plus HTTP API from
+one loopback origin. Map local and remote MCP tools to registered CLI commands
+in JSON mode; online clients use Streamable HTTP. Keep parity for validation,
+media/metadata search, quiz operations, progress, and recovery.
 
-## P5 — Local browser UI and optional Safari extension
+### TODO - Connect the configured Cloudflare Tunnel
 
-### TODO - Implement the local browser interface
+Run cloudflared against a dedicated MCP gateway using the saved tunnel token.
+Use the user-provided HTTPS hostname/path and authorization configuration.
+Publish only admitted MCP and required authorization routes; the local UI,
+settings, credentials, and general API stay private. No cloud account or domain
+provisioning is part of the application.
 
-Build one UI for projects, quiz review, validation, media editing, Blooket
-session state, settings, tunnel configuration, diagnostics, and execution
-progress. Preserve system light/dark appearance. Opening the local page should
-not require a native desktop window or a permanent Dock icon.
+Show ready/offline/configuration-error state, allow local disablement, and read
+secrets internally. Keep Blooket credentials, tunnel tokens, and MCP access
+credentials separate. Sleeping or offline Macs must produce unavailable status
+without replaying ambiguous writes.
 
-### TODO - Share browser UI behavior and declare its host boundary
+### TODO - Implement online AI media and teacher workflow tools
 
-Keep reusable state, components, validation rendering, and media intake in
-`src/ui/general/`. Declare a web host component in Jig before adding source and
-retire the unused desktop host declaration when that boundary is implemented.
-The page and extension share browser-safe code; secrets and filesystem access
-remain in the local service.
+Allow the AI to receive an image through a transport verified with ChatGPT,
+register it locally, inspect/search metadata, enrich English descriptions and
+topics, generate a quiz, change question types/timing, and select assets by ID.
+Verify actual image delivery and permitted formats; do not assume attachments
+arrive at an MCP server automatically.
 
-### TODO - Implement optional Safari extension intake
+Expose progress and diagnostics without secrets. Support authorized personal
+skill updates beside the user's settings and media. Test the actual ChatGPT
+connection through an authenticated read and an approved small quiz publication,
+including read-back, failure, interruption, and recovery.
 
-Add paste, drag-and-drop, and direct web-image intake into the local service.
-The extension may open the same browser UI rather than maintaining another full
-editor. It never receives stored Blooket credentials or implements quiz rules.
+## P5 — Browser workflow and macOS delivery
 
-### TODO - Implement macOS background-service lifecycle
+### TODO - Complete the browser review and media workflow
 
-Add visible, opt-in launch at login, start/stop controls, local status, and
-clean uninstall behavior. A menu-bar helper is optional; a native desktop shell
-is not required. The browser UI may open on demand while the service continues
-locally.
+Provide drag-and-drop import, user naming, descriptions in any language, topics,
+media preview/editing, quiz review, and execution progress. Reuse UI behavior
+between the local page and optional Safari extension; declare the browser host
+in Jig before adding source and retire the unused desktop host declaration.
 
-## P6 — macOS packaging and first-run diagnostics
+### TODO - Implement optional Safari intake and background lifecycle
 
-### TODO - Confirm the recipient's Mac and choose packaging inputs
+Add direct web-image intake and an extension entrypoint that can open the same
+UI. Add visible start/stop and opt-in launch-at-login behavior for the service.
+The initial workflow requires no separate desktop window or permanent Dock icon.
 
-Record the chip, actual macOS version, and browser in About This Mac. ARM64 is
-provisional; add x86-64 only if the recipient uses Intel. Establish a minimum OS
-from the selected runtime and native dependencies rather than guessing Big Sur
-compatibility from appearance. Metal acceleration is not required.
+### TODO - Package the recipient's macOS architecture
 
-### TODO - Package the macOS background service
+Confirm chip and OS version before final packaging; ARM64 is provisional and
+x86-64 is needed only if her Mac is Intel. Bundle runtime, UI, CLI, native image
+artifacts, and the selected cloudflared delivery method. Document actual
+Gatekeeper/signing status and third-party notices accurately.
 
-Bundle the runtime, UI assets, CLI, required Sharp/libvips artifacts, and the
-chosen cloudflared delivery method for the selected architecture. Preserve
-third-party notices and document Gatekeeper behavior accurately. Signing and
-notarization remain explicit packaging decisions, never unverified claims. No
-Linux/Windows package or VM setup is required for the prototype.
+### TODO - Run first-use diagnostics once and retain repair logs
 
-### TODO - Run a lightweight diagnostic once on first launch
+Run a bounded first-launch check of architecture/runtime, settings decoding,
+user-data/media storage, local port, native image decode, Keychain availability,
+and configured service/tunnel prerequisites. Missing configuration is distinct
+from a dependency failure. Do not change Blooket or write real credentials.
 
-Implement a bounded first-run check on the recipient's Mac: OS/architecture,
-settings decoding, disposable application-data read/write, local port, tiny
-native image decode, Keychain client availability, and configured service/tunnel
-readiness. Missing optional configuration is distinct from a broken dependency.
-Do not publish a quiz, change Blooket, write real credentials, or run the full
-repository test suite. Do not require remote access before a tunnel is enabled.
-
-Persist the diagnostic schema/check version, outcome, timestamp, stable failure
-codes, and local log reference in settings after the first attempt. Show
-failures and a manual Run diagnostics action; do not rerun the first-use suite
-on every launch. Logs contain bounded, useful environment/version facts and
-failure codes, never raw tokens, passwords, cookies, authorization headers, or
-private quizzes. Keep independent features usable when one capability fails.
-
-Development may remain theoretical for macOS integration until that first real
-run. Record untested behavior honestly; Fedora checks are portable checks, not
-macOS release evidence. There is no VM provisioning prerequisite.
-
-## Deferred ideas
-
-- Native desktop window or an optional menu-bar convenience helper.
-- Linux or Windows distribution and host/browser integration.
-- Experimental content-aware or generative media fill.
-- Native media acceleration only after measurements show a concrete need.
+Persist check version, outcome, timestamp, stable failure codes, and log
+reference in settings after the first attempt. Keep logs sanitized and bounded,
+with a manual rerun action after repair; do not run the full suite every launch.
+No VM provisioning is required. Label macOS behavior unverified until it runs on
+her Mac and keep independent features usable when one prerequisite fails.

@@ -47,7 +47,11 @@ Product byte limits, pixel limits, rendition dimensions, and upload constraints
 are not Sharp defaults. They remain explicit caller or capability inputs so an
 upstream library upgrade cannot silently change product policy.
 
-Animated GIF renditions preserve frame delays, loop state, and duplicate frames.
+The current GIF renderer preserves source frame delays, loop state, and
+duplicate frames. The teacher settings and media library decision supersedes
+source-delay preservation for future prepared GIFs with explicit configured FPS,
+default 10, and bounded timeline resampling.
+
 Editor transforms render each GIF frame independently to a bounded canvas before
 reassembling a paged raw image for one final GIF encode. This avoids multi-page
 transform restrictions and prevents one frame's crop or redaction from changing

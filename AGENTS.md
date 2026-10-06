@@ -19,9 +19,11 @@ and quiz language are independent. When creating or changing lesson content,
 respect an explicitly supplied quiz language. Ask for the quiz language only
 when it cannot be inferred safely from the task or project.
 
-Media descriptions stored by this project are canonical English descriptions.
-`english` defaults to `false` and must become `true` merely because an LLM
-claims it translated the text correctly.
+Preserve user-authored media names and descriptions in their original language.
+AI-generated English names/descriptions are separate metadata fields; they never
+replace originals or rename source files. Translation does not imply verified
+English. Product UI translations in English and Spanish are intentional language
+assets, independent of source/documentation language and quiz language.
 
 ## Read first
 
@@ -95,6 +97,38 @@ contradictory cross-field states. Do not silently coerce or "repair" a quiz.
 
 Only validated documents may be lowered to a Blooket write plan. The Blooket
 adapter must never receive raw LLM JSON.
+
+## User settings and media authority
+
+The target user-data root is macOS Application Support plus `blooket-api/`.
+Ordinary settings are versioned JSON; passwords and Cloudflare tunnel tokens are
+Keychain secrets referenced by settings. UI Save accepts local replacement
+credentials and never reads stored values back into a model-visible response.
+
+Support UI locale `en`/`es`, email, password configuration, local port, online
+MCP enablement, public HTTPS MCP URL, Cloudflare token, and a selectable media
+root. Cloudflare Tunnel is the only online provider. Enable online fields only
+while online MCP is enabled, and keep the general API/settings private.
+
+The target library uses user-owned filenames under `photos/` and mirrored
+`metadata/<full-original-filename>.yaml` documents under the selected media
+root. AI tools identify media by stable ID and update admitted YAML
+enrichment/topics; they never choose filenames, asset paths, or original text.
+JSONL may remain a rebuildable search cache, not a second metadata authority.
+
+Store personal skill text beside settings under `skills/` and expose bounded,
+authorized logical-ID operations. Verify how the actual remote AI retrieves it.
+Local quiz JSON is recoverable draft/execution state; the online teacher request
+and verified Blooket state drive changes.
+
+The editor requires a visible minus/plus zoom slider, foreground dragging,
+saturation/contrast, blurred or solid-color background, and a usable color
+picker/eyedropper. Prepared GIF FPS must be explicit, defaulting to 10, with
+bounded timeline resampling rather than source-delay preservation.
+
+These are accepted targets with migrations pending, not claims about the current
+runtime formats. Read the teacher settings and media library ADR before changing
+settings, metadata ownership, GIF timing, or filesystem naming contracts.
 
 ## Media search
 

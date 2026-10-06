@@ -4,6 +4,11 @@
 
 Accepted.
 
+The teacher settings and media library decision supersedes the current YAML-less
+metadata and user-visible naming layout described below. Existing durability,
+locking, and recoverable transaction invariants remain mandatory; implement a
+versioned migration rather than rewriting existing user data in place.
+
 ## Decision ID
 
 `blooket-api.persistence.atomic-local-state`
@@ -13,10 +18,10 @@ Accepted.
 Projects, settings, media metadata, imported originals, and prepared renditions
 must survive process termination and host power loss without turning a previous
 valid state into an ambiguous partial state. Several processes may also reach
-the same local data through the CLI, desktop application, or localhost service.
+the same local data through the CLI, browser interface, or localhost service.
 
-A successful write therefore needs more than a temporary file and a rename.
-New bytes, directory-entry changes, backups, multi-file transactions, and writer
+A successful write therefore needs more than a temporary file and a rename. New
+bytes, directory-entry changes, backups, multi-file transactions, and writer
 coordination each need an explicit durability rule.
 
 ## Decision
@@ -27,8 +32,8 @@ model-produced content.
 
 A single-file replacement follows this order:
 
-1. Create a unique hidden temporary file in the target directory with
-   owner-only permissions.
+1. Create a unique hidden temporary file in the target directory with owner-only
+   permissions.
 2. Write the complete validated contents to that file.
 3. Flush the temporary file before it can become the durable name.
 4. If the owning contract requires a previous-value backup, publish and flush
@@ -52,22 +57,22 @@ The POSIX lock adapter publishes complete owner metadata with a same-directory
 hard link. A visible lock therefore never depends on a partially written owner
 record. A lock owned by a live PID is never stolen.
 
-A recorded PID that is definitely absent may be reclaimed. Dead-lock
-reclamation is serialized through a sibling recovery guard so two reclaimers
-cannot remove each other's newly acquired lock. An existing, malformed,
-symbolic, or otherwise unverifiable recovery guard fails closed rather than
-being recursively reclaimed.
+A recorded PID that is definitely absent may be reclaimed. Dead-lock reclamation
+is serialized through a sibling recovery guard so two reclaimers cannot remove
+each other's newly acquired lock. An existing, malformed, symbolic, or otherwise
+unverifiable recovery guard fails closed rather than being recursively
+reclaimed.
 
 Malformed, symbolic, or otherwise unverifiable primary locks also fail closed.
 PID reuse can cause a false busy result, which is safer than stealing another
 writer's lock.
 
-Project replacement is a recoverable multi-file transaction. Before publishing
-a marker, any existing valid `project.json` and `media.jsonl` are snapshotted
-to their fixed previous-value backups. The marker records which files existed.
+Project replacement is a recoverable multi-file transaction. Before publishing a
+marker, any existing valid `project.json` and `media.jsonl` are snapshotted to
+their fixed previous-value backups. The marker records which files existed.
 
-The media index is replaced before the project document, the project document
-is replaced last, and the marker is durably deleted only after both replacements
+The media index is replaced before the project document, the project document is
+replaced last, and the marker is durably deleted only after both replacements
 are flushed. Recovery with a valid marker restores the exact pre-transaction
 pair. Missing required backups or invalid markers fail closed instead of
 guessing.
@@ -112,15 +117,14 @@ Media edits use the same vault-wide metadata lock but never replace an original.
 Before exposing an edit marker, the vault durably copies the current rendition
 to one previous-value rendition backup. The strict marker records the previous
 and next media records plus SHA-256 hashes of both index states and both
-rendition states. The rendition is replaced first and media.jsonl second, so
-the index replacement is the edit commit point.
+rendition states. The rendition is replaced first and media.jsonl second, so the
+index replacement is the edit commit point.
 
 Edit recovery accepts only exact old/new hash combinations. An old index with a
 new rendition restores the rendition backup; an old index with the old rendition
 only needs marker cleanup. A new index commits only with the exact new
-rendition.
-Unknown bytes, an unexpected index, corrupt markers, or simultaneous import and
-edit markers fail recovery closed without deleting evidence.
+rendition. Unknown bytes, an unexpected index, corrupt markers, or simultaneous
+import and edit markers fail recovery closed without deleting evidence.
 
 An editor write also carries the record and rendition hash observed before
 rendering. The locked update compares both values with current vault state and
@@ -130,17 +134,17 @@ overwriting a newer edit.
 Temporary names, lock names, transaction markers, and backup names are
 repository-owned implementation details. Product decoders never interpret them
 as lesson media. Normal successful operations remove their temporary files.
-Crash leftovers that cannot be proven safe to remove are ignored or surfaced
-for recovery rather than guessed away.
+Crash leftovers that cannot be proven safe to remove are ignored or surfaced for
+recovery rather than guessed away.
 
 ## Consequences
 
-- A reported successful write has flushed both its bytes and its directory
-  entry transitions on the supported POSIX hosts.
+- A reported successful write has flushed both its bytes and its directory entry
+  transitions on the supported POSIX hosts.
 - Concurrent writers fail closed instead of racing backup or marker state.
 - Project recovery can restore one exact previous aggregate after interruption.
-- The media pipeline has a persistence contract before it begins accepting
-  large binary inputs.
+- The media pipeline has a persistence contract before it begins accepting large
+  binary inputs.
 - Windows remains deferred because its replacement and locking semantics may
   require a distinct platform implementation.
 
@@ -154,8 +158,8 @@ for recovery rather than guessed away.
   can observe incomplete owner metadata.
 - Time-based lock stealing was rejected because a paused but valid writer must
   not lose ownership merely for exceeding a guessed duration.
-- Independent locks for `project.json` and `media.jsonl` were rejected
-  because readers and recovery require those files to remain one aggregate.
+- Independent locks for `project.json` and `media.jsonl` were rejected because
+  readers and recovery require those files to remain one aggregate.
 - Copying mutable vault metadata before its referenced binary assets were
   durable was rejected because it can publish dangling media references.
 
