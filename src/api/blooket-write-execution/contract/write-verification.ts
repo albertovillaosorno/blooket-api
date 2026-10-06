@@ -56,7 +56,7 @@ export type BlooketWriteVerificationObservationFailure =
 export type BlooketWriteVerificationBaselineResult =
   | {
       readonly ok: true;
-      readonly baseline: BlooketWriteVerificationBaseline;
+      readonly baseline: BlooketWriteVerificationBaseline | null;
     }
   | BlooketWriteVerificationObservationFailure;
 
