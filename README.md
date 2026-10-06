@@ -234,9 +234,16 @@ precise diagnostics that the teacher or agent can fix and resubmit.
 ## Authentication and browser automation
 
 Credentials are entered through the local application and stored through the
-host security capability. Development-only environment variables may exist for
-local testing, but production credentials do not live in project files or
-ordinary settings.
+host security capability. macOS uses Keychain generic-password items and Linux
+uses the user's Secret Service through secret-tool. Secret values are sent to
+host tools through stdin rather than process arguments, command stderr is never
+retained as diagnostic data, and successful writes are read back before they are
+reported as durable. The security domain exposes one host-secret-store port so a
+future Windows Credential Manager adapter can be added without changing
+authentication callers.
+
+Development-only environment variables may exist for local testing, but
+production credentials do not live in project files or ordinary settings.
 
 Automation operates from the teacher's computer and uses the teacher's own
 confirmed session. The browser adapter may behave at normal interactive pacing,

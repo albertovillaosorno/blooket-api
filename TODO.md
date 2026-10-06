@@ -14,12 +14,6 @@ capability-bound durable image-import operation once the localhost boundary is
 available. Populate the version-two canvas, pixel, and upload-byte fields only
 from verified Blooket evidence; unknown values continue to fail closed.
 
-### TODO - Implement host secret storage
-
-Use macOS Keychain for the product-quality target and a standard Linux secret
-store for development support. Define the interface so Windows Credential
-Manager can be added later without changing callers.
-
 ## P2 — Blooket execution boundary
 
 ### TODO - Complete verified Blooket capabilities
