@@ -263,6 +263,20 @@ The known Blooket organization-selection prompt, security challenges, unexpected
 pages, and explicit escalation all require human action. The organization form
 must not be filled or submitted automatically.
 
+Session health inspection performs one browser observation and never reads
+credentials. Session establishment reuses dashboard/create/edit states and reads
+the security-domain Blooket credentials only after observing signed-out or
+expired-session. Credentials are passed directly to the browser-session port and
+are never included in session results.
+
+Authenticated capability and set reads treat browser-adapter output as
+untrusted.
+Capability observations must decode through the versioned capability snapshot.
+Set lists currently expose only an opaque non-empty remote ID and title; detail
+adds description and public/private visibility. No remote-ID grammar, question
+payload shape, cover read shape, or additional set metadata is invented without
+verified browser evidence.
+
 ## Settings and port collisions
 
 The local service defaults to `127.0.0.1:2607`. Address and port are user

@@ -22,16 +22,18 @@ Extend the dated official-document fixture with authenticated browser
 observations for upload constraints, account-dependent behavior, navigation
 states, and other facts that official documentation does not establish.
 
-### TODO - Implement session reuse and login
+### TODO - Implement concrete browser session adapter
 
-Reuse the teacher's confirmed local browser session, obtain credentials only
-through the security domain when login is actually required, and never expose
-those credentials to higher transports.
+Connect the reuse-first session application to the teacher's local browser.
+Derive page classification and login-field selectors only from verified
+authenticated observations. Keep credential submission inside the trusted
+browser boundary and preserve all human-stop states.
 
-### TODO - Implement read operations
+### TODO - Complete browser read adapters and set content retrieval
 
-Implement health/session state, set listing, set retrieval, and capability
-inspection before writes.
+Implement concrete browser probes for capability inspection, My Sets listing,
+and set metadata detail. Extend set retrieval to question and media content only
+after authenticated observations establish an exact versioned read shape.
 
 ### TODO - Implement create and edit operations
 
