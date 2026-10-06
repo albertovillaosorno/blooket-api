@@ -72,12 +72,23 @@ Only a durably `confirmed` journal may advance a missing checkpoint step
 automatically. If the checkpoint already contains that confirmed advancement,
 recovery clears the redundant valid journal.
 
-The remaining integration requirement is to place journal creation after the
-session is ready and immediately before the remote mutation, then confirm the
-journal immediately after remote success and before checkpoint persistence.
-This ordering must be wired without duplicating the canonical one-step executor.
-Concrete pacing and retry classification also remain dependent on verified
-browser behavior rather than guessed timing constants.
+Persisted execution serializes the full recovery-to-cleanup transaction with an
+exclusive execution lock. It reuses the canonical executor as explicit
+prepare/attempt/complete phases: session readiness is established first, the
+`attempting` journal is created immediately before the remote attempt, and
+`confirmed` is persisted immediately after remote success. Only then may the
+checkpoint advance and the journal be cleared. Concurrent callers cannot observe
+stale progress and issue a duplicate mutation.
+
+A non-confirmed remote outcome deliberately leaves the `attempting` journal in
+place and returns reconciliation-required instead of a retryable result. Session
+stop states occur before journal creation. A confirmed journal whose checkpoint
+save fails remains sufficient for deterministic local recovery on the next call.
+
+Concrete browser mutation mechanics, provider-specific reconciliation of an
+ambiguous `attempting` journal, normal pacing, and retry classification remain
+dependent on verified browser behavior rather than guessed selectors or timing
+constants.
 
 ## Consequences
 
