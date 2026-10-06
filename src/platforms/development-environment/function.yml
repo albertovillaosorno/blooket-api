@@ -1,0 +1,9 @@
+identity:
+  id: function:development-environment
+  name: development-environment
+  path: src/platforms/development-environment
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

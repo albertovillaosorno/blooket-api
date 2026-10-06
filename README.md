@@ -365,6 +365,13 @@ persistence.
 
 ## Development
 
+A repository-root `.env` may be used for development and tests only. It is
+ignored by Git and is not part of end-user configuration. The supported
+development variables are `EMAIL`, `PASSWORD`, and `LOCAL_PORT`. Production
+credentials continue to use the host secret store, and persisted local-service
+settings remain authoritative outside development/test entry points.
+
+
 The repository uses a pnpm workspace and strict TypeScript. Dependencies belong
 at the narrowest owning package and require a concrete reason to exist.
 
