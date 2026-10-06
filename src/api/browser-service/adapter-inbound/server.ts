@@ -194,6 +194,7 @@ export async function startBrowserService(
       if (url.pathname === "/api/connections") {
         json(response, 200, {
           requests: options.online?.pending() ?? [],
+          connections: options.online?.connections() ?? [],
           status: options.online?.status() ?? { state: "disabled" },
         });
         return;
@@ -265,7 +266,8 @@ export async function startBrowserService(
       );
       if (url.pathname === "/api/settings") {
         const saved = await saveConfiguration(root, body, secrets);
-        if (saved.ok) await options.online?.reload(localPort);
+        if (saved.ok || saved.secretsSaved.includes("ownerPassword"))
+          await options.online?.reload(localPort);
         json(response, 200, {
           ...saved,
           onlineStatus: options.online?.status() ?? { state: "disabled" },
@@ -276,13 +278,36 @@ export async function startBrowserService(
         if (
           !body ||
           typeof body !== "object" ||
+          Object.keys(body).sort().join() !== "id,password" ||
+          !("id" in body) ||
+          typeof body.id !== "string" ||
+          !("password" in body) ||
+          typeof body.password !== "string" ||
+          Buffer.byteLength(body.password, "utf8") > 2048
+        )
+          throw new Error("invalid-connection-request");
+        if (!options.online) throw new Error("online-unavailable");
+        await options.online.approve(body.id, body.password);
+        json(response, 200, { ok: true });
+        return;
+      }
+      if (
+        ["/api/connection-reject", "/api/connection-revoke"].includes(
+          url.pathname,
+        )
+      ) {
+        if (
+          !body ||
+          typeof body !== "object" ||
           Object.keys(body).join() !== "id" ||
           !("id" in body) ||
           typeof body.id !== "string"
         )
           throw new Error("invalid-connection-request");
         if (!options.online) throw new Error("online-unavailable");
-        options.online.approve(body.id);
+        if (url.pathname === "/api/connection-reject")
+          options.online.reject(body.id);
+        else options.online.revoke(body.id);
         json(response, 200, { ok: true });
         return;
       }

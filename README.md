@@ -26,13 +26,14 @@ endorsed by the platform.
   folder, online connection, and export defaults.
 - Personal skills and recoverable quiz drafts with revision checks.
 - A Streamable HTTP MCP gateway with OAuth/PKCE and approval in the local UI.
+  Approval requires the owner password; connections can be rejected or revoked.
   Its tools execute the canonical CLI rather than a separate implementation.
 - A lightweight first-use diagnostic, saved locally, with a manual rerun.
 
 Current MCP tools retrieve teacher instructions, search/read/enrich media, and
 list/read/write skills and drafts. **Saving a draft does not publish a quiz.**
-A browser extension, native installer, launch-at-login integration, and
-additional owner-password approval are roadmap work.
+A browser extension, native installer, and launch-at-login integration are
+roadmap work.
 
 See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
 cannot establish Safari, Keychain, or native macOS compatibility.
@@ -99,6 +100,7 @@ token. For development, the corresponding fields are:
 LOCAL_HTTP_PORT="2607"
 MCP_PUBLIC_URL="https://your-host.example/mcp"
 CLOUDFLARE_TUNNEL_TOKEN=""
+MCP_OWNER_PASSWORD=""
 ```
 
 The public URL must include `https://` and end in `/mcp`. Bare hostnames,
@@ -109,16 +111,24 @@ For local port 2607, configure Cloudflare's origin as
 discovery need `/oauth/` and `/.well-known/` routes in addition to `/mcp`.
 
 Configure the AI client manually with the public MCP URL. Complete its OAuth
-flow and approve the matching connection in the local workspace. The tunnel
-token authorizes Cloudflare connectivity; it is not an MCP access token.
+flow, review the client/redirect/access details, and approve the matching
+connection with the owner password in the local workspace. Names and redirects
+are unverified client claims; approve only a connection you initiated.
+
+The tunnel token authorizes Cloudflare connectivity; it is not an MCP access
+token.
 
 Only MCP and authorization routes are public. The browser UI, settings, general
 API, and arbitrary files remain private. Unauthenticated `/mcp` returns 401;
 private UI/API routes return 404 at the public gateway.
 
 The configured tunnel passed a synthetic OAuth/PKCE and MCP tool-call test.
-Actual ChatGPT authorization, attachment delivery, restart behavior, revocation
-controls, and additional owner-password enforcement still require completion.
+Actual ChatGPT authorization, attachment delivery, and reconnect behavior still
+require acceptance. Restart deliberately clears clients, codes, and tokens;
+reauthorize afterward. Refresh tokens are issued only when offline access was
+requested and approved.
+
+Local password checks have a bounded attempt budget.
 A tunnel does not remove AI usage limits. Chat attachments and local files do
 not automatically become accessible to MCP.
 
@@ -143,8 +153,12 @@ For example, `photos/animals/My cat.gif` has metadata at
 English enrichment records its source revision and verification status. Legacy
 library migration and user rename/move recovery remain pending.
 
-Production passwords and tunnel tokens belong in macOS Keychain. The host
-adapter sends secret payloads through stdin, verifies writes, and returns only
+Production Blooket passwords, tunnel tokens, and the salted owner-password
+verifier belong in macOS Keychain. The owner password stays separate from the
+Blooket password and tunnel credential; its plaintext is not saved.
+
+The host adapter sends secret payloads through stdin, verifies writes, and
+returns only
 configured/missing status. `.env` is ignored development configuration, not
 production secret storage. Partial configuration saves report which secret
 replacements succeeded before a failure.

@@ -77,7 +77,8 @@ test("all replacement byte limits are validated before any write", async () => {
 });
 
 test(
-  "partial secret failure preserves settings and reports saved fields",
+  "partial secret failure preserves settings " +
+    "and reports saved fields",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "settings-partial-"));
   try {
@@ -108,7 +109,8 @@ test(
 });
 
 test(
-  "settings failure after secret replacement reports partial success",
+  "settings failure after secret replacement " +
+    "reports partial success",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "settings-file-failure-"));
   try {
@@ -138,7 +140,8 @@ test(
 });
 
 test(
-  "concurrent configuration saves cannot interleave secrets and settings",
+  "concurrent configuration saves cannot " +
+    "interleave secrets and settings",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "settings-concurrent-"));
   let release!: () => void;
@@ -190,7 +193,8 @@ test(
 });
 
 test(
-  "changing media root preserves the existing library and recovery copy",
+  "changing media root preserves the existing " +
+    "library and recovery copy",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "settings-library-"));
   try {
@@ -218,6 +222,44 @@ test(
     assert.deepEqual(
       JSON.parse(await readFile(join(root, "settings.previous.json"), "utf8")),
       preferences,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test(
+  "owner configuration saves only a verifier " +
+    "and reports its field",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "settings-owner-"));
+  try {
+    const writes: [string, string][] = [];
+    const preferences = await loadPreferences(root);
+    const result = await saveConfiguration(
+      root,
+      {
+        preferences,
+        password: "",
+        tunnelToken: "",
+        ownerPassword: "owner-fixture",
+      },
+      store(async (name, value) => {
+        writes.push([name, value]);
+        return { ok: true };
+      }),
+    );
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.secretsSaved, ["ownerPassword"]);
+    assert.equal(writes[0]![0], "mcp.owner-verifier");
+    assert.match(writes[0]![1], /^scrypt-v1\$/u);
+    assert.equal(writes[0]![1].includes("owner-fixture"), false);
+    assert.equal(JSON.stringify(result).includes("scrypt"), false);
+    assert.equal(
+      (await readFile(join(root, "settings.json"), "utf8")).includes(
+        "owner-fixture",
+      ),
+      false,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

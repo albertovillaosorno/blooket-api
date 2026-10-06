@@ -26,6 +26,18 @@ const words = {
     account: "Cuenta de Blooket",
     email: "Correo",
     password: "Nueva contraseña",
+    ownerPassword: "Nueva contraseña para aprobar conexiones de IA",
+    approvalPassword: "Contraseña del propietario",
+    ownerHelp:
+      "Es necesaria para aprobar conexiones. Escríbela solo aquí, " +
+      "en la página local. El nombre del cliente no prueba su identidad.",
+    ownerMissing: "Configura la contraseña del propietario",
+    wrongOwner: "Contraseña incorrecta. La conexión no se aprobó.",
+    approvalLimit:
+      "Demasiados intentos. Espera un minuto e inténtalo de nuevo.",
+    reject: "Rechazar",
+    revoke: "Revocar acceso",
+    requestedAccess: "Acceso solicitado",
     secretHelp:
       "Se guarda en el almacén seguro del sistema. Déjalo " +
       "vacío para conservarla.",
@@ -146,6 +158,17 @@ const words = {
     account: "Blooket account",
     email: "Email",
     password: "New password",
+    ownerPassword: "New password for approving AI connections",
+    approvalPassword: "Owner password",
+    ownerHelp:
+      "Required to approve connections. Enter it only here, on the local " +
+      "page. A client's name does not prove its identity.",
+    ownerMissing: "Configure an owner password",
+    wrongOwner: "Incorrect password. The connection was not approved.",
+    approvalLimit: "Too many attempts. Wait a minute and try again.",
+    reject: "Reject",
+    revoke: "Revoke access",
+    requestedAccess: "Requested access",
     secretHelp:
       "Saved in the system secret store. Leave empty to " +
       "keep the current value.",
@@ -269,6 +292,9 @@ function toast(message) {
 }
 function report(error) {
   const messages = {
+    "owner-password-invalid": "wrongOwner",
+    "owner-password-unavailable": "ownerMissing",
+    "owner-approval-rate-limited": "approvalLimit",
     "rendition-byte-limit-exceeded": "tooLarge",
     "rendition-pixel-limit-exceeded": "tooLarge",
     "revision-conflict": "conflict",
@@ -701,6 +727,9 @@ function renderSettingsState() {
   $("#tunnelState").textContent = t(
     bootstrap.secrets.tunnelConfigured ? "configured" : "missing",
   );
+  $("#ownerState").textContent = t(
+    bootstrap.secrets.ownerPasswordConfigured ? "configured" : "missing",
+  );
   $("#diagnostics").textContent = bootstrap.diagnostic.checks
     .map((check) => check.name + ": " + check.status)
     .join(" · ");
@@ -737,6 +766,7 @@ settingsForm.addEventListener("submit", async (event) => {
         preferences,
         password: field(settingsForm, "password").value,
         tunnelToken: field(settingsForm, "tunnelToken").value,
+        ownerPassword: field(settingsForm, "ownerPassword").value,
       }),
     });
     const result = await response.json();
@@ -754,6 +784,7 @@ settingsForm.addEventListener("submit", async (event) => {
   } finally {
     field(settingsForm, "password").value = "";
     field(settingsForm, "tunnelToken").value = "";
+    field(settingsForm, "ownerPassword").value = "";
     button.disabled = false;
   }
 });
@@ -836,6 +867,7 @@ try {
   report(error);
 }
 
+let connectionView = "";
 async function refreshConnections() {
   if (!bootstrap) return;
   try {
@@ -847,9 +879,11 @@ async function refreshConnections() {
         t(
           state === "tunnel-token-missing"
             ? "missingToken"
-            : ["disabled", "starting", "connected"].includes(state)
-              ? state
-              : "offline",
+            : state === "owner-password-missing"
+              ? "ownerMissing"
+              : ["disabled", "starting", "connected"].includes(state)
+                ? state
+                : "offline",
         ) +
         " · " +
         t("gateway") +
@@ -857,16 +891,77 @@ async function refreshConnections() {
         (connections.status.gatewayPort ?? 2608);
     const container = $("#connections");
     if (!container) return;
+    const nextView = JSON.stringify([
+      locale,
+      connections.requests,
+      connections.connections,
+    ]);
+    if (connectionView === nextView) return;
+    connectionView = nextView;
     container.replaceChildren();
     for (const request of connections.requests) {
       const paragraph = document.createElement("p");
       paragraph.textContent =
-        request.client + " · " + request.id + " · " + request.redirect;
+        request.client +
+        " · " +
+        request.id +
+        " · " +
+        request.redirect +
+        " · " +
+        request.clientId +
+        " · " +
+        t("requestedAccess") +
+        ": " +
+        request.scope;
+      const password = document.createElement("input");
+      password.type = "password";
+      password.autocomplete = "off";
+      password.setAttribute("aria-label", t("approvalPassword"));
+      password.placeholder = t("approvalPassword");
       const button = document.createElement("button");
       button.textContent = t("approve");
       button.addEventListener("click", async () => {
         try {
-          await api("/api/connection-approve", { id: request.id });
+          button.disabled = true;
+          await api("/api/connection-approve", {
+            id: request.id,
+            password: password.value,
+          });
+          await refreshConnections();
+        } catch (error) {
+          report(error);
+        } finally {
+          password.value = "";
+          button.disabled = false;
+        }
+      });
+      const reject = document.createElement("button");
+      reject.textContent = t("reject");
+      reject.addEventListener("click", async () => {
+        try {
+          await api("/api/connection-reject", { id: request.id });
+          await refreshConnections();
+        } catch (error) {
+          report(error);
+        }
+      });
+      container.append(paragraph, password, button, reject);
+    }
+    for (const connection of connections.connections ?? []) {
+      const paragraph = document.createElement("p");
+      paragraph.textContent =
+        connection.client +
+        " · " +
+        connection.id +
+        " · " +
+        connection.redirect +
+        " · " +
+        connection.scope;
+      const button = document.createElement("button");
+      button.textContent = t("revoke");
+      button.addEventListener("click", async () => {
+        try {
+          await api("/api/connection-revoke", { id: connection.id });
           await refreshConnections();
         } catch (error) {
           report(error);
