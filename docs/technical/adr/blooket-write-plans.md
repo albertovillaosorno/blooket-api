@@ -62,10 +62,17 @@ and stores a confirmed advancement before returning success. If a remote write
 is confirmed but checkpoint persistence fails, it returns an explicit recovery
 state rather than treating the operation as retryable.
 
-Write-ahead recovery uses a separate version-two attempt journal bound to the
+Write-ahead recovery uses a separate version-three attempt journal bound to the
 exact plan, operation ID, and operation index. An `attempting` record has no
 receipt. A confirmed Create Set record stores the opaque remote set receipt;
 question confirmations store `null`. Corrupt or cross-plan evidence is retained.
+
+Version three may also persist a non-sensitive verification baseline captured
+before mutation. The baseline contains only a collection kind, item count, and
+lowercase SHA-256 digest. It must never contain provider content, credentials,
+cookies, or raw browser/session state. Version-one and version-two journals
+decode with `baseline: null`; recovery never invents missing pre-attempt
+evidence.
 
 Local recovery treats `attempting` as ambiguous and requires reconciliation.
 An explicit resolver may apply externally verified evidence for the exact
@@ -73,19 +80,19 @@ operation: confirmed outcomes first persist their receipt and reuse normal
 recovery, while verified non-confirmation clears only the pending journal.
 
 Inconsistent progress, operation mismatches, invalid receipts, and lock
-conflicts
-preserve recovery evidence. Only a durably `confirmed` journal may advance a
-missing checkpoint step automatically.
+conflicts preserve recovery evidence. Only a durably `confirmed` journal may
+advance a missing checkpoint step automatically.
 
 Persisted execution serializes the full recovery-to-cleanup transaction with an
 exclusive execution lock. Standalone recovery acquires that same lock, whose
 path is derived by the attempt-journal adapter, so recovery cannot race a remote
 write using the same journal.
 
-The persisted path reuses the canonical executor
-as explicit
-prepare/attempt/complete phases: session readiness is established first, the
-`attempting` journal is created immediately before the remote attempt, and
+The persisted path reuses the canonical executor as explicit
+prepare/attempt/complete phases. Session readiness is established first. When a
+verification port is available, its pre-attempt baseline is captured and durably
+journaled before the remote mutation. Only then may the remote attempt begin.
+
 `confirmed` is persisted immediately after remote success. Only then may the
 checkpoint advance and the journal be cleared. Concurrent callers cannot observe
 stale progress and issue a duplicate mutation.
@@ -104,6 +111,18 @@ Authenticated build evidence shows that Create Set returns an opaque remote set
 identifier and continues at `/edit?id=<id>`. Confirmed execution now persists
 that receipt in the journal before checkpoint advancement, then carries the same
 binding into checkpoint version two before the journal is cleared.
+
+Recovered edit client evidence distinguishes question creation from set
+creation. Module `35211` submits Add Question through server-action reference
+`9898.Xv` and treats form status `SUCCESS` as the client success signal, but
+does not expose a remote question ID. Recovery therefore must not infer a
+question write from a matching toast, current page, or duplicate-able content.
+
+A concrete verifier should compare a post-attempt collection against the
+persisted pre-attempt count/digest. It may confirm only when removing the one
+expected effect reproduces the exact baseline and all other observed state is
+unchanged. Multiple candidates, concurrent changes, absent baselines, or weak
+page matches remain `inconclusive`.
 
 Subsequent question writes receive the checkpoint's remote set ID explicitly.
 Recovery refuses legacy advanced checkpoints, legacy confirmed Create Set

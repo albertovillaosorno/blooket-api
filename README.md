@@ -225,7 +225,8 @@ layers:
    operation IDs are deterministic from execution-relevant desired state, and a
    versioned sequential checkpoint resumes only against the exact plan. A
    confirmed Create Set receipt durably binds later question operations to one
-   opaque remote set ID.
+   opaque remote set ID. Optional verification captures only a pre-attempt item
+   count and SHA-256 digest, never raw provider content.
 
    The Blooket adapter receives the plan, never raw LLM JSON. Stop states and
    ambiguous outcomes preserve progress and recovery data.

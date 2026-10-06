@@ -39,11 +39,11 @@ after authenticated observations establish an exact versioned read shape.
 
 ### TODO - Complete concrete create/edit browser execution
 
-Implement the browser mutation adapter and provider-specific verifier that
-resolves ambiguous `attempting` journals into the explicit reconciliation
-operation. Add bounded normal pacing and retry classification only from verified
-behavior. Durable receipts, checkpoints, recovery, and reconciliation are in
-place.
+Implement the browser mutation adapter and provider-specific
+`captureBaseline`/`verify` methods from authenticated observations. The shared
+executor already persists count/digest baselines before mutation and feeds them
+back during explicit reconciliation. Add bounded normal pacing and retry
+classification only from verified behavior.
 
 ## P3 — Canonical CLI and localhost API
 
