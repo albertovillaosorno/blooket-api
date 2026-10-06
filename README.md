@@ -231,7 +231,11 @@ layers:
 
 Current official Blooket documentation describes two question types: Multiple
 Choice and Typing Answer. Multiple Choice currently requires 2–4 answer options
-and at least one correct answer. Platform details are treated as capability data
+and at least one correct answer. Question images are documented generally, while
+answer media is documented under Plus users; the dated official capability
+fixture therefore keeps answer images account-dependent until the active account
+is inspected. Upload byte, canvas, and pixel limits remain unknown because the
+official guides do not establish them. Platform details are capability data
 because Blooket may change them independently of this repository.
 
 Validation never performs a "helpful" semantic rewrite. An invalid quiz returns
