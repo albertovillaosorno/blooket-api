@@ -100,7 +100,7 @@ function decodedProject() {
       image: { description: "Question.", mediaId: "question-image" },
       answers: [
         {
-          text: "A",
+          text: null,
           correct: true,
           image: { description: "Answer.", mediaId: "answer-image" },
         },
