@@ -697,10 +697,10 @@ published releases are not reused.
 macOS ARM64 and Intel are required assets. Linux is always tested and is
 included only with `RELEASE_INCLUDE_LINUX=true`.
 
-**Release blockers:** configure the reviewed Jig download and SHA-256 repository
-variables and resolve its external evidence gap without weakening validation;
-implement and compile the real shared Safari extension; configure Apple signing
-and notarization; then run the workflow and native acceptance. The release
+**Release blockers:** obtain green Jig Action validation and resolve the local
+validator's external evidence gap without weakening validation; implement and
+compile the real shared Safari extension; configure Apple signing and
+notarization; then run the workflow and native acceptance. The release
 package check currently rejects missing Safari or untrusted signing. No workflow
 run, tag, push, signing success, or macOS acceptance is claimed from Fedora.
 

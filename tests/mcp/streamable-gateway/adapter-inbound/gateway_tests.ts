@@ -226,10 +226,10 @@ test(
       gateway.revokeAll();
       assert.equal((await call("tools/list", {})).status, 401);
     } finally {
-      gateway.server.closeAllConnections();
-      await new Promise<void>((resolve) =>
-        gateway.server.close(() => resolve()),
-      );
+      await new Promise<void>((resolve) => {
+        gateway.server.close(() => resolve());
+        gateway.server.closeAllConnections();
+      });
       await rm(root, { recursive: true, force: true });
     }
   },

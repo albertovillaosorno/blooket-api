@@ -490,8 +490,10 @@ export async function startBrowserService(
         service: { ...preferences.service, port: localPort },
       });
   } catch {
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      server.closeAllConnections();
+    });
     throw new Error("settings-save-failed");
   }
   return {

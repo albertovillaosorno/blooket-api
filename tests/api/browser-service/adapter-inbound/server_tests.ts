@@ -118,10 +118,10 @@ test(
     } finally {
       occupied.close();
       if (service) {
-        service.server.closeAllConnections();
-        await new Promise<void>((resolve) =>
-          service!.server.close(() => resolve()),
-        );
+        await new Promise<void>((resolve) => {
+          service!.server.close(() => resolve());
+          service!.server.closeAllConnections();
+        });
       }
       await rm(root, { recursive: true, force: true });
     }
@@ -239,10 +239,10 @@ test(
       assert.equal(command.ok, true);
       assert.equal(command.value.length, 1);
     } finally {
-      service.server.closeAllConnections();
-      await new Promise<void>((resolve) =>
-        service.server.close(() => resolve()),
-      );
+      await new Promise<void>((resolve) => {
+        service.server.close(() => resolve());
+        service.server.closeAllConnections();
+      });
       await rm(root, { recursive: true, force: true });
     }
   },

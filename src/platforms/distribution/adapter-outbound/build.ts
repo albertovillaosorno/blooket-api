@@ -46,7 +46,7 @@ import { join, dirname } from "node:path";
 
 export const TARGETS = ["linux-x64", "darwin-arm64", "darwin-x64"] as const;
 export type DistributionTarget = (typeof TARGETS)[number];
-const NODE_VERSION = "24.18.0";
+const NODE_VERSION = "24.21.0";
 const CLOUDFLARED_VERSION = "2026.10.0";
 const CONNECTOR_ASSETS = {
   "linux-x64": [

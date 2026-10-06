@@ -71,6 +71,12 @@ test("release requires the same full verifier and publishes only last",
       .sort(),
     ["darwin-arm64", "darwin-x64", "linux-x64"],
   );
+  assert.deepEqual(
+    verification.jobs.packages.strategy.matrix.include.map(
+      (item: { runner: string }) => item.runner,
+    ),
+    ["macos-latest", "macos-26-intel", "ubuntu-latest"],
+  );
   const commands = verification.jobs.packages.steps.flatMap(
     (step: { run?: string }) => (step.run ? [step.run] : []),
   );
@@ -80,8 +86,8 @@ test("release requires the same full verifier and publishes only last",
   );
   assert.ok(
     verification.jobs.repository.steps.some(
-      (step: { run?: string }) =>
-        step.run === ".temp/ci-tools/jig validate --root .",
+      (step: { uses?: string }) =>
+        step.uses === "albertovillaosorno/jig@main",
     ),
   );
   for (const value of [ci, release, verification]) {
@@ -92,7 +98,7 @@ test("release requires the same full verifier and publishes only last",
         if (key === "uses")
           assert.ok(
             typeof child === "string" &&
-              (child.startsWith("./") || /@[a-f0-9]{40}$/u.test(child)),
+              (child.startsWith("./") || /@(?:v\d+|main)$/u.test(child)),
           );
         visit(child);
       }
