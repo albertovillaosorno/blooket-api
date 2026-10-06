@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -45,7 +45,10 @@ import { loadPreferences } from
 import {
   listLibrary,
   metadataPath,
+  saveMetadata,
 } from "../../../../src/platforms/user-library/adapter-outbound/files.ts";
+import { installInitialSkills } from
+  "../../../../src/api/teacher-library/application/initial-skills.ts";
 import { loadSharp } from
   "../../../../src/media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
 
@@ -253,3 +256,222 @@ test(
     }
   },
 );
+
+test(
+  "search pages legacy IDs within count and " + "encoded-byte budgets",
+  async () => {
+    const { root, input, bytes } = await setup();
+    try {
+      const record = await importLibraryImage(root, input);
+      const library = (await loadPreferences(root)).mediaRoot;
+      for (let index = 0; index < 100; index++) {
+        const asset = "photos/bulk-" + index + ".png";
+        await writeFile(join(library, asset), bytes);
+        await saveMetadata(
+          library,
+          {
+            ...record,
+            id:
+              index === 0
+                ? "a." + "x".repeat(126)
+                : "legacy.id." + String(index).padStart(3, "0"),
+            asset,
+            original: {
+              ...record.original,
+              name: "bulk",
+              description: "a".repeat(10_000),
+            },
+            generatedEnglish: {
+              name: "bulk",
+              description: "b".repeat(10_000),
+              generatedBy: "ai",
+              sourceRevision: 1,
+              verified: false,
+            },
+          },
+          true,
+        );
+      }
+      const ids = new Set<string>();
+      let after: string | null = null;
+      do {
+        const result = await executeLibraryCommand(
+          {
+            version: 1,
+            operationId: "test:page",
+            command: "library.search",
+            payload: { query: "bulk", limit: 100, after },
+          },
+          root,
+        );
+        assert.ok(result.ok);
+        const page = result.value as {
+          records: { id: string }[];
+          nextCursor: string | null;
+          total: number;
+        };
+        assert.ok(Buffer.byteLength(JSON.stringify(result)) < 800_000);
+        assert.ok(page.records.length > 0 && page.records.length < 100);
+        assert.equal(page.total, 100);
+        for (const item of page.records) {
+          assert.equal(ids.has(item.id), false);
+          ids.add(item.id);
+        }
+        after = page.nextCursor;
+      } while (after !== null);
+      assert.equal(ids.size, 100);
+      const longId = "a." + "x".repeat(126);
+      const read = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:long-id",
+          command: "library.get",
+          payload: { id: longId },
+        },
+        root,
+      );
+      assert.equal(read.ok, true);
+      const invalid = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:bad-limit",
+          command: "library.search",
+          payload: { query: "bulk", limit: null },
+        },
+        root,
+      );
+      assert.equal(invalid.ok, false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "initial skills install once without " + "replacing personal changes",
+  async () => {
+    const { root } = await setup();
+    try {
+      await loadPreferences(root);
+      await installInitialSkills(root);
+      const path = join(root, "skills", "quiz-authoring.md");
+      assert.match(await readFile(path, "utf8"), /timeLimitSeconds/u);
+      await writeFile(path, "Personal guidance");
+      await installInitialSkills(root);
+      assert.equal(await readFile(path, "utf8"), "Personal guidance");
+      const result = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:seeded",
+          command: "skills.get",
+          payload: { id: "media-enrichment" },
+        },
+        root,
+      );
+      assert.equal(result.ok, true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "bundled draft example validates and " +
+    "malformed saved drafts are refused",
+  async () => {
+  const { root } = await setup();
+  try {
+    await loadPreferences(root);
+    await installInitialSkills(root);
+    const skill = await readFile(
+      join(root, "skills", "quiz-authoring.md"),
+      "utf8",
+    );
+    const document = JSON.parse(skill.split("```json\n")[1]!.split("```")[0]!);
+    const saved = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:example",
+        command: "drafts.put",
+        payload: { id: "example", document, expectedRevision: null },
+      },
+      root,
+    );
+    assert.equal(saved.ok, true);
+    await writeFile(
+      join(root, "drafts", "example.json"),
+      JSON.stringify({ schemaVersion: 1 }),
+    );
+    const read = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:corrupt",
+        command: "drafts.get",
+        payload: { id: "example" },
+      },
+      root,
+    );
+    assert.equal(read.ok, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test(
+  "aliases, duplicate keys and symbolic " +
+    "metadata fail without changing bytes",
+  async () => {
+  const { root, bytes, input } = await setup();
+  try {
+    const record = await importLibraryImage(root, input);
+    const library = (await loadPreferences(root)).mediaRoot;
+    const path = join(library, metadataPath(record.asset));
+    const source = await readFile(path, "utf8");
+    await writeFile(path, source + "revision: 2\n");
+    await assert.rejects(listLibrary(library));
+    await writeFile(
+      path,
+      source
+        .replace("name: Mi foto", "name: &label Mi foto")
+        .replace("description: Un ejemplo", "description: *label"),
+    );
+    await assert.rejects(listLibrary(library));
+    const outside = join(root, "synthetic-metadata.yaml");
+    await writeFile(outside, source);
+    await rm(path);
+    await symlink(outside, path);
+    await assert.rejects(listLibrary(library), /symbolic-library-path/u);
+    assert.deepEqual(
+      await readFile(join(library, record.asset)),
+      Buffer.from(bytes),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test(
+  "same-stem sources with different extensions " +
+    "have distinct metadata",
+  async () => {
+  const { root, input, bytes } = await setup();
+  try {
+    const png = await importLibraryImage(root, input);
+    const sharp = await loadSharp();
+    const jpeg = await sharp(bytes).jpeg().toBuffer();
+    const jpg = await importLibraryImage(root, {
+      ...input,
+      filename: "Mi foto.jpg",
+      base64: Buffer.from(jpeg).toString("base64"),
+    });
+    assert.notEqual(jpg.id, png.id);
+    assert.equal(metadataPath(jpg.asset), "metadata/Mi foto.jpg.yaml");
+    assert.equal(metadataPath(png.asset), "metadata/Mi foto.png.yaml");
+    assert.equal(
+      (await listLibrary((await loadPreferences(root)).mediaRoot)).length,
+      2,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

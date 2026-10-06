@@ -29,6 +29,11 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
+const PREPARED_FILE = new RegExp(
+  "^renditions/[a-zA-Z0-9_-]" + "[a-zA-Z0-9._-]{0,127}/[0-9]+\\.(png|gif)$",
+  "u",
+);
+
 export interface EditRecipe {
   readonly panX: number;
   readonly panY: number;
@@ -121,7 +126,7 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
   if (
     m["schemaVersion"] !== 1 ||
     typeof m["id"] !== "string" ||
-    !/^[a-zA-Z0-9_-]{1,100}$/u.test(m["id"]) ||
+    !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(m["id"]) ||
     typeof m["asset"] !== "string" ||
     !safeAsset(m["asset"]) ||
     !integer(m["revision"], 1, Number.MAX_SAFE_INTEGER)
@@ -161,9 +166,7 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
     exact(prepared, ["file", "bytes", "recipeRevision"]);
     if (
       typeof prepared["file"] !== "string" ||
-      !/^renditions\/[a-zA-Z0-9_-]+\/[0-9]+\.(png|gif)$/u.test(
-        prepared["file"],
-      ) ||
+      !PREPARED_FILE.test(prepared["file"]) ||
       !integer(prepared["bytes"], 1, 2_499_999) ||
       !integer(prepared["recipeRevision"], 1, Number(m["revision"]))
     )

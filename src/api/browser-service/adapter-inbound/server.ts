@@ -71,6 +71,8 @@ import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import { resolveConfiguredTcpPort } from
   "../../../platforms/tcp-ports/adapter-outbound/tcp-port.ts";
+import { installInitialSkills } from
+  "../../teacher-library/application/initial-skills.ts";
 
 export async function readBody(
   request: IncomingMessage,
@@ -117,6 +119,7 @@ export async function startBrowserService(
   }
   const bindAddress = preferences.service.bindAddress;
   await initializeLibrary(preferences.mediaRoot);
+  await installInitialSkills(root);
   const diagnostic = await runFirstUseDiagnostics(root);
   const csrf = randomBytes(32).toString("base64url");
   let origin = "";

@@ -34,7 +34,7 @@ import { executeJsonCommand } from
   "../../../cli/json-command-process/adapter-inbound/execute.ts";
 
 const string = { type: "string" };
-const id = { type: "string", pattern: "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$" };
+const id = { type: "string", pattern: "^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$" };
 const revision = {
   type: ["string", "null"],
   description:
@@ -47,6 +47,7 @@ function tool(
   description: string,
   properties: Record<string, unknown>,
   readOnly: boolean,
+  required: readonly string[] = Object.keys(properties),
 ) {
   return {
     name,
@@ -55,7 +56,7 @@ function tool(
     inputSchema: {
       type: "object",
       properties,
-      required: Object.keys(properties),
+      required,
       additionalProperties: false,
     },
     annotations: {
@@ -79,13 +80,19 @@ const tools = [
   ),
   tool(
     "library_search",
-    "library.list",
+    "library.search",
     "Search the teacher's media by original text, " +
       "generated English or topics. Empty query lists " +
       "media. Use stable IDs; never rename files or " +
-      "replace original text.",
-    { query: string },
+      "replace original text. Read records and pass nextCursor as " +
+      "after to continue; results are bounded by count and encoded bytes.",
+    {
+      query: { ...string, maxLength: 500 },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+      after: { ...id, type: ["string", "null"] },
+    },
     true,
+    ["query"],
   ),
   tool(
     "library_get",

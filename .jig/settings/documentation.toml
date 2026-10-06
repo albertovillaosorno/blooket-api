@@ -21,3 +21,10 @@ paths = ["docs/agents/"]
 decision_id = "none"
 section_mode = "required"
 sections = []
+
+[profile.authoring-skills]
+kind = "adr"
+paths = ["docs/skills/"]
+decision_id = "none"
+section_mode = "required"
+sections = []
