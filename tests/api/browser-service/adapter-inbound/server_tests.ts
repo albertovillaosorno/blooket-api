@@ -45,88 +45,88 @@ import {
 } from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 
 test(
-  "fixed collisions stop; automatic ports honor " +
-    "and persist loopback",
+  "fixed collisions stop; automatic ports honor " + "and persist loopback",
   async () => {
-  const root = await mkdtemp(join(tmpdir(), "browser-port-"));
-  const occupied = createServer();
-  await new Promise<void>((resolve) =>
-    occupied.listen(0, "127.0.0.2", resolve),
-  );
-  const address = occupied.address();
-  assert.ok(address && typeof address !== "string");
-  let service: Awaited<ReturnType<typeof startBrowserService>> | undefined;
-  try {
-    const preferences = await loadPreferences(root);
-    const fixed = {
-      ...preferences,
-      service: {
-        ...preferences.service,
-        bindAddress: "127.0.0.2",
-        port: address.port,
-      },
-    };
-    await savePreferences(root, fixed);
-    await assert.rejects(
-      startBrowserService({ root }),
-      /configured-port-in-use/u,
+    const root = await mkdtemp(join(tmpdir(), "browser-port-"));
+    const occupied = createServer();
+    await new Promise<void>((resolve) =>
+      occupied.listen(0, "127.0.0.2", resolve),
     );
-    await savePreferences(root, {
-      ...fixed,
-      service: { ...fixed.service, portMode: "automatic" },
-    });
-    let gatewayLocalPort = 0;
-    service = await startBrowserService({
-      root,
-      online: {
-        status: () => ({ state: "disabled" }),
-        pending: () => [],
-        approve: async () => {},
-        connections: () => [],
-        reject: () => {},
-        revoke: () => {},
-        stop: async () => {},
-        reload: async (port) => {
-          gatewayLocalPort = port!;
+    const address = occupied.address();
+    assert.ok(address && typeof address !== "string");
+    let service: Awaited<ReturnType<typeof startBrowserService>> | undefined;
+    try {
+      const preferences = await loadPreferences(root);
+      const fixed = {
+        ...preferences,
+        service: {
+          ...preferences.service,
+          bindAddress: "127.0.0.2",
+          port: address.port,
         },
-      },
-    });
-    assert.notEqual(service.port, address.port);
-    assert.equal(service.origin, "http://127.0.0.2:" + service.port);
-    const saved = await loadPreferences(root);
-    assert.equal(saved.service.port, service.port);
-    const boot = (await (
-      await fetch(service.origin + "/api/bootstrap")
-    ).json()) as { csrf: string };
-    const response = await fetch(service.origin + "/api/settings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": boot.csrf,
-        Origin: service.origin,
-      },
-      body: JSON.stringify({
-        preferences: {
-          ...saved,
-          service: { ...saved.service, port: address.port },
-        },
-        password: "",
-        tunnelToken: "",
-      }),
-    });
-    assert.equal(response.status, 200);
-    assert.equal(gatewayLocalPort, service.port);
-  } finally {
-    occupied.close();
-    if (service) {
-      service.server.closeAllConnections();
-      await new Promise<void>((resolve) =>
-        service!.server.close(() => resolve()),
+      };
+      await savePreferences(root, fixed);
+      await assert.rejects(
+        startBrowserService({ root }),
+        /configured-port-in-use/u,
       );
+      await savePreferences(root, {
+        ...fixed,
+        service: { ...fixed.service, portMode: "automatic" },
+      });
+      let gatewayLocalPort = 0;
+      service = await startBrowserService({
+        root,
+        online: {
+          status: () => ({ state: "disabled" }),
+          pending: () => [],
+          approve: async () => {},
+          connections: () => [],
+          reject: () => {},
+          revoke: () => {},
+          stop: async () => {},
+          reload: async (port) => {
+            gatewayLocalPort = port!;
+          },
+        },
+      });
+      assert.notEqual(service.port, address.port);
+      assert.equal(service.origin, "http://127.0.0.2:" + service.port);
+      const saved = await loadPreferences(root);
+      assert.equal(saved.service.port, service.port);
+      const boot = (await (
+        await fetch(service.origin + "/api/bootstrap")
+      ).json()) as { csrf: string };
+      const response = await fetch(service.origin + "/api/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": boot.csrf,
+          Origin: service.origin,
+        },
+        body: JSON.stringify({
+          preferences: {
+            ...saved,
+            service: { ...saved.service, port: address.port },
+          },
+          password: "",
+          tunnelToken: "",
+        }),
+      });
+      assert.equal(response.status, 200);
+      assert.equal(gatewayLocalPort, service.port);
+    } finally {
+      occupied.close();
+      if (service) {
+        service.server.closeAllConnections();
+        await new Promise<void>((resolve) =>
+          service!.server.close(() => resolve()),
+        );
+      }
+      await rm(root, { recursive: true, force: true });
     }
-    await rm(root, { recursive: true, force: true });
-  }
-});
+  },
+);
 
 test(
   "same-origin UI handles image import/export and " +
@@ -193,6 +193,28 @@ test(
           )
         ).status,
         200,
+      );
+      assert.equal(
+        (
+          await fetch(
+            service.origin +
+              "/media/" +
+              imported.id +
+              "?variant=prepared&revision=2",
+          )
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await fetch(
+            service.origin +
+              "/media/" +
+              imported.id +
+              "?variant=prepared&revision=1.0",
+          )
+        ).status,
+        400,
       );
       await writeFile(
         join((await loadPreferences(root)).mediaRoot, prepared.prepared.file),

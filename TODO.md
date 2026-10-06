@@ -341,10 +341,27 @@ modes. Task 03 preserves unsaved configuration on language changes; retain that
 behavior. Translate diagnostics, state, and failure
 messages fully rather than showing raw English codes in the Spanish UI.
 
-Rename the current `lossless` UI label to an accurate quality description for
-GIF quantization, or provide a format-specific explanation. Changing export
-defaults must not overwrite existing individual recipes. Confirm preview and
-export geometry agree and stale prepared files cannot be offered for download.
+Portable editor changes on 2026-10-06 add live recipe controls with grouped
+undo history, keyboard pan/zoom, translated accessible labels and diagnostic
+states, and a one-pixel fallback color sample without a full-image canvas.
+The stored `lossless` value stays compatible; its visible label now explains
+full-color PNG versus the standard GIF palette.
+
+Prepared downloads revalidate the current revision, rendition identity, actual
+bounded bytes, format, and canvas dimensions under the shared library lock.
+Regression checks reject stale URLs, incorrect format/size, mismatched asset
+identity, and a file at the exact 2,500,000-byte ceiling. All 520 portable tests,
+strict TypeScript, and browser-script syntax pass.
+
+Changing export defaults must not overwrite existing individual recipes.
+The browser framing preview explicitly directs the teacher to the prepared file
+for final colors, compression, and GIF timing; it does not claim pixel parity.
+
+**External blocker:** Safari, target-browser interaction/accessibility,
+preview/export geometry, and responsive visual acceptance remain unverified.
+Chrome inspection stalled during task 05, so the newly added editor controls
+have not passed an interactive browser test. Continue independent export
+isolation in task 07 and retain these acceptance checks.
 
 Complete when source bytes remain unchanged, per-image recipes save/reopen,
 preview/export agree, and import, zoom/drag, undo/redo, adjustments, both

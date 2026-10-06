@@ -39,6 +39,7 @@ import {
   editLibraryImage,
   prepareLibraryImage,
   executeLibraryCommand,
+  readPreparedLibraryImage,
 } from "../../../../src/api/teacher-library/application/library.ts";
 import { loadPreferences } from
   "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
@@ -478,3 +479,53 @@ test(
     }
   },
 );
+
+test(
+  "prepared reads reject stale revisions " +
+    "and changed format or byte count",
+  async () => {
+  const { root, input } = await setup();
+  try {
+    const imported = await importLibraryImage(root, input);
+    const library = (await loadPreferences(root)).mediaRoot;
+    const record = await prepareLibraryImage(root, imported.id);
+    const prepared = record.prepared!;
+    const valid = await readPreparedLibraryImage(library, record.id, 1);
+    assert.equal(valid.bytes.length, prepared.bytes);
+    await assert.rejects(
+      readPreparedLibraryImage(library, record.id, 2),
+      /prepared-revision-conflict/u,
+    );
+    await saveMetadata(library, { ...record, revision: 2 });
+    await assert.rejects(
+      readPreparedLibraryImage(library, record.id),
+      /prepared-revision-conflict/u,
+    );
+    await saveMetadata(library, record);
+    const path = join(library, prepared.file);
+    await writeFile(path, Buffer.alloc(prepared.bytes));
+    await assert.rejects(
+      readPreparedLibraryImage(library, record.id),
+      /prepared-media-invalid/u,
+    );
+    await writeFile(path, valid.bytes.subarray(0, valid.bytes.length - 1));
+    await assert.rejects(
+      readPreparedLibraryImage(library, record.id),
+      /prepared-media-invalid/u,
+    );
+    await writeFile(path, valid.bytes);
+    await saveMetadata(library, {
+      ...record,
+      prepared: {
+        ...prepared,
+        file: prepared.file.replace(record.id, "other-asset"),
+      },
+    });
+    await assert.rejects(
+      readPreparedLibraryImage(library, record.id),
+      /prepared-media-invalid/u,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
