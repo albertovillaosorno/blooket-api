@@ -97,11 +97,10 @@ export async function executeLibraryCommand(
     await initializeLibrary(preferences.mediaRoot);
     if (command.command.startsWith("library.")) {
       const records = await listLibrary(preferences.mediaRoot);
-      if (payload.kind === "list") {
+      if (payload.kind === "list" || payload.kind === "search") {
         const query = payload.query.toLocaleLowerCase();
-        return commandSuccess(
-          command.operationId,
-          records.filter((record) =>
+        const matches = records
+          .filter((record) =>
             JSON.stringify([
               record.id,
               record.original,
@@ -110,8 +109,34 @@ export async function executeLibraryCommand(
             ])
               .toLocaleLowerCase()
               .includes(query),
-          ),
+          )
+          .sort((a, b) => (a.id < b.id ? -1 : a.id === b.id ? 0 : 1));
+        if (payload.kind === "list") {
+          if (
+            matches.length > 100 ||
+            Buffer.byteLength(JSON.stringify(matches)) > 750_000
+          )
+            throw new Error("use-paginated-library-search");
+          return commandSuccess(command.operationId, matches);
+        }
+        const remaining = matches.filter(
+          (item) => payload.after === null || item.id > payload.after,
         );
+        const page: LibraryMetadata[] = [];
+        let bytes = 0;
+        for (const item of remaining) {
+          const size = Buffer.byteLength(JSON.stringify(item));
+          if (page.length >= payload.limit || bytes + size > 750_000) break;
+          page.push(item);
+          bytes += size;
+        }
+        if (remaining.length > 0 && page.length === 0)
+          throw new Error("media-metadata-response-too-large");
+        return commandSuccess(command.operationId, {
+          records: page,
+          nextCursor: remaining.length > page.length ? page.at(-1)!.id : null,
+          total: matches.length,
+        });
       }
       if (payload.kind !== "get" && payload.kind !== "enrich")
         throw new Error("invalid-command");
@@ -170,12 +195,16 @@ export async function executeLibraryCommand(
       if ((await lstat(path)).size > 1_000_000)
         throw new Error("document-too-large");
       const source = await readFile(path, "utf8");
+      let document: unknown;
+      if (folder === "drafts") {
+        const decoded = decodeProjectDocument(JSON.parse(source));
+        if (!decoded.ok) throw new Error("invalid-saved-draft");
+        document = decoded.value;
+      }
       return commandSuccess(command.operationId, {
         id: payload.id,
         revision: hash(source),
-        ...(folder === "skills"
-          ? { text: source }
-          : { document: JSON.parse(source) as unknown }),
+        ...(folder === "skills" ? { text: source } : { document }),
       });
     }
     const lock = await tryAcquireFileLock(path + ".lock");

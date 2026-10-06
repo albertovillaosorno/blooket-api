@@ -34,6 +34,7 @@ import { isRecord } from "../../runtime-decoding/domain/exact-object.ts";
 export const LIBRARY_COMMANDS = [
   "profile.get",
   "library.list",
+  "library.search",
   "library.get",
   "library.enrich",
   "skills.list",
@@ -47,6 +48,12 @@ export type LibraryCommandName = (typeof LIBRARY_COMMANDS)[number];
 export type LibraryPayload =
   | { readonly kind: "profile" }
   | { readonly kind: "list"; readonly query: string }
+  | {
+      readonly kind: "search";
+      readonly query: string;
+      readonly limit: number;
+      readonly after: string | null;
+    }
   | { readonly kind: "get"; readonly id: string }
   | {
       readonly kind: "enrich";
@@ -77,6 +84,25 @@ export function decodeLibraryCommand(
     keys(value, []);
     return { kind: "profile" };
   }
+  if (name === "library.search") {
+    keys(value, [
+      "query",
+      ...("limit" in value ? ["limit"] : []),
+      ...("after" in value ? ["after"] : []),
+    ]);
+    const limit = "limit" in value ? value["limit"] : 50;
+    const after = "after" in value ? value["after"] : null;
+    if (
+      !string(value["query"], 500) ||
+      typeof limit !== "number" ||
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      limit > 100 ||
+      (after !== null && !logicalId(after))
+    )
+      throw new Error("invalid-search");
+    return { kind: "search", query: value["query"], limit, after };
+  }
   if (name.endsWith(".list")) {
     keys(value, name === "library.list" ? ["query"] : []);
     if (name === "library.list" && !string(value["query"], 500))
@@ -86,11 +112,7 @@ export function decodeLibraryCommand(
       query: name === "library.list" ? (value["query"] as string) : "",
     };
   }
-  if (
-    !string(value["id"], 100) ||
-    !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/u.test(value["id"])
-  )
-    throw new Error("invalid-logical-id");
+  if (!logicalId(value["id"])) throw new Error("invalid-logical-id");
   const id = value["id"];
   if (name.endsWith(".get")) {
     keys(value, ["id"]);
@@ -136,6 +158,11 @@ export function decodeLibraryCommand(
     document: value["document"],
     expectedRevision,
   };
+}
+function logicalId(value: unknown): value is string {
+  return (
+    string(value, 128) && /^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(value)
+  );
 }
 function keys(
   record: Record<string, unknown>,

@@ -273,16 +273,31 @@ revision protection, stable IDs, and separate generated English metadata.
 Complete existing JSONL migration and user rename/move with atomic recovery,
 collision handling, preserved bytes/IDs, and mirrored paths.
 
-Resolve the new logical-ID decoder's incompatibility with legacy IDs containing
-dots or up to 128 characters before migrating. Add alias/symlink/collision,
-corrupt YAML, interrupted save, same-stem/different-extension, and concurrency
-coverage. Add bounded search/pagination for large libraries rather than relying
-on the CLI's bounded stdout to reject an oversized result.
+Portable library foundations were extended on 2026-10-06. Logical IDs now admit
+legacy dots and 128-character IDs while preserving current UUIDs. MCP search
+uses bounded pages with a stable-ID continuation cursor; the legacy small-list
+command remains compatible and rejects oversized results explicitly.
 
-Ship initial authoring skills without overwriting personal ones. Existing skill
-and draft tools have logical IDs, revision checks, and recovery copies; verify
-how the actual ChatGPT client reads skills and follows the project schema.
-Validate media/account semantics before publication, beyond draft JSON syntax.
+Filesystem enumeration bounds depth, entries, records, per-file YAML size, and
+aggregate metadata bytes. Regression checks cover duplicate YAML keys, aliases,
+symlink metadata, large paginated results, same-stem files with different actual
+formats, and legacy IDs. Invalid saved drafts fail their exact decoder.
+
+Service startup installs the bundled quiz-authoring and media-enrichment skills
+only when absent, preserving personal modifications. Tests exercise skill
+retrieval and the bundled quiz example through the canonical command path. All
+508 portable tests and strict TypeScript pass; Jig has only its documented
+external evidence gap.
+
+Next, implement recoverable legacy JSONL migration and user rename/move.
+Preserve legacy English-verification information without treating it as an
+inferred language or generated translation. Add interrupted-transaction,
+collision, and concurrent-operation checks before calling migration complete.
+
+Existing skill and draft tools have logical IDs, revision checks, and recovery
+copies; verify how the actual ChatGPT client reads skills and follows the project
+schema. Validate media/account semantics before publication, beyond draft
+JSON syntax.
 
 Complete when legacy IDs/bytes/text migrate without loss, user rename/move can
 recover from interruption, AI updates preserve user-owned fields, and initial
@@ -299,8 +314,8 @@ per-image edit recipes in YAML; global settings contain export defaults only.
 
 Finish Safari behavior, keyboard/accessibility and responsive checks, file
 chooser/drag-and-drop, GIF preview parity, pixel picking, and both background
-modes. Preserve unsaved configuration when changing the UI language; the current
-locale handler refills settings. Translate diagnostics, state, and failure
+modes. Task 03 preserves unsaved configuration on language changes; retain that
+behavior. Translate diagnostics, state, and failure
 messages fully rather than showing raw English codes in the Spanish UI.
 
 Rename the current `lossless` UI label to an accurate quality description for

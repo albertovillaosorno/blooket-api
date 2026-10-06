@@ -29,7 +29,7 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
-import { lstat, mkdir, readdir, readFile, realpath } from "node:fs/promises";
+import { lstat, mkdir, opendir, readFile, realpath } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import {
   writeAtomicFile,
@@ -99,18 +99,27 @@ export function metadataPath(asset: string): string {
 export async function listLibrary(root: string): Promise<LibraryMetadata[]> {
   const runtime = await yaml();
   const records: LibraryMetadata[] = [];
-  async function walk(relative: string): Promise<void> {
-    for (const entry of await readdir(await safeLibraryPath(root, relative), {
-      withFileTypes: true,
-    })) {
+  const ids = new Set<string>();
+  let visited = 0,
+    metadataBytes = 0;
+  async function walk(relative: string, depth = 0): Promise<void> {
+    if (depth > 32) throw new Error("library-depth-limit");
+    for await (const entry of await opendir(
+      await safeLibraryPath(root, relative),
+    )) {
+      visited++;
+      if (visited > 30_000) throw new Error("library-entry-limit");
       if (records.length >= 10_000) throw new Error("library-record-limit");
       if (entry.isSymbolicLink()) throw new Error("symbolic-library-path");
       const next = relative + "/" + entry.name;
-      if (entry.isDirectory()) await walk(next);
+      if (entry.isDirectory()) await walk(next, depth + 1);
       else if (entry.name.endsWith(".yaml")) {
         const path = await safeLibraryPath(root, next);
-        if ((await lstat(path)).size > 100_000)
-          throw new Error("metadata-too-large");
+        const size = (await lstat(path)).size;
+        metadataBytes += size;
+        if (size > 100_000) throw new Error("metadata-too-large");
+        if (metadataBytes > 32_000_000)
+          throw new Error("library-metadata-byte-limit");
         const record = decodeLibraryMetadata(
           runtime.parse(await readFile(path, "utf8"), {
             maxAliasCount: 0,
@@ -118,12 +127,10 @@ export async function listLibrary(root: string): Promise<LibraryMetadata[]> {
             schema: "core",
           }),
         );
-        if (
-          metadataPath(record.asset) !== next ||
-          records.some((m) => m.id === record.id)
-        )
+        if (metadataPath(record.asset) !== next || ids.has(record.id))
           throw new Error("metadata-identity-conflict");
         records.push(record);
+        ids.add(record.id);
       }
     }
   }

@@ -24,14 +24,16 @@ endorsed by the platform.
   pixels, and output size. Prepared files must be below 2,500,000 bytes.
 - Local configuration for email, masked credential replacement, port, media
   folder, online connection, and export defaults.
-- Personal skills and recoverable quiz drafts with revision checks.
+- Personal skills and recoverable quiz drafts with revision checks. Startup
+  installs initial authoring skills without replacing personal changes.
 - A Streamable HTTP MCP gateway with OAuth/PKCE and approval in the local UI.
   Approval requires the owner password; connections can be rejected or revoked.
   Its tools execute the canonical CLI rather than a separate implementation.
 - A lightweight first-use diagnostic, saved locally, with a manual rerun.
 
 Current MCP tools retrieve teacher instructions, search/read/enrich media, and
-list/read/write skills and drafts. **Saving a draft does not publish a quiz.**
+list/read/write skills and drafts. Media search returns bounded pages and a
+continuation cursor. **Saving a draft does not publish a quiz.**
 A browser extension, native installer, and launch-at-login integration are
 roadmap work.
 
