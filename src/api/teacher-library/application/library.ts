@@ -96,7 +96,9 @@ export async function executeLibraryCommand(
     const preferences = await loadPreferences(root);
     await initializeLibrary(preferences.mediaRoot);
     if (command.command.startsWith("library.")) {
-      const records = await listLibrary(preferences.mediaRoot);
+      const records = await withLibraryLock(preferences.mediaRoot, () =>
+        listLibrary(preferences.mediaRoot),
+      );
       if (payload.kind === "list" || payload.kind === "search") {
         const query = payload.query.toLocaleLowerCase();
         const matches = records

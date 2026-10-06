@@ -4,8 +4,9 @@
 
 Accepted target behavior; partially implemented as of 2026-10-06. Schema-3
 preferences, mirrored YAML, library/skill/draft operations, the browser editor,
-and explicit GIF resampling exist. Legacy library migration, complete native
-integration, and end-to-end publication remain pending in `TODO.md`.
+and explicit GIF resampling exist. Portable legacy migration and user rename
+recovery are implemented; complete native integration and end-to-end publication
+remain pending in `TODO.md`.
 
 This decision supersedes the English-only media description policy,
 authoritative JSONL media metadata, automatic internal naming of user-visible
@@ -139,6 +140,24 @@ rebuildable cache of validated records. Use a reviewed YAML parser with safe,
 bounded decoding and an exact versioned runtime contract. Migrate the existing
 JSONL/display-name records while retaining stable IDs, bytes, and recovery
 state.
+
+The implemented migration uses schema 2 only for records with legacy provenance.
+It adds `legacy.englishVerified`, `legacy.sourceRevision`, `legacy.sourcePath`,
+and `legacy.indexDigest`; schema-1 documents keep their existing exact contract.
+This historical verification is not an inferred language or AI translation.
+
+An explicit local import preflights the bounded JSONL index and actual images,
+preserves source files, and archives the exact index bytes. User rename/move
+preserves IDs, bytes, text, recipes, and provenance while clearing prepared
+status. A durable transfer journal is replayed under the library lock before
+other locked operations; ordinary reads refuse a pending transaction.
+
+Recovery checks source/destination hashes and metadata before removing old
+rename
+paths. Changed files stop recovery with the journal intact; no automatic merge
+or
+unrelated overwrite is admitted. Migration and filenames remain local user
+operations outside the remote command registry.
 
 ### Personal skills and online quiz authority
 

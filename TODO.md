@@ -270,8 +270,8 @@ tunnel credential, owner password, and Blooket password independent.
 Mirrored `metadata/<full-original-filename>.yaml` and immutable user-named
 `photos/` assets are implemented with bounded YAML parsing, atomic saves,
 revision protection, stable IDs, and separate generated English metadata.
-Complete existing JSONL migration and user rename/move with atomic recovery,
-collision handling, preserved bytes/IDs, and mirrored paths.
+Explicit local JSONL migration and user rename/move now use a durable transfer
+journal, collision checks, preserved bytes/IDs, and mirrored paths.
 
 Portable library foundations were extended on 2026-10-06. Logical IDs now admit
 legacy dots and 128-character IDs while preserving current UUIDs. MCP search
@@ -289,13 +289,36 @@ retrieval and the bundled quiz example through the canonical command path. All
 508 portable tests and strict TypeScript pass; Jig has only its documented
 external evidence gap.
 
-Next, implement recoverable legacy JSONL migration and user rename/move.
-Preserve legacy English-verification information without treating it as an
-inferred language or generated translation. Add interrupted-transaction,
-collision, and concurrent-operation checks before calling migration complete.
+Portable migration and rename recovery were implemented on 2026-10-06.
+Schema-1 YAML remains readable; migrated schema-2 records retain the legacy
+English-verification flag, original revision, source path, and index digest.
+Unknown original language stays empty; no translation is invented.
+
+Migration preflights the complete bounded plan before publication, preserves
+legacy sources, and archives the exact JSONL bytes as `media.jsonl.migrated`.
+User rename preserves IDs, source bytes, text, recipes, and provenance while
+invalidating prepared downloads. Neither operation is admitted through MCP.
+
+Transfer replay runs under the shared library lock at startup or before another
+locked operation. A pending journal blocks ordinary library reads, checks hashes
+and metadata conflicts, and resumes idempotently without overwriting unrelated
+files. Source changes retain the journal for repair instead of guessing success.
+
+Regression tests exercise interrupted publication/archival, unchanged source
+bytes, late invalid records, collisions, traversal, symlinks, concurrent
+renames,
+and forbidden remote commands. All 519 portable tests, strict TypeScript, and
+browser-script syntax pass; Jig retains only its external evidence gap.
+
+**External blocker:** no recipient Mac or actual ChatGPT client is available.
+Native case/Unicode filesystem behavior and real skill/schema consumption remain
+unverified. The Chrome import button and confirmation opened, but subsequent
+browser inspection timed out; do not claim the complete visual workflow passed.
+Continue independent editor work in task 06; keep client acceptance pending.
 
 Existing skill and draft tools have logical IDs, revision checks, and recovery
-copies; verify how the actual ChatGPT client reads skills and follows the project
+copies; verify how the actual ChatGPT client reads skills and follows the
+project
 schema. Validate media/account semantics before publication, beyond draft
 JSON syntax.
 

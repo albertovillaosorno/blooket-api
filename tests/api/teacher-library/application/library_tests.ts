@@ -376,102 +376,105 @@ test(
 );
 
 test(
-  "bundled draft example validates and " +
-    "malformed saved drafts are refused",
+  "bundled draft example validates and " + "malformed saved drafts are refused",
   async () => {
-  const { root } = await setup();
-  try {
-    await loadPreferences(root);
-    await installInitialSkills(root);
-    const skill = await readFile(
-      join(root, "skills", "quiz-authoring.md"),
-      "utf8",
-    );
-    const document = JSON.parse(skill.split("```json\n")[1]!.split("```")[0]!);
-    const saved = await executeLibraryCommand(
-      {
-        version: 1,
-        operationId: "test:example",
-        command: "drafts.put",
-        payload: { id: "example", document, expectedRevision: null },
-      },
-      root,
-    );
-    assert.equal(saved.ok, true);
-    await writeFile(
-      join(root, "drafts", "example.json"),
-      JSON.stringify({ schemaVersion: 1 }),
-    );
-    const read = await executeLibraryCommand(
-      {
-        version: 1,
-        operationId: "test:corrupt",
-        command: "drafts.get",
-        payload: { id: "example" },
-      },
-      root,
-    );
-    assert.equal(read.ok, false);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+    const { root } = await setup();
+    try {
+      await loadPreferences(root);
+      await installInitialSkills(root);
+      const skill = await readFile(
+        join(root, "skills", "quiz-authoring.md"),
+        "utf8",
+      );
+      const document = JSON.parse(
+        skill.split("```json\n")[1]!.split("```")[0]!,
+      );
+      const saved = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:example",
+          command: "drafts.put",
+          payload: { id: "example", document, expectedRevision: null },
+        },
+        root,
+      );
+      assert.equal(saved.ok, true);
+      await writeFile(
+        join(root, "drafts", "example.json"),
+        JSON.stringify({ schemaVersion: 1 }),
+      );
+      const read = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:corrupt",
+          command: "drafts.get",
+          payload: { id: "example" },
+        },
+        root,
+      );
+      assert.equal(read.ok, false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   "aliases, duplicate keys and symbolic " +
     "metadata fail without changing bytes",
   async () => {
-  const { root, bytes, input } = await setup();
-  try {
-    const record = await importLibraryImage(root, input);
-    const library = (await loadPreferences(root)).mediaRoot;
-    const path = join(library, metadataPath(record.asset));
-    const source = await readFile(path, "utf8");
-    await writeFile(path, source + "revision: 2\n");
-    await assert.rejects(listLibrary(library));
-    await writeFile(
-      path,
-      source
-        .replace("name: Mi foto", "name: &label Mi foto")
-        .replace("description: Un ejemplo", "description: *label"),
-    );
-    await assert.rejects(listLibrary(library));
-    const outside = join(root, "synthetic-metadata.yaml");
-    await writeFile(outside, source);
-    await rm(path);
-    await symlink(outside, path);
-    await assert.rejects(listLibrary(library), /symbolic-library-path/u);
-    assert.deepEqual(
-      await readFile(join(library, record.asset)),
-      Buffer.from(bytes),
-    );
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+    const { root, bytes, input } = await setup();
+    try {
+      const record = await importLibraryImage(root, input);
+      const library = (await loadPreferences(root)).mediaRoot;
+      const path = join(library, metadataPath(record.asset));
+      const source = await readFile(path, "utf8");
+      await writeFile(path, source + "revision: 2\n");
+      await assert.rejects(listLibrary(library));
+      await writeFile(
+        path,
+        source
+          .replace("name: Mi foto", "name: &label Mi foto")
+          .replace("description: Un ejemplo", "description: *label"),
+      );
+      await assert.rejects(listLibrary(library));
+      const outside = join(root, "synthetic-metadata.yaml");
+      await writeFile(outside, source);
+      await rm(path);
+      await symlink(outside, path);
+      await assert.rejects(listLibrary(library), /symbolic-library-path/u);
+      assert.deepEqual(
+        await readFile(join(library, record.asset)),
+        Buffer.from(bytes),
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
-  "same-stem sources with different extensions " +
-    "have distinct metadata",
+  "same-stem sources with different extensions " + "have distinct metadata",
   async () => {
-  const { root, input, bytes } = await setup();
-  try {
-    const png = await importLibraryImage(root, input);
-    const sharp = await loadSharp();
-    const jpeg = await sharp(bytes).jpeg().toBuffer();
-    const jpg = await importLibraryImage(root, {
-      ...input,
-      filename: "Mi foto.jpg",
-      base64: Buffer.from(jpeg).toString("base64"),
-    });
-    assert.notEqual(jpg.id, png.id);
-    assert.equal(metadataPath(jpg.asset), "metadata/Mi foto.jpg.yaml");
-    assert.equal(metadataPath(png.asset), "metadata/Mi foto.png.yaml");
-    assert.equal(
-      (await listLibrary((await loadPreferences(root)).mediaRoot)).length,
-      2,
-    );
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
+    const { root, input, bytes } = await setup();
+    try {
+      const png = await importLibraryImage(root, input);
+      const sharp = await loadSharp();
+      const jpeg = await sharp(bytes).jpeg().toBuffer();
+      const jpg = await importLibraryImage(root, {
+        ...input,
+        filename: "Mi foto.jpg",
+        base64: Buffer.from(jpeg).toString("base64"),
+      });
+      assert.notEqual(jpg.id, png.id);
+      assert.equal(metadataPath(jpg.asset), "metadata/Mi foto.jpg.yaml");
+      assert.equal(metadataPath(png.asset), "metadata/Mi foto.png.yaml");
+      assert.equal(
+        (await listLibrary((await loadPreferences(root)).mediaRoot)).length,
+        2,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

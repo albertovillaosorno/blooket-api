@@ -50,6 +50,8 @@ import {
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
 import {
   initializeLibrary,
+  withLibraryLock,
+  exists,
   listLibrary,
   safeLibraryPath,
 } from "../../../platforms/user-library/adapter-outbound/files.ts";
@@ -73,6 +75,11 @@ import { resolveConfiguredTcpPort } from
   "../../../platforms/tcp-ports/adapter-outbound/tcp-port.ts";
 import { installInitialSkills } from
   "../../teacher-library/application/initial-skills.ts";
+
+import {
+  migrateLegacyLibrary,
+  renameLibraryImage,
+} from "../../teacher-library/application/transfers.ts";
 
 export async function readBody(
   request: IncomingMessage,
@@ -119,6 +126,7 @@ export async function startBrowserService(
   }
   const bindAddress = preferences.service.bindAddress;
   await initializeLibrary(preferences.mediaRoot);
+  await withLibraryLock(preferences.mediaRoot, async () => {});
   await installInitialSkills(root);
   const diagnostic = await runFirstUseDiagnostics(root);
   const csrf = randomBytes(32).toString("base64url");
@@ -199,6 +207,15 @@ export async function startBrowserService(
           requests: options.online?.pending() ?? [],
           connections: options.online?.connections() ?? [],
           status: options.online?.status() ?? { state: "disabled" },
+        });
+        return;
+      }
+      if (url.pathname === "/api/library-status") {
+        const library = (await loadPreferences(root)).mediaRoot;
+        json(response, 200, {
+          legacyAvailable: await exists(
+            await safeLibraryPath(library, "media.jsonl"),
+          ),
         });
         return;
       }
@@ -332,6 +349,22 @@ export async function startBrowserService(
       }
       if (url.pathname === "/api/diagnostics") {
         json(response, 200, await runFirstUseDiagnostics(root, true));
+        return;
+      }
+      if (url.pathname === "/api/library-migrate") {
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Object.keys(body).join() !== "confirm" ||
+          !("confirm" in body) ||
+          body.confirm !== true
+        )
+          throw new Error("migration-confirmation-required");
+        json(response, 200, await migrateLegacyLibrary(root));
+        return;
+      }
+      if (url.pathname === "/api/media-rename") {
+        json(response, 200, await renameLibraryImage(root, body));
         return;
       }
       if (url.pathname === "/api/import") {

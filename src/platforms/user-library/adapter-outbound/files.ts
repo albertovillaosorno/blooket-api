@@ -29,16 +29,29 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
-import { lstat, mkdir, opendir, readFile, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  lstat,
+  mkdir,
+  open,
+  opendir,
+  readFile,
+  realpath,
+} from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import {
   writeAtomicFile,
+  removeDurableFile,
   writeDurableFileIfAbsent,
 } from "../../atomic-files/adapter-outbound/atomic-file.ts";
 import { tryAcquireFileLock } from
   "../../file-locks/adapter-outbound/file-lock.ts";
 import {
   decodeLibraryMetadata,
+  safeRelativeImage,
+  object,
+  exact,
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
 
@@ -97,6 +110,8 @@ export function metadataPath(asset: string): string {
   return "metadata/" + asset.slice("photos/".length) + ".yaml";
 }
 export async function listLibrary(root: string): Promise<LibraryMetadata[]> {
+  if (await exists(await safeLibraryPath(root, TRANSACTION_FILE)))
+    throw new Error("library-recovery-required");
   const runtime = await yaml();
   const records: LibraryMetadata[] = [];
   const ids = new Set<string>();
@@ -160,6 +175,7 @@ export async function withLibraryLock<T>(
   );
   if (!lock.ok) throw new Error("library-busy");
   try {
+    await recoverLibraryTransaction(root);
     return await work();
   } finally {
     await lock.lock.release();
@@ -167,4 +183,227 @@ export async function withLibraryLock<T>(
 }
 function isMissing(value: unknown): boolean {
   return value instanceof Error && "code" in value && value.code === "ENOENT";
+}
+
+const TRANSACTION_FILE = ".library-transaction.json";
+export interface LibraryTransfer {
+  readonly source: string;
+  readonly digest: string;
+  readonly bytes: number;
+  readonly before: LibraryMetadata | null;
+  readonly after: LibraryMetadata;
+}
+export interface LibraryTransaction {
+  readonly version: 1;
+  readonly kind: "migrate" | "rename";
+  readonly indexDigest: string | null;
+  readonly transfers: readonly LibraryTransfer[];
+}
+
+// The application holds .library.lock before planning or replaying a transfer.
+export async function commitLibraryTransaction(
+  root: string,
+  candidate: LibraryTransaction,
+): Promise<void> {
+  const transaction = decodeTransaction(candidate);
+  const source = JSON.stringify(transaction) + "\n";
+  if (Buffer.byteLength(source) > 32_000_000)
+    throw new Error("library-transaction-too-large");
+  if (
+    (await writeDurableFileIfAbsent(
+      await safeLibraryPath(root, TRANSACTION_FILE),
+      source,
+    )) !== "created"
+  )
+    throw new Error("library-recovery-required");
+  await recoverLibraryTransaction(root);
+}
+async function recoverLibraryTransaction(root: string): Promise<void> {
+  const journal = await safeLibraryPath(root, TRANSACTION_FILE);
+  if (!(await exists(journal))) return;
+  const transaction = decodeTransaction(
+    JSON.parse((await boundedBytes(journal, 32_000_000)).toString("utf8")),
+  );
+  if (transaction.kind === "migrate") {
+    const index = await safeLibraryPath(root, "media.jsonl");
+    const archive = await safeLibraryPath(root, "media.jsonl.migrated");
+    const existing = (await exists(index)) ? index : archive;
+    if (
+      digest(await boundedBytes(existing, 16_000_000)) !==
+      transaction.indexDigest
+    )
+      throw new Error("legacy-index-changed");
+  }
+  for (const transfer of transaction.transfers) {
+    const source = await safeLibraryPath(root, transfer.source);
+    const target = await safeLibraryPath(root, transfer.after.asset, true);
+    if (await exists(source)) {
+      const bytes = await boundedBytes(source, 25_000_000);
+      if (bytes.length !== transfer.bytes || digest(bytes) !== transfer.digest)
+        throw new Error("source-changed-during-transfer");
+      await writeDurableFileIfAbsent(target, bytes);
+    }
+    const targetBytes = await boundedBytes(target, 25_000_000);
+    if (
+      targetBytes.length !== transfer.bytes ||
+      digest(targetBytes) !== transfer.digest
+    )
+      throw new Error("transfer-destination-conflict");
+    const metadata = await safeLibraryPath(
+      root,
+      metadataPath(transfer.after.asset),
+      true,
+    );
+    if (await exists(metadata)) {
+      const current = decodeLibraryMetadata(
+        (await yaml()).parse(
+          (await boundedBytes(metadata, 100_000)).toString("utf8"),
+          { maxAliasCount: 0, uniqueKeys: true, schema: "core" },
+        ),
+      );
+      if (JSON.stringify(current) !== JSON.stringify(transfer.after))
+        throw new Error("transfer-metadata-conflict");
+    } else await saveMetadata(root, transfer.after, true);
+    if (transfer.before !== null) {
+      const oldMetadata = await safeLibraryPath(
+        root,
+        metadataPath(transfer.before.asset),
+      );
+      if (await exists(oldMetadata)) {
+        const current = decodeLibraryMetadata(
+          (await yaml()).parse(
+            (await boundedBytes(oldMetadata, 100_000)).toString("utf8"),
+            { maxAliasCount: 0, uniqueKeys: true, schema: "core" },
+          ),
+        );
+        if (JSON.stringify(current) !== JSON.stringify(transfer.before))
+          throw new Error("transfer-metadata-conflict");
+        await removeDurableFile(oldMetadata);
+      }
+      if (await exists(source)) await removeDurableFile(source);
+    }
+  }
+  if (transaction.kind === "migrate") {
+    const index = await safeLibraryPath(root, "media.jsonl");
+    const archive = await safeLibraryPath(root, "media.jsonl.migrated");
+    if (await exists(index)) {
+      const bytes = await boundedBytes(index, 16_000_000);
+      if (digest(bytes) !== transaction.indexDigest)
+        throw new Error("legacy-index-changed");
+      await writeDurableFileIfAbsent(archive, bytes);
+      if (
+        digest(await boundedBytes(archive, 16_000_000)) !==
+        transaction.indexDigest
+      )
+        throw new Error("legacy-archive-conflict");
+      await removeDurableFile(index);
+    }
+  }
+  await removeDurableFile(journal);
+}
+function decodeTransaction(value: unknown): LibraryTransaction {
+  const transaction = object(value);
+  exact(transaction, ["version", "kind", "indexDigest", "transfers"]);
+  const kind = transaction["kind"];
+  const indexDigest = transaction["indexDigest"];
+  const transfers = transaction["transfers"];
+  if (
+    transaction["version"] !== 1 ||
+    (kind !== "migrate" && kind !== "rename") ||
+    (kind === "migrate"
+      ? typeof indexDigest !== "string" || !/^[a-f0-9]{64}$/u.test(indexDigest)
+      : indexDigest !== null) ||
+    !Array.isArray(transfers) ||
+    transfers.length > 10_000 ||
+    (kind === "rename" && transfers.length !== 1)
+  )
+    throw new Error("invalid-library-transaction");
+  const ids = new Set<string>(),
+    assets = new Set<string>();
+  let bytes = 0;
+  for (const item of transfers) {
+    const transfer = object(item);
+    exact(transfer, ["source", "digest", "bytes", "before", "after"]);
+    const after = decodeLibraryMetadata(transfer["after"]);
+    const source = transfer["source"];
+    const hash = transfer["digest"];
+    const size = transfer["bytes"];
+    if (
+      typeof source !== "string" ||
+      !safeRelativeImage(source) ||
+      !safeRelativeImage(after.asset) ||
+      typeof hash !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(hash) ||
+      typeof size !== "number" ||
+      !Number.isSafeInteger(size) ||
+      size < 1 ||
+      size > 25_000_000 ||
+      ids.has(after.id) ||
+      assets.has(after.asset)
+    )
+      throw new Error("invalid-library-transfer");
+    if (kind === "rename") {
+      const before = decodeLibraryMetadata(transfer["before"]);
+      if (
+        source !== before.asset ||
+        source === after.asset ||
+        before.id !== after.id ||
+        after.revision !== before.revision + 1 ||
+        JSON.stringify({
+          ...before,
+          asset: after.asset,
+          revision: after.revision,
+          prepared: null,
+        }) !== JSON.stringify(after)
+      )
+        throw new Error("invalid-library-transfer");
+    } else if (
+      transfer["before"] !== null ||
+      after.schemaVersion !== 2 ||
+      after.legacy?.sourcePath !== source ||
+      after.legacy.indexDigest !== indexDigest
+    )
+      throw new Error("invalid-library-transfer");
+    bytes += size;
+    if (bytes > 256_000_000) throw new Error("library-transfer-byte-limit");
+    ids.add(after.id);
+    assets.add(after.asset);
+  }
+  return value as LibraryTransaction;
+}
+export async function boundedBytes(path: string, limit: number) {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > limit)
+      throw new Error("invalid-or-oversized-library-file");
+    const buffer = Buffer.alloc(stat.size + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        offset,
+        buffer.length - offset,
+        null,
+      );
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset !== stat.size) throw new Error("library-file-changed");
+    return buffer.subarray(0, offset);
+  } finally {
+    await handle.close();
+  }
+}
+export function digest(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+export async function exists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isMissing(error)) return false;
+    throw error;
+  }
 }

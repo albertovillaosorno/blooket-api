@@ -152,8 +152,18 @@ media/              Default media root; selectable in local configuration
 
 For example, `photos/animals/My cat.gif` has metadata at
 `metadata/animals/My cat.gif.yaml`. Original names/descriptions remain intact;
-English enrichment records its source revision and verification status. Legacy
-library migration and user rename/move recovery remain pending.
+English enrichment records its source revision and verification status. Local
+filename/folder changes preserve IDs and bytes and use a recovery journal.
+
+When a previous `media.jsonl` exists in the selected library folder, use
+**Import the previous library**. Migration preserves original files, archives
+the exact index as `media.jsonl.migrated`, and creates mirrored YAML. Migrated
+schema-2 records retain historical English verification and its source revision;
+an unspecified original language stays empty.
+
+Interrupted transfers resume under the library lock on startup. Changed sources
+or metadata stop recovery with the journal intact; repair the conflict before
+continuing. Never delete a pending journal to force the library open.
 
 Production Blooket passwords, tunnel tokens, and the salted owner-password
 verifier belong in macOS Keychain. The owner password stays separate from the
