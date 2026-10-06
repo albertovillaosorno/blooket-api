@@ -36,6 +36,7 @@ import {
   beginWriteAttempt,
   clearWriteAttempt,
   confirmWriteAttempt,
+  writeAttemptExecutionLockPath,
   type WriteAttemptFileMutationResult,
   type WriteAttemptRecord,
 } from
@@ -61,7 +62,7 @@ import {
   type PrepareNextBlooketWriteResult,
 } from "./execute-next.ts";
 import {
-  recoverPersistedBlooketWrite,
+  recoverPersistedBlooketWriteUnderLock,
   type RecoverPersistedBlooketWriteResult,
 } from "./recover-persisted.ts";
 import type { BlooketWriteExecutionPort } from
@@ -99,7 +100,6 @@ type RecoveryFailure = Extract<
 export interface BlooketWritePersistencePaths {
   readonly checkpoint: string;
   readonly attempt: string;
-  readonly executionLock: string;
 }
 
 export type ExecutePersistedBlooketWriteResult =
@@ -183,7 +183,9 @@ export async function executePersistedBlooketWrite(
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
 ): Promise<ExecutePersistedBlooketWriteResult> {
-  const acquired = await tryAcquireFileLock(paths.executionLock);
+  const acquired = await tryAcquireFileLock(
+    writeAttemptExecutionLockPath(paths.attempt),
+  );
   if (!acquired.ok) {
     return {
       ok: false,
@@ -197,6 +199,7 @@ export async function executePersistedBlooketWrite(
   }
 
   let result: ExecutePersistedBlooketWriteResult;
+  let threw = false;
   let unexpected: unknown;
   try {
     result = await executePersistedBlooketWriteLocked(
@@ -207,6 +210,7 @@ export async function executePersistedBlooketWrite(
       writes,
     );
   } catch (error: unknown) {
+    threw = true;
     unexpected = error;
     result = {
       ok: false,
@@ -225,7 +229,7 @@ export async function executePersistedBlooketWrite(
     };
   }
 
-  if (unexpected !== undefined) {
+  if (threw) {
     throw unexpected;
   }
   return result;
@@ -238,7 +242,7 @@ async function executePersistedBlooketWriteLocked(
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
 ): Promise<ExecutePersistedBlooketWriteResult> {
-  const recovery = await recoverPersistedBlooketWrite(
+  const recovery = await recoverPersistedBlooketWriteUnderLock(
     paths.checkpoint,
     paths.attempt,
     plan,

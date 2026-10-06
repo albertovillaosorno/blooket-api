@@ -30,9 +30,12 @@
 // - Defaults:
 //   - Missing journals permit normal execution from the loaded checkpoint.
 //
+import { tryAcquireFileLock } from
+  "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import {
   clearWriteAttempt,
   loadWriteAttemptFile,
+  writeAttemptExecutionLockPath,
   type WriteAttemptFileMutationResult,
   type WriteAttemptRecord,
 } from
@@ -102,9 +105,77 @@ export type RecoverPersistedBlooketWriteResult =
         { readonly ok: true }
       >;
       readonly checkpoint: BlooketWriteCheckpoint;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "execution-lock";
+      readonly code:
+        | "write-execution-locked"
+        | "write-execution-lock-unsafe"
+        | "write-execution-lock-failed";
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "execution-lock-release";
+      readonly code: "write-execution-lock-release-failed";
     };
 
 export async function recoverPersistedBlooketWrite(
+  checkpointPath: string,
+  attemptPath: string,
+  plan: BlooketWritePlan,
+): Promise<RecoverPersistedBlooketWriteResult> {
+  const acquired = await tryAcquireFileLock(
+    writeAttemptExecutionLockPath(attemptPath),
+  );
+  if (!acquired.ok) {
+    return {
+      ok: false,
+      stage: "execution-lock",
+      code: acquired.reason === "busy"
+        ? "write-execution-locked"
+        : acquired.reason === "unsafe"
+          ? "write-execution-lock-unsafe"
+          : "write-execution-lock-failed",
+    };
+  }
+
+  let result: RecoverPersistedBlooketWriteResult;
+  let threw = false;
+  let unexpected: unknown;
+  try {
+    result = await recoverPersistedBlooketWriteUnderLock(
+      checkpointPath,
+      attemptPath,
+      plan,
+    );
+  } catch (error: unknown) {
+    threw = true;
+    unexpected = error;
+    result = {
+      ok: false,
+      stage: "execution-lock",
+      code: "write-execution-lock-failed",
+    };
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return {
+      ok: false,
+      stage: "execution-lock-release",
+      code: "write-execution-lock-release-failed",
+    };
+  }
+  if (threw) {
+    throw unexpected;
+  }
+  return result;
+}
+
+// Caller must hold the write-attempt execution lock.
+export async function recoverPersistedBlooketWriteUnderLock(
   checkpointPath: string,
   attemptPath: string,
   plan: BlooketWritePlan,

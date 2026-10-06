@@ -143,7 +143,6 @@ function persistence(path: string) {
   return {
     checkpoint: path,
     attempt: path + ".attempt",
-    executionLock: path + ".execution.lock",
   };
 }
 

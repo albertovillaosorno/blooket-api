@@ -47,8 +47,11 @@ import {
   beginWriteAttempt,
   confirmWriteAttempt,
   loadWriteAttemptFile,
+  writeAttemptExecutionLockPath,
 } from
   "../../../../src/platforms/write-attempt-files/adapter-outbound/file.ts";
+import { tryAcquireFileLock } from
+  "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 import type { BlooketWritePlan } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
 
@@ -242,5 +245,47 @@ test("inconsistent attempt progress requires reconciliation", async () => {
     if (loaded.ok) {
       assert.equal(loaded.kind, "record");
     }
+  });
+});
+
+test("standalone recovery uses the shared execution lock", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const value = paths(directory);
+    const acquired = await tryAcquireFileLock(
+      writeAttemptExecutionLockPath(value.attempt),
+    );
+    assert.equal(acquired.ok, true);
+    if (!acquired.ok) {
+      return;
+    }
+
+    const result = await recoverPersistedBlooketWrite(
+      value.checkpoint,
+      value.attempt,
+      plan,
+    );
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "execution-lock",
+      code: "write-execution-locked",
+    });
+
+    await acquired.lock.release();
+    assert.deepEqual(
+      await recoverPersistedBlooketWrite(
+        value.checkpoint,
+        value.attempt,
+        plan,
+      ),
+      {
+        ok: true,
+        kind: "ready",
+        checkpoint: {
+          schemaVersion: 1,
+          planId: plan.planId,
+          nextOperationIndex: 0,
+        },
+      },
+    );
   });
 });

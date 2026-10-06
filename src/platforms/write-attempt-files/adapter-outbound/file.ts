@@ -54,6 +54,10 @@ import {
 
 export const WRITE_ATTEMPT_VERSION = 1 as const;
 
+export function writeAttemptExecutionLockPath(path: string): string {
+  return path + ".lock";
+}
+
 export interface WriteAttemptRecord {
   readonly schemaVersion: typeof WRITE_ATTEMPT_VERSION;
   readonly planId: string;
