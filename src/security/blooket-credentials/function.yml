@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-credentials
+  name: blooket-credentials
+  path: src/security/blooket-credentials
+classification:
+  repository: blooket-api
+  domain: security
+architecture:
+  kind: domain
