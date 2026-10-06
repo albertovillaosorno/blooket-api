@@ -33,11 +33,6 @@ those credentials to higher transports.
 Implement health/session state, set listing, set retrieval, and capability
 inspection before writes.
 
-### TODO - Implement validated write plans
-
-Lower only fully validated project/question documents into explicit idempotent
-Blooket write plans with operation identities and resumable progress.
-
 ### TODO - Implement create and edit operations
 
 Create and update sets and questions through the Blooket adapter, with bounded

@@ -220,8 +220,11 @@ layers:
 8. **Cross-field semantics** — mutually exclusive modes, impossible correct
    answer indexes, invalid True/False randomization policies, duplicate stable
    IDs, and other contradictions are rejected before side effects.
-9. **Write plan** — validated documents are lowered into an explicit write plan.
-   The Blooket adapter receives the plan, never raw LLM JSON.
+9. **Write plan** — decoded bundles, resolved media, and verified account
+   capabilities are lowered into an explicit remote-neutral write plan. Plan and
+   operation IDs are deterministic from execution-relevant desired state, and a
+   versioned sequential checkpoint resumes only against the exact plan. The
+   Blooket adapter receives the plan, never raw LLM JSON.
 
 Current official Blooket documentation describes two question types: Multiple
 Choice and Typing Answer. Multiple Choice currently requires 2–4 answer options
