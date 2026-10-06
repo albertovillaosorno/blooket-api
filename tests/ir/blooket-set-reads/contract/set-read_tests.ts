@@ -110,6 +110,21 @@ test("set details accept only verified metadata fields", () => {
   });
 });
 
+test("set details allow an empty observed description", () => {
+  const result = decodeBlooketSetDetail({
+    schemaVersion: 1,
+    id: "remote-a",
+    title: "Fractions",
+    description: "",
+    visibility: "private",
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.description, "");
+  }
+});
+
 test("set details reject invented fields and visibility values", () => {
   const result = decodeBlooketSetDetail({
     schemaVersion: 1,

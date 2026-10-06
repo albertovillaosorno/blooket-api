@@ -12,7 +12,8 @@
 //   - Minimal versioned runtime contracts for observed Blooket set
 //     metadata.
 // - Must-Not:
-//   - Guess remote ID grammar, question payloads, cover shapes, or extra fields.
+//   - Guess remote ID grammar, question payloads, cover shapes, or extra
+//     fields.
 // - Allows:
 //   - Inputs: Untrusted set-list and set-detail candidates.
 //   - Outputs: Exact decoded metadata or structured validation failures.
@@ -177,7 +178,7 @@ export function decodeBlooketSetDetail(
   validateVersion(value["schemaVersion"], "$", issues);
   const id = requiredString(value["id"], "$.id", issues);
   const title = requiredString(value["title"], "$.title", issues);
-  const description = requiredString(
+  const description = requiredStringValue(
     value["description"],
     "$.description",
     issues,
@@ -213,6 +214,22 @@ export function decodeBlooketSetDetail(
       visibility,
     },
   };
+}
+
+function requiredStringValue(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+  issues.push({
+    path,
+    code: "expected-string",
+    message: "Expected a string.",
+  });
+  return undefined;
 }
 
 function validateVersion(
