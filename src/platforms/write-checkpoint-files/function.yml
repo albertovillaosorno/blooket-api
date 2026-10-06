@@ -1,0 +1,9 @@
+identity:
+  id: function:write-checkpoint-files
+  name: write-checkpoint-files
+  path: src/platforms/write-checkpoint-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
