@@ -216,44 +216,42 @@ installation. No VM or Metal requirement is part of the initial plan.
 
 ## Packages and releases
 
-CalVer tags use three-month quarters: `vYYYY.Q.PATCH`, with `Q` from 1 through
-4. For example, `v2026.4.0` is the first release in October–December 2026;
-`v2026.4.1` is its next revision. Tags trigger GitHub Actions; creating a tag
-does not itself publish a release.
+Remote CI is deliberately opt-in so ordinary pushes and pull requests do not
+consume hosted-runner time. Local TypeScript and tests are the default
+development gate.
 
-**A release is published only after all required CI/CD checks and native package
-tests pass for that exact tagged commit.** Failure, cancellation, or a skipped
-required job blocks publication. Release verification reruns the same TypeScript
-and test gate, then adds native package checks before its publishing job can
-run.
-There are no ignored failures or unconditional publication steps.
+Push a tag matching `ci-*` only when remote native validation is useful. That
+single CI workflow runs three native targets in parallel: macOS ARM64, macOS
+Intel, and Linux x64. Each target installs dependencies, runs strict TypeScript
+and the full test suite, assembles its native archive, executes the extracted
+package smoke test, and uploads that verified archive as a workflow artifact.
+A CI tag never creates a GitHub Release.
 
-CI on branches and pull requests checks only strict TypeScript and the full test
-suite. Release verification separately builds and extracts packages on native
-Mac ARM64, Mac Intel, and Linux x64 runners. Package checks execute the
-delivered launcher and CLI, prepare and download synthetic media through the
-native worker,
-reject a foreign-origin shutdown, reuse the running service, and verify owned
-shutdown. They use disposable data without development credentials or Blooket
-mutations.
+CalVer release tags use three-month quarters: `vYYYY.Q.PATCH`, with `Q` from 1
+through 4. For example, `v2026.4.0` is the first release in
+October–December 2026. A release tag starts a strictly ordered pipeline:
 
-macOS release checks additionally require the packaged Safari extension and
-successful code-signature and Gatekeeper assessment. These checks are mandatory;
-the current missing Safari/signing integration blocks a release. Runner tests
-do not replace acceptance on the recipient's Mac or with ChatGPT.
+1. the tag must pass quarterly CalVer validation and the repository variable
+   `RELEASE_ENABLED` must equal `true`;
+2. the same reusable CI workflow must pass for that exact tagged commit;
+3. release-mode macOS verification additionally requires the Safari extension,
+   valid code signing, and Gatekeeper assessment;
+4. only then may the release job download the CI artifacts and publish them.
 
-**There is no automated changelog or generated release notes.** Before tagging,
-write the release notes manually in `docs/releases/<tag>.md`; a missing or empty
-file blocks the release. Actions creates a draft only after verification,
-uploads the tested archives and checksums, and publishes after every upload
-succeeds. An upload failure leaves an unpublished draft. Re-running the same
-tag may resume that draft and replace its assets; an already published release
-is never reused by this workflow.
+Release itself does not compile, run tests, build packages, or rerun package
+verification. It publishes the macOS ARM64 and Intel ZIP files already produced
+by CI. Linux x64 is always built and tested; include its tarball only when
+`RELEASE_INCLUDE_LINUX=true`.
 
-Mac ARM64 and Intel archives are the default release assets. Linux x64 is always
-built and tested; include it in releases only by setting the repository variable
-`RELEASE_INCLUDE_LINUX` to `true`. The Linux test requirement remains in place
-when its archive is omitted from the release.
+There is no automated changelog and no repository release-notes file is
+required. The workflow creates the release with empty notes; write the human
+release notes manually in the GitHub Release UI afterward. It never calls
+GitHub's generated-notes feature.
+
+Normal branch pushes do not run GitHub Actions. Use local validation while
+developing and reserve a `ci-*` tag for deliberate native-runner validation.
+A `vYYYY.Q.PATCH` release tag invokes CI itself, so do not add a second CI tag
+for the same release commit.
 
 Jig is a local repository validator and is not part of GitHub Actions. Apple
 signing and Safari build setup remain tracked in task 14.

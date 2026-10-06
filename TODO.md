@@ -682,27 +682,32 @@ default release assets, with optional Linux delivery. Do not claim a download
 button silently installs an extension.
 
 The native assembler and quarterly tag validator now exist. Linux delivery has
-passed the extracted-package smoke check locally. GitHub Actions verifies source
-and all three native packages for the same commit; release publication depends
-on those jobs succeeding. Failed, canceled, or skipped required checks must
-block publication, including Safari/signing prerequisites.
+passed the extracted-package smoke check locally. Hosted CI is deliberately
+opt-in: ordinary branch pushes and pull requests do not run it. A `ci-*` tag
+runs strict TypeScript, the full portable suite, native package assembly, and
+extracted-package smoke checks on macOS ARM64, macOS Intel, and Linux x64 in
+parallel.
 
-Keep this dependency
-in the workflow rather than only in documentation.
+A quarterly `vYYYY.Q.PATCH` tag runs the release pipeline in strict order. First
+the tag and repository variable `RELEASE_ENABLED=true` are required. Next the
+same reusable CI workflow validates that exact tagged commit with release mode
+enabled; macOS additionally requires the packaged Safari extension, trusted
+code signing, and Gatekeeper assessment. Only a green CI result allows the
+publish job to download those already-tested artifacts and create the release.
 
-There is no automated changelog. The maintainer writes
-`docs/releases/vYYYY.Q.PATCH.md` before tagging; missing or empty notes block
-release. A failed asset upload leaves a draft that the same tag can resume;
-published releases are not reused.
+Release itself does not compile, test, package, or reverify.
 
-macOS ARM64 and Intel are required assets. Linux is always tested and is
-included only with `RELEASE_INCLUDE_LINUX=true`.
+There is no automated changelog and no committed release-notes file. The
+workflow creates empty release notes; the maintainer writes the human notes
+manually in the GitHub Release UI. macOS ARM64 and Intel ZIPs are required
+assets. Linux is always built and tested and is included only with
+`RELEASE_INCLUDE_LINUX=true`.
 
 **Release blockers:** implement and compile the real shared Safari extension;
 configure Apple signing and notarization; then run the release workflow and
-native acceptance. The release
-package check currently rejects missing Safari or untrusted signing. No workflow
-run, tag, push, signing success, or macOS acceptance is claimed from Fedora.
+native acceptance. Release-mode CI currently rejects missing Safari or
+untrusted signing. No workflow run, tag, push, signing success, or macOS
+acceptance is claimed from Fedora.
 
 Confirm the recipient's OS in About This Mac before installation: the pinned
 Node 24 runtime requires macOS 13.5 or later. Bundle runtime,

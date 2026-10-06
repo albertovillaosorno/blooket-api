@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  tag:
+  gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -22,84 +22,40 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
-      - name: Validate quarterly CalVer and manual release notes
+      - name: Require release flag and valid quarterly CalVer
         env:
+          RELEASE_ENABLED: ${{ vars.RELEASE_ENABLED }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          node src/platforms/distribution/adapter-inbound/release-tag.ts \
-            "$RELEASE_TAG"
-          test -s "docs/releases/$RELEASE_TAG.md"
-  ci:
-    needs: tag
-    uses: ./.github/workflows/ci.yml
-  packages:
-    needs: [tag, ci]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: darwin-arm64
-            runner: macos-latest
-          - target: darwin-x64
-            runner: macos-26-intel
-          - target: linux-x64
-            runner: ubuntu-latest
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-      - run: pnpm install --frozen-lockfile
-      - run: npm run check
-      - run: npm test
-      - name: Assemble native package
-        env:
-          PACKAGE_TARGET: ${{ matrix.target }}
-        run: npm run package -- "$PACKAGE_TARGET"
-      - name: Verify extracted release package
-        env:
-          PACKAGE_TARGET: ${{ matrix.target }}
         shell: bash
         run: |
-          if [[ "$PACKAGE_TARGET" == darwin-* ]]; then
-            npm run package:verify -- "$PACKAGE_TARGET" --release
-          else
-            npm run package:verify -- "$PACKAGE_TARGET"
-          fi
-      - uses: actions/upload-artifact@v7
-        with:
-          name: package-${{ matrix.target }}
-          path: |
-            .temp/distributions/${{ matrix.target }}.zip
-            .temp/distributions/${{ matrix.target }}.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-          include-hidden-files: true
+          set -euo pipefail
+          [[ "$RELEASE_ENABLED" == true ]]
+          node src/platforms/distribution/adapter-inbound/release-tag.ts \
+            "$RELEASE_TAG"
+
+  ci:
+    needs: gate
+    uses: ./.github/workflows/ci.yml
+    with:
+      release: true
+
   publish:
-    needs: [tag, ci, packages]
+    needs: [gate, ci]
     if: >-
-      needs.tag.result == 'success' &&
-      needs.ci.result == 'success' &&
-      needs.packages.result == 'success'
+      needs.gate.result == 'success' &&
+      needs.ci.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: write
     steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           pattern: package-*
           path: .temp/release-assets
           merge-multiple: true
-      - name: Publish only verified assets with manually written notes
+      - name: Publish verified native archives
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -113,21 +69,5 @@ jobs:
             assets+=(.temp/release-assets/linux-x64.tar.gz)
           fi
           for asset in "${assets[@]}"; do test -s "$asset"; done
-          for asset in "${assets[@]}"; do
-            digest=$(sha256sum "$asset")
-            printf '%s  %s\n' "${digest%% *}" "${asset##*/}"
-          done > .temp/release-assets/SHA256SUMS
-          if draft=$(gh release view "$RELEASE_TAG" \
-            --json isDraft --jq .isDraft 2>/dev/null); then
-            [[ "$draft" == true ]]
-            gh release edit "$RELEASE_TAG" --draft \
-              --title "$RELEASE_TAG" \
-              --notes-file "docs/releases/$RELEASE_TAG.md"
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --draft \
-              --title "$RELEASE_TAG" \
-              --notes-file "docs/releases/$RELEASE_TAG.md"
-          fi
-          gh release upload "$RELEASE_TAG" "${assets[@]}" \
-            .temp/release-assets/SHA256SUMS --clobber
-          gh release edit "$RELEASE_TAG" --draft=false
+          gh release create "$RELEASE_TAG" "${assets[@]}" \
+            --verify-tag --title "$RELEASE_TAG" --notes ""
