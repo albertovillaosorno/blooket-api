@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-write-plans
+  name: blooket-write-plans
+  path: src/projects/blooket-write-plans
+classification:
+  repository: blooket-api
+  domain: projects
+architecture:
+  kind: domain
