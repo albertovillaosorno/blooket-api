@@ -152,7 +152,10 @@ export async function deleteHostSecret(
     if (!result.ok) {
       return commandFailure(result);
     }
-    return result.exitCode === 0
+    const missing = result.exitCode === 1
+      && result.stdout.byteLength === 0
+      && result.stderrBytes === 0;
+    return result.exitCode === 0 || missing
       ? { ok: true }
       : { ok: false, code: "host-secret-store-failed" };
   }

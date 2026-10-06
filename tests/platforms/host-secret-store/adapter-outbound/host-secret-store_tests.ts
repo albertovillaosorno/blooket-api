@@ -144,6 +144,17 @@ test("Linux stores encoded secrets only through stdin", async () => {
   );
 });
 
+test("Linux missing deletes are idempotent", async () => {
+  const fake = fakeRunner([result(1)]);
+  assert.deepEqual(
+    await deleteHostSecret("blooket-password", {
+      platform: "linux",
+      runner: fake.run,
+    }),
+    { ok: true },
+  );
+});
+
 test("Linux distinguishes a clean missing lookup from errors", async () => {
   const missing = fakeRunner([result(1)]);
   assert.deepEqual(
