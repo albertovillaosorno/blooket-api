@@ -1,0 +1,199 @@
+// Copyright:
+//   - Copyright © 2026 Alberto Villa Osorno.
+// SPDX-License-Identifier:
+//   - MIT
+// Confidential:
+//   - false
+// License-File:
+//   - LICENSE-MIT
+//
+// Boundary-Contract:
+// - Owns:
+//   - Unit tests for canonical-write to browser-surface adaptation.
+// - Must-Not:
+//   - Invoke a real browser, Blooket, filesystem, or retry loop.
+// - Allows:
+//   - Inputs: Fixed operations and deterministic browser-surface doubles.
+//   - Outputs: Exact submissions, receipts, stops, and stable failures.
+//   - Side effects: In-memory call recording only.
+// - Split-When:
+//   - Create/question browser surfaces gain independent adapters.
+// - Merge-When:
+//   - The write execution adapter is removed.
+// - Summary:
+//   - Proves only observed browser success can become a durable write receipt.
+// - Description:
+//   - Malformed Create Set IDs and surface exceptions fail closed.
+// - Usage:
+//   - Run through the repository Node test command.
+// - Defaults:
+//   - No confirmation is synthesized from target or operation data.
+//
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { blooketBrowserWriteExecutionPort } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/application/browser-write-adapter.ts";
+import type { BlooketBrowserWriteSurfacePort } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/contract/browser-write-surface.ts";
+import type { BlooketWriteOperation } from
+  "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
+
+const setOperation: BlooketWriteOperation = {
+  operationId: "plan:test:set",
+  kind: "set",
+  title: "Astronomy",
+  description: "Review",
+  visibility: "private",
+  coverMediaId: null,
+};
+
+const questionOperation: BlooketWriteOperation = {
+  operationId: "plan:test:q:0",
+  kind: "question",
+  localQuestionId: "q1",
+  questionNumber: 1,
+  question: {
+    type: "typing-answer",
+    prompt: "Type sun.",
+    timeLimitSeconds: 10,
+    imageMediaId: null,
+    matchMode: "exact",
+    answer: "sun",
+  },
+};
+
+test(
+  "confirmed Create Set success becomes an exact durable receipt",
+  async () => {
+  const calls: unknown[] = [];
+  const surface: BlooketBrowserWriteSurfacePort = {
+    createSet: async (submission) => {
+      calls.push(submission);
+      return { ok: true, remoteSetId: "remote-set-1" };
+    },
+    addQuestion: async () => ({ ok: true }),
+  };
+  const writes = blooketBrowserWriteExecutionPort(surface);
+
+  assert.deepEqual(
+    await writes.execute(setOperation, { remoteSetId: null }),
+    {
+      ok: true,
+      receipt: {
+        kind: "set-created",
+        remoteSetId: "remote-set-1",
+      },
+    },
+  );
+  assert.equal(calls.length, 1);
+  },
+);
+
+test(
+  "confirmed Add Question success never invents a question receipt",
+  async () => {
+  const calls: unknown[] = [];
+  const surface: BlooketBrowserWriteSurfacePort = {
+    createSet: async () => ({ ok: true, remoteSetId: "unused" }),
+    addQuestion: async (submission) => {
+      calls.push(submission);
+      return { ok: true };
+    },
+  };
+  const writes = blooketBrowserWriteExecutionPort(surface);
+
+  assert.deepEqual(
+    await writes.execute(
+      questionOperation,
+      { remoteSetId: "remote-set-1" },
+    ),
+    { ok: true, receipt: null },
+  );
+  assert.deepEqual(
+    calls,
+    [{
+      schemaVersion: 1,
+      kind: "add-question",
+      remoteSetId: "remote-set-1",
+      number: 1,
+      question: "Type sun.",
+      answers: [{ kind: "text", text: "sun", correct: true }],
+      image: null,
+      audio: "",
+      qType: "typing",
+      random: true,
+      answerTypes: ["exactly"],
+      timeLimit: 10,
+    }],
+  );
+  },
+);
+
+test("navigation stops pass through without becoming success", async () => {
+  const surface: BlooketBrowserWriteSurfacePort = {
+    createSet: async () => ({
+      ok: false,
+      kind: "navigation",
+      state: "security-challenge",
+    }),
+    addQuestion: async () => ({ ok: true }),
+  };
+  const writes = blooketBrowserWriteExecutionPort(surface);
+
+  assert.deepEqual(
+    await writes.execute(setOperation, { remoteSetId: null }),
+    {
+      ok: false,
+      kind: "navigation",
+      state: "security-challenge",
+    },
+  );
+});
+
+test(
+  "malformed success data exceptions and bad targets fail closed",
+  async () => {
+  const malformed = blooketBrowserWriteExecutionPort({
+    createSet: async () => ({ ok: true, remoteSetId: "" }),
+    addQuestion: async () => ({ ok: true }),
+  });
+  assert.deepEqual(
+    await malformed.execute(setOperation, { remoteSetId: null }),
+    {
+      ok: false,
+      kind: "browser",
+      code: "blooket-browser-failed",
+    },
+  );
+
+  const throwing = blooketBrowserWriteExecutionPort({
+    createSet: async () => {
+      throw new Error("fixture failure");
+    },
+    addQuestion: async () => ({ ok: true }),
+  });
+  assert.deepEqual(
+    await throwing.execute(setOperation, { remoteSetId: null }),
+    {
+      ok: false,
+      kind: "browser",
+      code: "blooket-browser-failed",
+    },
+  );
+
+  assert.deepEqual(
+    await malformed.execute(
+      questionOperation,
+      { remoteSetId: null },
+    ),
+    {
+      ok: false,
+      kind: "browser",
+      code: "blooket-browser-failed",
+    },
+  );
+  },
+);
