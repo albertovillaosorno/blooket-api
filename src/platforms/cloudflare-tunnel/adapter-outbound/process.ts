@@ -30,18 +30,30 @@
 //   - Unsupported or invalid requests fail closed.
 //
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+function connectorExecutable() {
+  const bundled = fileURLToPath(
+    new URL("../../../../../runtime/cloudflared", import.meta.url),
+  );
+  return existsSync(bundled) ? bundled : "cloudflared";
+}
 
 export function startCloudflareTunnel(
   token: string,
   update: (state: string) => void,
-  executable = "cloudflared",
+  executable = connectorExecutable(),
 ) {
   let child: ChildProcess | undefined;
   let stopped = false;
+  let closed = false;
+  let failure: string | undefined;
   update("starting");
   const timer = setTimeout(() => {
     if (!stopped) {
-      update("connection-timeout");
+      failure = "connection-timeout";
+      update(failure);
       child?.kill("SIGTERM");
     }
   }, 30_000);
@@ -55,29 +67,33 @@ export function startCloudflareTunnel(
     stdio: ["ignore", "ignore", "pipe"],
   });
   child.stderr?.on("data", (chunk: Buffer) => {
-    if (/Registered tunnel connection/u.test(chunk.toString("utf8"))) {
+    if (
+      !failure &&
+      !stopped &&
+      /Registered tunnel connection/u.test(chunk.toString("utf8"))
+    ) {
       clearTimeout(timer);
       update("connected");
     }
   });
   child.once("error", () => {
     clearTimeout(timer);
-    if (!stopped) update("cloudflared-unavailable");
+    failure = "cloudflared-unavailable";
+    if (!stopped) update(failure);
   });
   child.once("close", () => {
+    closed = true;
     clearTimeout(timer);
-    if (!stopped) update("offline");
+    if (!stopped) update(failure ?? "offline");
   });
   return {
     async stop(): Promise<void> {
       stopped = true;
       clearTimeout(timer);
-      if (!child || child.exitCode !== null || child.signalCode !== null)
-        return;
+      if (!child || closed) return;
       await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => {
           child?.kill("SIGKILL");
-          resolve();
         }, 3000);
         child!.once("close", () => {
           clearTimeout(timeout);

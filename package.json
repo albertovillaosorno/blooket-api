@@ -9,7 +9,10 @@
     "validate": "npm run check && npm run test && jig check --root .",
     "start": "node src/service/background-service/adapter-inbound/main.ts",
     "dev": "npm start -- --development",
-    "blooket": "node src/cli/executable/adapter-inbound/blooket.ts"
+    "blooket": "node src/cli/executable/adapter-inbound/blooket.ts",
+    "launch": "node src/service/desktop-launcher/adapter-inbound/launcher.ts",
+    "package": "node src/platforms/distribution/adapter-inbound/package.ts",
+    "package:verify": "npm run package -- --verify"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

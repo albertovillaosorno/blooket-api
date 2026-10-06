@@ -3,7 +3,9 @@
 The target is one teacher using a Mac: ChatGPT creates and changes quizzes, the
 browser UI manages settings and media, and the local service publishes to
 Blooket through authenticated MCP and the user's Cloudflare Tunnel. This is a
-working development prototype; publication and macOS delivery are incomplete.
+working development prototype; publication and native delivery are incomplete.
+The shared service must also have a Linux x64 package for developer testing.
+Prepare separate macOS ARM64 and Intel packages for the recipient.
 
 The numbered tasks below are the implementation order. Continue from the
 existing code and validated behavior, complete each task's acceptance checks,
@@ -168,11 +170,12 @@ lifecycle implementation remains task 13.
 Portable checks cover byte limits, partial host/filesystem failures, concurrent
 saves, library-root preservation, URL rejection, configured login, and actual
 port collisions. Strict TypeScript and browser-script syntax pass; all 493 tests
-pass. Chrome verified saving the dark theme and changing EN/ES without losing
+pass. Safari verified saving the dark theme and changing EN/ES without losing
 an unsaved synthetic email.
 
 **External blocker:** no recipient macOS host is available. Native Keychain
-read/write, folder selection, Safari appearance, and filesystem/port behavior
+read/write, folder selection, native Safari appearance, and filesystem/port
+behavior
 still require the actual Mac. Keep this task pending for those checks; continue
 independent authorization work in task 04 rather than claiming native coverage.
 
@@ -314,7 +317,7 @@ browser-script syntax pass; Jig retains only its external evidence gap.
 Native case/Unicode filesystem behavior and real skill/schema consumption remain
 unverified.
 
-Chrome subsequently passed a user rename and prepared export using
+Safari subsequently passed a user rename and prepared export using
 synthetic media. Its native migration confirmation stalled browser inspection;
 the complete visual migration workflow remains unverified. Continue independent
 editor work in task 06; keep client acceptance pending.
@@ -360,13 +363,13 @@ Changing export defaults must not overwrite existing individual recipes.
 The browser framing preview directs the teacher to the prepared file
 for final colors, compression, and GIF timing; it does not claim pixel parity.
 
-Chrome subsequently passed zoom buttons, keyboard pan, solid-background
+Safari subsequently passed zoom buttons, keyboard pan, solid-background
 selection, user filename/folder changes, preparation, and download readiness
 with synthetic media. Editing and rename controls freeze during preparation to
 prevent stale asynchronous results replacing a newer image or recipe. The
 prepared file was below the byte ceiling; this was not a real Blooket upload.
 
-**External blocker:** Safari interaction/accessibility, full preview/export
+**Pending:** Safari accessibility, full preview/export
 geometry, GIF preview, color picking, and responsive visual acceptance remain
 unverified. Continue independent export work in task 07 and retain these
 acceptance checks.
@@ -411,7 +414,7 @@ All 533 portable tests, strict TypeScript, and browser-script syntax passed on
 2026-10-06 after these changes. Jig reports only the external
 `scalability.repository-graph` evidence gap; repository checks were not
 weakened.
-Chrome editor acceptance used synthetic local data, without changing Blooket.
+Safari editor acceptance used synthetic local data, without changing Blooket.
 
 **Pending:** native macOS worker/package behavior and accepted resource budgets
 need a real target host. Native memory is bounded by admitted work, not an OS
@@ -610,22 +613,75 @@ executable/token, sleep/offline behavior, and process cleanup.
 Add visible stop/start and optional, reversible launch-at-login through ordinary
 macOS facilities.
 
+On 2026-10-06, managed startup acquired a shared service lock and published a
+private instance record. The launcher checks the live instance before reuse,
+supports browser opening, status, and CSRF-protected stop, and releases the lock
+on shutdown. Linux archive verification passed launch/reuse, native preparation,
+the actual packaged CLI, foreign-origin rejection, and owned shutdown with
+synthetic data. The real development service and `.env` were not changed.
+
+The packaged Cloudflare connector is resolved beside the runtime; missing-client
+and connection-timeout status survive process close. Shutdown still closes the
+gateway, local server, runtime record, and service lock when a connector stop
+fails. Linux child processes keep only required host-session hints instead of
+inheriting development credentials, including when opening the browser.
+Launch-at-login and the recipient's native-host lifecycle remain pending.
+
 Complete when first-use runs once, manual rerun repairs its status, start/stop
 and opt-in login launch are visible/reversible, and disablement or shutdown
 cleans up the gateway/tunnel. Sleep or reconnection must never replay an
 ambiguous Blooket write.
 
-### TODO 14 - Package the recipient's macOS architecture
+### TODO 14 - Package Linux testing and both macOS architectures
 
-Confirm chip and OS in About This Mac before final packaging; ARM64 is
-provisional and x86-64 is needed only for an Intel recipient. Bundle runtime,
+The user expanded delivery on 2026-10-06: produce a Linux x64 package for local
+development testing plus separate macOS ARM64 and Intel application bundles.
+Keep shared behavior identical and label native Mac acceptance unverified.
+
+The Mac app should be draggable to Applications and open the local workspace
+on launch, with visible extension setup and service controls. Browser extension
+installation requires browser consent. The user restored Safari packaging via
+GitHub Actions macOS runners on 2026-10-06.
+
+Release tags use three-month
+quarters: vYYYY.Q.PATCH (for example v2026.4.0); macOS ARM64 and Intel are the
+default release assets, with optional Linux delivery. Do not claim a download
+button silently installs an extension.
+
+The native assembler and quarterly tag validator now exist. Linux delivery has
+passed the extracted-package smoke check locally. GitHub Actions verifies source
+and all three native packages for the same commit; release publication depends
+on those jobs succeeding. Failed, canceled, or skipped required checks must
+block publication, including Safari/signing prerequisites.
+
+Keep this dependency
+in the workflow rather than only in documentation.
+
+There is no automated changelog. The maintainer writes
+`docs/releases/vYYYY.Q.PATCH.md` before tagging; missing or empty notes block
+release. A failed asset upload leaves a draft that the same tag can resume;
+published releases are not reused.
+
+macOS ARM64 and Intel are required assets. Linux is always tested and is
+included only with `RELEASE_INCLUDE_LINUX=true`.
+
+**Release blockers:** configure the reviewed Jig download and SHA-256 repository
+variables and resolve its external evidence gap without weakening validation;
+implement and compile the real shared Safari extension; configure Apple signing
+and notarization; then run the workflow and native acceptance. The release
+package check currently rejects missing Safari or untrusted signing. No workflow
+run, tag, push, signing success, or macOS acceptance is claimed from Fedora.
+
+Confirm the recipient's OS in About This Mac before installation: the pinned
+Node 24 runtime requires macOS 13.5 or later. Bundle runtime,
 UI, canonical CLI, native Sharp/libvips artifacts, and the selected cloudflared
 delivery method. Record actual signing/Gatekeeper status, third-party notices,
 install/update/uninstall behavior, and user-data retention.
 
 Complete when a package can be installed and started on the actual Mac, its
 first-use diagnostic reports real results, and the UI, Keychain, native media,
-browser session, and tunnel prerequisites work. Portable Fedora tests do not
+Safari browser session, and tunnel
+prerequisites work. Portable Fedora tests do not
 establish macOS compatibility.
 
 ### TODO 15 - Accept the complete teacher workflow
@@ -656,9 +712,9 @@ CLI. It used a synthetic client, not ChatGPT. Public UI/settings routes returned
 404 and unauthorized MCP returned 401; the test did not visit the callback or
 send its test code to another destination.
 
-The Chrome UI loaded, switched EN/ES configuration, and prepared a disposable
+The Safari UI loaded, switched EN/ES configuration, and prepared a disposable
 static-image edit with zoom and solid background. Preview/download worked.
-Import was exercised through the local API because the Chrome file chooser
+Import was exercised through the local API because the Safari file chooser
 lacked file URL permission; no browser security setting was changed.
 
 A private one-question quiz was created through the authorized Blooket UI and

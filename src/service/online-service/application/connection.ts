@@ -64,16 +64,35 @@ export function createOnlineConnection(
   let runningLocalPort: number | undefined;
   const verifyApproval = createOwnerApprovalGuard(secrets, dependencies.now);
   async function stopCurrent(): Promise<void> {
-    await tunnel?.stop();
+    let failure: unknown;
+    const cleanup = async (task: () => Promise<void>) => {
+      try {
+        await task();
+      } catch (error) {
+        failure ??= error;
+      }
+    };
+    const activeTunnel = tunnel;
     tunnel = undefined;
-    gateway?.revokeAll();
-    if (gateway)
-      await new Promise<void>((resolve) => {
-        gateway!.server.close(() => resolve());
-        gateway!.server.closeAllConnections();
-      });
+    await cleanup(async () => {
+      await activeTunnel?.stop();
+    });
+    const activeGateway = gateway;
     gateway = undefined;
+    if (activeGateway) {
+      activeGateway.revokeAll();
+      await cleanup(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            activeGateway.server.close((error) =>
+              error ? reject(error) : resolve(),
+            );
+            activeGateway.server.closeAllConnections();
+          }),
+      );
+    }
     state = "disabled";
+    if (failure) throw failure;
   }
   return {
     status: () => ({

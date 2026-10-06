@@ -1,0 +1,9 @@
+identity:
+  id: function:distribution
+  name: distribution
+  path: src/platforms/distribution
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

@@ -29,15 +29,12 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
-import { startBrowserService } from
-  "../../../api/browser-service/adapter-inbound/server.ts";
 import {
   loadPreferences,
   savePreferences,
   userDataRoot,
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
-import { createOnlineConnection } from
-  "../../online-service/application/connection.ts";
+import { startManagedBackgroundService } from "../application/runtime.ts";
 import { fileURLToPath } from "node:url";
 
 import { createHostSecretStore } from
@@ -69,20 +66,20 @@ if (process.argv.includes("--development")) {
     process.exit(1);
   }
 }
-const online = createOnlineConnection(root, secrets);
 try {
-  const service = await startBrowserService({ root, online, secrets });
-  await online.reload(service.port);
+  const service = await startManagedBackgroundService(root, secrets);
   process.stdout.write(service.origin + "\n");
+  process.send?.({
+    version: service.version,
+    pid: service.pid,
+    instance: service.instance,
+    origin: service.origin,
+  });
   for (const signal of ["SIGINT", "SIGTERM"] as const)
     process.once(signal, () => {
-      void online.stop().finally(() => {
-        service.server.close();
-        service.server.closeAllConnections();
-      });
+      void service.stop();
     });
 } catch {
-  await online.stop();
   process.stderr.write(
     "The local service could not start. Check its port " +
       "and saved configuration.\n",

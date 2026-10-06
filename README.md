@@ -9,8 +9,9 @@ files, credentials, media preparation, and execution. An optional Cloudflare
 Tunnel connects online AI clients to its authenticated MCP gateway.
 
 **This is a working development prototype. Automatic Blooket publication,
-macOS packaging, and acceptance with the recipient's ChatGPT account remain
-unfinished.** It is independent of Blooket and is neither affiliated with nor
+Safari integration, signed macOS delivery, and acceptance with the recipient's
+ChatGPT account remain unfinished.** It is independent of Blooket and is neither
+affiliated with nor
 endorsed by the platform.
 
 ## What works today
@@ -35,11 +36,15 @@ endorsed by the platform.
 Current MCP tools retrieve teacher instructions, search/read/enrich media, and
 list/read/write skills and drafts. Media search returns bounded pages and a
 continuation cursor. **Saving a draft does not publish a quiz.**
-A browser extension, native installer, and launch-at-login integration are
-roadmap work.
+The Linux package has passed local startup, native media preparation, the
+packaged CLI, repeated launch, and shutdown. The macOS bundle assembler exists;
+native Mac verification, browser extensions, signing, and launch-at-login
+remain roadmap work.
 
 See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
-cannot establish Safari, Keychain, or native macOS compatibility.
+cannot establish Keychain or native macOS compatibility. Chrome is the initial
+directly testable browser and extension target. Safari is packaged on a
+GitHub Actions macOS runner once its integration is implemented.
 
 ## Run the development workspace
 
@@ -204,9 +209,83 @@ CAPTCHAs, organization selection, unfamiliar login challenges, and unknown
 security states stop execution for human action. Normal interaction pacing is
 planned; challenge bypass and anti-bot evasion are outside the design.
 
-macOS is the sole product target. ARM64 is provisional until the recipient's
-chip and OS are confirmed. Linux runs portable development tests, but is not a
-binary release target. No VM or Metal requirement is part of the initial plan.
+macOS is the teacher product target, with ARM64 and Intel packages planned.
+Linux x64 delivery is required for developer testing of the shared service.
+The bundled Node 24 runtime requires macOS 13.5 or later; confirm the OS before
+installation. No VM or Metal requirement is part of the initial plan.
+
+## Packages and releases
+
+CalVer tags use three-month quarters: `vYYYY.Q.PATCH`, with `Q` from 1 through
+4. For example, `v2026.4.0` is the first release in October–December 2026;
+`v2026.4.1` is its next revision. Tags trigger GitHub Actions; creating a tag
+does not itself publish a release.
+
+**A release is published only after all required CI/CD checks and native package
+tests pass for that exact tagged commit.** Failure, cancellation, or a skipped
+required job blocks publication. The release workflow reuses the CI verification
+workflow, then requires successful results before its publishing job can run.
+There are no ignored failures or unconditional publication steps.
+
+CI checks strict TypeScript, the full test suite, browser-script syntax, and
+Jig.
+It also builds and extracts packages on native Mac ARM64, Mac Intel, and Linux
+x64 runners. Package checks execute the delivered launcher and CLI, prepare and
+download synthetic media through the native worker, reject a foreign-origin
+shutdown, reuse the running service, and verify owned shutdown. They use
+disposable data without development credentials or Blooket mutations.
+
+macOS release checks additionally require the packaged Safari extension and
+successful code-signature and Gatekeeper assessment. These checks are mandatory;
+the current missing Safari/signing integration blocks a release. Runner tests
+do not replace acceptance on the recipient's Mac or with ChatGPT.
+
+**There is no automated changelog or generated release notes.** Before tagging,
+write the release notes manually in `docs/releases/<tag>.md`; a missing or empty
+file blocks the release. Actions creates a draft only after verification,
+uploads the tested archives and checksums, and publishes after every upload
+succeeds. An upload failure leaves an unpublished draft. Re-running the same
+tag may resume that draft and replace its assets; an already published release
+is never reused by this workflow.
+
+Mac ARM64 and Intel archives are the default release assets. Linux x64 is always
+built and tested; include it in releases only by setting the repository variable
+`RELEASE_INCLUDE_LINUX` to `true`. The Linux test requirement remains in place
+when its archive is omitted from the release.
+
+Configure `CI_JIG_LINUX_URL` and `CI_JIG_LINUX_SHA256` as repository variables
+for the reviewed Linux Jig executable. CI downloads it over HTTPS and verifies
+its SHA-256 before execution. Missing configuration, a checksum mismatch, or a
+Jig failure blocks publication; the known external Jig evidence gap is not
+suppressed. Apple signing and Safari build setup remain tracked in task 14.
+
+To build and verify a local package on the matching host:
+
+```sh
+npm run package -- linux-x64
+npm run package:verify -- linux-x64
+```
+
+The other targets are `darwin-arm64` and `darwin-x64`. Outputs live under
+`.temp/distributions/`; assembly refuses to overwrite an existing target
+directory.
+
+Packages include their Node runtime, native Sharp/libvips libraries, and
+Cloudflare
+connector. They exclude `.env`, private references, and developer instructions.
+Distribution metadata records the source commit, dirty state, dependency
+versions, and integrity scope.
+
+An unsigned local build is a development artifact.
+
+Extract the Linux archive and run `./blooket-studio` to open the workspace.
+`--no-open` starts without opening a browser, `--status` reports the service,
+and `--stop` stops that instance. Reopening reuses the running service.
+Replacing the extracted package retains user data; deleting the package does
+not remove settings, media, or host-store secrets.
+
+macOS installation acceptance remains
+pending; do not present an unsigned archive as a ready-to-install release.
 
 ## Develop and verify
 

@@ -114,6 +114,8 @@ export async function startBrowserService(
     port?: number;
     online?: OnlineConnectionController;
     secrets?: HostSecretStore;
+    instance?: string;
+    stop?: () => Promise<void>;
   } = {},
 ) {
   const root = options.root ?? userDataRoot();
@@ -182,6 +184,15 @@ export async function startBrowserService(
         response.end(
           await readFile(fileURLToPath(new URL(asset[0], staticRoot))),
         );
+        return;
+      }
+      if (url.pathname === "/api/service-status" && options.instance) {
+        json(response, 200, {
+          version: 1,
+          pid: process.pid,
+          instance: options.instance,
+          origin,
+        });
         return;
       }
       if (url.pathname === "/api/bootstrap") {
@@ -294,6 +305,21 @@ export async function startBrowserService(
     }
     active += 1;
     try {
+      if (url.pathname === "/api/service-stop" && options.stop) {
+        const body = await readBody(request);
+        if (
+          typeof body !== "object" ||
+          body === null ||
+          Array.isArray(body) ||
+          Object.keys(body).length !== 0
+        )
+          throw new Error("invalid-service-stop");
+        response.once("finish", () => {
+          void options.stop!();
+        });
+        json(response, 202, { ok: true });
+        return;
+      }
       const body = await readBody(
         request,
         url.pathname === "/api/import" ? 36_000_000 : 1_000_000,
@@ -351,10 +377,15 @@ export async function startBrowserService(
         return;
       }
       if (url.pathname === "/api/stop") {
+        response.once("finish", () => {
+          if (options.stop) void options.stop();
+          else
+            void Promise.resolve(options.online?.stop()).finally(() => {
+              server.close();
+              server.closeAllConnections();
+            });
+        });
         json(response, 200, { ok: true });
-        await options.online?.stop();
-        server.close();
-        server.closeAllConnections();
         return;
       }
       if (url.pathname === "/api/folder") {
