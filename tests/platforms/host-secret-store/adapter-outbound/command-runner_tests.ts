@@ -61,7 +61,7 @@ test("runner bounds child execution time", async () => {
   const result = await runSecretCommand({
     command: process.execPath,
     args: ["-e", "setTimeout(() => {}, 1000)"],
-    timeoutMs: 10,
+    timeoutMs: 50,
   });
 
   assert.deepEqual(result, {

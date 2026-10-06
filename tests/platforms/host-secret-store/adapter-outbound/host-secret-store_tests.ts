@@ -32,6 +32,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { HOST_SECRET_MAX_BYTES } from
+  "../../../../src/security/host-secrets/domain/host-secret.ts";
 import {
   createHostSecretStore,
   deleteHostSecret,
@@ -77,6 +79,49 @@ test("new macOS secrets never place secret material in argv", async () => {
   assert.equal(stdin.includes(SECRET), false);
   assert.equal(stdin.includes(STORED), true);
   assert.equal(stdin.includes("-T /usr/bin/security"), true);
+});
+
+test("maximum macOS secrets stay within the stdin command bound", async () => {
+  const secret = "x".repeat(HOST_SECRET_MAX_BYTES);
+  const stored = "v1."
+    + Buffer.from(secret, "utf8").toString("base64url");
+  const fake = fakeRunner([
+    result(44),
+    result(0),
+    result(0, stored),
+  ]);
+
+  assert.deepEqual(
+    await writeHostSecret("maximum-secret", secret, {
+      platform: "darwin",
+      runner: fake.run,
+    }),
+    { ok: true },
+  );
+
+  const command = fake.calls[1]?.stdin;
+  assert.notEqual(command, undefined);
+  assert.ok((command?.byteLength ?? Number.MAX_SAFE_INTEGER) < 4096);
+});
+
+test("invalid secret values fail before host commands", async () => {
+  const fake = fakeRunner([]);
+  assert.deepEqual(
+    await writeHostSecret("blooket-password", "", {
+      platform: "linux",
+      runner: fake.run,
+    }),
+    { ok: false, code: "host-secret-empty" },
+  );
+  assert.deepEqual(
+    await writeHostSecret(
+      "blooket-password",
+      "x".repeat(HOST_SECRET_MAX_BYTES + 1),
+      { platform: "linux", runner: fake.run },
+    ),
+    { ok: false, code: "host-secret-too-large" },
+  );
+  assert.equal(fake.calls.length, 0);
 });
 
 test("existing macOS secrets update without replacing ACLs", async () => {
@@ -188,6 +233,32 @@ test("writes fail closed when read-back does not match", async () => {
     await writeHostSecret("blooket-password", SECRET, {
       platform: "linux",
       runner: fake.run,
+    }),
+    { ok: false, code: "host-secret-store-failed" },
+  );
+});
+
+test("command infrastructure failures become stable store codes", async () => {
+  const unavailable = fakeRunner([{
+    ok: false,
+    code: "secret-command-unavailable",
+  }]);
+  assert.deepEqual(
+    await readHostSecret("blooket-password", {
+      platform: "linux",
+      runner: unavailable.run,
+    }),
+    { ok: false, code: "host-secret-store-unavailable" },
+  );
+
+  const timedOut = fakeRunner([{
+    ok: false,
+    code: "secret-command-timeout",
+  }]);
+  assert.deepEqual(
+    await readHostSecret("blooket-password", {
+      platform: "linux",
+      runner: timedOut.run,
     }),
     { ok: false, code: "host-secret-store-failed" },
   );
