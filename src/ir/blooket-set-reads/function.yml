@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-set-reads
+  name: blooket-set-reads
+  path: src/ir/blooket-set-reads
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract
