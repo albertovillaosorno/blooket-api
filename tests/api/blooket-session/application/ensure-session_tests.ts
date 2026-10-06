@@ -32,12 +32,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  type BlooketBrowserAuthenticationResult,
-  type BlooketBrowserObservationResult,
-  type BlooketBrowserSessionPort,
-  ensureBlooketSession,
-} from "../../../../src/api/blooket-session/application/ensure-session.ts";
+import { ensureBlooketSession } from
+  "../../../../src/api/blooket-session/application/ensure-session.ts";
+import type {
+  BlooketBrowserAuthenticationResult,
+  BlooketBrowserObservationResult,
+  BlooketBrowserSessionPort,
+} from "../../../../src/api/blooket-session/contract/browser-session.ts";
 import {
   BLOOKET_LOGIN_IDENTIFIER_SECRET,
   BLOOKET_PASSWORD_SECRET,

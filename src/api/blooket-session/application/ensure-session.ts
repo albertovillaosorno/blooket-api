@@ -31,14 +31,19 @@
 //   - Ambiguous, challenged, and organization states require human action.
 //
 import {
-  blooketNavigationDecision,
-  type ObservedBlooketNavigationStateKind,
-} from "../../../ir/blooket-navigation/domain/navigation-state.ts";
-import {
   readBlooketCredentials,
   type BlooketCredentialReadResult,
   type BlooketCredentials,
 } from "../../../security/blooket-credentials/domain/credentials.ts";
+import {
+  inspectBlooketSession,
+  type InspectBlooketSessionResult,
+} from "./inspect-session.ts";
+import type {
+  BlooketBrowserAuthenticationResult,
+  BlooketBrowserFailureCode,
+  BlooketBrowserSessionPort,
+} from "../contract/browser-session.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 
@@ -51,34 +56,6 @@ export type BlooketHumanNavigationState =
   | "organization-prompt"
   | "security-challenge"
   | "unexpected-page";
-
-export type BlooketBrowserFailureCode =
-  | "blooket-browser-unavailable"
-  | "blooket-browser-failed";
-
-export type BlooketBrowserObservationResult =
-  | {
-      readonly ok: true;
-      readonly state: ObservedBlooketNavigationStateKind;
-    }
-  | {
-      readonly ok: false;
-      readonly code: BlooketBrowserFailureCode;
-    };
-
-export type BlooketBrowserAuthenticationResult =
-  | { readonly ok: true }
-  | {
-      readonly ok: false;
-      readonly code: BlooketBrowserFailureCode;
-    };
-
-export interface BlooketBrowserSessionPort {
-  observe(): Promise<BlooketBrowserObservationResult>;
-  authenticate(
-    credentials: BlooketCredentials,
-  ): Promise<BlooketBrowserAuthenticationResult>;
-}
 
 type CredentialFailure = Extract<
   BlooketCredentialReadResult,
@@ -114,12 +91,12 @@ export async function ensureBlooketSession(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
 ): Promise<EnsureBlooketSessionResult> {
-  const initial = await safeObserve(browser);
+  const initial = await inspectBlooketSession(browser);
   if (!initial.ok) {
     return initial;
   }
 
-  const initialDecision = classifyObservedState(initial.state, true);
+  const initialDecision = classifyInspectedSession(initial, true);
   if (initialDecision !== null) {
     return initialDecision;
   }
@@ -137,62 +114,65 @@ export async function ensureBlooketSession(
     return authenticated;
   }
 
-  const observed = await safeObserve(browser);
+  const observed = await inspectBlooketSession(browser);
   if (!observed.ok) {
     return observed;
   }
 
-  const finalDecision = classifyObservedState(observed.state, false);
+  const finalDecision = classifyInspectedSession(observed, false);
   return finalDecision ?? {
     ok: false,
     code: "blooket-authentication-not-established",
   };
 }
 
-function classifyObservedState(
-  state: ObservedBlooketNavigationStateKind,
+function classifyInspectedSession(
+  session: Extract<InspectBlooketSessionResult, { readonly ok: true }>,
   reused: boolean,
 ): EnsureBlooketSessionResult | null {
-  const decision = blooketNavigationDecision({ kind: state });
-  if (decision.action === "continue") {
+  if (session.action === "continue") {
+    if (
+      session.state !== "dashboard"
+      && session.state !== "create"
+      && session.state !== "edit"
+    ) {
+      return {
+        ok: false,
+        code: "blooket-browser-failed",
+      };
+    }
     return {
       ok: true,
       kind: "ready",
-      state: decision.state,
+      state: session.state,
       reused,
     };
   }
-  if (decision.action === "wait") {
+  if (session.action === "wait") {
     return {
       ok: true,
       kind: "wait",
-      state: decision.state,
+      state: "rate-limited",
     };
   }
-  if (decision.action === "human-action-required") {
-    if (decision.state === "human-action-required") {
-      return null;
+  if (session.action === "human-action-required") {
+    if (
+      session.state !== "organization-prompt"
+      && session.state !== "security-challenge"
+      && session.state !== "unexpected-page"
+    ) {
+      return {
+        ok: false,
+        code: "blooket-browser-failed",
+      };
     }
     return {
       ok: true,
       kind: "human-action-required",
-      state: decision.state,
+      state: session.state,
     };
   }
   return null;
-}
-
-async function safeObserve(
-  browser: BlooketBrowserSessionPort,
-): Promise<BlooketBrowserObservationResult> {
-  try {
-    return await browser.observe();
-  } catch {
-    return {
-      ok: false,
-      code: "blooket-browser-failed",
-    };
-  }
 }
 
 async function safeAuthenticate(
