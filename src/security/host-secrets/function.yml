@@ -1,0 +1,9 @@
+identity:
+  id: function:host-secrets
+  name: host-secrets
+  path: src/security/host-secrets
+classification:
+  repository: blooket-api
+  domain: security
+architecture:
+  kind: domain
