@@ -783,3 +783,51 @@ Existing MCP tools provide library search/read/enrichment, personal skill
 list/read/write, and recoverable draft list/read/write. Drafts are not published
 quizzes. Continue these implementations rather than recreating their already
 validated foundations.
+
+### TODO 16 - Add adaptive teacher workflow skills
+
+Build a lightweight `master-workflow` skill that indexes stable teacher defaults
+and points to narrower task-specific skills. Do not put personal information,
+credentials, lesson secrets, or account identifiers in repository defaults.
+Runtime personal skills remain in the teacher's private data root.
+
+When a teacher explains a reusable workflow, save it as personal guidance so it
+does not need to be re-asked on later sessions. For example, a vocabulary
+activity may default to one term, one matching GIF, and four options containing
+one correct answer plus three distractors. Scope such a rule to that activity
+type unless the teacher explicitly makes it universal.
+
+Treat corrections as learning evidence, not automatic permanent rules. Record
+provenance and revision history. If the scope of a correction is clear, update
+the narrow skill; if it is ambiguous, ask one casual question about whether to
+remember it for that type of activity. Ask more setup questions early when
+needed, then rely on learned preferences instead of repeating them.
+
+Add task skills for quiz authoring, human validation, direct browser image
+search, image-bank research/metadata, media analysis, and Codex repository
+access. Image research should use bounded requests, normal provider-supported
+access where available, useful source metadata, and respectful request pacing.
+Analyze candidate images immediately when admitted tools permit it.
+
+CAPTCHA, security challenge, unfamiliar login, organization selection, consent,
+browser permission, or another explicit human checkpoint is always a
+human-validation boundary. Preserve the checkpoint, explain the legitimate
+local action required, wait for confirmation, then re-read session and remote
+state before continuing. Do not solve, bypass, outsource, or silently replay a
+CAPTCHA merely because it is surfaced through localhost.
+
+Codex configuration may use broad repository permissions only after explicit
+user authorization for that workspace. Skill text cannot itself grant access,
+silently escalate permissions, expose secrets, or broaden host authority.
+
+Keep Blooket semantics accurate: Blooket has no remote draft object in this
+product model. Local drafts are private recovery/authoring state only. Once
+canonical create/edit execution is validated, requested publication should
+proceed autonomously unless a real human-validation boundary, ambiguity, or
+safety stop is reached.
+
+Complete when the teacher profile reads the master skill first, discovers only
+relevant task skills afterward, learns scoped preferences through revision-safe
+personal skill updates, preserves corrections without overgeneralizing them,
+and resumes autonomous work after explicit human checkpoints without asking
+the same settled questions again.
