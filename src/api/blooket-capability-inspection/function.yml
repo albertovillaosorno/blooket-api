@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-capability-inspection
+  name: blooket-capability-inspection
+  path: src/api/blooket-capability-inspection
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
