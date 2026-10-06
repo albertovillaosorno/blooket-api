@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-navigation
+  name: blooket-navigation
+  path: src/ir/blooket-navigation
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: domain
