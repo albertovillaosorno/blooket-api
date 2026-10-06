@@ -1,0 +1,9 @@
+identity:
+  id: function:write-attempt-files
+  name: write-attempt-files
+  path: src/platforms/write-attempt-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
