@@ -44,6 +44,10 @@ import {
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
+import {
+  decodeBlooketWriteReceipt,
+  type BlooketWriteReceipt,
+} from "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import {
@@ -52,7 +56,8 @@ import {
   writeDurableFileIfAbsent,
 } from "../../atomic-files/adapter-outbound/atomic-file.ts";
 
-export const WRITE_ATTEMPT_VERSION = 1 as const;
+export const WRITE_ATTEMPT_VERSION = 2 as const;
+const LEGACY_WRITE_ATTEMPT_VERSION = 1 as const;
 
 export function writeAttemptExecutionLockPath(path: string): string {
   return path + ".lock";
@@ -64,14 +69,19 @@ export interface WriteAttemptRecord {
   readonly operationId: string;
   readonly operationIndex: number;
   readonly phase: "attempting" | "confirmed";
+  readonly receipt: BlooketWriteReceipt | null;
 }
 
-const WRITE_ATTEMPT_KEYS = new Set([
+const LEGACY_WRITE_ATTEMPT_KEYS = new Set([
   "schemaVersion",
   "planId",
   "operationId",
   "operationIndex",
   "phase",
+]);
+const WRITE_ATTEMPT_KEYS = new Set([
+  ...LEGACY_WRITE_ATTEMPT_KEYS,
+  "receipt",
 ]);
 
 export type WriteAttemptFileLoadResult =
@@ -178,6 +188,7 @@ export async function beginWriteAttempt(
     operationId: operation.operationId,
     operationIndex,
     phase: "attempting",
+    receipt: null,
   };
 
   try {
@@ -205,6 +216,7 @@ export async function confirmWriteAttempt(
   path: string,
   plan: BlooketWritePlan,
   operationId: string,
+  receiptCandidate: unknown,
 ): Promise<WriteAttemptFileMutationResult> {
   const loaded = await loadWriteAttemptFile(path, plan);
   if (!loaded.ok) {
@@ -234,13 +246,36 @@ export async function confirmWriteAttempt(
       "Attempt journal belongs to a different operation.",
     );
   }
+  const operation = plan.operations[record.operationIndex];
+  if (operation === undefined) {
+    return invalidFailure(
+      "$.operationIndex",
+      "invalid-write-attempt-index",
+      "Expected an operation index present in the write plan.",
+    );
+  }
+  const receipt = decodeConfirmedReceipt(
+    receiptCandidate,
+    operation.kind,
+  );
+  if (!receipt.ok) {
+    return receipt;
+  }
   if (record.phase === "confirmed") {
+    if (!sameReceipt(record.receipt, receipt.value)) {
+      return invalidFailure(
+        "$.receipt",
+        "write-attempt-receipt-mismatch",
+        "Confirmed journal has a different write receipt.",
+      );
+    }
     return { ok: true, record };
   }
 
   const confirmed: WriteAttemptRecord = {
     ...record,
     phase: "confirmed",
+    receipt: receipt.value,
   };
   try {
     await writeAtomicFile(path, serialize(confirmed));
@@ -304,8 +339,15 @@ function decodeWriteAttempt(
     );
   }
 
+  const inputVersion = value["schemaVersion"];
   const issues: ValidationIssue[] = [
-    ...unknownFieldIssues(value, WRITE_ATTEMPT_KEYS, "$"),
+    ...unknownFieldIssues(
+      value,
+      inputVersion === LEGACY_WRITE_ATTEMPT_VERSION
+        ? LEGACY_WRITE_ATTEMPT_KEYS
+        : WRITE_ATTEMPT_KEYS,
+      "$",
+    ),
   ];
   const planId = requiredString(value["planId"], "$.planId", issues);
   const operationId = requiredString(
@@ -316,11 +358,14 @@ function decodeWriteAttempt(
   const operationIndex = value["operationIndex"];
   const phase = value["phase"];
 
-  if (value["schemaVersion"] !== WRITE_ATTEMPT_VERSION) {
+  if (
+    inputVersion !== LEGACY_WRITE_ATTEMPT_VERSION
+    && inputVersion !== WRITE_ATTEMPT_VERSION
+  ) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
-      message: "Expected write attempt journal version 1.",
+      message: "Expected write attempt journal version 1 or 2.",
     });
   }
   if (planId !== undefined && planId !== plan.planId) {
@@ -364,6 +409,20 @@ function decodeWriteAttempt(
     });
   }
 
+  const operation = typeof operationIndex === "number"
+    && Number.isSafeInteger(operationIndex)
+    && operationIndex >= 0
+    && operationIndex < plan.operations.length
+    ? plan.operations[operationIndex]
+    : undefined;
+  const receipt = decodeStoredReceipt(
+    inputVersion,
+    value["receipt"],
+    phase,
+    operation?.kind,
+    issues,
+  );
+
   if (issues.length > 0) {
     return { ok: false, kind: "invalid", issues };
   }
@@ -372,6 +431,7 @@ function decodeWriteAttempt(
     || operationId === undefined
     || typeof operationIndex !== "number"
     || (phase !== "attempting" && phase !== "confirmed")
+    || receipt === undefined
   ) {
     return invalidFailure(
       "$",
@@ -388,8 +448,96 @@ function decodeWriteAttempt(
       operationId,
       operationIndex,
       phase,
+      receipt,
     },
   };
+}
+
+function decodeConfirmedReceipt(
+  value: unknown,
+  operationKind: "set" | "question",
+):
+  | { readonly ok: true; readonly value: BlooketWriteReceipt | null }
+  | {
+      readonly ok: false;
+      readonly kind: "invalid";
+      readonly issues: readonly ValidationIssue[];
+    } {
+  if (operationKind === "question") {
+    return value === null
+      ? { ok: true, value: null }
+      : invalidFailure(
+          "$.receipt",
+          "unexpected-write-receipt",
+          "Question writes must not return a set-creation receipt.",
+        );
+  }
+  const decoded = decodeBlooketWriteReceipt(value);
+  return decoded.ok
+    ? { ok: true, value: decoded.value }
+    : { ok: false, kind: "invalid", issues: decoded.issues };
+}
+
+function decodeStoredReceipt(
+  version: unknown,
+  value: unknown,
+  phase: unknown,
+  operationKind: "set" | "question" | undefined,
+  issues: ValidationIssue[],
+): BlooketWriteReceipt | null | undefined {
+  if (operationKind === undefined) {
+    return null;
+  }
+  if (version === LEGACY_WRITE_ATTEMPT_VERSION) {
+    if (phase === "confirmed" && operationKind === "set") {
+      issues.push({
+        path: "$.receipt",
+        code: "missing-set-receipt",
+        message: "Legacy confirmed set attempt has no remote set binding.",
+      });
+    }
+    return null;
+  }
+  if (phase === "attempting") {
+    if (value !== null) {
+      issues.push({
+        path: "$.receipt",
+        code: "unexpected-write-receipt",
+        message: "Attempting journals cannot contain confirmed receipts.",
+      });
+    }
+    return value === null ? null : undefined;
+  }
+  if (phase !== "confirmed") {
+    return null;
+  }
+  if (operationKind === "question") {
+    if (value !== null) {
+      issues.push({
+        path: "$.receipt",
+        code: "unexpected-write-receipt",
+        message: "Question attempts cannot contain set receipts.",
+      });
+    }
+    return value === null ? null : undefined;
+  }
+  const decoded = decodeBlooketWriteReceipt(value);
+  if (!decoded.ok) {
+    issues.push(...decoded.issues);
+    return undefined;
+  }
+  return decoded.value;
+}
+
+function sameReceipt(
+  left: BlooketWriteReceipt | null,
+  right: BlooketWriteReceipt | null,
+): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return left.kind === right.kind
+    && left.remoteSetId === right.remoteSetId;
 }
 
 function parseJson(source: string):

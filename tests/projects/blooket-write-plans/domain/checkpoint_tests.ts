@@ -73,6 +73,7 @@ const capabilities = {
 import {
   advanceBlooketWriteCheckpoint,
   decodeBlooketWriteCheckpoint,
+  decodeBlooketWriteReceipt,
   initialBlooketWriteCheckpoint,
   nextBlooketWriteOperation,
 } from
@@ -118,9 +119,10 @@ test("fresh checkpoints resume at the first operation", () => {
   const checkpoint = initialBlooketWriteCheckpoint(value);
 
   assert.deepEqual(checkpoint, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     planId: value.planId,
     nextOperationIndex: 0,
+    remoteSetId: null,
   });
   assert.deepEqual(
     nextBlooketWriteOperation(value, checkpoint),
@@ -144,6 +146,7 @@ test("confirmed operations advance exactly one step", () => {
     value,
     initial,
     first.operationId,
+    { kind: "set-created", remoteSetId: "remote-set-1" },
   );
   assert.equal(advanced.ok, true);
   if (advanced.ok) {
@@ -172,6 +175,7 @@ test("checkpoints reject skipped or cross-plan operations", () => {
       value,
       initial,
       second.operationId,
+      null,
     ),
     { ok: false, code: "unexpected-operation" },
   );
@@ -188,6 +192,7 @@ test("checkpoints reject skipped or cross-plan operations", () => {
         otherResult.value,
         initial,
         second.operationId,
+        null,
       ),
       { ok: false, code: "write-plan-mismatch" },
     );
@@ -221,6 +226,9 @@ test("completed checkpoints have no next operation", () => {
       value,
       checkpoint,
       operation.operationId,
+      operation.kind === "set"
+        ? { kind: "set-created", remoteSetId: "remote-set-1" }
+        : null,
     );
     assert.equal(advanced.ok, true);
     if (!advanced.ok) {
@@ -238,6 +246,7 @@ test("completed checkpoints have no next operation", () => {
       value,
       checkpoint,
       "anything",
+      null,
     ),
     { ok: false, code: "write-plan-complete" },
   );
@@ -247,16 +256,18 @@ test("checkpoint decoding binds progress to one exact plan", () => {
   const value = plan();
   assert.deepEqual(
     decodeBlooketWriteCheckpoint({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planId: value.planId,
       nextOperationIndex: 1,
+      remoteSetId: "remote-set-1",
     }, value),
     {
       ok: true,
       value: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: value.planId,
         nextOperationIndex: 1,
+        remoteSetId: "remote-set-1",
       },
     },
   );
@@ -269,9 +280,10 @@ test("checkpoint decoding binds progress to one exact plan", () => {
   assert.equal(changedResult.ok, true);
   if (changedResult.ok) {
     const decoded = decodeBlooketWriteCheckpoint({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planId: value.planId,
       nextOperationIndex: 1,
+      remoteSetId: "remote-set-1",
     }, changedResult.value);
     assert.equal(decoded.ok, false);
     if (!decoded.ok) {
@@ -280,12 +292,166 @@ test("checkpoint decoding binds progress to one exact plan", () => {
   }
 });
 
-test("checkpoint decoding rejects unknown fields and invalid bounds", () => {
+test("legacy fresh checkpoints migrate without inventing a binding", () => {
+  const value = plan();
+  assert.deepEqual(
+    decodeBlooketWriteCheckpoint({
+      schemaVersion: 1,
+      planId: value.planId,
+      nextOperationIndex: 0,
+    }, value),
+    {
+      ok: true,
+      value: {
+        schemaVersion: 2,
+        planId: value.planId,
+        nextOperationIndex: 0,
+        remoteSetId: null,
+      },
+    },
+  );
+});
+
+test("legacy advanced checkpoints fail without a remote binding", () => {
   const value = plan();
   const decoded = decodeBlooketWriteCheckpoint({
     schemaVersion: 1,
     planId: value.planId,
+    nextOperationIndex: 1,
+  }, value);
+
+  assert.equal(decoded.ok, false);
+  if (!decoded.ok) {
+    assert.equal(
+      decoded.issues.some(
+        (issue) => issue.code === "missing-remote-set-binding",
+      ),
+      true,
+    );
+  }
+});
+
+test("set advancement requires an opaque remote set receipt", () => {
+  const value = plan();
+  const initial = initialBlooketWriteCheckpoint(value);
+  const setOperation = value.operations[0];
+  assert.equal(setOperation?.kind, "set");
+  if (setOperation === undefined) {
+    return;
+  }
+
+  assert.deepEqual(
+    advanceBlooketWriteCheckpoint(
+      value,
+      initial,
+      setOperation.operationId,
+      null,
+    ),
+    { ok: false, code: "missing-set-receipt" },
+  );
+  const advanced = advanceBlooketWriteCheckpoint(
+    value,
+    initial,
+    setOperation.operationId,
+    { kind: "set-created", remoteSetId: "opaque-remote-set" },
+  );
+  assert.equal(advanced.ok, true);
+  if (advanced.ok) {
+    assert.equal(advanced.value.remoteSetId, "opaque-remote-set");
+  }
+});
+
+test("question advancement rejects set-creation receipts", () => {
+  const value = plan();
+  const setOperation = value.operations[0];
+  const questionOperation = value.operations[1];
+  assert.equal(setOperation?.kind, "set");
+  assert.equal(questionOperation?.kind, "question");
+  if (setOperation === undefined || questionOperation === undefined) {
+    return;
+  }
+  const bound = advanceBlooketWriteCheckpoint(
+    value,
+    initialBlooketWriteCheckpoint(value),
+    setOperation.operationId,
+    { kind: "set-created", remoteSetId: "remote-set-1" },
+  );
+  assert.equal(bound.ok, true);
+  if (!bound.ok) {
+    return;
+  }
+
+  assert.deepEqual(
+    advanceBlooketWriteCheckpoint(
+      value,
+      bound.value,
+      questionOperation.operationId,
+      { kind: "set-created", remoteSetId: "remote-set-2" },
+    ),
+    { ok: false, code: "unexpected-write-receipt" },
+  );
+  const advanced = advanceBlooketWriteCheckpoint(
+    value,
+    bound.value,
+    questionOperation.operationId,
+    null,
+  );
+  assert.equal(advanced.ok, true);
+  if (advanced.ok) {
+    assert.equal(advanced.value.remoteSetId, "remote-set-1");
+  }
+});
+
+test("write receipts are exact opaque-id objects", () => {
+  assert.deepEqual(
+    decodeBlooketWriteReceipt({
+      kind: "set-created",
+      remoteSetId: "opaque:remote/id",
+    }),
+    {
+      ok: true,
+      value: {
+        kind: "set-created",
+        remoteSetId: "opaque:remote/id",
+      },
+    },
+  );
+  for (const candidate of [
+    { kind: "set-created", remoteSetId: "" },
+    { kind: "set-created", remoteSetId: "id", extra: true },
+    { kind: "question-created", remoteSetId: "id" },
+  ]) {
+    assert.equal(decodeBlooketWriteReceipt(candidate).ok, false);
+  }
+});
+
+test("fresh checkpoints reject premature remote bindings", () => {
+  const value = plan();
+  const decoded = decodeBlooketWriteCheckpoint({
+    schemaVersion: 2,
+    planId: value.planId,
+    nextOperationIndex: 0,
+    remoteSetId: "remote-set-1",
+  }, value);
+
+  assert.equal(decoded.ok, false);
+  if (!decoded.ok) {
+    assert.equal(
+      decoded.issues.some(
+        (issue) => issue.code === "unexpected-remote-set-binding",
+      ),
+      true,
+    );
+  }
+});
+
+test("checkpoint decoding rejects unknown fields and invalid bounds", () => {
+  const value = plan();
+  const decoded = decodeBlooketWriteCheckpoint({
+    schemaVersion: 2,
+    planId: value.planId,
     nextOperationIndex: value.operations.length + 1,
+    remoteSetId: "remote-set-1",
     extra: true,
   }, value);
 

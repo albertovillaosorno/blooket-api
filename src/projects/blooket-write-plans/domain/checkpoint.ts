@@ -43,19 +43,33 @@ import type {
   BlooketWritePlan,
 } from "./write-plan.ts";
 
-export const BLOOKET_WRITE_CHECKPOINT_VERSION = 1 as const;
+export const BLOOKET_WRITE_CHECKPOINT_VERSION = 2 as const;
+const LEGACY_BLOOKET_WRITE_CHECKPOINT_VERSION = 1 as const;
+
+export interface BlooketSetWriteReceipt {
+  readonly kind: "set-created";
+  readonly remoteSetId: string;
+}
+
+export type BlooketWriteReceipt = BlooketSetWriteReceipt;
 
 export interface BlooketWriteCheckpoint {
   readonly schemaVersion: typeof BLOOKET_WRITE_CHECKPOINT_VERSION;
   readonly planId: string;
   readonly nextOperationIndex: number;
+  readonly remoteSetId: string | null;
 }
 
-const CHECKPOINT_KEYS = new Set([
+const LEGACY_CHECKPOINT_KEYS = new Set([
   "schemaVersion",
   "planId",
   "nextOperationIndex",
 ]);
+const CHECKPOINT_KEYS = new Set([
+  ...LEGACY_CHECKPOINT_KEYS,
+  "remoteSetId",
+]);
+const RECEIPT_KEYS = new Set(["kind", "remoteSetId"]);
 
 export function initialBlooketWriteCheckpoint(
   plan: BlooketWritePlan,
@@ -64,6 +78,7 @@ export function initialBlooketWriteCheckpoint(
     schemaVersion: BLOOKET_WRITE_CHECKPOINT_VERSION,
     planId: plan.planId,
     nextOperationIndex: 0,
+    remoteSetId: null,
   };
 }
 
@@ -82,8 +97,15 @@ export function decodeBlooketWriteCheckpoint(
     };
   }
 
+  const inputVersion = value["schemaVersion"];
   const issues: ValidationIssue[] = [
-    ...unknownFieldIssues(value, CHECKPOINT_KEYS, "$"),
+    ...unknownFieldIssues(
+      value,
+      inputVersion === LEGACY_BLOOKET_WRITE_CHECKPOINT_VERSION
+        ? LEGACY_CHECKPOINT_KEYS
+        : CHECKPOINT_KEYS,
+      "$",
+    ),
   ];
   const planId = requiredString(
     value["planId"],
@@ -91,12 +113,22 @@ export function decodeBlooketWriteCheckpoint(
     issues,
   );
   const nextOperationIndex = value["nextOperationIndex"];
+  const remoteSetId = inputVersion === LEGACY_BLOOKET_WRITE_CHECKPOINT_VERSION
+    ? null
+    : decodeNullableRemoteSetId(
+        value["remoteSetId"],
+        "$.remoteSetId",
+        issues,
+      );
 
-  if (value["schemaVersion"] !== BLOOKET_WRITE_CHECKPOINT_VERSION) {
+  if (
+    inputVersion !== LEGACY_BLOOKET_WRITE_CHECKPOINT_VERSION
+    && inputVersion !== BLOOKET_WRITE_CHECKPOINT_VERSION
+  ) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
-      message: "Expected Blooket write checkpoint version 1.",
+      message: "Expected Blooket write checkpoint version 1 or 2.",
     });
   }
   if (planId !== undefined && planId !== plan.planId) {
@@ -118,6 +150,31 @@ export function decodeBlooketWriteCheckpoint(
       message: "Expected a completed operation boundary.",
     });
   }
+  if (
+    typeof nextOperationIndex === "number"
+    && Number.isSafeInteger(nextOperationIndex)
+    && nextOperationIndex === 0
+    && remoteSetId !== null
+    && remoteSetId !== undefined
+  ) {
+    issues.push({
+      path: "$.remoteSetId",
+      code: "unexpected-remote-set-binding",
+      message: "A fresh checkpoint cannot already target a remote set.",
+    });
+  }
+  if (
+    typeof nextOperationIndex === "number"
+    && Number.isSafeInteger(nextOperationIndex)
+    && nextOperationIndex > 0
+    && remoteSetId === null
+  ) {
+    issues.push({
+      path: "$.remoteSetId",
+      code: "missing-remote-set-binding",
+      message: "Advanced progress requires the created remote set ID.",
+    });
+  }
 
   if (issues.length > 0) {
     return { ok: false, issues };
@@ -125,6 +182,7 @@ export function decodeBlooketWriteCheckpoint(
   if (
     planId === undefined
     || typeof nextOperationIndex !== "number"
+    || remoteSetId === undefined
   ) {
     return {
       ok: false,
@@ -142,6 +200,7 @@ export function decodeBlooketWriteCheckpoint(
       schemaVersion: BLOOKET_WRITE_CHECKPOINT_VERSION,
       planId,
       nextOperationIndex,
+      remoteSetId,
     },
   };
 }
@@ -179,13 +238,17 @@ export type AdvanceBlooketWriteCheckpointResult =
       readonly code:
         | "write-plan-mismatch"
         | "write-plan-complete"
-        | "unexpected-operation";
+        | "unexpected-operation"
+        | "missing-set-receipt"
+        | "missing-remote-set-binding"
+        | "unexpected-write-receipt";
     };
 
 export function advanceBlooketWriteCheckpoint(
   plan: BlooketWritePlan,
   checkpoint: BlooketWriteCheckpoint,
   completedOperationId: string,
+  receipt: BlooketWriteReceipt | null,
 ): AdvanceBlooketWriteCheckpointResult {
   if (checkpoint.planId !== plan.planId) {
     return { ok: false, code: "write-plan-mismatch" };
@@ -198,6 +261,26 @@ export function advanceBlooketWriteCheckpoint(
     return { ok: false, code: "unexpected-operation" };
   }
 
+  if (next.kind === "set") {
+    if (receipt === null || !isRemoteSetId(receipt.remoteSetId)) {
+      return { ok: false, code: "missing-set-receipt" };
+    }
+    return {
+      ok: true,
+      value: {
+        ...checkpoint,
+        nextOperationIndex: checkpoint.nextOperationIndex + 1,
+        remoteSetId: receipt.remoteSetId,
+      },
+    };
+  }
+
+  if (checkpoint.remoteSetId === null) {
+    return { ok: false, code: "missing-remote-set-binding" };
+  }
+  if (receipt !== null) {
+    return { ok: false, code: "unexpected-write-receipt" };
+  }
   return {
     ok: true,
     value: {
@@ -205,4 +288,68 @@ export function advanceBlooketWriteCheckpoint(
       nextOperationIndex: checkpoint.nextOperationIndex + 1,
     },
   };
+}
+
+export function decodeBlooketWriteReceipt(
+  value: unknown,
+  path = "$.receipt",
+): DecodeResult<BlooketWriteReceipt> {
+  if (!isRecord(value)) {
+    return {
+      ok: false,
+      issues: [{
+        path,
+        code: "expected-object",
+        message: "Expected a Blooket write receipt.",
+      }],
+    };
+  }
+  const issues: ValidationIssue[] = [
+    ...unknownFieldIssues(value, RECEIPT_KEYS, path),
+  ];
+  const remoteSetId = requiredString(
+    value["remoteSetId"],
+    path + ".remoteSetId",
+    issues,
+  );
+  if (value["kind"] !== "set-created") {
+    issues.push({
+      path: path + ".kind",
+      code: "invalid-write-receipt-kind",
+      message: 'Expected "set-created".',
+    });
+  }
+  if (issues.length > 0) {
+    return { ok: false, issues };
+  }
+  if (remoteSetId === undefined) {
+    return {
+      ok: false,
+      issues: [{
+        path,
+        code: "decoder-invariant",
+        message: "Write receipt decoder invariant failed.",
+      }],
+    };
+  }
+  return {
+    ok: true,
+    value: { kind: "set-created", remoteSetId },
+  };
+}
+
+function decodeNullableRemoteSetId(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  const decoded = requiredString(value, path, issues);
+  return decoded;
+}
+
+function isRemoteSetId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
 }

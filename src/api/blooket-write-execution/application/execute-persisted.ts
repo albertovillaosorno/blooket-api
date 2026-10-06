@@ -290,6 +290,7 @@ async function executePersistedBlooketWriteLocked(
   const attempted = await attemptBlooketWrite(
     writes,
     prepared.operation,
+    prepared.checkpoint.remoteSetId,
   );
   const completed = completeBlooketWriteAttempt(
     plan,
@@ -313,6 +314,7 @@ async function executePersistedBlooketWriteLocked(
     paths.attempt,
     plan,
     prepared.operation.operationId,
+    attempted.receipt,
   );
   if (!confirmed.ok) {
     return {

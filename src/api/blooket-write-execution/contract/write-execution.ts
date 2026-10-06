@@ -31,13 +31,22 @@
 //
 import type { ObservedBlooketNavigationStateKind } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
+import type { BlooketWriteReceipt } from
+  "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import type { BlooketWriteOperation } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { BlooketBrowserFailureCode } from
   "../../blooket-session/contract/browser-session.ts";
 
+export interface BlooketWriteTarget {
+  readonly remoteSetId: string | null;
+}
+
 export type BlooketWriteAttemptResult =
-  | { readonly ok: true }
+  | {
+      readonly ok: true;
+      readonly receipt: BlooketWriteReceipt | null;
+    }
   | {
       readonly ok: false;
       readonly kind: "navigation";
@@ -52,5 +61,6 @@ export type BlooketWriteAttemptResult =
 export interface BlooketWriteExecutionPort {
   execute(
     operation: BlooketWriteOperation,
+    target: BlooketWriteTarget,
   ): Promise<BlooketWriteAttemptResult>;
 }

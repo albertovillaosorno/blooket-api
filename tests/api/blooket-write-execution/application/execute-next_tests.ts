@@ -63,9 +63,10 @@ const plan: BlooketWritePlan = {
 
 function checkpoint(index = 0) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2 as const,
     planId: plan.planId,
     nextOperationIndex: index,
+    remoteSetId: index === 0 ? null : "remote-set-1",
   };
 }
 
@@ -96,10 +97,12 @@ function secrets(calls: string[]): HostSecretStore {
 function writePort(
   result: BlooketWriteAttemptResult | "throw",
   calls: string[],
+  targets: Array<string | null> = [],
 ): BlooketWriteExecutionPort {
   return {
-    execute: async (operation) => {
+    execute: async (operation, target) => {
       calls.push("write:" + operation.operationId);
+      targets.push(target.remoteSetId);
       if (result === "throw") {
         throw new Error("fixture write failure");
       }
@@ -120,7 +123,10 @@ test("invalid checkpoints fail before all side effects", async () => {
     },
     browser(browserCalls),
     secrets(secretCalls),
-    writePort({ ok: true }, writeCalls),
+    writePort({
+      ok: true,
+      receipt: { kind: "set-created", remoteSetId: "remote-set-1" },
+    }, writeCalls),
   );
 
   assert.equal(result.ok, false);
@@ -140,7 +146,10 @@ test("completed checkpoints cause no remote side effects", async () => {
     checkpoint(1),
     browser(browserCalls),
     secrets([]),
-    writePort({ ok: true }, writeCalls),
+    writePort({
+      ok: true,
+      receipt: { kind: "set-created", remoteSetId: "remote-set-1" },
+    }, writeCalls),
   );
 
   assert.deepEqual(result, {
@@ -152,14 +161,18 @@ test("completed checkpoints cause no remote side effects", async () => {
   assert.deepEqual(writeCalls, []);
 });
 
-test("confirmed writes advance exactly one checkpoint step", async () => {
+test("confirmed writes bind the created remote set exactly once", async () => {
   const writeCalls: string[] = [];
+  const targets: Array<string | null> = [];
   const result = await executeNextBlooketWrite(
     plan,
     checkpoint(),
     browser([]),
     secrets([]),
-    writePort({ ok: true }, writeCalls),
+    writePort({
+      ok: true,
+      receipt: { kind: "set-created", remoteSetId: "remote-set-1" },
+    }, writeCalls, targets),
   );
 
   assert.deepEqual(result, {
@@ -169,6 +182,23 @@ test("confirmed writes advance exactly one checkpoint step", async () => {
     checkpoint: checkpoint(1),
   });
   assert.deepEqual(writeCalls, ["write:plan:test:set"]);
+  assert.deepEqual(targets, [null]);
+});
+
+test("set success without a receipt cannot advance", async () => {
+  const result = await executeNextBlooketWrite(
+    plan,
+    checkpoint(),
+    browser([]),
+    secrets([]),
+    writePort({ ok: true, receipt: null }, []),
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    stage: "checkpoint",
+    code: "checkpoint-invariant",
+  });
 });
 
 test("rate limiting preserves the original checkpoint", async () => {

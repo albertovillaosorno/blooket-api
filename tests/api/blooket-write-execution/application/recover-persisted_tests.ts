@@ -69,6 +69,11 @@ const plan: BlooketWritePlan = {
   }],
 };
 
+const SET_RECEIPT = {
+  kind: "set-created" as const,
+  remoteSetId: "remote-set-1",
+};
+
 async function withTemporaryDirectory(
   callback: (directory: string) => Promise<void>,
 ): Promise<void> {
@@ -100,9 +105,10 @@ test("missing attempt journals leave initial progress ready", async () => {
       ok: true,
       kind: "ready",
       checkpoint: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: plan.planId,
         nextOperationIndex: 0,
+        remoteSetId: null,
       },
     });
   });
@@ -147,6 +153,7 @@ test(
       value.attempt,
       plan,
       "plan:recovery-test:set",
+      SET_RECEIPT,
     );
 
     const result = await recoverPersistedBlooketWrite(
@@ -160,9 +167,10 @@ test(
       kind: "recovered",
       operationId: "plan:recovery-test:set",
       checkpoint: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: plan.planId,
         nextOperationIndex: 1,
+        remoteSetId: "remote-set-1",
       },
     });
     assert.deepEqual(
@@ -185,15 +193,17 @@ test(
   await withTemporaryDirectory(async (directory) => {
     const value = paths(directory);
     await writeFile(value.checkpoint, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planId: plan.planId,
       nextOperationIndex: 1,
+      remoteSetId: "remote-set-1",
     }));
     await beginWriteAttempt(value.attempt, plan, 0);
     await confirmWriteAttempt(
       value.attempt,
       plan,
       "plan:recovery-test:set",
+      SET_RECEIPT,
     );
 
     const result = await recoverPersistedBlooketWrite(
@@ -214,13 +224,54 @@ test(
   },
 );
 
+test("confirmed receipt mismatch preserves recovery evidence", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const value = paths(directory);
+    await writeFile(value.checkpoint, JSON.stringify({
+      schemaVersion: 2,
+      planId: plan.planId,
+      nextOperationIndex: 1,
+      remoteSetId: "different-remote-set",
+    }));
+    await beginWriteAttempt(value.attempt, plan, 0);
+    await confirmWriteAttempt(
+      value.attempt,
+      plan,
+      "plan:recovery-test:set",
+      SET_RECEIPT,
+    );
+
+    const result = await recoverPersistedBlooketWrite(
+      value.checkpoint,
+      value.attempt,
+      plan,
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.kind, "reconciliation-required");
+      if (result.kind === "reconciliation-required") {
+        assert.equal(result.reason, "inconsistent-attempt-state");
+        assert.equal(result.checkpoint.remoteSetId, "different-remote-set");
+        assert.deepEqual(result.attempt.receipt, SET_RECEIPT);
+      }
+    }
+    const loaded = await loadWriteAttemptFile(value.attempt, plan);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok && loaded.kind === "record") {
+      assert.equal(loaded.record.phase, "confirmed");
+    }
+  });
+});
+
 test("inconsistent attempt progress requires reconciliation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const value = paths(directory);
     await writeFile(value.checkpoint, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planId: plan.planId,
       nextOperationIndex: 1,
+      remoteSetId: "remote-set-1",
     }));
     await beginWriteAttempt(value.attempt, plan, 0);
 
@@ -281,9 +332,10 @@ test("standalone recovery uses the shared execution lock", async () => {
         ok: true,
         kind: "ready",
         checkpoint: {
-          schemaVersion: 1,
+          schemaVersion: 2,
           planId: plan.planId,
           nextOperationIndex: 0,
+          remoteSetId: null,
         },
       },
     );

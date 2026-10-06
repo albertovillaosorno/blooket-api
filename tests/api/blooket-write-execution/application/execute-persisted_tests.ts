@@ -91,6 +91,13 @@ const plan: BlooketWritePlan = {
   ],
 };
 
+const SET_RECEIPT = {
+  kind: "set-created" as const,
+  remoteSetId: "remote-set-1",
+};
+const SET_SUCCESS = { ok: true as const, receipt: SET_RECEIPT };
+const QUESTION_SUCCESS = { ok: true as const, receipt: null };
+
 function browser(calls: string[]): BlooketBrowserSessionPort {
   return {
     observe: async () => {
@@ -116,10 +123,12 @@ function writes(
   result: BlooketWriteAttemptResult,
   calls: string[],
   beforeReturn?: () => Promise<void>,
+  targets: Array<string | null> = [],
 ): BlooketWriteExecutionPort {
   return {
-    execute: async (operation) => {
+    execute: async (operation, target) => {
       calls.push(operation.operationId);
+      targets.push(target.remoteSetId);
       if (beforeReturn !== undefined) {
         await beforeReturn();
       }
@@ -161,13 +170,14 @@ test("confirmed writes persist before advanced success returns", async () => {
       plan,
       browser(browserCalls),
       secrets(),
-      writes({ ok: true }, writeCalls, async () => {
+      writes(SET_SUCCESS, writeCalls, async () => {
         assert.deepEqual(browserCalls, ["observe"]);
         const attempt = await loadWriteAttemptFile(attemptPath, plan);
         assert.equal(attempt.ok, true);
         if (attempt.ok && attempt.kind === "record") {
           assert.equal(attempt.record.phase, "attempting");
           assert.equal(attempt.record.operationIndex, 0);
+          assert.equal(attempt.record.receipt, null);
         }
       }),
     );
@@ -177,9 +187,10 @@ test("confirmed writes persist before advanced success returns", async () => {
       kind: "advanced",
       operationId: "plan:persisted-test:set",
       checkpoint: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: plan.planId,
         nextOperationIndex: 1,
+        remoteSetId: "remote-set-1",
       },
     });
     assert.deepEqual(
@@ -200,18 +211,20 @@ test("persisted progress resumes at the exact next operation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
     await writeFile(path, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planId: plan.planId,
       nextOperationIndex: 1,
+      remoteSetId: "remote-set-1",
     }));
     const writeCalls: string[] = [];
+    const targets: Array<string | null> = [];
 
     const result = await executePersistedBlooketWrite(
       persistence(path),
       plan,
       browser([]),
       secrets(),
-      writes({ ok: true }, writeCalls),
+      writes(QUESTION_SUCCESS, writeCalls, undefined, targets),
     );
 
     assert.equal(result.ok, true);
@@ -219,6 +232,7 @@ test("persisted progress resumes at the exact next operation", async () => {
       assert.equal(result.checkpoint.nextOperationIndex, 2);
     }
     assert.deepEqual(writeCalls, ["plan:persisted-test:q:0"]);
+    assert.deepEqual(targets, ["remote-set-1"]);
   });
 });
 
@@ -236,7 +250,7 @@ test(
       plan,
       browser(browserCalls),
       secrets(),
-      writes({ ok: true }, writeCalls),
+      writes(SET_SUCCESS, writeCalls),
     );
 
     assert.equal(result.ok, false);
@@ -292,7 +306,7 @@ test(
       plan,
       browser(browserCalls),
       secrets(),
-      writes({ ok: true }, writeCalls),
+      writes(SET_SUCCESS, writeCalls),
     );
     assert.equal(resumed.ok, true);
     if (resumed.ok) {
@@ -318,7 +332,7 @@ test(
         plan,
         browser([]),
         secrets(),
-        writes({ ok: true }, [], async () => {
+        writes(SET_SUCCESS, [], async () => {
           const acquired = await tryAcquireFileLock(path + ".lock");
           assert.equal(acquired.ok, true);
           if (acquired.ok) {
@@ -351,6 +365,7 @@ test(
       assert.equal(attempt.ok, true);
       if (attempt.ok && attempt.kind === "record") {
         assert.equal(attempt.record.phase, "confirmed");
+        assert.deepEqual(attempt.record.receipt, SET_RECEIPT);
       }
 
       await heldLock?.release();
@@ -361,7 +376,7 @@ test(
         plan,
         browser([]),
         secrets(),
-        writes({ ok: true }, writeCalls),
+        writes(SET_SUCCESS, writeCalls),
       );
       assert.equal(recovered.ok, true);
       if (recovered.ok) {
@@ -371,9 +386,10 @@ test(
       assert.deepEqual(
         JSON.parse(await readFile(path, "utf8")),
         {
-          schemaVersion: 1,
+          schemaVersion: 2,
           planId: plan.planId,
           nextOperationIndex: 1,
+          remoteSetId: "remote-set-1",
         },
       );
       assert.deepEqual(
@@ -412,7 +428,7 @@ test("execution lock prevents stale concurrent duplicate writes", async () => {
           firstWriteCalls.push(operation.operationId);
           markEntered();
           await holdWrite;
-          return { ok: true };
+          return SET_SUCCESS;
         },
       },
     );
@@ -424,7 +440,7 @@ test("execution lock prevents stale concurrent duplicate writes", async () => {
       plan,
       browser(secondBrowserCalls),
       secrets(),
-      writes({ ok: true }, secondWriteCalls),
+      writes(SET_SUCCESS, secondWriteCalls),
     );
 
     assert.deepEqual(second, {
@@ -449,9 +465,10 @@ test("execution lock prevents stale concurrent duplicate writes", async () => {
     assert.deepEqual(
       JSON.parse(await readFile(path, "utf8")),
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: plan.planId,
         nextOperationIndex: 1,
+        remoteSetId: "remote-set-1",
       },
     );
   });
@@ -479,7 +496,7 @@ test("session stop states never create an attempt journal", async () => {
       plan,
       stoppedBrowser,
       secrets(),
-      writes({ ok: true }, writeCalls),
+      writes(SET_SUCCESS, writeCalls),
     );
 
     assert.deepEqual(result, {
@@ -487,9 +504,10 @@ test("session stop states never create an attempt journal", async () => {
       kind: "wait",
       state: "rate-limited",
       checkpoint: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: plan.planId,
         nextOperationIndex: 0,
+        remoteSetId: null,
       },
     });
     assert.deepEqual(browserCalls, ["observe"]);
@@ -513,7 +531,7 @@ test("journal confirmation failure blocks checkpoint persistence", async () => {
       plan,
       browser([]),
       secrets(),
-      writes({ ok: true }, [], async () => {
+      writes(SET_SUCCESS, [], async () => {
         await rm(paths.attempt);
         await symlink(outside, paths.attempt);
       }),

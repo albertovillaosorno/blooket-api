@@ -65,6 +65,26 @@ const plan: BlooketWritePlan = {
   }],
 };
 
+const questionPlan: BlooketWritePlan = {
+  ...plan,
+  operations: [
+    ...plan.operations,
+    {
+      operationId: "plan:attempt-test:q:0",
+      kind: "question",
+      localQuestionId: "q1",
+      question: {
+        type: "typing-answer",
+        prompt: "2 + 2",
+        timeLimitSeconds: 10,
+        imageMediaId: null,
+        matchMode: "exact",
+        answer: "4",
+      },
+    },
+  ],
+};
+
 async function withTemporaryDirectory(
   callback: (directory: string) => Promise<void>,
 ): Promise<void> {
@@ -84,11 +104,12 @@ test("begin creates an attempting journal without overwriting it", async () => {
     assert.deepEqual(begun, {
       ok: true,
       record: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planId: plan.planId,
         operationId: "plan:attempt-test:set",
         operationIndex: 0,
         phase: "attempting",
+        receipt: null,
       },
     });
     assert.deepEqual(await beginWriteAttempt(path, plan, 0), {
@@ -110,10 +131,15 @@ test(
       path,
       plan,
       "plan:attempt-test:set",
+      { kind: "set-created", remoteSetId: "remote-set-1" },
     );
     assert.equal(confirmed.ok, true);
     if (confirmed.ok) {
       assert.equal(confirmed.record?.phase, "confirmed");
+      assert.deepEqual(confirmed.record?.receipt, {
+        kind: "set-created",
+        remoteSetId: "remote-set-1",
+      });
     }
 
     const loaded = await loadWriteAttemptFile(path, plan);
@@ -129,12 +155,18 @@ test("confirmation is idempotent for the same operation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "attempt.json");
     await beginWriteAttempt(path, plan, 0);
-    await confirmWriteAttempt(path, plan, "plan:attempt-test:set");
+    await confirmWriteAttempt(
+      path,
+      plan,
+      "plan:attempt-test:set",
+      { kind: "set-created", remoteSetId: "remote-set-1" },
+    );
 
     const repeated = await confirmWriteAttempt(
       path,
       plan,
       "plan:attempt-test:set",
+      { kind: "set-created", remoteSetId: "remote-set-1" },
     );
     assert.equal(repeated.ok, true);
     if (repeated.ok) {
@@ -168,6 +200,102 @@ test("mismatched operations and plan indexes fail closed", async () => {
         mismatch.issues[0]?.code,
         "write-attempt-operation-mismatch",
       );
+    }
+  });
+});
+
+test("legacy confirmed set journals fail without a receipt", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "attempt.json");
+    await writeFile(path, JSON.stringify({
+      schemaVersion: 1,
+      planId: plan.planId,
+      operationId: "plan:attempt-test:set",
+      operationIndex: 0,
+      phase: "confirmed",
+    }));
+
+    const loaded = await loadWriteAttemptFile(path, plan);
+    assert.equal(loaded.ok, false);
+    if (!loaded.ok && loaded.kind === "invalid") {
+      assert.equal(
+        loaded.issues.some((issue) => issue.code === "missing-set-receipt"),
+        true,
+      );
+    }
+  });
+});
+
+test("confirmed receipts are idempotent but cannot change", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "attempt.json");
+    await beginWriteAttempt(path, plan, 0);
+    const receipt = {
+      kind: "set-created" as const,
+      remoteSetId: "remote-set-1",
+    };
+    assert.equal(
+      (await confirmWriteAttempt(
+        path,
+        plan,
+        "plan:attempt-test:set",
+        receipt,
+      )).ok,
+      true,
+    );
+    assert.equal(
+      (await confirmWriteAttempt(
+        path,
+        plan,
+        "plan:attempt-test:set",
+        receipt,
+      )).ok,
+      true,
+    );
+    const mismatch = await confirmWriteAttempt(
+      path,
+      plan,
+      "plan:attempt-test:set",
+      { kind: "set-created", remoteSetId: "remote-set-2" },
+    );
+    assert.equal(mismatch.ok, false);
+    if (!mismatch.ok && mismatch.kind === "invalid") {
+      assert.equal(
+        mismatch.issues[0]?.code,
+        "write-attempt-receipt-mismatch",
+      );
+    }
+  });
+});
+
+test("question confirmation requires a null receipt", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "attempt.json");
+    await beginWriteAttempt(path, questionPlan, 1);
+    const unexpected = await confirmWriteAttempt(
+      path,
+      questionPlan,
+      "plan:attempt-test:q:0",
+      { kind: "set-created", remoteSetId: "remote-set-1" },
+    );
+    assert.equal(unexpected.ok, false);
+    if (!unexpected.ok && unexpected.kind === "invalid") {
+      assert.equal(
+        unexpected.issues[0]?.code,
+        "unexpected-write-receipt",
+      );
+    }
+
+    const confirmed = await confirmWriteAttempt(
+      path,
+      questionPlan,
+      "plan:attempt-test:q:0",
+      null,
+    );
+    assert.equal(confirmed.ok, true);
+    if (confirmed.ok) {
+      assert.equal(confirmed.record?.phase, "confirmed");
+      assert.equal(confirmed.record?.receipt, null);
     }
   });
 });

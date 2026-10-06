@@ -86,9 +86,10 @@ const plan: BlooketWritePlan = {
 
 function checkpoint(index: number): BlooketWriteCheckpoint {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     planId: plan.planId,
     nextOperationIndex: index,
+    remoteSetId: index === 0 ? null : "remote-set-1",
   };
 }
 

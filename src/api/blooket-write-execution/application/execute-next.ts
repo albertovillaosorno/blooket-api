@@ -157,6 +157,7 @@ export async function executeNextBlooketWrite(
   const attempted = await attemptBlooketWrite(
     writes,
     prepared.operation,
+    prepared.checkpoint.remoteSetId,
   );
   return completeBlooketWriteAttempt(
     plan,
@@ -233,8 +234,9 @@ export async function prepareNextBlooketWrite(
 export async function attemptBlooketWrite(
   writes: BlooketWriteExecutionPort,
   operation: BlooketWriteOperation,
+  remoteSetId: string | null,
 ): Promise<BlooketWriteAttemptResult> {
-  return await safeExecute(writes, operation);
+  return await safeExecute(writes, operation, remoteSetId);
 }
 
 export function completeBlooketWriteAttempt(
@@ -248,6 +250,7 @@ export function completeBlooketWriteAttempt(
       plan,
       checkpoint,
       operation.operationId,
+      attempted.receipt,
     );
     if (!advanced.ok) {
       return {
@@ -281,9 +284,10 @@ export function completeBlooketWriteAttempt(
 async function safeExecute(
   writes: BlooketWriteExecutionPort,
   operation: Parameters<BlooketWriteExecutionPort["execute"]>[0],
+  remoteSetId: string | null,
 ): Promise<BlooketWriteAttemptResult> {
   try {
-    return await writes.execute(operation);
+    return await writes.execute(operation, { remoteSetId });
   } catch {
     return {
       ok: false,
