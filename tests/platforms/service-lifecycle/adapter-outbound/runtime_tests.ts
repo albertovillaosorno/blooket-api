@@ -73,8 +73,10 @@ test("runtime discovery rejects public URLs and mismatched instances",
     await writeFile(join(root, "service-runtime.json"), JSON.stringify(record));
     assert.equal(await existingService(root), undefined);
   } finally {
-    server.closeAllConnections();
-    server.close();
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      server.closeAllConnections();
+    });
     await rm(root, { recursive: true, force: true });
   }
 });

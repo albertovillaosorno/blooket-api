@@ -253,11 +253,10 @@ built and tested; include it in releases only by setting the repository variable
 `RELEASE_INCLUDE_LINUX` to `true`. The Linux test requirement remains in place
 when its archive is omitted from the release.
 
-Configure `CI_JIG_LINUX_URL` and `CI_JIG_LINUX_SHA256` as repository variables
-for the reviewed Linux Jig executable. CI downloads it over HTTPS and verifies
-its SHA-256 before execution. Missing configuration, a checksum mismatch, or a
-Jig failure blocks publication; the known external Jig evidence gap is not
-suppressed. Apple signing and Safari build setup remain tracked in task 14.
+CI invokes the repository Jig Action directly, so validation no longer depends
+on separately configured Jig download variables. A Jig failure still blocks
+publication; the known local validator evidence gap is not suppressed. Apple
+signing and Safari build setup remain tracked in task 14.
 
 To build and verify a local package on the matching host:
 
