@@ -74,6 +74,9 @@ cookies, or raw browser/session state. Version-one and version-two journals
 decode with `baseline: null`; recovery never invents missing pre-attempt
 evidence.
 
+Collection hashing uses versioned JSON framing that preserves observed order and
+duplicates, avoiding delimiter-based or concatenation ambiguity.
+
 Local recovery treats `attempting` as ambiguous and requires reconciliation.
 An explicit resolver may apply externally verified evidence for the exact
 operation: confirmed outcomes first persist their receipt and reuse normal

@@ -164,3 +164,12 @@ export function verificationBaselineKindForOperation(
     ? "set-list"
     : "question-list";
 }
+
+export function frameBlooketWriteVerificationCollection(
+  items: readonly string[],
+): string {
+  return JSON.stringify([
+    BLOOKET_WRITE_VERIFICATION_BASELINE_VERSION,
+    ...items,
+  ]);
+}

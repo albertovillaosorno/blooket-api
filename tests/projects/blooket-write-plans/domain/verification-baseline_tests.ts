@@ -34,6 +34,7 @@ import test from "node:test";
 
 import {
   decodeBlooketWriteVerificationBaseline,
+  frameBlooketWriteVerificationCollection,
   verificationBaselineKindForOperation,
 } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
@@ -125,5 +126,38 @@ test(
       false,
     );
   }
+  },
+);
+
+test("collection framing is versioned ordered and unambiguous", () => {
+  assert.equal(
+    frameBlooketWriteVerificationCollection(["alpha", "beta"]),
+    '[1,"alpha","beta"]',
+  );
+  assert.notEqual(
+    frameBlooketWriteVerificationCollection(["ab", "c"]),
+    frameBlooketWriteVerificationCollection(["a", "bc"]),
+  );
+  assert.notEqual(
+    frameBlooketWriteVerificationCollection(["same", "same"]),
+    frameBlooketWriteVerificationCollection(["same"]),
+  );
+  assert.notEqual(
+    frameBlooketWriteVerificationCollection(["first", "second"]),
+    frameBlooketWriteVerificationCollection(["second", "first"]),
+  );
+});
+
+test(
+  "collection framing escapes delimiters and Unicode deterministically",
+  () => {
+  assert.equal(
+    frameBlooketWriteVerificationCollection([
+      "comma,value",
+      "line\nbreak",
+      "emoji-🧪",
+    ]),
+    '[1,"comma,value","line\\nbreak","emoji-🧪"]',
+  );
   },
 );
