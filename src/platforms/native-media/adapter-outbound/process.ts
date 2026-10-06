@@ -138,6 +138,75 @@ export async function decodeImageIsolated(
     throw new Error("native-media-invalid-result");
   return reply as unknown as ImageDecodeResult;
 }
+export type CompactImageResult =
+  | {
+      readonly ok: true;
+      readonly value: {
+        readonly bytes: Uint8Array;
+        readonly format: "webp" | "gif";
+      };
+    }
+  | {
+      readonly ok: false;
+      readonly code:
+        | "unsupported-image-format"
+        | "image-pixel-limit-exceeded"
+        | "image-frame-limit-exceeded"
+        | "image-decode-failed"
+        | "decoder-format-mismatch"
+        | "invalid-image-metadata"
+        | "native-media-failed";
+    };
+
+export async function compactImageIsolated(
+  bytes: Uint8Array,
+  options?: NativeMediaOptions,
+): Promise<CompactImageResult> {
+  admitSource(bytes);
+  try {
+    const reply = object(
+      await runNativeJob(
+        {
+          version: 1,
+          kind: "compact",
+          bytes: new Uint8Array(bytes),
+        },
+        options,
+      ),
+    );
+    if (reply["ok"] === false) {
+      exact(reply, ["ok", "code"]);
+      if (
+        typeof reply["code"] !== "string"
+        || !SOURCE_CODES.has(reply["code"])
+      ) {
+        throw new Error("native-media-invalid-result");
+      }
+      return reply as CompactImageResult;
+    }
+    exact(reply, ["ok", "value"]);
+    const value = object(reply["value"]);
+    exact(value, ["bytes", "format"]);
+    const output = value["bytes"];
+    const detected =
+      output instanceof Uint8Array ? detectImageFormat(output) : undefined;
+    if (
+      reply["ok"] !== true
+      || !(output instanceof Uint8Array)
+      || output.byteLength < 1
+      || output.byteLength > 25_000_000
+      || !detected
+      || !["webp", "gif"].includes(detected.format)
+      || value["format"] !== detected.format
+    ) {
+      throw new Error("native-media-invalid-result");
+    }
+    return reply as CompactImageResult;
+  } catch {
+    return { ok: false, code: "native-media-failed" };
+  }
+}
+
 export async function renderImageIsolated(
   bytes: Uint8Array,
   recipe: EditRecipe,

@@ -62,7 +62,9 @@ async function work(input: unknown) {
       ? ["maxInputPixels"]
       : kind === "editor"
         ? ["state", "canvas", "limits", "options"]
-        : ["recipe"]),
+        : kind === "compact"
+          ? []
+          : ["recipe"]),
   ]);
   const bytes = request["bytes"];
   if (
@@ -70,7 +72,12 @@ async function work(input: unknown) {
     !(bytes instanceof Uint8Array) ||
     bytes.length < 1 ||
     bytes.length > 25_000_000 ||
-    (kind !== "decode" && kind !== "render" && kind !== "editor")
+    (
+      kind !== "decode"
+      && kind !== "render"
+      && kind !== "editor"
+      && kind !== "compact"
+    )
   )
     throw new Error("invalid-native-job");
   const sharp = await loadSharp();
@@ -86,6 +93,39 @@ async function work(input: unknown) {
     )
       throw new Error("invalid-native-job");
     return await decodeSourceImage(bytes, limit);
+  }
+  if (kind === "compact") {
+    const decoded = await decodeSourceImage(bytes, 80_000_000);
+    if (!decoded.ok) return decoded;
+    const input = sharp(bytes, {
+      animated: decoded.value.animated,
+      failOn: "warning",
+      limitInputPixels: 80_000_000,
+    });
+    const output = decoded.value.animated
+      ? await input.gif({
+          reuse: true,
+          colours: 256,
+          effort: 10,
+          dither: 1,
+          interFrameMaxError: 0,
+          interPaletteMaxError: 0,
+          keepDuplicateFrames: true,
+        }).toBuffer()
+      : await input.rotate().webp({
+          quality: 92,
+          alphaQuality: 100,
+          effort: 6,
+          smartSubsample: true,
+          smartDeblock: true,
+        }).toBuffer();
+    return {
+      ok: true as const,
+      value: {
+        bytes: output,
+        format: decoded.value.animated ? "gif" as const : "webp" as const,
+      },
+    };
   }
   if (kind === "editor") {
     const state = object(request["state"]);

@@ -17,8 +17,8 @@ endorsed by the platform.
 ## What works today
 
 - A localhost browser workspace with English and Spanish interfaces.
-- A photo/GIF library with immutable, user-named originals and mirrored YAML
-  metadata. AI-generated English text is separate from original descriptions.
+- A photo/GIF library with optimized canonical media and mirrored YAML
+  metadata. Temporary intake bytes are discarded after canonicalization.
 - An editor with zoom buttons and slider, dragging, saturation, contrast,
   blurred or solid backgrounds, color picking, undo/redo, and prepared exports.
 - Explicit GIF export FPS, defaulting to 10, with bounded duration, frames,

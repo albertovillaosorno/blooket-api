@@ -139,9 +139,10 @@ const tools = [
   tool(
     "skills_put",
     "skills.put",
-    "Save a teacher-requested personal skill with " +
-      "revision protection and a local recovery copy. No " +
-      "executable files or arbitrary paths.",
+    "Save or revise reusable teacher workflow guidance when " +
+      "its scope is explicit. Ask one brief scope question " +
+      "when a correction could be one-off. Uses revision " +
+      "protection and a local recovery copy.",
     { id, text: string, expectedRevision: revision },
     false,
   ),

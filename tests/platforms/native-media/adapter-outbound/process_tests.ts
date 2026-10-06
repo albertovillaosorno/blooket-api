@@ -37,6 +37,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  compactImageIsolated,
   decodeImageIsolated,
   renderImageIsolated,
   renderEditorIsolated,
@@ -94,6 +95,19 @@ test("isolated decode returns facts only after its worker exits", async () => {
   assert.equal(decoded.value.format.format, "png");
   gone(pid);
 });
+test("isolated compaction discards source encoding", async () => {
+  const compacted = await compactImageIsolated(PNG);
+  assert.ok(compacted.ok);
+  if (!compacted.ok) return;
+  assert.equal(compacted.value.format, "webp");
+  assert.notDeepEqual(compacted.value.bytes, PNG);
+  const sharp = await loadSharp();
+  const output = await sharp(compacted.value.bytes).metadata();
+  assert.equal(output.format, "webp");
+  assert.equal(output.width, 2);
+  assert.equal(output.height, 2);
+});
+
 test("isolated GIF rendering preserves loops and explicit 20 FPS", async () => {
   const result = await renderImageIsolated(GIF, recipe);
   assert.ok(result.ok);

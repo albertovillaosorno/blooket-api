@@ -72,14 +72,21 @@ async function setup() {
   return { root, bytes, input };
 }
 test(
-  "library preserves originals, mirrors YAML and " +
+  "library stores optimized canonical media and " +
     "separates enrichment from edits",
   async () => {
     const { root, bytes, input } = await setup();
     try {
       const record = await importLibraryImage(root, input);
       const library = (await loadPreferences(root)).mediaRoot;
-      assert.equal(metadataPath(record.asset), "metadata/Mi foto.png.yaml");
+      assert.match(
+        record.asset,
+        /^photos\/[0-9a-f-]{36}\.webp$/u,
+      );
+      assert.equal(
+        metadataPath(record.asset),
+        "metadata/" + record.asset.slice("photos/".length) + ".yaml",
+      );
       const result = await executeLibraryCommand(
         {
           version: 1,
@@ -124,14 +131,13 @@ test(
       const prepared = await prepareLibraryImage(root, record.id);
       assert.ok(prepared.prepared!.bytes < 2_500_000);
       assert.equal((await loadPreferences(root)).defaults.width, 1280);
-      assert.deepEqual(
-        await readFile(join(library, record.asset)),
-        Buffer.from(bytes),
-      );
-      await assert.rejects(
-        importLibraryImage(root, input),
-        /filename-already-exists/u,
-      );
+      const canonical = await readFile(join(library, record.asset));
+      assert.notDeepEqual(canonical, Buffer.from(bytes));
+      const sharp = await loadSharp();
+      assert.equal((await sharp(canonical).metadata()).format, "webp");
+      const duplicateName = await importLibraryImage(root, input);
+      assert.notEqual(duplicateName.id, record.id);
+      assert.notEqual(duplicateName.asset, record.asset);
       await assert.rejects(
         editLibraryImage(root, {
           id: record.id,
@@ -176,10 +182,11 @@ test(
           .revision,
         1,
       );
-      await assert.rejects(
-        importLibraryImage(root, { ...input, filename: "../outside.png" }),
-        /invalid-import/u,
-      );
+      const ignoredFilename = await importLibraryImage(root, {
+        ...input,
+        filename: "../outside.png",
+      });
+      assert.notEqual(ignoredFilename.asset, "../outside.png");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -357,6 +364,18 @@ test(
       await installInitialSkills(root);
       const path = join(root, "skills", "quiz-authoring.md");
       assert.match(await readFile(path, "utf8"), /timeLimitSeconds/u);
+      assert.match(
+        await readFile(join(root, "skills", "master-workflow.md"), "utf8"),
+        /workflow-learning/u,
+      );
+      assert.match(
+        await readFile(join(root, "skills", "human-validation.md"), "utf8"),
+        /CAPTCHA/u,
+      );
+      assert.match(
+        await readFile(join(root, "skills", "media-analysis.md"), "utf8"),
+        /ephemeral/u,
+      );
       await writeFile(path, "Personal guidance");
       await installInitialSkills(root);
       assert.equal(await readFile(path, "utf8"), "Personal guidance");
@@ -444,7 +463,7 @@ test(
       await rm(path);
       await symlink(outside, path);
       await assert.rejects(listLibrary(library), /symbolic-library-path/u);
-      assert.deepEqual(
+      assert.notDeepEqual(
         await readFile(join(library, record.asset)),
         Buffer.from(bytes),
       );
@@ -468,8 +487,9 @@ test(
         base64: Buffer.from(jpeg).toString("base64"),
       });
       assert.notEqual(jpg.id, png.id);
-      assert.equal(metadataPath(jpg.asset), "metadata/Mi foto.jpg.yaml");
-      assert.equal(metadataPath(png.asset), "metadata/Mi foto.png.yaml");
+      assert.notEqual(metadataPath(jpg.asset), metadataPath(png.asset));
+      assert.match(jpg.asset, /\.webp$/u);
+      assert.match(png.asset, /\.webp$/u);
       assert.equal(
         (await listLibrary((await loadPreferences(root)).mediaRoot)).length,
         2,
