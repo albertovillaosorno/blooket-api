@@ -102,6 +102,33 @@ test("multiple choice admits image-only answers structurally", () => {
   assert.equal(result.ok, true);
 });
 
+test("multiple choice rejects answers with text and image together", () => {
+  const result = decodeQuestionDocument({
+    ...multipleChoice,
+    answers: [
+      {
+        text: "Sun",
+        correct: true,
+        image: {
+          description: "A bright yellow sun in a blue sky.",
+          mediaId: null,
+        },
+      },
+      multipleChoice.answers[1],
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some(
+        (issue) => issue.code === "ambiguous-answer-content",
+      ),
+      true,
+    );
+  }
+});
+
 test("typing answers admit exact and contains matching", () => {
   assert.equal(decodeQuestionDocument(typingAnswer).ok, true);
   assert.equal(

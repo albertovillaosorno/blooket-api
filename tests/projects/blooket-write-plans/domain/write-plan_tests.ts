@@ -116,12 +116,12 @@ function project(description = "Astronomy review.") {
         image: null,
         answers: [
           {
-            text: "Sun",
+            text: null,
             correct: true,
             image: { description: "Sun.", mediaId: "sun" },
           },
           {
-            text: "Moon",
+            text: null,
             correct: false,
             image: { description: "Moon.", mediaId: "moon" },
           },
@@ -176,8 +176,8 @@ test("validated projects lower to ordered remote-neutral operations", () => {
       randomOrder: true,
       imageMediaId: null,
       answers: [
-        { text: "Sun", correct: true, imageMediaId: "sun" },
-        { text: "Moon", correct: false, imageMediaId: "moon" },
+        { text: null, correct: true, imageMediaId: "sun" },
+        { text: null, correct: false, imageMediaId: "moon" },
       ],
     },
   });

@@ -328,7 +328,14 @@ function decodeAnswer(
     issues.push({
       path,
       code: "empty-answer",
-      message: "Expected answer text, an image, or both.",
+      message: "Expected answer text or an image.",
+    });
+  }
+  if (text !== null && text !== undefined && image !== null) {
+    issues.push({
+      path,
+      code: "ambiguous-answer-content",
+      message: "Expected answer text or an image, but not both.",
     });
   }
 
