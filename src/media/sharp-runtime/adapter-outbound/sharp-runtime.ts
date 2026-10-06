@@ -85,35 +85,41 @@ export interface SharpPipeline {
     multiplier: number | readonly number[],
     offset: number | readonly number[],
   ): SharpPipeline;
-  modulate(options: {
-    readonly saturation?: number;
-  }): SharpPipeline;
+  modulate(options: { readonly saturation?: number }): SharpPipeline;
   blur(sigma: number): SharpPipeline;
-  png(): SharpPipeline;
+  png(options?: {
+    readonly palette?: boolean;
+    readonly quality?: number;
+    readonly compressionLevel?: number;
+  }): SharpPipeline;
   gif(options: {
+    readonly colours?: number;
+    readonly effort?: number;
     readonly loop: number;
     readonly delay: readonly number[];
     readonly keepDuplicateFrames: boolean;
   }): SharpPipeline;
-  composite(images: readonly {
-    readonly input:
-      | Uint8Array
-      | {
-          readonly create: {
-            readonly width: number;
-            readonly height: number;
-            readonly channels: 4;
-            readonly background: {
-              readonly r: number;
-              readonly g: number;
-              readonly b: number;
-              readonly alpha: number;
+  composite(
+    images: readonly {
+      readonly input:
+        | Uint8Array
+        | {
+            readonly create: {
+              readonly width: number;
+              readonly height: number;
+              readonly channels: 4;
+              readonly background: {
+                readonly r: number;
+                readonly g: number;
+                readonly b: number;
+                readonly alpha: number;
+              };
             };
           };
-        };
-    readonly top?: number;
-    readonly left?: number;
-  }[]): SharpPipeline;
+      readonly top?: number;
+      readonly left?: number;
+    }[],
+  ): SharpPipeline;
   toBuffer(): Promise<Uint8Array>;
 }
 
@@ -130,10 +136,10 @@ export async function loadSharp(): Promise<SharpFactory> {
   }
 
   const moduleUrl = new URL(
-    "../../../../.dependencies/pnpm/node_modules/sharp/dist/index.mjs",
+    "../../../../.dependencies/pnpm/node_modules/sharp/" + "dist/index.mjs",
     import.meta.url,
   );
-  const loaded = await import(moduleUrl.href) as {
+  const loaded = (await import(moduleUrl.href)) as {
     readonly default: SharpFactory;
   };
   sharpFactory = loaded.default;

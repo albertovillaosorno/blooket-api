@@ -1,0 +1,9 @@
+identity:
+  id: function:user-library
+  name: user-library
+  path: src/platforms/user-library
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

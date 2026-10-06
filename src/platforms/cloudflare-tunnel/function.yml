@@ -1,0 +1,9 @@
+identity:
+  id: function:cloudflare-tunnel
+  name: cloudflare-tunnel
+  path: src/platforms/cloudflare-tunnel
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

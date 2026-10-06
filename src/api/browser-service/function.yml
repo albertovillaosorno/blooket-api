@@ -1,0 +1,9 @@
+identity:
+  id: function:browser-service
+  name: browser-service
+  path: src/api/browser-service
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: adapter-inbound

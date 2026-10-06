@@ -1,0 +1,9 @@
+identity:
+  id: function:json-command-process
+  name: json-command-process
+  path: src/cli/json-command-process
+classification:
+  repository: blooket-api
+  domain: cli
+architecture:
+  kind: adapter-inbound

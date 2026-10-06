@@ -29,6 +29,8 @@
 // - Defaults:
 //   - Semantic failures return exit code 2 and adapter failures return 3.
 //
+import { decodeCommandEnvelope } from
+  "../../../ir/wire-envelopes/contract/command-envelope.ts";
 import { dirname, join } from "node:path";
 
 import { executeCommand } from
@@ -48,6 +50,7 @@ import {
 
 export interface CliDependencies {
   readonly readText: (path: string) => Promise<string>;
+  readonly readStdin?: () => Promise<string>;
   readonly operationId: () => string;
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
@@ -78,6 +81,39 @@ export async function runCli(
   args: readonly string[],
   dependencies: CliDependencies,
 ): Promise<number> {
+  if (args.length === 2 && args[0] === "command" && args[1] === "--json") {
+    try {
+      if (!dependencies.readStdin) throw new Error("stdin-unavailable");
+      const decoded = decodeCommandEnvelope(
+        JSON.parse(await dependencies.readStdin()),
+      );
+      if (!decoded.ok) {
+        renderResult(
+          {
+            version: 1,
+            operationId: dependencies.operationId(),
+            ok: false,
+            issues: decoded.issues,
+          },
+          true,
+          dependencies,
+        );
+        return 2;
+      }
+      const result = await (dependencies.execute ?? executeCommand)(
+        decoded.value,
+      );
+      renderResult(result, true, dependencies);
+      return result.ok ? 0 : 2;
+    } catch {
+      renderResult(
+        internalFailure(dependencies.operationId()),
+        true,
+        dependencies,
+      );
+      return 3;
+    }
+  }
   const parsed = parseCliArguments(args);
   if (!parsed.ok) {
     dependencies.stderr(`${parsed.message}\n`);
@@ -141,8 +177,9 @@ async function prepareCommand(
     };
   }
 
-  const mediaPath = invocation.mediaPath
-    ?? join(dirname(invocation.projectPath), "media.jsonl");
+  const mediaPath =
+    invocation.mediaPath ??
+    join(dirname(invocation.projectPath), "media.jsonl");
   const [projectJson, mediaJsonl] = await Promise.all([
     readText(invocation.projectPath),
     readText(mediaPath),

@@ -1,0 +1,110 @@
+// Copyright:
+//   - Copyright © 2026 Alberto Villa Osorno.
+// SPDX-License-Identifier:
+//   - MIT
+// Confidential:
+//   - false
+// License-File:
+//   - LICENSE-MIT
+//
+// Boundary-Contract:
+// - Owns:
+//   - Composition of the configured private gateway and tunnel.
+// - Must-Not:
+//   - Provision Cloudflare accounts or expose the general HTTP API.
+// - Allows:
+//   - Inputs: Explicit bounded capability requests.
+//   - Outputs: Validated values or stable failure codes.
+//   - Side effects: Only those admitted by this owning boundary.
+// - Split-When:
+//   - Another capability requires independent lifecycle or authority.
+// - Merge-When:
+//   - The capability no longer needs an independent boundary.
+// - Summary:
+//   - Composition of the configured private gateway and tunnel.
+// - Description:
+//   - Preserves the configured authority across local and remote callers.
+// - Usage:
+//   - Use the owning entrypoint after validating external input.
+// - Defaults:
+//   - Unsupported or invalid requests fail closed.
+//
+import type { OnlineConnectionController } from
+  "../../../api/online-connection/contract/controller.ts";
+import { startMcpGateway } from
+  "../../../mcp/streamable-gateway/adapter-inbound/gateway.ts";
+import { startCloudflareTunnel } from
+  "../../../platforms/cloudflare-tunnel/adapter-outbound/process.ts";
+import { createHostSecretStore } from
+  "../../../platforms/host-secret-store/adapter-outbound/host-secret-store.ts";
+import type { HostSecretStore } from
+  "../../../security/host-secrets/domain/host-secret.ts";
+import { loadPreferences } from
+  "../../../platforms/user-storage/adapter-outbound/root.ts";
+
+export function createOnlineConnection(
+  root: string,
+  secrets: HostSecretStore = createHostSecretStore(),
+): OnlineConnectionController {
+  let gateway: Awaited<ReturnType<typeof startMcpGateway>> | undefined;
+  let tunnel: ReturnType<typeof startCloudflareTunnel> | undefined;
+  let state = "disabled",
+    gatewayPort = 2608;
+  let serial: Promise<void> = Promise.resolve();
+  async function stop(): Promise<void> {
+    await tunnel?.stop();
+    tunnel = undefined;
+    gateway?.revokeAll();
+    if (gateway)
+      await new Promise<void>((resolve) => {
+        gateway!.server.close(() => resolve());
+        gateway!.server.closeAllConnections();
+      });
+    gateway = undefined;
+    state = "disabled";
+  }
+  return {
+    status: () => ({
+      state,
+      gatewayPort,
+      productVerification: "recipient-mac-and-chatgpt-pending",
+    }),
+    pending: () => gateway?.pending() ?? [],
+    approve: (id) => {
+      if (!gateway) throw new Error("online-disabled");
+      gateway.approve(id);
+    },
+    stop,
+    reload: async () => {
+      const run = async () => {
+        await stop();
+        const preferences = await loadPreferences(root);
+        if (!preferences.online.enabled) return;
+        const token = await secrets.read("cloudflare-tunnel");
+        if (!token.ok || token.kind !== "found") {
+          state = "tunnel-token-missing";
+          return;
+        }
+        gatewayPort =
+          preferences.service.port === 65535
+            ? 2608
+            : preferences.service.port + 1;
+        try {
+          gateway = await startMcpGateway({
+            publicUrl: preferences.online.publicUrl,
+            dataRoot: root,
+            port: gatewayPort,
+          });
+        } catch {
+          state = "gateway-start-failed";
+          return;
+        }
+        tunnel = startCloudflareTunnel(token.secret, (next) => {
+          state = next;
+        });
+      };
+      serial = serial.then(run, run);
+      await serial;
+    },
+  };
+}

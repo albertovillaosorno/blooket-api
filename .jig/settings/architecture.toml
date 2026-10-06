@@ -17,7 +17,7 @@ depends_on = ["cli"]
 depends_on = ["ir"]
 
 [component.platforms]
-depends_on = ["projects", "security", "settings"]
+depends_on = ["ir", "media", "projects", "security", "settings"]
 
 [component.projects]
 depends_on = ["ir", "media"]
@@ -28,11 +28,14 @@ depends_on = ["ir"]
 [component.settings]
 depends_on = ["ir"]
 
-[component.ui_desktop]
-depends_on = ["api", "ui_general"]
+[component.ui_web]
+depends_on = ["ir", "ui_general"]
 
 [component.ui_extension]
 depends_on = ["ir", "ui_general"]
 
 [component.ui_general]
 depends_on = ["ir"]
+
+[component.service]
+depends_on = ["api", "mcp", "platforms", "security", "settings"]

@@ -2,11 +2,15 @@
 
 ## Status
 
-Accepted target behavior; not yet implemented. This decision supersedes the
-English-only media description policy, authoritative JSONL media metadata,
-automatic internal naming of user-visible source files, and source-timing
-preservation for prepared GIFs. Migrate existing data explicitly rather than
-changing a published schema in place.
+Accepted target behavior; partially implemented as of 2026-10-06. Schema-3
+preferences, mirrored YAML, library/skill/draft operations, the browser editor,
+and explicit GIF resampling exist. Legacy library migration, complete native
+integration, and end-to-end publication remain pending in `TODO.md`.
+
+This decision supersedes the English-only media description policy,
+authoritative JSONL media metadata, automatic internal naming of user-visible
+source files, and source-timing preservation for prepared GIFs. Migrate existing
+data explicitly rather than changing a published schema in place.
 
 ## Decision ID
 

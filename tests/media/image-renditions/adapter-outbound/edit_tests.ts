@@ -36,34 +36,34 @@ import { renderEditedImageRendition } from
   "../../../../src/media/image-renditions/adapter-outbound/edit.ts";
 import { loadSharp } from
   "../../../../src/media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
-import {
-  type MediaEditorState,
-} from "../../../../src/media/editor-state/domain/editor-state.ts";
+import { type MediaEditorState } from
+  "../../../../src/media/editor-state/domain/editor-state.ts";
 
 const COLOR_2X2 = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPo"
-    + "AAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfyTAAAAA"
-    + "BJRU5ErkJggg==",
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPo" +
+    "AAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfyTAAAAA" +
+    "BJRU5ErkJggg==",
   "base64",
 );
 
 const GRADIENT_4X4 = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAACXBIWXMAAAPo"
-    + "AAAD6AG1e1JrAAAASElEQVQImQXBgQAAIAxFwY8QwhBCCCGEIYQQQgghhB"
-    + "BCCEOYwetOkiilYGbUWlFrjd477s4YA805WWux9+acg+69vPeICDKTDwC4"
-    + "JnFMdMGmAAAAAElFTkSuQmCC",
+  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAACXBIWXMAAAPo" +
+    "AAAD6AG1e1JrAAAASElEQVQImQXBgQAAIAxFwY8QwhBCCCGEIYQQQgghhB" +
+    "BCCEOYwetOkiilYGbUWlFrjd477s4YA805WWux9+acg+69vPeICDKTDwC4" +
+    "JnFMdMGmAAAAAElFTkSuQmCC",
   "base64",
 );
 
 const GIF_2_FRAME_1X1 = Buffer.from(
-  "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwALAAAAAABAAEAAAIBTAA7",
+  "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwALAAAAA" + "ABAAEAAAIBTAA7",
   "base64",
 );
 
 const GIF_2_FRAME_2X2 = Buffer.from(
-  "R0lGODlhAgACAIIAAExpcQD/AP8AAP///wAA/wAAAAAAAAAAACH/C05FVFNDQVBF"
-    + "Mi4wAwEBAAAh+QQFCAAAACwAAAAAAgACAAADAyhBkwAh+QQFDgAAACwAAAAAAg"
-    + "ACAIJMaXH//wAAAAAA////AP8AAAAAAAAAAAADAygxlAA7",
+  "R0lGODlhAgACAIIAAExpcQD/AP8AAP///wAA/wAAAAAAAAAAAC" +
+    "H/C05FVFNDQVBF" +
+    "Mi4wAwEBAAAh+QQFCAAAACwAAAAAAgACAAADAyhBkwAh+QQFDgAAACwAAAAAAg" +
+    "ACAIJMaXH//wAAAAAA////AP8AAAAAAAAAAAADAygxlAA7",
   "base64",
 );
 
@@ -111,13 +111,8 @@ test("neutral editor rendering preserves equal-canvas pixels", async () => {
   }
 
   assert.deepEqual(
-    [...await rawPixels(rendered.value.bytes)],
-    [
-      255, 0, 0, 255,
-      0, 255, 0, 255,
-      0, 0, 255, 255,
-      255, 255, 255, 255,
-    ],
+    [...(await rawPixels(rendered.value.bytes))],
+    [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255],
   );
 });
 
@@ -143,8 +138,8 @@ test("zoom samples a bounded center crop before resize", async () => {
   }
 
   assert.notDeepEqual(
-    [...await rawPixels(zoomed.value.bytes)],
-    [...await rawPixels(neutral.value.bytes)],
+    [...(await rawPixels(zoomed.value.bytes))],
+    [...(await rawPixels(neutral.value.bytes))],
   );
 });
 
@@ -161,7 +156,7 @@ test("pan moves the sampled foreground across the canvas", async () => {
     return;
   }
 
-  const pixels = [...await rawPixels(rendered.value.bytes)];
+  const pixels = [...(await rawPixels(rendered.value.bytes))];
   assert.deepEqual(pixels.slice(4, 8), [255, 0, 0, 255]);
   assert.deepEqual(pixels.slice(12, 16), [0, 0, 255, 255]);
 });
@@ -177,10 +172,7 @@ test("extreme zoom remains bounded to canvas-sized rendering", async () => {
 
   assert.equal(rendered.ok, true);
   if (rendered.ok) {
-    assert.equal(
-      (await rawPixels(rendered.value.bytes)).byteLength,
-      4 * 4 * 4,
-    );
+    assert.equal((await rawPixels(rendered.value.bytes)).byteLength, 4 * 4 * 4);
   }
 });
 
@@ -230,14 +222,16 @@ test("saturation zero removes chroma while preserving alpha", async () => {
 test("redaction replaces its rectangle with opaque black", async () => {
   const rendered = await renderEditedImageRendition(
     COLOR_2X2,
-    state({}, [{
-      id: "top-left",
-      mode: "redact",
-      x: 0,
-      y: 0,
-      width: 0.5,
-      height: 0.5,
-    }]),
+    state({}, [
+      {
+        id: "top-left",
+        mode: "redact",
+        x: 0,
+        y: 0,
+        width: 0.5,
+        height: 0.5,
+      },
+    ]),
     { width: 2, height: 2 },
     LIMITS,
     { blurSigma: 1 },
@@ -247,7 +241,7 @@ test("redaction replaces its rectangle with opaque black", async () => {
     return;
   }
 
-  const pixels = [...await rawPixels(rendered.value.bytes)];
+  const pixels = [...(await rawPixels(rendered.value.bytes))];
   assert.deepEqual(pixels.slice(0, 4), [0, 0, 0, 255]);
   assert.deepEqual(pixels.slice(4, 8), [0, 255, 0, 255]);
 });
@@ -262,14 +256,16 @@ test("blur changes its region without touching outside pixels", async () => {
   );
   const blurred = await renderEditedImageRendition(
     GRADIENT_4X4,
-    state({}, [{
-      id: "top",
-      mode: "blur",
-      x: 0,
-      y: 0,
-      width: 1,
-      height: 0.75,
-    }]),
+    state({}, [
+      {
+        id: "top",
+        mode: "blur",
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 0.75,
+      },
+    ]),
     { width: 4, height: 4 },
     LIMITS,
     { blurSigma: 1 },
@@ -280,8 +276,8 @@ test("blur changes its region without touching outside pixels", async () => {
     return;
   }
 
-  const before = [...await rawPixels(baseline.value.bytes)];
-  const after = [...await rawPixels(blurred.value.bytes)];
+  const before = [...(await rawPixels(baseline.value.bytes))];
+  const after = [...(await rawPixels(blurred.value.bytes))];
   assert.notDeepEqual(after.slice(0, 4 * 4 * 3), before.slice(0, 4 * 4 * 3));
   assert.deepEqual(after.slice(4 * 4 * 3), before.slice(4 * 4 * 3));
 });
@@ -289,14 +285,16 @@ test("blur changes its region without touching outside pixels", async () => {
 test("one-pixel blur regions remain valid bounded operations", async () => {
   const rendered = await renderEditedImageRendition(
     COLOR_2X2,
-    state({}, [{
-      id: "pixel",
-      mode: "blur",
-      x: 0,
-      y: 0,
-      width: 0.5,
-      height: 0.5,
-    }]),
+    state({}, [
+      {
+        id: "pixel",
+        mode: "blur",
+        x: 0,
+        y: 0,
+        width: 0.5,
+        height: 0.5,
+      },
+    ]),
     { width: 2, height: 2 },
     LIMITS,
     { blurSigma: 1 },
@@ -305,69 +303,70 @@ test("one-pixel blur regions remain valid bounded operations", async () => {
   assert.equal(rendered.ok, true);
 });
 
-test("animated GIF edits preserve frame timing and loop state", async () => {
-  const rendered = await renderEditedImageRendition(
-    GIF_2_FRAME_2X2,
-    state({}, [{
-      id: "top-left",
-      mode: "redact",
-      x: 0,
-      y: 0,
-      width: 0.5,
-      height: 0.5,
-    }]),
-    { width: 2, height: 2 },
-    LIMITS,
-    { blurSigma: 1 },
-  );
-  assert.equal(rendered.ok, true);
-  if (!rendered.ok) {
-    return;
-  }
+test(
+  "animated GIF edits normalize timing to 10 FPS and " + "preserve loop state",
+  async () => {
+    const rendered = await renderEditedImageRendition(
+      GIF_2_FRAME_2X2,
+      state({}, [
+        {
+          id: "top-left",
+          mode: "redact",
+          x: 0,
+          y: 0,
+          width: 0.5,
+          height: 0.5,
+        },
+      ]),
+      { width: 2, height: 2 },
+      LIMITS,
+      { blurSigma: 1 },
+    );
+    assert.equal(rendered.ok, true);
+    if (!rendered.ok) {
+      return;
+    }
 
-  assert.deepEqual(
-    {
-      format: rendered.value.format,
-      mediaType: rendered.value.mediaType,
-      frameCount: rendered.value.frameCount,
-      animated: rendered.value.animated,
-    },
-    {
-      format: "gif",
-      mediaType: "image/gif",
-      frameCount: 2,
+    assert.deepEqual(
+      {
+        format: rendered.value.format,
+        mediaType: rendered.value.mediaType,
+        frameCount: rendered.value.frameCount,
+        animated: rendered.value.animated,
+      },
+      {
+        format: "gif",
+        mediaType: "image/gif",
+        frameCount: 2,
+        animated: true,
+      },
+    );
+
+    const sharp = await loadSharp();
+    const metadata = await sharp(rendered.value.bytes, {
       animated: true,
-    },
-  );
+    }).metadata();
+    assert.equal(metadata.pages, 2);
+    assert.equal(metadata.pageHeight, 2);
+    assert.deepEqual(metadata.delay, [100, 100]);
+    assert.equal(metadata.loop, 2);
 
-  const sharp = await loadSharp();
-  const metadata = await sharp(
-    rendered.value.bytes,
-    { animated: true },
-  ).metadata();
-  assert.equal(metadata.pages, 2);
-  assert.equal(metadata.pageHeight, 2);
-  assert.deepEqual(metadata.delay, [80, 140]);
-  assert.equal(metadata.loop, 2);
-
-  const raw = await sharp(
-    rendered.value.bytes,
-    { animated: true },
-  )
-    .ensureAlpha()
-    .raw()
-    .toBuffer();
-  const frameBytes = 2 * 2 * 4;
-  assert.deepEqual([...raw.slice(0, 4)], [0, 0, 0, 255]);
-  assert.deepEqual(
-    [...raw.slice(frameBytes, frameBytes + 4)],
-    [0, 0, 0, 255],
-  );
-  assert.notDeepEqual(
-    [...raw.slice(0, frameBytes)],
-    [...raw.slice(frameBytes)],
-  );
-});
+    const raw = await sharp(rendered.value.bytes, { animated: true })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    const frameBytes = 2 * 2 * 4;
+    assert.deepEqual([...raw.slice(0, 4)], [0, 0, 0, 255]);
+    assert.deepEqual(
+      [...raw.slice(frameBytes, frameBytes + 4)],
+      [0, 0, 0, 255],
+    );
+    assert.notDeepEqual(
+      [...raw.slice(0, frameBytes)],
+      [...raw.slice(frameBytes)],
+    );
+  },
+);
 
 test("animated GIF edits preserve duplicate frames", async () => {
   const rendered = await renderEditedImageRendition(
@@ -383,10 +382,9 @@ test("animated GIF edits preserve duplicate frames", async () => {
   }
 
   const sharp = await loadSharp();
-  const metadata = await sharp(
-    rendered.value.bytes,
-    { animated: true },
-  ).metadata();
+  const metadata = await sharp(rendered.value.bytes, {
+    animated: true,
+  }).metadata();
   assert.equal(metadata.pages, 2);
   assert.deepEqual(metadata.delay, [100, 100]);
   assert.equal(metadata.loop, 1);

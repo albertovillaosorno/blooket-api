@@ -1,0 +1,9 @@
+identity:
+  id: function:streamable-gateway
+  name: streamable-gateway
+  path: src/mcp/streamable-gateway
+classification:
+  repository: blooket-api
+  domain: mcp
+architecture:
+  kind: adapter-inbound

@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blooket Studio</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">Blooket <span>Studio</span></a>
+      <nav aria-label="Main navigation">
+        <button
+          data-tab="library"
+          data-i18n="library"
+          aria-current="page"
+        ></button>
+        <button data-tab="quizzes" data-i18n="quizzes"></button>
+        <button data-tab="settings" data-i18n="settings"></button>
+      </nav>
+      <select id="locale" aria-label="Language">
+        <option value="es">Español</option>
+        <option value="en">English</option>
+      </select>
+    </header>
+    <main>
+      <section id="library" class="view">
+        <div class="heading">
+          <div>
+            <p class="eyebrow" data-i18n="yourSpace"></p>
+            <h1 data-i18n="library"></h1>
+            <p data-i18n="libraryHelp"></p>
+          </div>
+          <label class="button primary" for="file" data-i18n="addImage"></label
+          ><input
+            id="file"
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            hidden
+          />
+        </div>
+        <div class="toolbar">
+          <input type="search" id="search" data-placeholder="search" /><span
+            id="count"
+          ></span>
+        </div>
+        <div id="drop" tabindex="0">
+          <span class="drop-icon">＋</span><strong data-i18n="drop"></strong
+          ><span data-i18n="formats"></span>
+        </div>
+        <div id="gallery" class="gallery"></div>
+      </section>
+      <section id="quizzes" class="view" hidden>
+        <p class="eyebrow" data-i18n="yourSpace"></p>
+        <h1 data-i18n="quizzes"></h1>
+        <p data-i18n="quizzesHelp"></p>
+        <div id="drafts" class="cards"></div>
+        <article class="notice">
+          <h2 data-i18n="connection"></h2>
+          <p id="quizConnection" data-i18n="publicationPending"></p>
+        </article>
+      </section>
+      <section id="settings" class="view" hidden>
+        <p class="eyebrow" data-i18n="preferences"></p>
+        <h1 data-i18n="settings"></h1>
+        <form id="settingsForm" class="settings-grid">
+          <article>
+            <h2 data-i18n="account"></h2>
+            <label
+              ><span data-i18n="email"></span
+              ><input
+                name="email"
+                type="email"
+                autocomplete="username" /></label
+            ><label
+              ><span data-i18n="password"></span
+              ><input
+                name="password"
+                type="password"
+                autocomplete="new-password"
+            /></label>
+            <p id="passwordState" class="hint"></p>
+            <p class="hint" data-i18n="secretHelp"></p>
+          </article>
+          <article>
+            <h2 data-i18n="localService"></h2>
+            <label
+              ><span data-i18n="port"></span
+              ><input
+                name="port"
+                type="number"
+                min="1"
+                max="65535"
+                required /></label
+            ><label
+              ><span data-i18n="mediaFolder"></span
+              ><input name="mediaRoot" type="text" required /></label
+            ><button
+              id="folder"
+              type="button"
+              data-i18n="chooseFolder"
+            ></button>
+          </article>
+          <article>
+            <h2>Online MCP</h2>
+            <label class="switch"
+              ><input name="online" type="checkbox" /><span
+                data-i18n="enableOnline"
+              ></span
+            ></label>
+            <fieldset id="onlineFields">
+              <label
+                ><span data-i18n="domain"></span
+                ><input
+                  name="publicUrl"
+                  type="url"
+                  placeholder="https://blooket.example.com/mcp" /></label
+              ><label
+                ><span data-i18n="tunnelToken"></span
+                ><input
+                  name="tunnelToken"
+                  type="password"
+                  autocomplete="new-password"
+              /></label>
+            </fieldset>
+            <p id="tunnelState" class="hint"></p>
+            <p class="hint" data-i18n="onlineHelp"></p>
+            <p id="onlineStatus" class="hint"></p>
+            <button
+              id="retryOnline"
+              type="button"
+              data-i18n="retryOnline"
+            ></button>
+          </article>
+          <article>
+            <h2 data-i18n="exportDefaults"></h2>
+            <p class="hint" data-i18n="defaultsHelp"></p>
+            <div class="pair">
+              <label
+                ><span data-i18n="width"></span
+                ><input
+                  name="width"
+                  type="number"
+                  min="16"
+                  max="1920"
+                  required /></label
+              ><label
+                ><span data-i18n="height"></span
+                ><input
+                  name="height"
+                  type="number"
+                  min="16"
+                  max="1920"
+                  required
+              /></label>
+            </div>
+            <label
+              ><span data-i18n="fps"></span
+              ><select name="gifFps">
+                <option>1</option>
+                <option>2</option>
+                <option>5</option>
+                <option>10</option>
+                <option>20</option>
+                <option>25</option>
+                <option>50</option>
+              </select></label
+            ><label
+              ><span data-i18n="compression"></span
+              ><select name="compression">
+                <option value="compact" data-i18n="compact"></option>
+                <option value="lossless" data-i18n="lossless"></option></select
+            ></label>
+            <p class="limit" data-i18n="limit"></p>
+          </article>
+          <div class="settings-actions">
+            <button
+              type="submit"
+              class="primary"
+              data-i18n="saveSettings"
+            ></button
+            ><span id="saveState"></span>
+          </div>
+        </form>
+        <article class="notice">
+          <h2 data-i18n="connectionRequests"></h2>
+          <p data-i18n="consentHelp"></p>
+          <div id="connections"></div>
+        </article>
+        <article class="notice">
+          <h2 data-i18n="diagnostics"></h2>
+          <p id="diagnostics"></p>
+          <button id="rerun" data-i18n="runDiagnostics"></button>
+        </article>
+      </section>
+    </main>
+    <dialog id="importDialog">
+      <form id="importForm">
+        <h2 data-i18n="addImage"></h2>
+        <label
+          ><span data-i18n="filename"></span
+          ><input name="filename" required /></label
+        ><label
+          ><span data-i18n="name"></span
+          ><input name="name" required maxlength="200" /></label
+        ><label
+          ><span data-i18n="description"></span
+          ><textarea name="description" maxlength="10000"></textarea></label
+        ><label
+          ><span data-i18n="originalLanguage"></span
+          ><input name="language" value="es" maxlength="35" /></label
+        ><label><span data-i18n="topics"></span><input name="topics" /></label>
+        <div class="actions">
+          <button
+            type="button"
+            data-close="importDialog"
+            data-i18n="cancel"
+          ></button
+          ><button type="submit" class="primary" data-i18n="import"></button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="editor">
+      <div class="editor-heading">
+        <h2 id="editorTitle"></h2>
+        <button data-close="editor" data-i18n="close"></button>
+      </div>
+      <div class="editor-grid">
+        <div>
+          <div id="canvas">
+            <img id="background" alt="" draggable="false" /><img
+              id="foreground"
+              alt=""
+              draggable="false"
+            />
+          </div>
+          <p class="hint" data-i18n="dragHelp"></p>
+          <img id="preparedPreview" alt="Prepared image" hidden />
+          <p id="preparedState" class="limit"></p>
+        </div>
+        <form id="editForm">
+          <label
+            ><span data-i18n="name"></span
+            ><input name="name" maxlength="200" /></label
+          ><label
+            ><span data-i18n="description"></span
+            ><textarea name="description" maxlength="10000"></textarea></label
+          ><label
+            ><span data-i18n="originalLanguage"></span
+            ><input name="language" maxlength="35" /></label
+          ><label><span data-i18n="topics"></span><input name="topics" /></label
+          ><label
+            ><span data-i18n="zoom"></span>
+            <div class="zoom">
+              <button type="button" id="minus">−</button
+              ><input
+                name="zoom"
+                type="range"
+                min=".1"
+                max="5"
+                step=".05"
+              /><button type="button" id="plus">＋</button>
+            </div></label
+          ><label
+            ><span data-i18n="saturation"></span
+            ><input
+              name="saturation"
+              type="range"
+              min="0"
+              max="3"
+              step=".05" /></label
+          ><label
+            ><span data-i18n="contrast"></span
+            ><input
+              name="contrast"
+              type="range"
+              min="0"
+              max="3"
+              step=".05" /></label
+          ><label
+            ><span data-i18n="background"></span
+            ><select name="background">
+              <option value="blur" data-i18n="blur"></option>
+              <option value="solid" data-i18n="solid"></option></select
+          ></label>
+          <div class="pair">
+            <input
+              name="color"
+              type="color"
+              aria-label="Background color"
+            /><button
+              type="button"
+              id="eyedropper"
+              data-i18n="eyedropper"
+            ></button>
+          </div>
+          <details>
+            <summary data-i18n="exportOptions"></summary>
+            <div class="pair">
+              <label
+                ><span data-i18n="width"></span
+                ><input name="width" type="number" min="16" max="1920" /></label
+              ><label
+                ><span data-i18n="height"></span
+                ><input name="height" type="number" min="16" max="1920"
+              /></label>
+            </div>
+            <label
+              ><span data-i18n="fps"></span
+              ><select name="gifFps">
+                <option>1</option>
+                <option>2</option>
+                <option>5</option>
+                <option>10</option>
+                <option>20</option>
+                <option>25</option>
+                <option>50</option>
+              </select></label
+            ><label
+              ><span data-i18n="compression"></span
+              ><select name="compression">
+                <option value="compact" data-i18n="compact"></option>
+                <option value="lossless" data-i18n="lossless"></option></select
+            ></label>
+          </details>
+          <div class="actions">
+            <button type="button" id="undo" data-i18n="undo"></button
+            ><button type="button" id="redo" data-i18n="redo"></button
+            ><button type="submit" class="primary" data-i18n="prepare"></button>
+          </div>
+          <a
+            id="download"
+            class="button"
+            data-i18n="download"
+            hidden
+            download
+          ></a>
+        </form>
+      </div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

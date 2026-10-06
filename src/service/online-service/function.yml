@@ -1,0 +1,9 @@
+identity:
+  id: function:online-service
+  name: online-service
+  path: src/service/online-service
+classification:
+  repository: blooket-api
+  domain: service
+architecture:
+  kind: application

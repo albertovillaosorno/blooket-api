@@ -1,0 +1,9 @@
+identity:
+  id: function:teacher-workspace
+  name: teacher-workspace
+  path: src/ui/teacher-workspace
+classification:
+  repository: blooket-api
+  domain: ui
+architecture:
+  kind: adapter-inbound

@@ -1,0 +1,9 @@
+identity:
+  id: function:library-commands
+  name: library-commands
+  path: src/ir/library-commands
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

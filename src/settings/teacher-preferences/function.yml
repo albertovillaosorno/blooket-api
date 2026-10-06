@@ -1,0 +1,9 @@
+identity:
+  id: function:teacher-preferences
+  name: teacher-preferences
+  path: src/settings/teacher-preferences
+classification:
+  repository: blooket-api
+  domain: settings
+architecture:
+  kind: domain

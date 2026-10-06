@@ -1,0 +1,9 @@
+identity:
+  id: function:teacher-configuration
+  name: teacher-configuration
+  path: src/api/teacher-configuration
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
