@@ -59,6 +59,7 @@ import {
   importLibraryImage,
   editLibraryImage,
   prepareLibraryImage,
+  readPreparedLibraryImage,
   safeCode,
 } from "../../teacher-library/application/library.ts";
 import {
@@ -230,6 +231,23 @@ export async function startBrowserService(
       if (url.pathname.startsWith("/media/")) {
         const id = url.pathname.slice(7);
         const library = (await loadPreferences(root)).mediaRoot;
+        if (url.searchParams.get("variant") === "prepared") {
+          const revision = url.searchParams.get("revision");
+          if (revision !== null && !/^[1-9][0-9]{0,15}$/u.test(revision))
+            throw new Error("invalid-prepared-revision");
+          const image = await readPreparedLibraryImage(
+            library,
+            id,
+            revision === null ? undefined : Number(revision),
+          );
+          response.writeHead(200, {
+            "Content-Type": image.file.endsWith(".gif")
+              ? "image/gif"
+              : "image/png",
+          });
+          response.end(image.bytes);
+          return;
+        }
         const record = (await listLibrary(library)).find(
           (entry) => entry.id === id,
         );
@@ -237,16 +255,10 @@ export async function startBrowserService(
           json(response, 404, { code: "media-not-found" });
           return;
         }
-        const prepared = url.searchParams.get("variant") === "prepared";
-        if (prepared && record.prepared === null) {
-          json(response, 409, { code: "media-not-prepared" });
-          return;
-        }
-        const file = prepared ? record.prepared!.file : record.asset;
+        const file = record.asset;
         const path = await safeLibraryPath(library, file);
         const size = (await lstat(path)).size;
-        if (size > (prepared ? 2_499_999 : 25_000_000))
-          throw new Error("media-byte-limit-exceeded");
+        if (size > 25_000_000) throw new Error("media-byte-limit-exceeded");
         response.writeHead(200, {
           "Content-Type": file.endsWith(".gif")
             ? "image/gif"

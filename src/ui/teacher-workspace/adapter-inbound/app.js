@@ -78,7 +78,30 @@ const words = {
     fps: "FPS de GIF",
     compression: "Compresión",
     compact: "Compacta",
-    lossless: "Sin pérdida",
+    lossless: "Color completo PNG / paleta estándar GIF",
+    qualityHelp: "Los GIF siempre usan paleta; esto no significa sin pérdida.",
+    previewHelp:
+      "Esta vista muestra el encuadre. Revisa el archivo preparado " +
+      "para confirmar colores, compresión y ritmo del GIF.",
+    canvasLabel: "Vista de encuadre. Flechas para mover; − y + para el zoom.",
+    colorLabel: "Color del fondo",
+    zoomOut: "Alejar",
+    zoomIn: "Acercar",
+    preparedLabel: "Imagen preparada",
+    diagRuntime: "Versión del servicio",
+    diagMac: "Compatibilidad macOS",
+    diagSettings: "Configuración",
+    diagStorage: "Acceso a archivos",
+    diagOnline: "Conexión online",
+    diagImage: "Procesamiento de imágenes",
+    diagSecrets: "Cliente del almacén seguro",
+    passed: "Correcto",
+    failed: "Falló",
+    unconfigured: "Sin configurar",
+    unverified: "Sin comprobar",
+    sourceTooLarge: "El original supera 25 MB. Elige una copia más pequeña.",
+    invalidImage: "No se pudo decodificar la imagen. Revisa el archivo.",
+    stalePrepared: "La imagen cambió. Vuelve a guardarla y prepararla.",
     limit:
       "El archivo preparado debe pesar menos de 2,5 MB. " +
       "Si no cumple, no puede continuar.",
@@ -220,7 +243,30 @@ const words = {
     fps: "GIF FPS",
     compression: "Compression",
     compact: "Compact",
-    lossless: "Lossless",
+    lossless: "Full-color PNG / standard GIF palette",
+    qualityHelp: "GIFs always use a palette; this does not mean lossless.",
+    previewHelp:
+      "This view shows framing. Review the prepared file to confirm " +
+      "colors, compression and GIF timing.",
+    canvasLabel: "Framing preview. Arrow keys move; − and + change zoom.",
+    colorLabel: "Background color",
+    zoomOut: "Zoom out",
+    zoomIn: "Zoom in",
+    preparedLabel: "Prepared image",
+    diagRuntime: "Service runtime",
+    diagMac: "macOS compatibility",
+    diagSettings: "Configuration",
+    diagStorage: "File access",
+    diagOnline: "Online connection",
+    diagImage: "Image processing",
+    diagSecrets: "Secret-store client",
+    passed: "Passed",
+    failed: "Failed",
+    unconfigured: "Unconfigured",
+    unverified: "Unverified",
+    sourceTooLarge: "The original exceeds 25 MB. Choose a smaller copy.",
+    invalidImage: "The image could not be decoded. Check the source file.",
+    stalePrepared: "The image changed. Save and prepare it again.",
     limit:
       "Prepared files must be smaller than 2.5 MB. Export " +
       "is blocked until they fit.",
@@ -302,6 +348,10 @@ function translate() {
   document.querySelectorAll("[data-placeholder]").forEach((el) => {
     el.placeholder = t(el.dataset.placeholder);
   });
+  document.querySelectorAll("[data-aria]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.dataset.aria));
+  });
+  $("#preparedPreview").alt = t("preparedLabel");
   renderGallery();
 }
 function toast(message) {
@@ -321,6 +371,11 @@ function report(error) {
     "rendition-pixel-limit-exceeded": "tooLarge",
     "revision-conflict": "conflict",
     "filename-already-exists": "collision",
+    "source-too-large": "sourceTooLarge",
+    "invalid-or-oversized-library-file": "tooLarge",
+    "prepared-revision-conflict": "stalePrepared",
+    "prepared-media-invalid": "invalidImage",
+    "image-decode-failed": "invalidImage",
     "invalid-user-filename": "invalidFilename",
     "filename-format-mismatch": "invalidFilename",
     "library-recovery-required": "recoveryRequired",
@@ -523,6 +578,7 @@ function openEditor(record) {
   history = [];
   future = [];
   picking = false;
+  recipeGesture = undefined;
   for (const name of ["name", "description", "language"])
     field(editForm, name).value = record.original[name];
   field(editForm, "topics").value = record.topics.join(", ");
@@ -601,15 +657,58 @@ function invalidate() {
   showPrepared();
   preview();
 }
-editForm.addEventListener("change", (event) => {
+let recipeGesture;
+editForm.addEventListener("input", (event) => {
   const name = event.target.name;
-  remember();
+  const recipeField =
+    name in selected.edit || ["background", "color"].includes(name);
+  if (recipeField && event.target.validity && !event.target.validity.valid)
+    return;
+  if (recipeField && recipeGesture !== event.target) {
+    remember();
+    recipeGesture = event.target;
+  }
   if (name === "background") selected.edit.background.mode = event.target.value;
   else if (name === "color")
     selected.edit.background.color = event.target.value;
   else if (name in selected.edit)
     selected.edit[name] =
       name === "compression" ? event.target.value : Number(event.target.value);
+  invalidate();
+});
+editForm.addEventListener("change", () => {
+  recipeGesture = undefined;
+});
+editForm.addEventListener("focusout", () => {
+  recipeGesture = undefined;
+});
+$("#canvas").addEventListener("keydown", (event) => {
+  const step = event.shiftKey ? 0.1 : 0.01;
+  const moves = {
+    ArrowLeft: [-step, 0],
+    ArrowRight: [step, 0],
+    ArrowUp: [0, -step],
+    ArrowDown: [0, step],
+  };
+  const move = moves[event.key];
+  if (!move && !["+", "=", "-"].includes(event.key)) return;
+  event.preventDefault();
+  remember();
+  if (move) {
+    selected.edit.panX = Math.max(
+      -10,
+      Math.min(10, selected.edit.panX + move[0]),
+    );
+    selected.edit.panY = Math.max(
+      -10,
+      Math.min(10, selected.edit.panY + move[1]),
+    );
+  } else
+    selected.edit.zoom = Math.max(
+      0.1,
+      Math.min(5, selected.edit.zoom + (event.key === "-" ? -0.1 : 0.1)),
+    );
+  syncRecipe();
   invalidate();
 });
 for (const [id, amount] of [
@@ -647,32 +746,28 @@ $("#foreground").addEventListener("pointerdown", (event) => {
     const image = event.target,
       bounds = image.getBoundingClientRect(),
       canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
+    canvas.width = canvas.height = 1;
+    const sourceX = Math.max(
+      0,
+      Math.min(
+        image.naturalWidth - 1,
+        Math.floor(
+          ((event.clientX - bounds.left) / bounds.width) * image.naturalWidth,
+        ),
+      ),
+    );
+    const sourceY = Math.max(
+      0,
+      Math.min(
+        image.naturalHeight - 1,
+        Math.floor(
+          ((event.clientY - bounds.top) / bounds.height) * image.naturalHeight,
+        ),
+      ),
+    );
     const context = canvas.getContext("2d");
-    context.drawImage(image, 0, 0);
-    const pixel = context.getImageData(
-      Math.max(
-        0,
-        Math.min(
-          canvas.width - 1,
-          Math.floor(
-            ((event.clientX - bounds.left) / bounds.width) * canvas.width,
-          ),
-        ),
-      ),
-      Math.max(
-        0,
-        Math.min(
-          canvas.height - 1,
-          Math.floor(
-            ((event.clientY - bounds.top) / bounds.height) * canvas.height,
-          ),
-        ),
-      ),
-      1,
-      1,
-    ).data;
+    context.drawImage(image, sourceX, sourceY, 1, 1, 0, 0, 1, 1);
+    const pixel = context.getImageData(0, 0, 1, 1).data;
     remember();
     selected.edit.background = {
       mode: "solid",
@@ -798,8 +893,28 @@ function renderSettingsState() {
   $("#ownerState").textContent = t(
     bootstrap.secrets.ownerPasswordConfigured ? "configured" : "missing",
   );
+  const names = {
+    runtime: "diagRuntime",
+    macos: "diagMac",
+    settings: "diagSettings",
+    storage: "diagStorage",
+    online: "diagOnline",
+    "native-image": "diagImage",
+    "secret-store-client": "diagSecrets",
+  };
   $("#diagnostics").textContent = bootstrap.diagnostic.checks
-    .map((check) => check.name + ": " + check.status)
+    .map(
+      (check) =>
+        t(names[check.name] ?? "diagnostics") +
+        ": " +
+        t(
+          ["passed", "failed", "unconfigured", "unverified"].includes(
+            check.status,
+          )
+            ? check.status
+            : "unverified",
+        ),
+    )
     .join(" · ");
 }
 field(settingsForm, "online").addEventListener("change", (event) => {

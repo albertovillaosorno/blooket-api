@@ -56,6 +56,7 @@ import {
   saveMetadata,
   safeLibraryPath,
   withLibraryLock,
+  boundedBytes,
 } from "../../../platforms/user-library/adapter-outbound/files.ts";
 import {
   loadPreferences,
@@ -438,4 +439,40 @@ export function safeCode(error: unknown): string {
 }
 function hash(source: string): string {
   return createHash("sha256").update(source).digest("hex");
+}
+
+export async function readPreparedLibraryImage(
+  library: string,
+  id: string,
+  expectedRevision?: number,
+) {
+  return await withLibraryLock(library, async () => {
+    const record = (await listLibrary(library)).find((item) => item.id === id);
+    if (!record) throw new Error("media-not-found");
+    const prepared = record.prepared;
+    if (prepared === null) throw new Error("media-not-prepared");
+    if (
+      prepared.recipeRevision !== record.revision ||
+      (expectedRevision !== undefined && expectedRevision !== record.revision)
+    )
+      throw new Error("prepared-revision-conflict");
+    const prefix = "renditions/" + record.id + "/" + record.revision;
+    if (![prefix + ".png", prefix + ".gif"].includes(prepared.file))
+      throw new Error("prepared-media-invalid");
+    const bytes = await boundedBytes(
+      await safeLibraryPath(library, prepared.file),
+      2_499_999,
+    );
+    if (bytes.length !== prepared.bytes)
+      throw new Error("prepared-media-invalid");
+    const decoded = await decodeSourceImage(bytes, 80_000_000);
+    if (
+      !decoded.ok ||
+      decoded.value.frameWidth !== record.edit.width ||
+      decoded.value.frameHeight !== record.edit.height ||
+      !prepared.file.endsWith("." + decoded.value.format.format)
+    )
+      throw new Error("prepared-media-invalid");
+    return { bytes, file: prepared.file, revision: record.revision };
+  });
 }

@@ -200,6 +200,7 @@
                 <option value="compact" data-i18n="compact"></option>
                 <option value="lossless" data-i18n="lossless"></option></select
             ></label>
+            <p class="hint" data-i18n="qualityHelp"></p>
             <p class="limit" data-i18n="limit"></p>
           </article>
           <div class="settings-actions">
@@ -256,7 +257,7 @@
       </div>
       <div class="editor-grid">
         <div>
-          <div id="canvas">
+          <div id="canvas" tabindex="0" role="group" data-aria="canvasLabel">
             <img id="background" alt="" draggable="false" /><img
               id="foreground"
               alt=""
@@ -264,6 +265,7 @@
             />
           </div>
           <p class="hint" data-i18n="dragHelp"></p>
+          <p class="hint" data-i18n="previewHelp"></p>
           <img id="preparedPreview" alt="Prepared image" hidden />
           <p id="preparedState" class="limit"></p>
         </div>
@@ -281,14 +283,14 @@
           ><label
             ><span data-i18n="zoom"></span>
             <div class="zoom">
-              <button type="button" id="minus">−</button
+              <button type="button" id="minus" data-aria="zoomOut">−</button
               ><input
                 name="zoom"
                 type="range"
                 min=".1"
                 max="5"
                 step=".05"
-              /><button type="button" id="plus">＋</button>
+              /><button type="button" id="plus" data-aria="zoomIn">＋</button>
             </div></label
           ><label
             ><span data-i18n="saturation"></span
@@ -313,11 +315,7 @@
               <option value="solid" data-i18n="solid"></option></select
           ></label>
           <div class="pair">
-            <input
-              name="color"
-              type="color"
-              aria-label="Background color"
-            /><button
+            <input name="color" type="color" data-aria="colorLabel" /><button
               type="button"
               id="eyedropper"
               data-i18n="eyedropper"
@@ -351,6 +349,7 @@
                 <option value="compact" data-i18n="compact"></option>
                 <option value="lossless" data-i18n="lossless"></option></select
             ></label>
+            <p class="hint" data-i18n="qualityHelp"></p>
           </details>
           <div class="actions">
             <button
