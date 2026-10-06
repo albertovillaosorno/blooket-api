@@ -11,16 +11,18 @@ horizon.
 
 Connect paste, drag-and-drop, file, and browser-extension host adapters to the
 capability-bound durable image-import operation once the localhost boundary is
-available. Populate the version-two canvas, pixel, and upload-byte fields only
-from verified Blooket evidence; unknown values continue to fail closed.
+available. Populate the remaining canvas and pixel fields only from verified
+Blooket evidence; the authenticated dashboard build now establishes the
+2,500,000-byte upload ceiling. Unknown values continue to fail closed.
 
 ## P2 — Blooket execution boundary
 
 ### TODO - Complete verified Blooket capabilities
 
-Extend the dated official-document fixture with authenticated browser
-observations for upload constraints, account-dependent behavior, navigation
-states, and other facts that official documentation does not establish.
+Continue extending the dated capability fixture with authenticated browser
+observations for remaining canvas/pixel constraints, account-dependent behavior,
+navigation states, and other facts that official documentation does not
+establish. Upload bytes and set title/description limits are now observed.
 
 ### TODO - Implement concrete browser session adapter
 

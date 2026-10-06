@@ -236,9 +236,11 @@ answer media is documented under Plus users; the dated official capability
 fixture therefore keeps answer images account-dependent until the active account
 is inspected.
 
-Upload byte, canvas, and pixel limits remain unknown because the
-official guides do not establish them. Platform details are capability data
-because Blooket may change them independently of this repository.
+The authenticated dashboard build verifies a 2,500,000-byte image-upload
+ceiling, a 75-character set title limit, and a 300-character description limit.
+Canvas dimensions and pixel ceilings remain unknown. These browser-observed
+facts stay capability data because Blooket may change them independently of this
+repository and the public guides do not publish those numeric limits.
 
 Validation never performs a "helpful" semantic rewrite. An invalid quiz returns
 precise diagnostics that the teacher or agent can fix and resubmit.
@@ -313,9 +315,9 @@ Sharp/libvips adapter before durable publication.
 The media pipeline keeps the original and creates a fixed-dimension Blooket
 rendition separately. Static images use an automatic blurred-background fill
 when aspect ratios do not match, with pan and zoom controlling the foreground
-crop. Capability snapshot version two carries nullable canvas, output-pixel, and
-upload-byte limits; legacy version-one snapshots migrate those facts to unknown
-instead of guessing values.
+crop. Capability snapshot version three carries nullable canvas, output-pixel,
+upload-byte, and set-metadata length limits. Version-one and version-two
+snapshots migrate facts they predate to unknown instead of guessing values.
 
 Editor state is immutable and uses an explicit bounded undo/redo history. Zoom
 one means neutral contain scaling. Pan coordinates are fractions of the canvas:
