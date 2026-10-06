@@ -9,6 +9,9 @@ node_modules/
 .pnpm-store/
 .npm/
 
+# Blooket reference materials
+reference/
+
 # Local configuration and credentials
 .env
 .env.*

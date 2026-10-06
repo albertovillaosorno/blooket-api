@@ -34,7 +34,7 @@ paths = ["src/platforms/"]
 paths = ["src/projects/"]
 
 [role.root_governance]
-paths = [".editorconfig", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE-MIT", "README.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
+paths = [".editorconfig", ".env.example", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE-MIT", "README.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
 
 [role.security]
 paths = ["src/security/"]
