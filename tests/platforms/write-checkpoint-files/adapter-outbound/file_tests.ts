@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import {
+  chmod,
   lstat,
   mkdtemp,
   readFile,
@@ -277,6 +278,26 @@ test("invalid and symbolic checkpoint files fail closed", async () => {
         code: "checkpoint-file-unsafe",
       },
     );
+  });
+});
+
+test("unreadable regular checkpoints fail as write failures", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "write.json");
+    await writeFile(path, JSON.stringify(checkpoint(0)));
+    await chmod(path, 0o000);
+    try {
+      assert.deepEqual(
+        await saveWriteCheckpointFile(path, plan, checkpoint(1)),
+        {
+          ok: false,
+          kind: "io",
+          code: "checkpoint-write-failed",
+        },
+      );
+    } finally {
+      await chmod(path, 0o600);
+    }
   });
 });
 

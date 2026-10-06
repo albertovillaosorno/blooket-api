@@ -51,10 +51,21 @@ mutation advances exactly one operation; rate limiting, session expiry, human
 stop states, browser failures, and otherwise unconfirmed outcomes preserve the
 existing checkpoint.
 
-The executor intentionally does not sleep, loop, or auto-retry. Concrete pacing,
-retry classification, and durable checkpoint persistence remain adapter and
-application concerns that require verified browser behavior rather than guessed
-timing constants.
+The executor intentionally does not sleep, loop, or auto-retry. Confirmed
+progress is persisted through an atomic, writer-locked checkpoint file. Missing
+files mean index zero; durable saves may hold the current index or advance by
+exactly one and reject regressions, skips, and cross-plan state.
+
+The persisted application composition loads progress before browser side effects
+and stores a confirmed advancement before returning success. If a remote write
+is confirmed but checkpoint persistence fails, it returns an explicit recovery
+state rather than treating the operation as retryable.
+
+A process crash can still occur after the remote service accepts a mutation but
+before local confirmation state is durable. Closing that ambiguity requires a
+write-ahead attempt journal plus reconciliation. Concrete pacing and retry
+classification also remain dependent on verified browser behavior rather than
+guessed timing constants.
 
 ## Consequences
 

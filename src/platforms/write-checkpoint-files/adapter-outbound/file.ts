@@ -175,8 +175,11 @@ async function saveWriteCheckpointFileLocked(
   checkpoint: BlooketWriteCheckpoint,
 ): Promise<WriteCheckpointFileSaveResult> {
   const existing = await readOwnedTextFile(path);
-  if (existing.kind === "unsafe" || existing.kind === "unreadable") {
+  if (existing.kind === "unsafe") {
     return saveIoFailure("checkpoint-file-unsafe");
+  }
+  if (existing.kind === "unreadable") {
+    return saveIoFailure("checkpoint-write-failed");
   }
 
   let previousIndex = 0;
