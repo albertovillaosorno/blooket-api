@@ -16,7 +16,8 @@ description, and relevant topics. Read again after a revision conflict instead
 of overwriting concurrent changes. A translation is stale when its
 `sourceRevision` differs from `original.revision`.
 
-Original files and prepared renditions are different. An image is eligible for
+Canonical library media and prepared renditions are different. Temporary intake
+source bytes are not retained. An image is eligible for
 upload only after preparation, recipe validation, and an actual byte-size check
 below 2,500,000 bytes at the upload boundary. A preview or metadata size alone
 cannot establish that eligibility.

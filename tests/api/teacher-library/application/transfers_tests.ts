@@ -70,7 +70,7 @@ async function setup() {
   const library = (await loadPreferences(root)).mediaRoot;
   await initializeLibrary(library);
   const sharp = await loadSharp();
-  const bytes = await sharp(new Uint8Array([20, 90, 150, 255]), {
+  const sourceBytes = await sharp(new Uint8Array([20, 90, 150, 255]), {
     raw: { width: 1, height: 1, channels: 4 },
   })
     .png()
@@ -81,9 +81,10 @@ async function setup() {
     description: "Texto original",
     language: "es",
     topics: ["example"],
-    base64: Buffer.from(bytes).toString("base64"),
+    base64: Buffer.from(sourceBytes).toString("base64"),
   });
-  return { root, library, bytes, record };
+  const bytes = await readFile(join(library, record.asset));
+  return { root, library, bytes, sourceBytes, record };
 }
 async function legacy(library: string, bytes: Uint8Array) {
   await mkdir(join(library, "old"));
@@ -109,9 +110,9 @@ async function journal(library: string, value: LibraryTransaction) {
 test(
   "migration preserves IDs, bytes, " + "text and legacy verification",
   async () => {
-    const { root, library, bytes } = await setup();
+    const { root, library, sourceBytes } = await setup();
     try {
-      const index = await legacy(library, bytes);
+      const index = await legacy(library, sourceBytes);
       assert.deepEqual(await migrateLegacyLibrary(root), {
         migrated: 1,
         alreadyMigrated: false,
@@ -130,8 +131,14 @@ test(
         sourcePath: "old/Mi foto.png",
         indexDigest: digest(Buffer.from(index)),
       });
-      assert.deepEqual(await readFile(join(library, migrated.asset)), bytes);
-      assert.deepEqual(await readFile(join(library, "old/Mi foto.png")), bytes);
+      assert.deepEqual(
+        await readFile(join(library, migrated.asset)),
+        sourceBytes,
+      );
+      assert.deepEqual(
+        await readFile(join(library, "old/Mi foto.png")),
+        sourceBytes,
+      );
       assert.equal(
         await readFile(join(library, "media.jsonl.migrated"), "utf8"),
         index,
@@ -176,11 +183,11 @@ test(
       const renamed = await renameLibraryImage(root, {
         id: record.id,
         revision: 1,
-        relativePath: "animals/Mi gato.png",
+        relativePath: "animals/Mi gato.webp",
       });
       assert.equal(renamed.id, record.id);
       assert.equal(renamed.revision, 2);
-      assert.equal(renamed.asset, "photos/animals/Mi gato.png");
+      assert.equal(renamed.asset, "photos/animals/Mi gato.webp");
       assert.deepEqual(renamed.original, record.original);
       assert.equal(renamed.prepared, null);
       assert.deepEqual(await readFile(join(library, renamed.asset)), bytes);
@@ -207,7 +214,7 @@ test(
     try {
       const after = {
         ...record,
-        asset: "photos/Recovered.png",
+        asset: "photos/Recovered.webp",
         revision: 2,
         prepared: null,
       };
@@ -244,7 +251,7 @@ test(
     try {
       const after = {
         ...record,
-        asset: "photos/Recovered.png",
+        asset: "photos/Recovered.webp",
         revision: 2,
         prepared: null,
       };
@@ -347,7 +354,7 @@ test(
         renameLibraryImage(root, {
           id: record.id,
           revision: 1,
-          relativePath: "linked/escape.png",
+          relativePath: "linked/escape.webp",
         }),
         /symbolic-library-path/u,
       );
@@ -364,7 +371,7 @@ test(
     const { root, library, bytes, record } = await setup();
     try {
       const results = await Promise.allSettled(
-        ["One.png", "Two.png"].map((relativePath) =>
+        ["One.webp", "Two.webp"].map((relativePath) =>
           renameLibraryImage(root, {
             id: record.id,
             revision: 1,
@@ -392,7 +399,7 @@ test(
     try {
       const after = {
         ...record,
-        asset: "photos/Recovered.png",
+        asset: "photos/Recovered.webp",
         revision: 2,
         prepared: null,
         topics: ["unauthorized-change"],
@@ -568,9 +575,9 @@ test(
   "migration respects the legacy writer lock and releases " +
     "its own",
   async () => {
-  const { root, library, bytes } = await setup();
+  const { root, library, sourceBytes } = await setup();
   try {
-    await legacy(library, bytes);
+    await legacy(library, sourceBytes);
     const acquired = await tryAcquireFileLock(
       join(library, ".blooket-api-media-vault.lock"),
     );

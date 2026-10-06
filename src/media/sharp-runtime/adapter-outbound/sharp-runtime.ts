@@ -92,12 +92,25 @@ export interface SharpPipeline {
     readonly quality?: number;
     readonly compressionLevel?: number;
   }): SharpPipeline;
+  webp(options?: {
+    readonly quality?: number;
+    readonly alphaQuality?: number;
+    readonly lossless?: boolean;
+    readonly nearLossless?: boolean;
+    readonly smartSubsample?: boolean;
+    readonly smartDeblock?: boolean;
+    readonly effort?: number;
+  }): SharpPipeline;
   gif(options: {
+    readonly reuse?: boolean;
     readonly colours?: number;
     readonly effort?: number;
-    readonly loop: number;
-    readonly delay: readonly number[];
-    readonly keepDuplicateFrames: boolean;
+    readonly dither?: number;
+    readonly interFrameMaxError?: number;
+    readonly interPaletteMaxError?: number;
+    readonly loop?: number;
+    readonly delay?: readonly number[];
+    readonly keepDuplicateFrames?: boolean;
   }): SharpPipeline;
   composite(
     images: readonly {

@@ -299,8 +299,9 @@ Unknown original language stays empty; no translation is invented.
 
 Migration preflights the complete bounded plan before publication, preserves
 legacy sources, and archives the exact JSONL bytes as `media.jsonl.migrated`.
-User rename preserves IDs, source bytes, text, recipes, and provenance while
-invalidating prepared downloads. Neither operation is admitted through MCP.
+User rename preserves IDs, canonical media bytes, text, recipes, and provenance
+while invalidating prepared downloads. Neither operation is admitted through
+MCP.
 
 Transfer replay runs under the shared library lock at startup or before another
 locked operation. A pending journal blocks ordinary library reads, checks hashes
@@ -338,7 +339,8 @@ profile from task 01 can discover and read the resulting skills.
 The prototype already has import naming/descriptions/topics, source previews,
 zoom minus/plus and slider, drag pan, wheel zoom, saturation/contrast, blurred
 or solid backgrounds, color input, native eyedropper/fallback canvas picker,
-undo/redo, preparation, preview, and download. Preserve immutable originals and
+undo/redo, preparation, preview, and download. Preserve canonical optimized
+media and
 per-image edit recipes in YAML; global settings contain export defaults only.
 
 Finish Safari behavior, keyboard/accessibility and responsive checks, file
@@ -374,7 +376,7 @@ geometry, GIF preview, color picking, and responsive visual acceptance remain
 unverified. Continue independent export work in task 07 and retain these
 acceptance checks.
 
-Complete when source bytes remain unchanged, per-image recipes save/reopen,
+Complete when canonical media remains stable, per-image recipes save/reopen,
 preview/export agree, and import, zoom/drag, undo/redo, adjustments, both
 backgrounds, and color picking work in the target browser. Keep native-browser
 checks explicitly pending where no macOS test host is available.
@@ -785,6 +787,14 @@ quizzes. Continue these implementations rather than recreating their already
 validated foundations.
 
 ### TODO 16 - Add adaptive teacher workflow skills
+
+Portable skill foundations were implemented on 2026-10-06. Startup now seeds a
+small master index plus workflow-learning, human-validation, browser-image
+search, image-bank research, media-analysis, and Codex-access guidance without
+overwriting personal changes. The teacher profile reads the master first and may
+store clearly scoped reusable defaults with optimistic revisions; ambiguous
+corrections still require one short scope question. Actual client behavior and
+long-term teacher acceptance remain pending.
 
 Build a lightweight `master-workflow` skill that indexes stable teacher defaults
 and points to narrower task-specific skills. Do not put personal information,

@@ -31,7 +31,7 @@
 //
 import { randomUUID, createHash } from "node:crypto";
 import { readFile, readdir, mkdir, rm, lstat } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { join } from "node:path";
 import {
   decodeLibraryCommand,
   type LibraryCommandName,
@@ -47,6 +47,7 @@ import {
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
 import {
+  compactImageIsolated,
   decodeImageIsolated,
   renderImageIsolated,
 } from "../../../platforms/native-media/adapter-outbound/process.ts";
@@ -62,10 +63,8 @@ import {
   loadPreferences,
   userDataRoot,
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
-import {
-  writeAtomicFile,
-  writeDurableFileIfAbsent,
-} from "../../../platforms/atomic-files/adapter-outbound/atomic-file.ts";
+import { writeAtomicFile } from
+  "../../../platforms/atomic-files/adapter-outbound/atomic-file.ts";
 import { tryAcquireFileLock } from
   "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import { decodeProjectDocument } from
@@ -261,17 +260,15 @@ export async function importLibraryImage(
 ): Promise<LibraryMetadata> {
   const request = object(input);
   exact(request, [
-    "filename",
     "name",
     "description",
     "language",
     "topics",
     "base64",
+    ...("filename" in request ? ["filename"] : []),
   ]);
   if (
-    !text(request["filename"], 240) ||
-    !/^[^/\\\x00-\x1f]+\.(png|jpe?g|gif|webp)$/iu.test(request["filename"]) ||
-    request["filename"].startsWith(".") ||
+    ("filename" in request && !text(request["filename"], 240)) ||
     !text(request["name"], 200) ||
     !text(request["description"], 10_000) ||
     !text(request["language"], 35) ||
@@ -287,26 +284,21 @@ export async function importLibraryImage(
     throw new Error("invalid-source-bytes");
   const decoded = await decodeImageIsolated(bytes, 40_000_000);
   if (!decoded.ok) throw new Error(decoded.code);
-  const extension = extname(request["filename"]).toLowerCase();
-  const actual = decoded.value.format.format;
-  if (
-    actual === "jpeg"
-      ? ![".jpg", ".jpeg"].includes(extension)
-      : extension !== "." + actual
-  )
-    throw new Error("filename-format-mismatch");
+  const compacted = await compactImageIsolated(bytes);
+  if (!compacted.ok) throw new Error(compacted.code);
+
   const preferences = await loadPreferences(root);
   const library = preferences.mediaRoot;
   await initializeLibrary(library);
   return await withLibraryLock(library, async () => {
-    const asset = "photos/" + request["filename"];
+    const id = randomUUID();
+    const asset = "photos/" + id + "." + compacted.value.format;
     const path = await safeLibraryPath(library, asset, true);
-    if ((await writeDurableFileIfAbsent(path, bytes)) !== "created")
-      throw new Error("filename-already-exists");
+    await writeAtomicFile(path, compacted.value.bytes);
     try {
       const metadata: LibraryMetadata = {
         schemaVersion: 1,
-        id: randomUUID(),
+        id,
         asset,
         revision: 1,
         original: {

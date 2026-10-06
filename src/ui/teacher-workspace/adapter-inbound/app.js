@@ -33,7 +33,7 @@ const words = {
     addImage: "Agregar imagen",
     search: "Buscar por nombre, descripción o tema…",
     drop: "Arrastra aquí una foto o un GIF",
-    formats: "JPG · PNG · GIF · WebP — originales intactos",
+    formats: "JPG · PNG · GIF · WebP — optimizados al importar",
     preferences: "A tu manera",
     account: "Cuenta de Blooket",
     email: "Correo",
@@ -116,9 +116,9 @@ const words = {
     diagnostics: "Diagnóstico inicial",
     runDiagnostics: "Repetir diagnóstico",
     filename: "Nombre del archivo (incluye la extensión)",
-    name: "Nombre original",
-    description: "Descripción original",
-    originalLanguage: "Idioma del texto original",
+    name: "Nombre",
+    description: "Descripción",
+    originalLanguage: "Idioma del texto",
     topics: "Temas (separados por comas)",
     cancel: "Cancelar",
     import: "Importar",
@@ -180,7 +180,7 @@ const words = {
       "Import previous files from this folder? " +
       "Original files and a copy of the index will be preserved.",
     renameImage: "Change filename or folder",
-    renameHelp: "The image ID, text and source bytes are preserved.",
+    renameHelp: "The image ID, text and optimized media bytes are preserved.",
     relativeFilename: "Filename with extension, or folder/filename",
     invalidFilename: "Use a relative path and keep the actual image format.",
     recoveryRequired:
@@ -206,7 +206,7 @@ const words = {
     addImage: "Add image",
     search: "Search names, descriptions or topics…",
     drop: "Drop a photo or GIF here",
-    formats: "JPG · PNG · GIF · WebP — originals preserved",
+    formats: "JPG · PNG · GIF · WebP — optimized on import",
     preferences: "Make it yours",
     account: "Blooket account",
     email: "Email",
@@ -288,9 +288,9 @@ const words = {
     diagnostics: "First-use diagnostics",
     runDiagnostics: "Run diagnostics again",
     filename: "Filename (including extension)",
-    name: "Original name",
-    description: "Original description",
-    originalLanguage: "Original text language",
+    name: "Name",
+    description: "Description",
+    originalLanguage: "Text language",
     topics: "Topics (comma separated)",
     cancel: "Cancel",
     import: "Import",
@@ -541,7 +541,6 @@ function pickFile(file) {
   if (!file) return;
   sourceFile = file;
   const form = $("#importForm");
-  field(form, "filename").value = file.name;
   field(form, "name").value = file.name.replace(/\.[^.]+$/, "");
   field(form, "description").value = "";
   field(form, "topics").value = "";
@@ -570,6 +569,14 @@ for (const name of ["dragleave", "drop"])
     $("#drop").classList.remove("drag");
     if (name === "drop") pickFile(event.dataTransfer.files[0]);
   });
+window.addEventListener("paste", (event) => {
+  const image = [...(event.clipboardData?.files ?? [])].find((file) =>
+    file.type.startsWith("image/")
+  );
+  if (!image) return;
+  event.preventDefault();
+  pickFile(image);
+});
 $("#importForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target,
@@ -584,7 +591,6 @@ $("#importForm").addEventListener("submit", async (event) => {
       reader.readAsDataURL(sourceFile);
     });
     const record = await api("/api/import", {
-      filename: field(form, "filename").value,
       name: field(form, "name").value,
       description: field(form, "description").value,
       language: field(form, "language").value,

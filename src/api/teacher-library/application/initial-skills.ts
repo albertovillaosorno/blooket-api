@@ -36,7 +36,17 @@ import { writeDurableFileIfAbsent } from
   "../../../platforms/atomic-files/adapter-outbound/atomic-file.ts";
 
 export async function installInitialSkills(root: string): Promise<void> {
-  for (const id of ["quiz-authoring", "media-enrichment"]) {
+  for (const id of [
+    "master-workflow",
+    "workflow-learning",
+    "quiz-authoring",
+    "human-validation",
+    "browser-image-search",
+    "image-bank-research",
+    "media-analysis",
+    "media-enrichment",
+    "codex-repository-access",
+  ]) {
     const source = await readFile(
       new URL("../../../../docs/skills/" + id + ".md", import.meta.url),
       "utf8",
