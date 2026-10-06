@@ -30,7 +30,7 @@
 //   - Failed checks block release and cleanup only the owned fixture.
 //
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 const yaml = await import(
@@ -50,47 +50,53 @@ const workflow = async (name: string) =>
     ),
   );
 
-test("release requires the same full verifier and publishes only last",
+test("release invokes the single CI workflow and publishes only last",
   async () => {
   const ci = await workflow("ci");
   const release = await workflow("release");
-  const verification = await workflow("verify");
-  assert.equal(ci.jobs.verify.uses, release.jobs.verify.uses);
-  assert.equal(release.jobs.verify.with.release, true);
-  assert.equal(release.jobs.verify.needs, "tag");
-  assert.deepEqual(release.jobs.publish.needs, ["tag", "verify"]);
+  assert.deepEqual(
+    (await readdir(new URL("../../../../.github/workflows/", import.meta.url)))
+      .sort(),
+    ["ci.yml", "release.yml"],
+  );
+  const ciCommands = ci.jobs.repository.steps.flatMap(
+    (step: { run?: string }) => (step.run ? [step.run] : []),
+  );
+  assert.deepEqual(ciCommands, [
+    "pnpm install --frozen-lockfile",
+    "npm run check",
+    "npm test",
+  ]);
+  assert.equal(release.jobs.ci.uses, "./.github/workflows/ci.yml");
+  assert.equal(release.jobs.ci.needs, "tag");
+  assert.deepEqual(release.jobs.publish.needs, ["tag", "ci", "packages"]);
   assert.equal(
     release.jobs.publish.if,
-    "needs.tag.result == 'success' && needs.verify.result == 'success'",
+    "needs.tag.result == 'success' && needs.ci.result == 'success' && " +
+      "needs.packages.result == 'success'",
   );
   assert.equal(release.permissions.contents, "read");
   assert.equal(release.jobs.publish.permissions.contents, "write");
   assert.deepEqual(
-    verification.jobs.packages.strategy.matrix.include
+    release.jobs.packages.strategy.matrix.include
       .map((item: { target: string }) => item.target)
       .sort(),
     ["darwin-arm64", "darwin-x64", "linux-x64"],
   );
   assert.deepEqual(
-    verification.jobs.packages.strategy.matrix.include.map(
+    release.jobs.packages.strategy.matrix.include.map(
       (item: { runner: string }) => item.runner,
     ),
     ["macos-latest", "macos-26-intel", "ubuntu-latest"],
   );
-  const commands = verification.jobs.packages.steps.flatMap(
+  const commands = release.jobs.packages.steps.flatMap(
     (step: { run?: string }) => (step.run ? [step.run] : []),
   );
   assert.ok(commands.includes('npm run package:verify -- "$PACKAGE_TARGET"'));
   assert.ok(
     commands.includes('npm run package:verify -- "$PACKAGE_TARGET" --release'),
   );
-  assert.ok(
-    verification.jobs.repository.steps.some(
-      (step: { uses?: string }) =>
-        step.uses === "albertovillaosorno/jig@main",
-    ),
-  );
-  for (const value of [ci, release, verification]) {
+  for (const value of [ci, release]) {
     const visit = (node: unknown): void => {
       if (!node || typeof node !== "object") return;
       for (const [key, child] of Object.entries(node)) {
