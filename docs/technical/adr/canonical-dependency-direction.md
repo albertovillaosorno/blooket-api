@@ -11,21 +11,21 @@ Accepted.
 ## Context
 
 The product exposes one set of lesson and media behaviors through several
-surfaces. CLI, localhost HTTP, MCP, desktop UI, and browser integration must not
+surfaces. CLI, localhost HTTP, MCP, browser UI, and browser integration must not
 become independent semantic implementations because fixes would drift and
 teacher-visible results could differ by transport.
 
-Platform code also needs a strict role. macOS and Linux adapters translate
-existing capabilities into host facilities; they do not own project, media,
-settings, security, or Blooket business rules.
+Platform code also needs a strict role. macOS host adapters translate existing
+capabilities into host facilities; they do not own project, media, settings,
+security, or Blooket business rules.
 
 ## Decision
 
-The repository dependency graph is declared in
-`.jig/settings/architecture.toml` and enforced by Jig. `ir` is dependency-free;
-`media`, `projects`, `security`, and `settings` own domain behavior; `api`
-composes those capabilities into application operations; and `cli` adapts user
-arguments into the same API executor.
+The repository dependency graph is declared in `.jig/settings/architecture.toml`
+and enforced by Jig. `ir` is dependency-free; `media`, `projects`, `security`,
+and `settings` own domain behavior; `api` composes those capabilities into
+application operations; and `cli` adapts user arguments into the same API
+executor.
 
 MCP depends only on CLI and executes the installed `blooket` command in machine
 mode. It must not import API or domain internals. Localhost HTTP belongs to the
@@ -34,8 +34,14 @@ implementing separate semantics.
 
 Platform adapters may depend on existing owning-domain contracts, including
 project, security, or settings contracts, but may not reverse the dependency
-direction. Desktop and extension surfaces may depend on their admitted UI/API
+direction. Browser and extension surfaces may depend on their admitted UI/API
 layers and must not acquire Blooket semantics.
+
+The macOS browser UI and online MCP decision supersedes the initial desktop
+presentation and Linux product scope. Declare the browser host component before
+adding its source; the existing desktop graph entry is not a native-window
+requirement. A remote MCP gateway preserves the same CLI boundary and does not
+make the general localhost API public.
 
 ## Consequences
 
@@ -46,8 +52,8 @@ layers and must not acquire Blooket semantics.
 
 ## Rejected Alternatives
 
-- A generic `core` package was rejected because it obscures capability
-  ownership and invites unrelated logic into one dependency sink.
+- A generic `core` package was rejected because it obscures capability ownership
+  and invites unrelated logic into one dependency sink.
 - Letting MCP import the API directly was rejected because it would create a
   second automation path instead of exercising the canonical CLI.
 - Duplicating product behavior in platform adapters was rejected because macOS

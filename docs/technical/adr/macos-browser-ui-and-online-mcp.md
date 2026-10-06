@@ -1,0 +1,179 @@
+# macOS browser UI and required online MCP
+
+## Status
+
+Accepted product direction. Browser UI hosting, tunnel configuration, remote
+MCP, packaging, and first-run diagnostics are not yet implemented.
+
+This decision replaces the initial native-desktop-first presentation plan, Linux
+product test baseline, and deferred remote-relay scope. Existing portable
+implementations and useful tests remain; no domain rewrite is implied.
+
+## Decision ID
+
+`blooket-api.product.macos-browser-ui-and-online-mcp`
+
+## Context
+
+The initial recipient is one teacher with a Mac who wants to create quizzes
+quickly with ChatGPT. A browser interface keeps review and editing in the same
+daily workflow. Online AI access is essential to that workflow, not an optional
+enterprise feature. The user provisions the Cloudflare domain, tunnel, and MCP
+client connection.
+
+The Mac's CPU and OS have not been confirmed. Appearance and Touch ID are not
+sufficient to choose an architecture or claim a minimum macOS version. There is
+no current macOS test host and no requirement to set up a virtual machine.
+
+## Decision
+
+### Local service and browser UI
+
+Target macOS only. Run a small local background service that owns projects,
+media, settings, secrets, and browser execution. Serve the UI and its HTTP API
+from the same loopback origin. The user opens the page on demand; the initial
+release requires neither a native desktop window nor a permanent Dock icon.
+
+Share browser-safe behavior through `src/ui/general/` with the optional Safari
+extension. Declare the web host in Jig when implementing it, replacing the
+unused desktop host boundary. Preserve the canonical IR and executor. The UI
+cannot directly access another site's authenticated page; browser automation
+remains behind the existing Blooket ports.
+
+### Online MCP and user-owned tunnel setup
+
+Expose a dedicated loopback MCP gateway with Streamable HTTP through the
+user-configured Cloudflare Tunnel and stable HTTPS hostname. The gateway
+executes registered canonical CLI commands in JSON mode. It does not import
+application internals or accept arbitrary process commands.
+
+The tunnel provides connectivity. Authenticate and authorize MCP tools through
+the user's compatible setup before execution. Publish only MCP routes and
+required authorization/discovery endpoints. Keep the local UI, general API,
+settings, secret management, and arbitrary filesystem routes private.
+
+ChatGPT supports remote MCP over streaming HTTP or SSE and documents OAuth
+authentication. Its authorization flow is distinct from the tunnel credential;
+do not assume arbitrary Cloudflare service-token headers are accepted. Confirm
+access using the recipient's actual account and configuration.
+
+The Mac must be awake with the service and tunnel running. Disconnects preserve
+execution state and do not automatically replay an ambiguous mutation.
+
+### Settings and credential entry
+
+The local UI accepts the public hostname and a masked Cloudflare tunnel token
+with Save. The user handles external provisioning. Extend the existing settings
+schema with migration, tunnel enablement, secret references, and diagnostic
+status. Persist ordinary settings atomically and store credential values in
+Keychain through `HostSecretStore`.
+
+The background process reads saved settings and secret values internally. UI
+responses expose only configured/missing status. Never return stored tokens,
+Blooket credentials, cookies, or authorization headers through UI, API, CLI, or
+MCP results.
+
+A Cloudflare tunnel token, an MCP authorization credential, and a Blooket
+credential are independent secrets. A failed secret/settings save must leave an
+explicit recoverable state rather than claiming successful setup.
+
+### Packaging and first-use verification
+
+ARM64 is the provisional target. Confirm the chip, OS version, and browser from
+About This Mac before choosing final packaging inputs. Add x86-64 only if the
+recipient's Mac needs it.
+
+Include the runtime, native Sharp/libvips dependencies, UI assets, CLI, and the
+selected cloudflared delivery mechanism. Do not require Metal acceleration or a
+Linux/Windows build.
+
+Development can proceed without a VM or macOS host. Portable tests on Fedora
+remain useful and do not establish macOS integration correctness. An Intel VM
+would not validate ARM64 behavior; OpenCore is a bootloader, not a CPU emulator.
+
+Apple's documented macOS ARM virtualization uses an Apple-silicon Mac. None of
+these environments is a prerequisite for this prototype.
+
+Run one bounded first-use diagnostic on the recipient's Mac. Check runtime
+OS/architecture, settings decoding, disposable application-data storage, local
+port availability, a tiny native image decode, Keychain client availability, and
+configured service/tunnel prerequisites. Distinguish missing configuration from
+failed dependencies. Do not change Blooket, write real credentials, run the full
+test suite, or require an unconfigured tunnel to connect.
+
+Persist the first attempt's diagnostic/check version, outcome, timestamp, stable
+failure codes, and local log reference in settings. Do not automatically rerun
+the suite on every launch. Offer manual diagnostics after configuration or
+repair.
+
+Keep logs bounded and sanitized, with useful OS/runtime versions and failure
+codes but no private quizzes, tokens, passwords, cookies, or raw secret command
+output. Let independent features remain usable.
+
+Until a check or user workflow has actually run on macOS, label that behavior
+unverified. A first-use diagnostic is evidence of its narrow checks, not proof
+of full quiz publication or recovery behavior.
+
+### Blooket API evidence
+
+On 2026-10-05, unauthenticated GET requests to `blooket.com/api`,
+`www.blooket.com/api`, and `dashboard.blooket.com/api` ended in HTTP 403. The
+first also redirected to the public homepage. Opening `www.blooket.com/api` in
+the user's Chrome reached the public homepage, not API documentation or a JSON
+service response. These observations do not prove an API is absent.
+
+The recovered dashboard client has internal `/api/v2/unsplash/search`,
+`/api/v2/unsplash/track`, and `/api/v2/download/image` routes in modules 90151,
+30661, and 18622. They establish media-related client paths, not a supported
+quiz creation API. Inspect actual authenticated requests and their versioned
+read/write behavior before choosing direct HTTP over browser execution. Do not
+probe guessed mutations or treat a base `/api` URL as a stable contract.
+
+## Consequences
+
+- One browser UI serves the initial Mac workflow and shares extension behavior.
+- Online AI access is a first-release requirement with user-provisioned hosting.
+- Existing IR, CLI execution, persistence, and recovery semantics are retained.
+- macOS integration remains honestly unverified until the recipient runs it.
+- First-use diagnostics provide repair evidence without requiring a VM project.
+
+## Rejected Alternatives
+
+- A native desktop window is deferred because the browser meets the initial UI
+  need and avoids another presentation host.
+- Linux distribution and host/browser gates are removed from initial scope
+  because the recipient uses a Mac. Existing portable test coverage remains.
+- VM provisioning is excluded from the prototype plan; it is not required to
+  prepare the service or collect a first-use diagnostic.
+- A public general API is rejected because only the approved MCP tools need
+  online access. The configured tunnel targets the narrow gateway.
+- Storing token values in ordinary settings is rejected in favor of existing
+  Keychain storage with secret references and the same local Save workflow.
+
+## Verification
+
+The roadmap is complete only when the local UI can save the user-provided
+configuration, the first-use diagnostic records and reports its real result, and
+the actual online AI account can execute an authenticated MCP read. Quiz
+publication additionally needs an approved end-to-end create/read-back and
+interruption/recovery exercise through the same canonical executor.
+
+Linux host/browser checks, Linux distribution, and VM provisioning are not
+release gates. Existing portable test failures must still be reported; changing
+product scope is not permission to delete or weaken working coverage.
+
+### Sources
+
+- [Identify Apple silicon or Intel][chip].
+- [Apple virtualization architecture][vm].
+- [OpenCore bootloader][opencore].
+- [Cloudflare Tunnel routing][tunnel].
+- [ChatGPT custom MCP servers][mcp].
+- [MCP authentication for ChatGPT][auth].
+
+[chip]: https://support.apple.com/en-us/116943
+[vm]: https://developer.apple.com/videos/play/wwdc2022/10002/
+[opencore]: https://github.com/acidanthera/OpenCorePkg
+[tunnel]: https://developers.cloudflare.com/tunnel/concepts/routing/
+[mcp]: https://developers.openai.com/api/docs/guides/custom-mcp-server
+[auth]: https://developers.openai.com/plugins/build/auth

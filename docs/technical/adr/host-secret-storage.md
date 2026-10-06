@@ -4,6 +4,11 @@
 
 Accepted.
 
+Current product scope is macOS only, as recorded in the macOS browser UI and
+online MCP decision. Linux backend details below describe existing development
+infrastructure, not a Linux product or release requirement. New tunnel secrets
+use the same owning security port; ordinary settings contain secret references.
+
 ## Decision ID
 
 `blooket-api.security.host-secret-storage`
@@ -53,11 +58,10 @@ adding a newline. Lookup and clear use only non-secret attributes in argv. A
 clean exit 1 with no stdout or stderr is the observed no-match result and is
 treated as missing; other failures remain failures.
 
-The shared subprocess runner has a five-second timeout and bounds stdout to
-128 KiB.
-and never retains stderr text. Stdout is retained only for secret-read commands;
-write, probe, and delete output is drained without being stored. Callers receive
-stable error codes rather than command error strings.
+The shared subprocess runner has a five-second timeout and bounds stdout to 128
+KiB. and never retains stderr text. Stdout is retained only for secret-read
+commands; write, probe, and delete output is drained without being stored.
+Callers receive stable error codes rather than command error strings.
 
 Windows is currently unsupported. A future Credential Manager implementation
 must satisfy the existing HostSecretStore port, so authentication callers do not
@@ -99,6 +103,5 @@ security-domain port factory.
 
 The command-runner tests verify stdin transport, timeouts, output ceilings,
 uncaptured stdout draining, stderr-text elision, and missing executable
-handling.
-A Linux development-host smoke check also exercises only a guaranteed-missing
-random key so validation does not write a real credential.
+handling. A Linux development-host smoke check also exercises only a
+guaranteed-missing random key so validation does not write a real credential.

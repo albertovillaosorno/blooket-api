@@ -11,7 +11,8 @@ Accepted.
 ## Context
 
 The media pipeline must validate and transform untrusted JPEG, PNG, WebP, AVIF,
-and GIF inputs on the macOS product target and Linux development baseline.
+and GIF inputs on the macOS product target. Portable codec tests may also run on
+the development host without requiring Linux distribution or host integration.
 Animated inputs need frame-aware metadata and future rendition support.
 
 Implementing and maintaining those image codecs in repository TypeScript would
@@ -25,17 +26,17 @@ version in `package.json`, record the current release through Jig version
 authority, and keep direct Sharp access inside media adapter code.
 
 Sharp is justified because it provides maintained libvips-backed decoding and
-encoding for the required formats, prebuilt binaries for current macOS and
-Linux targets, frame metadata for animated GIF/WebP inputs, explicit pixel
-limits, and strict warning-level handling for untrusted input. It also avoids
-spawning image-processing child processes.
+encoding for the required formats, prebuilt binaries for current macOS and Linux
+targets, frame metadata for animated GIF/WebP inputs, explicit pixel limits, and
+strict warning-level handling for untrusted input. It also avoids spawning
+image-processing child processes.
 
 The repository intentionally materializes packages below
 `.dependencies/pnpm/node_modules`. Node's ordinary package resolver does not
 search that nonstandard modules directory, and Jig forbids a second root
-`node_modules`. The Sharp adapter therefore owns the one dynamic module URL
-that points at the canonical repository dependency location. Media domain code
-must not repeat that path.
+`node_modules`. The Sharp adapter therefore owns the one dynamic module URL that
+points at the canonical repository dependency location. Media domain code must
+not repeat that path.
 
 Source-image validation first checks repository-owned magic-byte rules. Sharp
 then parses metadata, which is used to enforce a caller-supplied total pixel
@@ -74,12 +75,12 @@ until equivalent preservation behavior is implemented and covered by tests.
 - Repository-owned JPEG, PNG, WebP, AVIF, and GIF decoders were rejected because
   codec implementation is not a product differentiator and would increase the
   security surface substantially.
-- Shelling out to ImageMagick or similar host tools was rejected because it
-  adds a process boundary and an undeclared host dependency.
+- Shelling out to ImageMagick or similar host tools was rejected because it adds
+  a process boundary and an undeclared host dependency.
 - Trusting extensions or MIME labels without decoder validation was rejected
   because media intake is untrusted input.
-- Creating a root `node_modules` solely for Node resolution was rejected
-  because Jig requires package materialization under `.dependencies/pnpm`.
+- Creating a root `node_modules` solely for Node resolution was rejected because
+  Jig requires package materialization under `.dependencies/pnpm`.
 
 ## Verification
 
