@@ -68,9 +68,14 @@ receipt. A confirmed Create Set record stores the opaque remote set receipt;
 question confirmations store `null`. Corrupt or cross-plan evidence is retained.
 
 Local recovery treats `attempting` as ambiguous and requires reconciliation.
-Only a durably `confirmed` journal may advance a missing checkpoint step
-automatically. If the checkpoint already contains that confirmed advancement,
-recovery clears the redundant valid journal.
+An explicit resolver may apply externally verified evidence for the exact
+operation: confirmed outcomes first persist their receipt and reuse normal
+recovery, while verified non-confirmation clears only the pending journal.
+
+Inconsistent progress, operation mismatches, invalid receipts, and lock
+conflicts
+preserve recovery evidence. Only a durably `confirmed` journal may advance a
+missing checkpoint step automatically.
 
 Persisted execution serializes the full recovery-to-cleanup transaction with an
 exclusive execution lock. Standalone recovery acquires that same lock, whose
@@ -90,8 +95,8 @@ place and returns reconciliation-required instead of a retryable result. Session
 stop states occur before journal creation. A confirmed journal whose checkpoint
 save fails remains sufficient for deterministic local recovery on the next call.
 
-Concrete browser mutation mechanics, provider-specific reconciliation of an
-ambiguous `attempting` journal, normal pacing, and retry classification remain
+Concrete browser mutation mechanics, the provider-specific verifier that feeds
+explicit reconciliation, normal pacing, and retry classification remain
 dependent on verified browser behavior rather than guessed selectors or timing
 constants.
 

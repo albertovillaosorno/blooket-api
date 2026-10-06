@@ -39,11 +39,11 @@ after authenticated observations establish an exact versioned read shape.
 
 ### TODO - Complete concrete create/edit browser execution
 
-Implement the browser mutation adapter and provider-specific reconciliation for
-ambiguous `attempting` journals. Add bounded normal pacing and retry
-classification only from verified behavior. Canonical prepare/attempt/complete
-execution, serialized write-ahead journaling, durable remote-set binding,
-checkpoints, and deterministic confirmed-write recovery are in place.
+Implement the browser mutation adapter and provider-specific verifier that
+resolves ambiguous `attempting` journals into the explicit reconciliation
+operation. Add bounded normal pacing and retry classification only from verified
+behavior. Durable receipts, checkpoints, recovery, and reconciliation are in
+place.
 
 ## P3 — Canonical CLI and localhost API
 
