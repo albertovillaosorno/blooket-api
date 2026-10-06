@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-question-reads
+  name: blooket-question-reads
+  path: src/ir/blooket-question-reads
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

@@ -444,6 +444,38 @@ is needed. Preserve CAPTCHA, organization selection, unfamiliar login, loading,
 expired-session, and human-stop states. Session data and cookies must remain
 inside the browser/security boundary.
 
+Portable question-read foundations were added on 2026-10-06. The version-one
+read contract normalizes question number/text, `mc`/`typing`, randomization,
+seconds, answers/correct answers, typing match modes, and only the presence of
+question image/audio media. It deliberately does not retain provider media URLs
+or invent remote question IDs. Authenticated `listBlooketQuestions` validates
+the opaque set ID before browser or secret access and decodes every adapter
+result before returning it.
+
+The field evidence comes from recovered build
+`86784c3d4c38fcd559c92f38fbadd7a160947de2`: edit module 12048
+(`page-720bc856ab06b26b.js`, factory
+`b0c808b1bcf957f7a974ba0a27269e5c4eca8c3a3be0663f0207fc7ad04f8bb4`)
+reads `set.questions` and each question's number, question, image, audio,
+`qType`, random flag, and `timeLimit`; dependency module 35211
+(`6749-987e303c90e94fbf.js`, factory
+`b21ec449a8a5bbc90abd132bb6b08de90881ab45ba3654182a4d90690e98b90d`)
+also reads answers, correct answers, and answer types. Neither module has a
+recorded factory variant. The previously authorized Chrome observation on the
+newer build confirmed that changing a private test question to typing with a
+15-second limit persisted after reload; keep the two builds distinct.
+
+Question write recovery now captures a normalized question-list digest and can
+confirm one exact text-only addition only when removing that candidate
+reproduces the pre-write collection. Unchanged state is `not-confirmed`; media
+writes, concurrent edits, malformed reads, and ambiguous additions remain
+`inconclusive`.
+
+All 552 portable tests, strict TypeScript, and browser-script syntax pass after
+this read/reconciliation work. The concrete browser/extension extractor is
+still missing, so this does not complete task 08 or claim live question
+read-back.
+
 Complete when fresh validated remote state can be read reliably, capability
 changes are detected, and a missing/challenged session returns the appropriate
 stop instead of fabricated data or a mutation. These reads establish the

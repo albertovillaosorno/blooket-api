@@ -9,16 +9,16 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Unit tests for differential Create Set verification over set reads.
+//   - Unit tests for differential set and question verification over reads.
 // - Must-Not:
-//   - Contact Blooket, mutate remotely, or claim question verification.
+//   - Contact Blooket, mutate remotely, or infer media identity.
 // - Allows:
 //   - Inputs: Deterministic list/detail probe sequences.
 //   - Outputs: Baselines and exact confirmed/not-confirmed/inconclusive
 //     verdicts.
 //   - Side effects: In-memory probe call recording only.
 // - Split-When:
-//   - Question verification gains a concrete read model.
+//   - Set and question verification need separate test lifecycles.
 // - Merge-When:
 //   - Set verification no longer uses differential collection evidence.
 // - Summary:
@@ -28,7 +28,7 @@
 // - Usage:
 //   - Run through the repository Node test command.
 // - Defaults:
-//   - Questions capture null baselines and cannot be recovery-confirmed.
+//   - Question media remains inconclusive without stable media identity.
 //
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -38,6 +38,8 @@ import { blooketSetReadWriteVerifier } from
   "../../../../src/api/blooket-write-execution/application/set-read-verifier.ts";
 import type { BlooketSetReadPort } from
   "../../../../src/api/blooket-set-reads/contract/set-reads.ts";
+import type { BlooketQuestionReadPort } from
+  "../../../../src/api/blooket-set-reads/contract/question-reads.ts";
 import type { BlooketWriteOperation } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
 
@@ -289,3 +291,158 @@ test(
   );
   },
 );
+
+function typingOperation(
+  imageMediaId: string | null = null,
+): BlooketWriteOperation {
+  return {
+    operationId: "plan:test:q:0",
+    kind: "question",
+    localQuestionId: "q1",
+    questionNumber: 1,
+    question: {
+      type: "typing-answer",
+      prompt: "Type sun.",
+      timeLimitSeconds: 10,
+      imageMediaId,
+      matchMode: "exact",
+      answer: "sun",
+    },
+  };
+}
+
+function remoteTyping(
+  overrides: Readonly<Record<string, unknown>> = {},
+) {
+  return {
+    schemaVersion: 1,
+    number: 1,
+    question: "Type sun.",
+    qType: "typing",
+    random: true,
+    timeLimit: 10,
+    answers: ["sun"],
+    correctAnswers: ["sun"],
+    answerTypes: ["exactly"],
+    hasImage: false,
+    hasAudio: false,
+    ...overrides,
+  };
+}
+
+function questionReads(
+  values: readonly (readonly unknown[])[],
+): BlooketQuestionReadPort {
+  let index = 0;
+  return {
+    list: async () => ({
+      ok: true,
+      value: values[index++] ?? values.at(-1) ?? [],
+    }),
+  };
+}
+
+test("exact text question addition is confirmed from differential reads",
+  async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => {
+      throw new Error("question verification must not list sets");
+    },
+    get: async () => {
+      throw new Error("question verification must not get set metadata");
+    },
+  };
+  const verifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([[], [remoteTyping()]]),
+  );
+  const operation = typingOperation();
+  const target = { remoteSetId: "remote-set-1" };
+  const captured = await verifier.captureBaseline(operation, target);
+  assert.equal(captured.ok, true);
+  if (!captured.ok) return;
+  assert.equal(captured.baseline?.kind, "question-list");
+  assert.equal(captured.baseline?.itemCount, 0);
+
+  assert.deepEqual(
+    await verifier.verify(operation, target, captured.baseline),
+    { ok: true, outcome: "confirmed", receipt: null },
+  );
+  },);
+
+test("unchanged question collection proves non-confirmation", async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => ({ ok: true, value: [] }),
+    get: async () => ({ ok: true, value: {} }),
+  };
+  const verifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([[], []]),
+  );
+  const operation = typingOperation();
+  const target = { remoteSetId: "remote-set-1" };
+  const captured = await verifier.captureBaseline(operation, target);
+  assert.equal(captured.ok, true);
+  if (!captured.ok) return;
+
+  assert.deepEqual(
+    await verifier.verify(operation, target, captured.baseline),
+    { ok: true, outcome: "not-confirmed" },
+  );
+});
+
+test("question media and concurrent edits remain inconclusive", async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => ({ ok: true, value: [] }),
+    get: async () => ({ ok: true, value: {} }),
+  };
+  const mediaVerifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([[], [remoteTyping({ hasImage: true })]]),
+  );
+  const mediaOperation = typingOperation("media-1");
+  const target = { remoteSetId: "remote-set-1" };
+  const mediaBaseline = await mediaVerifier.captureBaseline(
+    mediaOperation,
+    target,
+  );
+  assert.equal(mediaBaseline.ok, true);
+  if (!mediaBaseline.ok) return;
+  assert.deepEqual(
+    await mediaVerifier.verify(
+      mediaOperation,
+      target,
+      mediaBaseline.baseline,
+    ),
+    { ok: true, outcome: "inconclusive" },
+  );
+
+  const existing = remoteTyping({
+    number: 2,
+    question: "Existing",
+    answers: ["old"],
+    correctAnswers: ["old"],
+  });
+  const changed = { ...existing, timeLimit: 20 };
+  const concurrentVerifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([
+      [existing],
+      [changed, remoteTyping()],
+    ]),
+  );
+  const concurrentBaseline = await concurrentVerifier.captureBaseline(
+    typingOperation(),
+    target,
+  );
+  assert.equal(concurrentBaseline.ok, true);
+  if (!concurrentBaseline.ok) return;
+  assert.deepEqual(
+    await concurrentVerifier.verify(
+      typingOperation(),
+      target,
+      concurrentBaseline.baseline,
+    ),
+    { ok: true, outcome: "inconclusive" },
+  );
+});

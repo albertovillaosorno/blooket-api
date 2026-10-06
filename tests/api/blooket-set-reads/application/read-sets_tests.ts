@@ -34,12 +34,15 @@ import test from "node:test";
 
 import {
   getBlooketSet,
+  listBlooketQuestions,
   listBlooketSets,
 } from "../../../../src/api/blooket-set-reads/application/read-sets.ts";
 import type {
   BlooketSetProbeResult,
   BlooketSetReadPort,
 } from "../../../../src/api/blooket-set-reads/contract/set-reads.ts";
+import type { BlooketQuestionReadPort } from
+  "../../../../src/api/blooket-set-reads/contract/question-reads.ts";
 import type {
   BlooketBrowserObservationResult,
   BlooketBrowserSessionPort,
@@ -342,4 +345,105 @@ test("set adapter failures and exceptions remain stable", async () => {
       assert.equal(result.stage, "read");
     }
   }
+});
+
+test(
+  "ready sessions list strictly decoded questions for the exact set",
+  async () => {
+  const calls: string[] = [];
+  const questionCalls: string[] = [];
+  const reads: BlooketQuestionReadPort = {
+    list: async (setId) => {
+      questionCalls.push(setId);
+      return {
+        ok: true,
+        value: [{
+          schemaVersion: 1,
+          number: 1,
+          question: "Type sun.",
+          qType: "typing",
+          random: true,
+          timeLimit: 10,
+          answers: ["sun"],
+          correctAnswers: ["sun"],
+          answerTypes: ["exactly"],
+          hasImage: false,
+          hasAudio: false,
+        }],
+      };
+    },
+  };
+  const result = await listBlooketQuestions(
+    browser([{ ok: true, state: "edit" }], calls),
+    secretStore(calls),
+    reads,
+    "opaque/set id?",
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok && result.kind === "questions") {
+    assert.equal(result.value.length, 1);
+    assert.equal(result.value[0]?.question, "Type sun.");
+    assert.deepEqual(result.session, { state: "edit", reused: true });
+  }
+  assert.deepEqual(questionCalls, ["opaque/set id?"]);
+  assert.deepEqual(calls, ["browser:observe"]);
+  },
+);
+
+test(
+  "invalid question set IDs fail before browser and secret access",
+  async () => {
+  const browserCalls: string[] = [];
+  const secretCalls: string[] = [];
+  let read = false;
+  const result = await listBlooketQuestions(
+    browser([], browserCalls),
+    secretStore(secretCalls),
+    {
+      list: async () => {
+        read = true;
+        return { ok: true, value: [] };
+      },
+    },
+    "",
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.stage, "request");
+  assert.equal(read, false);
+  assert.deepEqual(browserCalls, []);
+  assert.deepEqual(secretCalls, []);
+  },
+);
+
+test("invalid question payloads do not expose raw adapter values", async () => {
+  const rawSecret = "raw-question-page-secret";
+  const result = await listBlooketQuestions(
+    browser([{ ok: true, state: "edit" }], []),
+    secretStore([]),
+    {
+      list: async () => ({
+        ok: true,
+        value: [{
+          schemaVersion: 1,
+          number: 1,
+          question: "Safe prompt",
+          qType: "typing",
+          random: true,
+          timeLimit: 10,
+          answers: ["safe"],
+          correctAnswers: ["safe"],
+          answerTypes: ["exactly"],
+          hasImage: false,
+          hasAudio: false,
+          password: rawSecret,
+        }],
+      }),
+    },
+    "set-a",
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(JSON.stringify(result).includes(rawSecret), false);
 });

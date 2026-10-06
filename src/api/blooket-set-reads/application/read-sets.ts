@@ -36,6 +36,10 @@ import {
   type BlooketSetDetail,
   type BlooketSetSummary,
 } from "../../../ir/blooket-set-reads/contract/set-read.ts";
+import {
+  decodeBlooketQuestionReadList,
+  type BlooketQuestionRead,
+} from "../../../ir/blooket-question-reads/contract/question-read.ts";
 import type { ValidationIssue } from
   "../../../ir/runtime-decoding/domain/decode-result.ts";
 import type { HostSecretStore } from
@@ -52,6 +56,10 @@ import type {
   BlooketSetProbeResult,
   BlooketSetReadPort,
 } from "../contract/set-reads.ts";
+import type {
+  BlooketQuestionProbeResult,
+  BlooketQuestionReadPort,
+} from "../contract/question-reads.ts";
 
 type SessionFailure = Extract<
   EnsureBlooketSessionResult,
@@ -118,6 +126,37 @@ export type GetBlooketSetResult =
       readonly ok: false;
       readonly stage: "validation";
       readonly code: "set-id-mismatch";
+    };
+
+export type ListBlooketQuestionsResult =
+  | {
+      readonly ok: true;
+      readonly kind: "questions";
+      readonly session: ReadySessionSummary;
+      readonly value: readonly BlooketQuestionRead[];
+    }
+  | SessionStop
+  | {
+      readonly ok: false;
+      readonly stage: "session";
+      readonly code: SessionFailure["code"];
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "read";
+      readonly code: BlooketBrowserFailureCode;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "request";
+      readonly code: "invalid-set-id";
+      readonly issues: readonly ValidationIssue[];
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "validation";
+      readonly code: "invalid-question-read";
+      readonly issues: readonly ValidationIssue[];
     };
 
 export async function listBlooketSets(
@@ -220,6 +259,59 @@ export async function getBlooketSet(
   };
 }
 
+export async function listBlooketQuestions(
+  browser: BlooketBrowserSessionPort,
+  secrets: HostSecretStore,
+  reads: BlooketQuestionReadPort,
+  setId: unknown,
+): Promise<ListBlooketQuestionsResult> {
+  const decodedId = decodeBlooketSetId(setId);
+  if (!decodedId.ok) {
+    return {
+      ok: false,
+      stage: "request",
+      code: "invalid-set-id",
+      issues: decodedId.issues,
+    };
+  }
+
+  const session = await ensureReadySession(browser, secrets);
+  if (!session.ok || session.kind !== "ready") {
+    return session;
+  }
+
+  const probed = await safeQuestionProbe(
+    () => reads.list(decodedId.value),
+  );
+  if (!probed.ok) {
+    return {
+      ok: false,
+      stage: "read",
+      code: probed.code,
+    };
+  }
+
+  const decoded = decodeBlooketQuestionReadList(probed.value);
+  if (!decoded.ok) {
+    return {
+      ok: false,
+      stage: "validation",
+      code: "invalid-question-read",
+      issues: decoded.issues,
+    };
+  }
+
+  return {
+    ok: true,
+    kind: "questions",
+    session: {
+      state: session.state,
+      reused: session.reused,
+    },
+    value: decoded.value,
+  };
+}
+
 async function ensureReadySession(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
@@ -248,6 +340,19 @@ async function ensureReadySession(
 async function safeProbe(
   probe: () => Promise<BlooketSetProbeResult>,
 ): Promise<BlooketSetProbeResult> {
+  try {
+    return await probe();
+  } catch {
+    return {
+      ok: false,
+      code: "blooket-browser-failed",
+    };
+  }
+}
+
+async function safeQuestionProbe(
+  probe: () => Promise<BlooketQuestionProbeResult>,
+): Promise<BlooketQuestionProbeResult> {
   try {
     return await probe();
   } catch {
