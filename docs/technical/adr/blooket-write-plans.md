@@ -95,6 +95,12 @@ ambiguous `attempting` journal, normal pacing, and retry classification remain
 dependent on verified browser behavior rather than guessed selectors or timing
 constants.
 
+Authenticated build evidence also shows that Create Set returns an opaque remote
+set identifier and continues at `/edit?id=<id>`. The current success result does
+not yet persist that provider receipt. The concrete create path therefore must
+not rely on remaining on the same browser page: the remote set binding must be
+durable and plan-bound before subsequent question operations are enabled.
+
 ## Consequences
 
 - Raw or malformed project data cannot reach a write plan.
