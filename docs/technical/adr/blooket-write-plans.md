@@ -39,10 +39,11 @@ state, prefixed as an operation identifier. Operation IDs derive from that plan
 ID. Retrying the same desired state therefore reuses identities, while changing
 remote-visible content creates a new plan.
 
-Progress uses a version-one checkpoint containing the exact plan ID and the next
-operation index. A checkpoint advances only when the executor confirms the exact
-next operation ID. Cross-plan checkpoints, skipped operations, out-of-order
-operations, and advancement after completion all fail explicitly.
+Progress uses a version-two checkpoint containing the exact plan ID, the next
+operation index, and the opaque remote set ID after Create Set succeeds. The
+checkpoint advances only when the executor confirms the exact next operation ID.
+Cross-plan, skipped, out-of-order, and unbound advanced progress fail
+explicitly.
 
 Remote execution consumes at most one planned operation per application call.
 The checkpoint is decoded before any browser, credential, or mutation side
@@ -61,11 +62,10 @@ and stores a confirmed advancement before returning success. If a remote write
 is confirmed but checkpoint persistence fails, it returns an explicit recovery
 state rather than treating the operation as retryable.
 
-Write-ahead recovery uses a separate version-one attempt journal bound to the
-exact plan, operation ID, and operation index. A new attempt journal is created
-without overwrite in the `attempting` phase and may be atomically promoted to
-`confirmed`. Corrupt, cross-plan, or symbolic recovery evidence is never deleted
-automatically.
+Write-ahead recovery uses a separate version-two attempt journal bound to the
+exact plan, operation ID, and operation index. An `attempting` record has no
+receipt. A confirmed Create Set record stores the opaque remote set receipt;
+question confirmations store `null`. Corrupt or cross-plan evidence is retained.
 
 Local recovery treats `attempting` as ambiguous and requires reconciliation.
 Only a durably `confirmed` journal may advance a missing checkpoint step
@@ -95,11 +95,15 @@ ambiguous `attempting` journal, normal pacing, and retry classification remain
 dependent on verified browser behavior rather than guessed selectors or timing
 constants.
 
-Authenticated build evidence also shows that Create Set returns an opaque remote
-set identifier and continues at `/edit?id=<id>`. The current success result does
-not yet persist that provider receipt. The concrete create path therefore must
-not rely on remaining on the same browser page: the remote set binding must be
-durable and plan-bound before subsequent question operations are enabled.
+Authenticated build evidence shows that Create Set returns an opaque remote set
+identifier and continues at `/edit?id=<id>`. Confirmed execution now persists
+that receipt in the journal before checkpoint advancement, then carries the same
+binding into checkpoint version two before the journal is cleared.
+
+Subsequent question writes receive the checkpoint's remote set ID explicitly.
+Recovery refuses legacy advanced checkpoints, legacy confirmed Create Set
+journals, premature bindings, and receipt/checkpoint mismatches instead of
+inventing or changing the target.
 
 ## Consequences
 
