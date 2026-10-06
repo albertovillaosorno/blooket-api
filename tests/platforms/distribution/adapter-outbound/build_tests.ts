@@ -50,8 +50,7 @@ const workflow = async (name: string) =>
     ),
   );
 
-test("release invokes the single CI workflow and publishes only last",
-  async () => {
+test("CI is opt-in and release consumes its verified artifacts", async () => {
   const ci = await workflow("ci");
   const release = await workflow("release");
   assert.deepEqual(
@@ -59,44 +58,42 @@ test("release invokes the single CI workflow and publishes only last",
       .sort(),
     ["ci.yml", "release.yml"],
   );
-  const ciCommands = ci.jobs.repository.steps.flatMap(
-    (step: { run?: string }) => (step.run ? [step.run] : []),
-  );
-  assert.deepEqual(ciCommands, [
-    "pnpm install --frozen-lockfile",
-    "npm run check",
-    "npm test",
-  ]);
-  assert.equal(release.jobs.ci.uses, "./.github/workflows/ci.yml");
-  assert.equal(release.jobs.ci.needs, "tag");
-  assert.deepEqual(release.jobs.publish.needs, ["tag", "ci", "packages"]);
-  assert.equal(
-    release.jobs.publish.if,
-    "needs.tag.result == 'success' && needs.ci.result == 'success' && " +
-      "needs.packages.result == 'success'",
-  );
-  assert.equal(release.permissions.contents, "read");
-  assert.equal(release.jobs.publish.permissions.contents, "write");
+
+  assert.deepEqual(ci.on.push.tags, ["ci-*"]);
+  assert.equal(ci.on.push.branches, undefined);
+  assert.equal(ci.on.pull_request, undefined);
+  assert.equal(ci.on.workflow_dispatch, undefined);
+  assert.equal(ci.on.workflow_call.inputs.release.default, false);
+
   assert.deepEqual(
-    release.jobs.packages.strategy.matrix.include
+    ci.jobs.packages.strategy.matrix.include
       .map((item: { target: string }) => item.target)
       .sort(),
     ["darwin-arm64", "darwin-x64", "linux-x64"],
   );
   assert.deepEqual(
-    release.jobs.packages.strategy.matrix.include.map(
+    ci.jobs.packages.strategy.matrix.include.map(
       (item: { runner: string }) => item.runner,
     ),
     ["macos-latest", "macos-26-intel", "ubuntu-latest"],
   );
-  const commands = release.jobs.packages.steps.flatMap(
+
+  const ciCommands = ci.jobs.packages.steps.flatMap(
     (step: { run?: string }) => (step.run ? [step.run] : []),
   );
-  const packageVerify = commands.find((command: string) =>
+  for (const command of [
+    "pnpm install --frozen-lockfile",
+    "npm run check",
+    "npm test",
+    'npm run package -- "$PACKAGE_TARGET"',
+  ]) {
+    assert.ok(ciCommands.includes(command));
+  }
+  const packageVerify = ciCommands.find((command: string) =>
     command.includes("npm run package:verify"),
   );
   assert.equal(
-    commands.filter((command: string) =>
+    ciCommands.filter((command: string) =>
       command.includes("package:verify"),
     ).length,
     1,
@@ -109,6 +106,41 @@ test("release invokes the single CI workflow and publishes only last",
       'npm run package:verify -- "$PACKAGE_TARGET" --release',
     ),
   );
+  assert.ok(packageVerify?.includes('"$PACKAGE_TARGET" == darwin-*'));
+  assert.ok(packageVerify?.includes('"$RELEASE_MODE" == true'));
+
+  assert.deepEqual(release.on.push.tags, ["v20*.*.*"]);
+  assert.equal(
+    release.jobs.gate.steps.at(-1).env.RELEASE_ENABLED,
+    "${{ vars.RELEASE_ENABLED }}",
+  );
+  const gate = release.jobs.gate.steps.at(-1).run as string;
+  assert.ok(gate.indexOf('[[ "$RELEASE_ENABLED" == true ]]') >= 0);
+  assert.ok(gate.indexOf("release-tag.ts") > gate.indexOf("RELEASE_ENABLED"));
+
+  assert.equal(release.jobs.ci.uses, "./.github/workflows/ci.yml");
+  assert.equal(release.jobs.ci.needs, "gate");
+  assert.equal(release.jobs.ci.with.release, true);
+  assert.deepEqual(release.jobs.publish.needs, ["gate", "ci"]);
+  assert.equal(
+    release.jobs.publish.if,
+    "needs.gate.result == 'success' && needs.ci.result == 'success'",
+  );
+  assert.equal(release.jobs.packages, undefined);
+
+  const download = release.jobs.publish.steps[0];
+  assert.equal(download.uses, "actions/download-artifact@v8");
+  assert.equal(download.with.pattern, "package-*");
+  const publication = release.jobs.publish.steps.at(-1).run as string;
+  assert.ok(publication.includes('gh release create "$RELEASE_TAG"'));
+  assert.ok(publication.includes("--verify-tag"));
+  assert.ok(publication.includes('--notes ""'));
+  assert.ok(!publication.includes("--generate-notes"));
+  assert.ok(!publication.includes("--notes-file"));
+  assert.ok(!publication.includes("SHA256SUMS"));
+  assert.ok(!publication.includes("npm "));
+  assert.ok(!publication.includes("package:"));
+
   for (const value of [ci, release]) {
     const visit = (node: unknown): void => {
       if (!node || typeof node !== "object") return;
@@ -117,28 +149,11 @@ test("release invokes the single CI workflow and publishes only last",
         if (key === "uses")
           assert.ok(
             typeof child === "string" &&
-              (child.startsWith("./") || /@(?:v\d+|main)$/u.test(child)),
+              (child.startsWith("./") || /@v\d+$/u.test(child)),
           );
         visit(child);
       }
     };
     visit(value);
   }
-  const publication = release.jobs.publish.steps.at(-1).run as string;
-  assert.ok(!publication.includes("--generate-notes"));
-  assert.ok(
-    publication.includes('--notes-file "docs/releases/$RELEASE_TAG.md"'),
-  );
-  assert.ok(
-    publication.indexOf("gh release upload") > publication.indexOf("--draft"),
-  );
-  assert.ok(
-    publication.indexOf("--draft=false") >
-      publication.indexOf("gh release upload"),
-  );
-  assert.ok(publication.includes('gh release view "$RELEASE_TAG"'));
-  assert.ok(publication.includes("--json isDraft --jq .isDraft"));
-  assert.ok(publication.includes('[[ "$draft" == true ]]'));
-  assert.ok(publication.includes("SHA256SUMS --clobber"));
-  assert.ok(publication.includes("set -euo pipefail"));
 });

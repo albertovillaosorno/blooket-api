@@ -65,14 +65,19 @@ When commits are authorized, every commit must use DCO signoff
 (`git commit -s`). Jig requires the `Signed-off-by` trailer and the hook must
 never be bypassed.
 
-Releases use quarterly CalVer tags `vYYYY.Q.PATCH`, with three-month quarters.
-Publish only when CI/CD and native package checks for the tagged commit all
-succeed.
+Hosted CI is opt-in. Ordinary branch pushes and pull requests rely on local
+validation; push a `ci-*` tag only for deliberate native-runner validation.
+Releases use quarterly CalVer tags `vYYYY.Q.PATCH`, with three-month quarters,
+and require the repository variable `RELEASE_ENABLED=true`.
 
-Failed, canceled, or skipped required checks block release; preserve
-that dependency in GitHub Actions. Release notes are handwritten, with no
-automated changelog or generated notes. Both Mac architectures are required;
-Linux packaging/tests remain required even when its release asset is omitted.
+A release tag must pass its gate, then the reusable CI workflow for that exact
+commit, before publication can run. Failed, canceled, or skipped CI blocks the
+release. Release does not rebuild or re-test; it publishes CI artifacts.
+Release notes are handwritten later in the GitHub UI, with no automated
+changelog or generated notes.
+
+Both Mac architectures are required; Linux packaging/tests remain required even
+when its release asset is omitted.
 
 ## Architecture rules
 
