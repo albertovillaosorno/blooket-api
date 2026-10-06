@@ -31,6 +31,13 @@ const words = {
       "vacío para conservarla.",
     localService: "Servicio local",
     port: "Puerto local",
+    portMode: "Si el puerto está ocupado",
+    fixedPort: "Avisar y detener",
+    automaticPort: "Elegir otro puerto local",
+    theme: "Apariencia",
+    systemTheme: "Usar la del sistema",
+    lightTheme: "Clara",
+    darkTheme: "Oscura",
     mediaFolder: "Carpeta de la biblioteca",
     chooseFolder: "Elegir carpeta",
     enableOnline: "Habilitar MCP online",
@@ -144,6 +151,13 @@ const words = {
       "keep the current value.",
     localService: "Local service",
     port: "Local port",
+    portMode: "When the port is busy",
+    fixedPort: "Report and stop",
+    automaticPort: "Choose another local port",
+    theme: "Appearance",
+    systemTheme: "Follow the system",
+    lightTheme: "Light",
+    darkTheme: "Dark",
     mediaFolder: "Library folder",
     chooseFolder: "Choose folder",
     enableOnline: "Enable online MCP",
@@ -479,8 +493,7 @@ function preview() {
     `calc(-50% + ${recipe.panY * bounds.height}px)) ` +
     `scale(${recipe.zoom})`;
   image.style.filter =
-    `saturate(${recipe.saturation}) ` +
-    `contrast(${recipe.contrast})`;
+    `saturate(${recipe.saturation}) ` + `contrast(${recipe.contrast})`;
 }
 $("#foreground").addEventListener("load", preview);
 window.addEventListener("resize", preview);
@@ -671,11 +684,17 @@ function fillSettings() {
   for (const name of ["email", "mediaRoot"])
     field(settingsForm, name).value = settings[name];
   field(settingsForm, "port").value = settings.service.port;
+  field(settingsForm, "portMode").value = settings.service.portMode;
+  field(settingsForm, "theme").value = settings.service.theme;
+  document.documentElement.dataset.theme = settings.service.theme;
   field(settingsForm, "online").checked = settings.online.enabled;
   field(settingsForm, "publicUrl").value = settings.online.publicUrl;
   for (const name of ["width", "height", "gifFps", "compression"])
     field(settingsForm, name).value = settings.defaults[name];
   $("#onlineFields").disabled = !settings.online.enabled;
+  renderSettingsState();
+}
+function renderSettingsState() {
   $("#passwordState").textContent = t(
     bootstrap.secrets.passwordConfigured ? "configured" : "missing",
   );
@@ -698,6 +717,8 @@ settingsForm.addEventListener("submit", async (event) => {
   preferences.email = field(settingsForm, "email").value;
   preferences.mediaRoot = field(settingsForm, "mediaRoot").value;
   preferences.service.port = Number(field(settingsForm, "port").value);
+  preferences.service.portMode = field(settingsForm, "portMode").value;
+  preferences.service.theme = field(settingsForm, "theme").value;
   preferences.online.enabled = field(settingsForm, "online").checked;
   preferences.online.publicUrl = field(settingsForm, "publicUrl").value;
   for (const name of ["width", "height", "gifFps", "compression"])
@@ -748,7 +769,7 @@ $("#folder").addEventListener("click", async () => {
 $("#rerun").addEventListener("click", async () => {
   try {
     bootstrap.diagnostic = await api("/api/diagnostics", {});
-    fillSettings();
+    renderSettingsState();
     toast(t("diagnosticsDone"));
   } catch (error) {
     report(error);
@@ -757,7 +778,10 @@ $("#rerun").addEventListener("click", async () => {
 $("#locale").addEventListener("change", (event) => {
   locale = event.target.value;
   translate();
-  fillSettings();
+  renderSettingsState();
+});
+field(settingsForm, "theme").addEventListener("change", (event) => {
+  document.documentElement.dataset.theme = event.target.value;
 });
 $("#search").addEventListener("input", renderGallery);
 document

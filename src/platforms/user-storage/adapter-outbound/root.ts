@@ -37,8 +37,12 @@ import {
   decodeTeacherPreferences,
   type TeacherPreferences,
 } from "../../../settings/teacher-preferences/domain/preferences.ts";
-import { writeAtomicFile } from
-  "../../atomic-files/adapter-outbound/atomic-file.ts";
+import {
+  writeAtomicFile,
+  writeDurableFileIfAbsent,
+} from "../../atomic-files/adapter-outbound/atomic-file.ts";
+import { tryAcquireFileLock } from
+  "../../file-locks/adapter-outbound/file-lock.ts";
 
 export function userDataRoot(): string {
   const override = process.env["BLOOKET_DATA_HOME"];
@@ -63,8 +67,11 @@ export async function loadPreferences(
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
       throw new Error("settings-unreadable");
     const defaults = defaultTeacherPreferences(join(root, "media"));
-    await savePreferences(root, defaults);
-    return defaults;
+    await writeDurableFileIfAbsent(
+      join(root, "settings.json"),
+      JSON.stringify(defaults, null, 2) + "\n",
+    );
+    return loadPreferences(root);
   }
 }
 export async function savePreferences(
@@ -72,9 +79,15 @@ export async function savePreferences(
   settings: TeacherPreferences,
 ): Promise<void> {
   decodeTeacherPreferences(settings, join(root, "media"));
-  await writeAtomicFile(
-    join(root, "settings.json"),
-    JSON.stringify(settings, null, 2) + "\n",
-    { backupPath: join(root, "settings.previous.json") },
-  );
+  const acquired = await tryAcquireFileLock(join(root, ".settings.lock"));
+  if (!acquired.ok) throw new Error("settings-" + acquired.reason);
+  try {
+    await writeAtomicFile(
+      join(root, "settings.json"),
+      JSON.stringify(settings, null, 2) + "\n",
+      { backupPath: join(root, "settings.previous.json") },
+    );
+  } finally {
+    await acquired.lock.release();
+  }
 }

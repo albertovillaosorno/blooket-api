@@ -72,7 +72,7 @@ if (process.argv.includes("--development")) {
 const online = createOnlineConnection(root, secrets);
 try {
   const service = await startBrowserService({ root, online, secrets });
-  await online.reload();
+  await online.reload(service.port);
   process.stdout.write(service.origin + "\n");
   for (const signal of ["SIGINT", "SIGTERM"] as const)
     process.once(signal, () => {

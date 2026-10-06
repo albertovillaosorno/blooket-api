@@ -48,8 +48,12 @@ import { initializeLibrary } from
   "../../../platforms/user-library/adapter-outbound/files.ts";
 import { createHostSecretStore } from
   "../../../platforms/host-secret-store/adapter-outbound/host-secret-store.ts";
-import type { HostSecretStore } from
-  "../../../security/host-secrets/domain/host-secret.ts";
+import {
+  validateHostSecretValue,
+  type HostSecretStore,
+} from "../../../security/host-secrets/domain/host-secret.ts";
+import { tryAcquireFileLock } from
+  "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import { writeAtomicFile } from
   "../../../platforms/atomic-files/adapter-outbound/atomic-file.ts";
 import { loadSharp } from
@@ -85,11 +89,50 @@ export async function saveConfiguration(
   exact(request, ["preferences", "password", "tunnelToken"]);
   if (!text(request["password"], 2048) || !text(request["tunnelToken"], 2048))
     throw new Error("invalid-secret-replacement");
+  for (const field of ["password", "tunnelToken"] as const) {
+    const value = request[field] as string;
+    if (value !== "" && !validateHostSecretValue(value).ok)
+      throw new Error("invalid-secret-replacement");
+  }
   const preferences = decodeTeacherPreferences(
     request["preferences"],
     join(root, "media"),
   );
-  await initializeLibrary(preferences.mediaRoot);
+  const acquired = await tryAcquireFileLock(join(root, ".configuration.lock"));
+  if (!acquired.ok)
+    return {
+      ok: false,
+      code: "configuration-" + acquired.reason,
+      secretsSaved: [],
+      settingsSaved: false,
+    };
+  try {
+    return await saveValidatedConfiguration(
+      root,
+      preferences,
+      request,
+      secrets,
+    );
+  } finally {
+    await acquired.lock.release();
+  }
+}
+async function saveValidatedConfiguration(
+  root: string,
+  preferences: ReturnType<typeof decodeTeacherPreferences>,
+  request: Record<string, unknown>,
+  secrets: HostSecretStore,
+) {
+  try {
+    await initializeLibrary(preferences.mediaRoot);
+  } catch {
+    return {
+      ok: false,
+      code: "media-root-unavailable",
+      secretsSaved: [],
+      settingsSaved: false,
+    };
+  }
   const written: string[] = [];
   for (const [field, key] of [
     ["password", "blooket.password"],
@@ -97,7 +140,10 @@ export async function saveConfiguration(
   ] as const) {
     const secret = request[field] as string;
     if (secret !== "") {
-      const result = await secrets.write(key, secret);
+      const result = await secrets.write(key, secret).catch(() => ({
+        ok: false as const,
+        code: "host-secret-store-failed" as const,
+      }));
       if (!result.ok)
         return {
           ok: false,

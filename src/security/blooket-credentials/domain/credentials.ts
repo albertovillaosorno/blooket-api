@@ -13,7 +13,7 @@
 // - Must-Not:
 //   - Log, serialize, persist outside the host store, or authenticate remotely.
 // - Allows:
-//   - Inputs: A trusted host-secret store.
+//   - Inputs: A trusted host-secret store and optional validated saved email.
 //   - Outputs: In-process credentials or stable secret-free failures.
 //   - Side effects: Reads at most two host-secret entries.
 // - Split-When:
@@ -23,7 +23,7 @@
 // - Summary:
 //   - Retrieves login material only through the security-domain secret port.
 // - Description:
-//   - Stops immediately when a required secret is absent or unreadable.
+//   - Uses ordinary saved email when supplied, preserving legacy key reads.
 // - Usage:
 //   - Call only when the navigation policy says authentication is required.
 // - Defaults:
@@ -49,15 +49,19 @@ export type BlooketCredentialReadResult =
     }
   | {
       readonly ok: false;
-      readonly code:
-        | "blooket-credentials-missing"
-        | HostSecretFailureCode;
+      readonly code: "blooket-credentials-missing" | HostSecretFailureCode;
     };
 
 export async function readBlooketCredentials(
   store: HostSecretStore,
+  loginIdentifier?: string,
 ): Promise<BlooketCredentialReadResult> {
-  const identifier = await store.read(BLOOKET_LOGIN_IDENTIFIER_SECRET);
+  const identifier =
+    loginIdentifier === undefined
+      ? await store.read(BLOOKET_LOGIN_IDENTIFIER_SECRET)
+      : loginIdentifier === ""
+        ? ({ ok: true, kind: "missing" } as const)
+        : ({ ok: true, kind: "found", secret: loginIdentifier } as const);
   if (!identifier.ok) {
     return identifier;
   }

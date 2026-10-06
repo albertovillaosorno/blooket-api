@@ -32,8 +32,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ensureBlooketSession } from
-  "../../../../src/api/blooket-session/application/ensure-session.ts";
+import {
+  ensureBlooketSession,
+  ensureConfiguredBlooketSession,
+} from "../../../../src/api/blooket-session/application/ensure-session.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  loadPreferences,
+  savePreferences,
+} from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 import type {
   BlooketBrowserAuthenticationResult,
   BlooketBrowserObservationResult,
@@ -43,8 +52,7 @@ import {
   BLOOKET_LOGIN_IDENTIFIER_SECRET,
   BLOOKET_PASSWORD_SECRET,
   type BlooketCredentials,
-} from
-  "../../../../src/security/blooket-credentials/domain/credentials.ts";
+} from "../../../../src/security/blooket-credentials/domain/credentials.ts";
 import type {
   HostSecretReadResult,
   HostSecretStore,
@@ -52,6 +60,41 @@ import type {
 
 const LOGIN = "teacher@example.test";
 const PASSWORD = "fixture-password";
+
+test(
+  "configured login uses saved email without changing legacy secrets",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "configured-session-"));
+  try {
+    await savePreferences(root, {
+      ...(await loadPreferences(root)),
+      email: "configured@example.test",
+    });
+    const reads: string[] = [];
+    const credentials: BlooketCredentials[] = [];
+    const result = await ensureConfiguredBlooketSession(
+      browserDouble(
+        {
+          observations: [
+            { ok: true, state: "signed-out" },
+            { ok: true, state: "dashboard" },
+          ],
+        },
+        [],
+        credentials,
+      ),
+      root,
+      secretStore(reads),
+    );
+    assert.equal(result.ok, true);
+    assert.deepEqual(reads, [BLOOKET_PASSWORD_SECRET]);
+    assert.equal(credentials[0]!.loginIdentifier, "configured@example.test");
+    assert.equal(JSON.stringify(result).includes(PASSWORD), false);
+    assert.equal(JSON.stringify(result).includes("configured@"), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 function secretStore(
   reads: string[],
@@ -72,8 +115,7 @@ function secretStore(
   return {
     read: async (name) => {
       reads.push(name);
-      return overrides[name] ?? defaults[name]
-        ?? { ok: true, kind: "missing" };
+      return overrides[name] ?? defaults[name] ?? { ok: true, kind: "missing" };
     },
     write: async () => ({ ok: true }),
     delete: async () => ({ ok: true }),
@@ -81,8 +123,7 @@ function secretStore(
 }
 
 interface BrowserDoubleOptions {
-  readonly observations:
-    readonly BlooketBrowserObservationResult[];
+  readonly observations: readonly BlooketBrowserObservationResult[];
   readonly authentication?: BlooketBrowserAuthenticationResult;
   readonly throwOnObserve?: boolean;
   readonly throwOnAuthenticate?: boolean;
@@ -102,10 +143,12 @@ function browserDouble(
       }
       const result = options.observations[observationIndex];
       observationIndex += 1;
-      return result ?? {
-        ok: false,
-        code: "blooket-browser-failed",
-      };
+      return (
+        result ?? {
+          ok: false,
+          code: "blooket-browser-failed",
+        }
+      );
     },
     authenticate: async (value) => {
       calls.push("authenticate");
@@ -123,9 +166,13 @@ test("confirmed dashboard sessions reuse without reading secrets", async () => {
   const calls: string[] = [];
   const credentials: BlooketCredentials[] = [];
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [{ ok: true, state: "dashboard" }],
-    }, calls, credentials),
+    browserDouble(
+      {
+        observations: [{ ok: true, state: "dashboard" }],
+      },
+      calls,
+      credentials,
+    ),
     secretStore(reads),
   );
 
@@ -145,12 +192,16 @@ test("signed-out sessions read credentials only when needed", async () => {
   const calls: string[] = [];
   const credentials: BlooketCredentials[] = [];
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [
-        { ok: true, state: "signed-out" },
-        { ok: true, state: "dashboard" },
-      ],
-    }, calls, credentials),
+    browserDouble(
+      {
+        observations: [
+          { ok: true, state: "signed-out" },
+          { ok: true, state: "dashboard" },
+        ],
+      },
+      calls,
+      credentials,
+    ),
     secretStore(reads),
   );
 
@@ -165,10 +216,12 @@ test("signed-out sessions read credentials only when needed", async () => {
     BLOOKET_LOGIN_IDENTIFIER_SECRET,
     BLOOKET_PASSWORD_SECRET,
   ]);
-  assert.deepEqual(credentials, [{
-    loginIdentifier: LOGIN,
-    password: PASSWORD,
-  }]);
+  assert.deepEqual(credentials, [
+    {
+      loginIdentifier: LOGIN,
+      password: PASSWORD,
+    },
+  ]);
 });
 
 test("expired sessions follow the same explicit login path", async () => {
@@ -176,12 +229,16 @@ test("expired sessions follow the same explicit login path", async () => {
   const calls: string[] = [];
   const credentials: BlooketCredentials[] = [];
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [
-        { ok: true, state: "expired-session" },
-        { ok: true, state: "edit" },
-      ],
-    }, calls, credentials),
+    browserDouble(
+      {
+        observations: [
+          { ok: true, state: "expired-session" },
+          { ok: true, state: "edit" },
+        ],
+      },
+      calls,
+      credentials,
+    ),
     secretStore(reads),
   );
 
@@ -199,9 +256,13 @@ test("rate limiting waits without reading credentials", async () => {
   const reads: string[] = [];
   const calls: string[] = [];
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [{ ok: true, state: "rate-limited" }],
-    }, calls, []),
+    browserDouble(
+      {
+        observations: [{ ok: true, state: "rate-limited" }],
+      },
+      calls,
+      [],
+    ),
     secretStore(reads),
   );
 
@@ -222,9 +283,13 @@ test("security and organization states require human action", async () => {
   ] as const) {
     const reads: string[] = [];
     const result = await ensureBlooketSession(
-      browserDouble({
-        observations: [{ ok: true, state }],
-      }, [], []),
+      browserDouble(
+        {
+          observations: [{ ok: true, state }],
+        },
+        [],
+        [],
+      ),
       secretStore(reads),
     );
 
@@ -241,9 +306,13 @@ test("missing credentials stop before browser authentication", async () => {
   const reads: string[] = [];
   const calls: string[] = [];
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [{ ok: true, state: "signed-out" }],
-    }, calls, []),
+    browserDouble(
+      {
+        observations: [{ ok: true, state: "signed-out" }],
+      },
+      calls,
+      [],
+    ),
     secretStore(reads, {
       [BLOOKET_LOGIN_IDENTIFIER_SECRET]: {
         ok: true,
@@ -262,12 +331,16 @@ test("missing credentials stop before browser authentication", async () => {
 
 test("post-login challenges stop without reporting login success", async () => {
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [
-        { ok: true, state: "signed-out" },
-        { ok: true, state: "security-challenge" },
-      ],
-    }, [], []),
+    browserDouble(
+      {
+        observations: [
+          { ok: true, state: "signed-out" },
+          { ok: true, state: "security-challenge" },
+        ],
+      },
+      [],
+      [],
+    ),
     secretStore([]),
   );
 
@@ -280,12 +353,16 @@ test("post-login challenges stop without reporting login success", async () => {
 
 test("remaining signed out after login fails explicitly", async () => {
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [
-        { ok: true, state: "signed-out" },
-        { ok: true, state: "signed-out" },
-      ],
-    }, [], []),
+    browserDouble(
+      {
+        observations: [
+          { ok: true, state: "signed-out" },
+          { ok: true, state: "signed-out" },
+        ],
+      },
+      [],
+      [],
+    ),
     secretStore([]),
   );
 
@@ -297,17 +374,25 @@ test("remaining signed out after login fails explicitly", async () => {
 
 test("browser exceptions become stable secret-free failures", async () => {
   const observeFailure = await ensureBlooketSession(
-    browserDouble({
-      observations: [],
-      throwOnObserve: true,
-    }, [], []),
+    browserDouble(
+      {
+        observations: [],
+        throwOnObserve: true,
+      },
+      [],
+      [],
+    ),
     secretStore([]),
   );
   const authenticationFailure = await ensureBlooketSession(
-    browserDouble({
-      observations: [{ ok: true, state: "signed-out" }],
-      throwOnAuthenticate: true,
-    }, [], []),
+    browserDouble(
+      {
+        observations: [{ ok: true, state: "signed-out" }],
+        throwOnAuthenticate: true,
+      },
+      [],
+      [],
+    ),
     secretStore([]),
   );
 
@@ -319,10 +404,7 @@ test("browser exceptions become stable secret-free failures", async () => {
     ok: false,
     code: "blooket-browser-failed",
   });
-  const serialized = JSON.stringify([
-    observeFailure,
-    authenticationFailure,
-  ]);
+  const serialized = JSON.stringify([observeFailure, authenticationFailure]);
   assert.equal(serialized.includes(LOGIN), false);
   assert.equal(serialized.includes(PASSWORD), false);
 });
@@ -331,13 +413,17 @@ test(
   "browser-declared failures propagate without secret material",
   async () => {
   const result = await ensureBlooketSession(
-    browserDouble({
-      observations: [{ ok: true, state: "signed-out" }],
-      authentication: {
-        ok: false,
-        code: "blooket-browser-unavailable",
+    browserDouble(
+      {
+        observations: [{ ok: true, state: "signed-out" }],
+        authentication: {
+          ok: false,
+          code: "blooket-browser-unavailable",
+        },
       },
-    }, [], []),
+      [],
+      [],
+    ),
     secretStore([]),
   );
 
@@ -346,5 +432,4 @@ test(
     code: "blooket-browser-unavailable",
   });
   assert.equal(JSON.stringify(result).includes(PASSWORD), false);
-  },
-);
+});
