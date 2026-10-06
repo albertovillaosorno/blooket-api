@@ -46,6 +46,7 @@ test("runner sends secret bytes through stdin rather than argv", async () => {
     command: process.execPath,
     args,
     stdin: Buffer.from(secret, "utf8"),
+    captureStdout: true,
   });
 
   assert.equal(args.join(" ").includes(secret), false);
@@ -69,6 +70,18 @@ test("runner bounds child execution time", async () => {
   });
 });
 
+test("runner drains uncaptured stdout without retaining it", async () => {
+  const result = await runSecretCommand({
+    command: process.execPath,
+    args: ["-e", "process.stdout.write('discard-me')"],
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.stdout.byteLength, 0);
+  }
+});
+
 test("runner rejects excessive stdout", async () => {
   const result = await runSecretCommand({
     command: process.execPath,
@@ -90,13 +103,14 @@ test("runner counts stderr without retaining its text", async () => {
     command: process.execPath,
     args: [
       "-e",
-      "process.stderr.write(process.env.TEST_SECRET ?? '')",
+      "process.stdin.pipe(process.stderr)",
     ],
+    stdin: Buffer.from(secret, "utf8"),
   });
 
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.stderrBytes, 0);
+    assert.equal(result.stderrBytes, Buffer.byteLength(secret));
     assert.equal(JSON.stringify(result).includes(secret), false);
   }
 });

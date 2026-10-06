@@ -169,6 +169,7 @@ async function readMacSecret(
   const result = await runner({
     command: MAC_SECURITY,
     args: ["find-generic-password", "-a", name, "-s", SERVICE, "-w"],
+    captureStdout: true,
   });
   if (!result.ok) {
     return commandFailure(result);
@@ -222,6 +223,7 @@ async function readLinuxSecret(
   const result = await runner({
     command: LINUX_SECRET_TOOL,
     args: linuxIdentityArgs("lookup", name),
+    captureStdout: true,
   });
   if (!result.ok) {
     return commandFailure(result);

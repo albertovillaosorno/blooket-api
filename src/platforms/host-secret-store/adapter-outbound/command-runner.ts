@@ -39,6 +39,7 @@ export interface SecretCommandInvocation {
   readonly args: readonly string[];
   readonly stdin?: Uint8Array;
   readonly timeoutMs?: number;
+  readonly captureStdout?: boolean;
 }
 
 export type SecretCommandResult =
@@ -112,7 +113,9 @@ export const runSecretCommand: SecretCommandRunner = async (
         });
         return;
       }
-      stdoutChunks.push(Buffer.from(chunk));
+      if (invocation.captureStdout === true) {
+        stdoutChunks.push(Buffer.from(chunk));
+      }
     });
     child.stderr.on("data", (chunk: Buffer) => {
       stderrBytes += chunk.byteLength;
