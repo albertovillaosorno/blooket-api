@@ -247,3 +247,96 @@ test(
     }
   },
 );
+
+test(
+  "extension bridge requires its bearer token and correlates one job",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "browser-extension-bridge-"));
+  const service = await startBrowserService({ root, port: 0 });
+  try {
+    const boot = (await (
+      await fetch(service.origin + "/api/bootstrap")
+    ).json()) as {
+      browserBridge: {
+        schemaVersion: number;
+        token: string;
+        connected: boolean;
+      };
+    };
+    assert.equal(boot.browserBridge.schemaVersion, 1);
+    assert.equal(boot.browserBridge.connected, false);
+    assert.ok(boot.browserBridge.token.length >= 32);
+
+    const extensionOrigin = "chrome-extension://fixture-extension";
+    const foreign = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      {
+        headers: {
+          Authorization: "Bearer " + boot.browserBridge.token,
+          Origin: "https://evil.example",
+        },
+      },
+    );
+    assert.equal(foreign.status, 403);
+
+    const wrong = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      {
+        headers: {
+          Authorization: "Bearer wrong-token",
+          Origin: extensionOrigin,
+        },
+      },
+    );
+    assert.equal(wrong.status, 401);
+
+    const pending = service.browserBridge.request({ kind: "sets.list" });
+    const response = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      {
+        headers: {
+          Authorization: "Bearer " + boot.browserBridge.token,
+          Origin: extensionOrigin,
+        },
+      },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get("access-control-allow-origin"),
+      extensionOrigin,
+    );
+    const next = (await response.json()) as {
+      job: { id: string; command: { kind: string } };
+    };
+    assert.equal(next.job.command.kind, "sets.list");
+
+    const completed = await fetch(
+      service.origin + "/api/browser-bridge/result",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + boot.browserBridge.token,
+          "Content-Type": "application/json",
+          Origin: extensionOrigin,
+        },
+        body: JSON.stringify({
+          schemaVersion: 1,
+          id: next.job.id,
+          ok: true,
+          value: [{ schemaVersion: 1, id: "set-a", title: "Synthetic" }],
+        }),
+      },
+    );
+    assert.equal(completed.status, 200);
+    assert.deepEqual(await pending, {
+      ok: true,
+      value: [{ schemaVersion: 1, id: "set-a", title: "Synthetic" }],
+    });
+  } finally {
+    await new Promise<void>((resolve) => {
+      service.server.close(() => resolve());
+      service.server.closeAllConnections();
+    });
+    await rm(root, { recursive: true, force: true });
+  }
+});

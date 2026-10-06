@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-browser-bridge
+  name: blooket-browser-bridge
+  path: src/api/blooket-browser-bridge
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: adapter-outbound

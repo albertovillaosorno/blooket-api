@@ -76,6 +76,10 @@ import { resolveConfiguredTcpPort } from
   "../../../platforms/tcp-ports/adapter-outbound/tcp-port.ts";
 import { installInitialSkills } from
   "../../teacher-library/application/initial-skills.ts";
+import {
+  createBlooketBrowserBridgeBroker,
+  type BlooketBrowserBridgeBroker,
+} from "../../../platforms/blooket-browser/adapter-outbound/broker.ts";
 
 import {
   migrateLegacyLibrary,
@@ -116,6 +120,7 @@ export async function startBrowserService(
     secrets?: HostSecretStore;
     instance?: string;
     stop?: () => Promise<void>;
+    browserBridge?: BlooketBrowserBridgeBroker;
   } = {},
 ) {
   const root = options.root ?? userDataRoot();
@@ -133,6 +138,8 @@ export async function startBrowserService(
   await installInitialSkills(root);
   const diagnostic = await runFirstUseDiagnostics(root);
   const csrf = randomBytes(32).toString("base64url");
+  const browserBridge =
+    options.browserBridge ?? createBlooketBrowserBridgeBroker();
   let origin = "";
   const staticRoot = new URL(
     "../../../ui/teacher-workspace/adapter-inbound/",
@@ -161,6 +168,19 @@ export async function startBrowserService(
     );
     response.setHeader("Referrer-Policy", "no-referrer");
     response.setHeader("Cache-Control", "no-store");
+    const requestPath = new URL(
+      request.url ?? "/",
+      "http://loopback.invalid",
+    ).pathname;
+    if (requestPath.startsWith("/api/browser-bridge/")) {
+      await handleBrowserBridgeRequest(
+        request,
+        response,
+        origin,
+        browserBridge,
+      );
+      return;
+    }
     if (
       request.headers.host !== new URL(origin).host ||
       (request.headers.origin !== undefined &&
@@ -210,6 +230,11 @@ export async function startBrowserService(
           onlineStatus: options.online?.status() ?? {
             state: "disabled",
             gatewayPort: 2608,
+          },
+          browserBridge: {
+            schemaVersion: 1,
+            token: browserBridge.pairingToken(),
+            ...browserBridge.status(),
           },
         });
         return;
@@ -496,11 +521,78 @@ export async function startBrowserService(
     });
     throw new Error("settings-save-failed");
   }
+  server.once("close", () => browserBridge.close());
   return {
     server,
     origin,
     root,
     port: localPort,
+    browserBridge,
     operationId: () => "http:" + randomUUID(),
   };
+}
+
+async function handleBrowserBridgeRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  serviceOrigin: string,
+  bridge: BlooketBrowserBridgeBroker,
+): Promise<void> {
+  if (request.headers.host !== new URL(serviceOrigin).host) {
+    json(response, 403, { ok: false, code: "invalid-origin" });
+    return;
+  }
+  const extensionOrigin = request.headers.origin;
+  const allowedOrigin =
+    extensionOrigin === undefined
+    || extensionOrigin.startsWith("chrome-extension://")
+    || extensionOrigin.startsWith("safari-web-extension://");
+  if (!allowedOrigin) {
+    json(response, 403, { ok: false, code: "invalid-origin" });
+    return;
+  }
+  if (extensionOrigin !== undefined) {
+    response.setHeader("Access-Control-Allow-Origin", extensionOrigin);
+    response.setHeader("Vary", "Origin");
+  }
+  if (request.method === "OPTIONS") {
+    response.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type",
+    );
+    response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  const authorization = request.headers.authorization;
+  const token = authorization?.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : "";
+  if (!bridge.authenticated(token)) {
+    json(response, 401, { ok: false, code: "invalid-browser-bridge-token" });
+    return;
+  }
+  const path = new URL(
+    request.url ?? "/",
+    "http://loopback.invalid",
+  ).pathname;
+  if (path === "/api/browser-bridge/next" && request.method === "GET") {
+    json(response, 200, { ok: true, job: bridge.next(token) });
+    return;
+  }
+  if (path === "/api/browser-bridge/result" && request.method === "POST") {
+    const body = await readBody(request, 1_000_000);
+    if (!bridge.complete(token, body)) {
+      json(response, 400, {
+        ok: false,
+        code: "invalid-browser-bridge-result",
+      });
+      return;
+    }
+    json(response, 200, { ok: true });
+    return;
+  }
+  json(response, 404, { ok: false, code: "not-found" });
 }
