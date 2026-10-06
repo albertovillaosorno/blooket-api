@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createHostSecretStore,
   deleteHostSecret,
   readHostSecret,
   writeHostSecret,
@@ -200,6 +201,23 @@ test("invalid stored payloads never become caller secrets", async () => {
       runner: fake.run,
     }),
     { ok: false, code: "host-secret-data-invalid" },
+  );
+});
+
+test("store factory implements the security-domain port", async () => {
+  const fake = fakeRunner([result(1), result(1)]);
+  const store = createHostSecretStore({
+    platform: "linux",
+    runner: fake.run,
+  });
+
+  assert.deepEqual(
+    await store.read("blooket-password"),
+    { ok: true, kind: "missing" },
+  );
+  assert.deepEqual(
+    await store.delete("blooket-password"),
+    { ok: true },
   );
 });
 

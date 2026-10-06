@@ -31,7 +31,10 @@
 //
 import {
   decodeHostSecretName,
+  type HostSecretMutationResult,
   type HostSecretName,
+  type HostSecretReadResult,
+  type HostSecretStore,
   validateHostSecretValue,
 } from "../../../security/host-secrets/domain/host-secret.ts";
 import {
@@ -46,27 +49,21 @@ const MAC_SECURITY = "/usr/bin/security";
 const LINUX_SECRET_TOOL = "/usr/bin/secret-tool";
 const MAC_NOT_FOUND = 44;
 
-export type HostSecretFailureCode =
-  | "invalid-host-secret-name"
-  | "host-secret-empty"
-  | "host-secret-too-large"
-  | "host-secret-store-unsupported"
-  | "host-secret-store-unavailable"
-  | "host-secret-store-failed"
-  | "host-secret-data-invalid";
-
-export type HostSecretReadResult =
-  | { readonly ok: true; readonly kind: "found"; readonly secret: string }
-  | { readonly ok: true; readonly kind: "missing" }
-  | { readonly ok: false; readonly code: HostSecretFailureCode };
-
-export type HostSecretMutationResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly code: HostSecretFailureCode };
-
 export interface HostSecretStoreOptions {
   readonly platform?: NodeJS.Platform;
   readonly runner?: SecretCommandRunner;
+}
+
+export function createHostSecretStore(
+  options: HostSecretStoreOptions = {},
+): HostSecretStore {
+  return {
+    read: async (name) => await readHostSecret(name, options),
+    write: async (name, secret) => {
+      return await writeHostSecret(name, secret, options);
+    },
+    delete: async (name) => await deleteHostSecret(name, options),
+  };
 }
 
 export async function readHostSecret(

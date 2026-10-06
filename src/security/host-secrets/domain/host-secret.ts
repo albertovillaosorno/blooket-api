@@ -88,3 +88,40 @@ export function validateHostSecretValue(
 
   return { ok: true };
 }
+
+export type HostSecretFailureCode =
+  | "invalid-host-secret-name"
+  | "host-secret-empty"
+  | "host-secret-too-large"
+  | "host-secret-store-unsupported"
+  | "host-secret-store-unavailable"
+  | "host-secret-store-failed"
+  | "host-secret-data-invalid";
+
+export type HostSecretReadResult =
+  | {
+      readonly ok: true;
+      readonly kind: "found";
+      readonly secret: string;
+    }
+  | {
+      readonly ok: true;
+      readonly kind: "missing";
+    }
+  | {
+      readonly ok: false;
+      readonly code: HostSecretFailureCode;
+    };
+
+export type HostSecretMutationResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly code: HostSecretFailureCode;
+    };
+
+export interface HostSecretStore {
+  read(name: string): Promise<HostSecretReadResult>;
+  write(name: string, secret: string): Promise<HostSecretMutationResult>;
+  delete(name: string): Promise<HostSecretMutationResult>;
+}
