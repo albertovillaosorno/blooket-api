@@ -51,6 +51,11 @@ import type {
   BlooketWriteExecutionPort,
 } from
   "../../../../src/api/blooket-write-execution/contract/write-execution.ts";
+import type {
+  BlooketWriteVerificationBaselineResult,
+  BlooketWriteVerificationPort,
+} from
+  "../../../../src/api/blooket-write-execution/contract/write-verification.ts";
 import { loadWriteAttemptFile } from
   "../../../../src/platforms/write-attempt-files/adapter-outbound/file.ts";
 import { tryAcquireFileLock } from
@@ -98,6 +103,19 @@ const SET_RECEIPT = {
 const SET_SUCCESS = { ok: true as const, receipt: SET_RECEIPT };
 const QUESTION_SUCCESS = { ok: true as const, receipt: null };
 
+const SET_BASELINE = {
+  schemaVersion: 1 as const,
+  kind: "set-list" as const,
+  itemCount: 3,
+  sha256: "a".repeat(64),
+};
+const QUESTION_BASELINE = {
+  schemaVersion: 1 as const,
+  kind: "question-list" as const,
+  itemCount: 1,
+  sha256: "b".repeat(64),
+};
+
 function browser(calls: string[]): BlooketBrowserSessionPort {
   return {
     observe: async () => {
@@ -134,6 +152,31 @@ function writes(
       }
       return result;
     },
+  };
+}
+
+function verification(
+  result: BlooketWriteVerificationBaselineResult | "throw",
+  calls: Array<{
+    readonly operationId: string;
+    readonly remoteSetId: string | null;
+  }> = [],
+): BlooketWriteVerificationPort {
+  return {
+    captureBaseline: async (operation, target) => {
+      calls.push({
+        operationId: operation.operationId,
+        remoteSetId: target.remoteSetId,
+      });
+      if (result === "throw") {
+        throw new Error("fixture baseline failure");
+      }
+      return result;
+    },
+    verify: async () => ({
+      ok: true,
+      outcome: "inconclusive",
+    }),
   };
 }
 
@@ -178,6 +221,7 @@ test("confirmed writes persist before advanced success returns", async () => {
           assert.equal(attempt.record.phase, "attempting");
           assert.equal(attempt.record.operationIndex, 0);
           assert.equal(attempt.record.receipt, null);
+          assert.equal(attempt.record.baseline, null);
         }
       }),
     );
@@ -207,6 +251,105 @@ test("confirmed writes persist before advanced success returns", async () => {
   });
 });
 
+test("captured set baseline is durable before remote mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const writeCalls: string[] = [];
+    const verificationCalls: Array<{
+      readonly operationId: string;
+      readonly remoteSetId: string | null;
+    }> = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls, async () => {
+        const attempt = await loadWriteAttemptFile(paths.attempt, plan);
+        assert.equal(attempt.ok, true);
+        if (attempt.ok && attempt.kind === "record") {
+          assert.deepEqual(attempt.record.baseline, SET_BASELINE);
+          assert.equal(attempt.record.phase, "attempting");
+        }
+      }),
+      verification({
+        ok: true,
+        baseline: SET_BASELINE,
+      }, verificationCalls),
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(writeCalls, ["plan:persisted-test:set"]);
+    assert.deepEqual(verificationCalls, [{
+      operationId: "plan:persisted-test:set",
+      remoteSetId: null,
+    }]);
+  });
+});
+
+test("baseline capture stops happen before journal or mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const writeCalls: string[] = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      verification({
+        ok: false,
+        kind: "navigation",
+        state: "security-challenge",
+      }),
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.kind, "human-action-required");
+    }
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
+test("mismatched captured baseline fails before remote mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const writeCalls: string[] = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      verification({
+        ok: true,
+        baseline: QUESTION_BASELINE,
+      }),
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.stage, "attempt-begin");
+    }
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
 test("persisted progress resumes at the exact next operation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
@@ -218,13 +361,28 @@ test("persisted progress resumes at the exact next operation", async () => {
     }));
     const writeCalls: string[] = [];
     const targets: Array<string | null> = [];
+    const verificationCalls: Array<{
+      readonly operationId: string;
+      readonly remoteSetId: string | null;
+    }> = [];
+    const paths = persistence(path);
 
     const result = await executePersistedBlooketWrite(
-      persistence(path),
+      paths,
       plan,
       browser([]),
       secrets(),
-      writes(QUESTION_SUCCESS, writeCalls, undefined, targets),
+      writes(QUESTION_SUCCESS, writeCalls, async () => {
+        const attempt = await loadWriteAttemptFile(paths.attempt, plan);
+        assert.equal(attempt.ok, true);
+        if (attempt.ok && attempt.kind === "record") {
+          assert.deepEqual(attempt.record.baseline, QUESTION_BASELINE);
+        }
+      }, targets),
+      verification({
+        ok: true,
+        baseline: QUESTION_BASELINE,
+      }, verificationCalls),
     );
 
     assert.equal(result.ok, true);
@@ -233,6 +391,10 @@ test("persisted progress resumes at the exact next operation", async () => {
     }
     assert.deepEqual(writeCalls, ["plan:persisted-test:q:0"]);
     assert.deepEqual(targets, ["remote-set-1"]);
+    assert.deepEqual(verificationCalls, [{
+      operationId: "plan:persisted-test:q:0",
+      remoteSetId: "remote-set-1",
+    }]);
   });
 });
 

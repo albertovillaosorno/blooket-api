@@ -153,6 +153,17 @@ function verifier(
   }>,
 ): BlooketWriteVerificationPort {
   return {
+    captureBaseline: async (operation) => ({
+      ok: true,
+      baseline: {
+        schemaVersion: 1,
+        kind: operation.kind === "set"
+          ? "set-list"
+          : "question-list",
+        itemCount: 0,
+        sha256: "0".repeat(64),
+      },
+    }),
     verify: async (operation, target) => {
       calls.push({
         operation,
@@ -174,6 +185,85 @@ async function persistBoundCheckpoint(path: string): Promise<void> {
     remoteSetId: "remote-set-1",
   }));
 }
+
+test("verification receives the exact persisted baseline", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const value = paths(directory);
+    const baseline = {
+      schemaVersion: 1 as const,
+      kind: "set-list" as const,
+      itemCount: 7,
+      sha256: "c".repeat(64),
+    };
+    await beginWriteAttempt(value.attempt, plan, 0, baseline);
+    const received: unknown[] = [];
+    const verifying: BlooketWriteVerificationPort = {
+      captureBaseline: async () => ({
+        ok: true,
+        baseline,
+      }),
+      verify: async (_operation, _target, candidate) => {
+        received.push(candidate);
+        return { ok: true, outcome: "inconclusive" };
+      },
+    };
+
+    const result = await verifyPersistedBlooketWrite(
+      value,
+      plan,
+      browser(),
+      secrets(),
+      verifying,
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.kind, "reconciliation-required");
+    }
+    assert.deepEqual(received, [baseline]);
+  });
+});
+
+test("legacy ambiguous journals verify with a null baseline", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const value = paths(directory);
+    await writeFile(value.attempt, JSON.stringify({
+      schemaVersion: 2,
+      planId: plan.planId,
+      operationId: "plan:verify-test:set",
+      operationIndex: 0,
+      phase: "attempting",
+      receipt: null,
+    }));
+    const received: unknown[] = [];
+    const verifying: BlooketWriteVerificationPort = {
+      captureBaseline: async () => ({
+        ok: true,
+        baseline: {
+          schemaVersion: 1,
+          kind: "set-list",
+          itemCount: 0,
+          sha256: "0".repeat(64),
+        },
+      }),
+      verify: async (_operation, _target, candidate) => {
+        received.push(candidate);
+        return { ok: true, outcome: "inconclusive" };
+      },
+    };
+
+    const result = await verifyPersistedBlooketWrite(
+      value,
+      plan,
+      browser(),
+      secrets(),
+      verifying,
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(received, [null]);
+  });
+});
 
 test(
   "confirmed set verification persists its receipt through recovery",

@@ -30,6 +30,9 @@
 // - Defaults:
 //   - No retry or pacing delay is guessed.
 //
+import {
+  blooketNavigationDecision,
+} from "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import { tryAcquireFileLock } from
   "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import {
@@ -52,8 +55,10 @@ import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
-import type { BlooketBrowserSessionPort } from
-  "../../blooket-session/contract/browser-session.ts";
+import type {
+  BlooketBrowserFailureCode,
+  BlooketBrowserSessionPort,
+} from "../../blooket-session/contract/browser-session.ts";
 import {
   attemptBlooketWrite,
   completeBlooketWriteAttempt,
@@ -67,6 +72,10 @@ import {
 } from "./recover-persisted.ts";
 import type { BlooketWriteExecutionPort } from
   "../contract/write-execution.ts";
+import type {
+  BlooketWriteVerificationBaselineResult,
+  BlooketWriteVerificationPort,
+} from "../contract/write-verification.ts";
 
 type PrepareTerminal = Exclude<
   PrepareNextBlooketWriteResult,
@@ -164,6 +173,13 @@ export type ExecutePersistedBlooketWriteResult =
     }
   | {
       readonly ok: false;
+      readonly stage: "verification-baseline";
+      readonly code:
+        | BlooketBrowserFailureCode
+        | "blooket-write-baseline-not-captured";
+    }
+  | {
+      readonly ok: false;
       readonly stage: "execution-lock";
       readonly code:
         | "write-execution-locked"
@@ -182,6 +198,7 @@ export async function executePersistedBlooketWrite(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
+  verifier?: BlooketWriteVerificationPort,
 ): Promise<ExecutePersistedBlooketWriteResult> {
   const acquired = await tryAcquireFileLock(
     writeAttemptExecutionLockPath(paths.attempt),
@@ -208,6 +225,7 @@ export async function executePersistedBlooketWrite(
       browser,
       secrets,
       writes,
+      verifier,
     );
   } catch (error: unknown) {
     threw = true;
@@ -235,12 +253,111 @@ export async function executePersistedBlooketWrite(
   return result;
 }
 
+type CapturedVerificationBaseline =
+  | {
+      readonly ok: true;
+      readonly value: unknown;
+    }
+  | {
+      readonly ok: false;
+      readonly result: ExecutePersistedBlooketWriteResult;
+    };
+
+async function captureVerificationBaseline(
+  verifier: BlooketWriteVerificationPort | undefined,
+  operation: Parameters<BlooketWriteVerificationPort["captureBaseline"]>[0],
+  checkpoint: BlooketWriteCheckpoint,
+): Promise<CapturedVerificationBaseline> {
+  if (verifier === undefined) {
+    return { ok: true, value: null };
+  }
+
+  let captured: BlooketWriteVerificationBaselineResult;
+  try {
+    captured = await verifier.captureBaseline(
+      operation,
+      { remoteSetId: checkpoint.remoteSetId },
+    );
+  } catch {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        stage: "verification-baseline",
+        code: "blooket-browser-failed",
+      },
+    };
+  }
+  if (captured.ok) {
+    return { ok: true, value: captured.baseline };
+  }
+  if (captured.kind === "browser") {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        stage: "verification-baseline",
+        code: captured.code,
+      },
+    };
+  }
+
+  const decision = blooketNavigationDecision({
+    kind: captured.state,
+  });
+  switch (decision.action) {
+    case "wait":
+      return {
+        ok: false,
+        result: {
+          ok: true,
+          kind: "wait",
+          state: decision.state,
+          checkpoint,
+        },
+      };
+    case "human-action-required":
+      return {
+        ok: false,
+        result: {
+          ok: true,
+          kind: "human-action-required",
+          state: decision.state === "human-action-required"
+            ? "unexpected-page"
+            : decision.state,
+          checkpoint,
+        },
+      };
+    case "authenticate":
+      return {
+        ok: false,
+        result: {
+          ok: true,
+          kind: "session-required",
+          state: decision.state,
+          checkpoint,
+        },
+      };
+    case "continue":
+    case "observe":
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          stage: "verification-baseline",
+          code: "blooket-write-baseline-not-captured",
+        },
+      };
+  }
+}
+
 async function executePersistedBlooketWriteLocked(
   paths: BlooketWritePersistencePaths,
   plan: BlooketWritePlan,
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
+  verifier?: BlooketWriteVerificationPort,
 ): Promise<ExecutePersistedBlooketWriteResult> {
   const recovery = await recoverPersistedBlooketWriteUnderLock(
     paths.checkpoint,
@@ -261,10 +378,20 @@ async function executePersistedBlooketWriteLocked(
     return prepared;
   }
 
+  const baseline = await captureVerificationBaseline(
+    verifier,
+    prepared.operation,
+    prepared.checkpoint,
+  );
+  if (!baseline.ok) {
+    return baseline.result;
+  }
+
   const begun = await beginWriteAttempt(
     paths.attempt,
     plan,
     prepared.checkpoint.nextOperationIndex,
+    baseline.value,
   );
   if (!begun.ok) {
     return {

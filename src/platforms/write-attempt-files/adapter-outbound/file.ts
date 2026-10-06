@@ -48,6 +48,12 @@ import {
   decodeBlooketWriteReceipt,
   type BlooketWriteReceipt,
 } from "../../../projects/blooket-write-plans/domain/checkpoint.ts";
+import {
+  decodeBlooketWriteVerificationBaseline,
+  verificationBaselineKindForOperation,
+  type BlooketWriteVerificationBaseline,
+} from
+  "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import {
@@ -56,8 +62,9 @@ import {
   writeDurableFileIfAbsent,
 } from "../../atomic-files/adapter-outbound/atomic-file.ts";
 
-export const WRITE_ATTEMPT_VERSION = 2 as const;
+export const WRITE_ATTEMPT_VERSION = 3 as const;
 const LEGACY_WRITE_ATTEMPT_VERSION = 1 as const;
+const RECEIPT_WRITE_ATTEMPT_VERSION = 2 as const;
 
 export function writeAttemptExecutionLockPath(path: string): string {
   return path + ".lock";
@@ -70,6 +77,7 @@ export interface WriteAttemptRecord {
   readonly operationIndex: number;
   readonly phase: "attempting" | "confirmed";
   readonly receipt: BlooketWriteReceipt | null;
+  readonly baseline: BlooketWriteVerificationBaseline | null;
 }
 
 const LEGACY_WRITE_ATTEMPT_KEYS = new Set([
@@ -79,9 +87,13 @@ const LEGACY_WRITE_ATTEMPT_KEYS = new Set([
   "operationIndex",
   "phase",
 ]);
-const WRITE_ATTEMPT_KEYS = new Set([
+const RECEIPT_WRITE_ATTEMPT_KEYS = new Set([
   ...LEGACY_WRITE_ATTEMPT_KEYS,
   "receipt",
+]);
+const WRITE_ATTEMPT_KEYS = new Set([
+  ...RECEIPT_WRITE_ATTEMPT_KEYS,
+  "baseline",
 ]);
 
 export type WriteAttemptFileLoadResult =
@@ -172,6 +184,7 @@ export async function beginWriteAttempt(
   path: string,
   plan: BlooketWritePlan,
   operationIndex: number,
+  baselineCandidate: unknown = null,
 ): Promise<WriteAttemptFileMutationResult> {
   const operation = plan.operations[operationIndex];
   if (operation === undefined) {
@@ -182,6 +195,18 @@ export async function beginWriteAttempt(
     );
   }
 
+  const baseline = decodeAttemptBaseline(
+    baselineCandidate,
+    operation.kind,
+  );
+  if (!baseline.ok) {
+    return {
+      ok: false,
+      kind: "invalid",
+      issues: baseline.issues,
+    };
+  }
+
   const record: WriteAttemptRecord = {
     schemaVersion: WRITE_ATTEMPT_VERSION,
     planId: plan.planId,
@@ -189,6 +214,7 @@ export async function beginWriteAttempt(
     operationIndex,
     phase: "attempting",
     receipt: null,
+    baseline: baseline.value,
   };
 
   try {
@@ -345,7 +371,9 @@ function decodeWriteAttempt(
       value,
       inputVersion === LEGACY_WRITE_ATTEMPT_VERSION
         ? LEGACY_WRITE_ATTEMPT_KEYS
-        : WRITE_ATTEMPT_KEYS,
+        : inputVersion === RECEIPT_WRITE_ATTEMPT_VERSION
+          ? RECEIPT_WRITE_ATTEMPT_KEYS
+          : WRITE_ATTEMPT_KEYS,
       "$",
     ),
   ];
@@ -360,12 +388,13 @@ function decodeWriteAttempt(
 
   if (
     inputVersion !== LEGACY_WRITE_ATTEMPT_VERSION
+    && inputVersion !== RECEIPT_WRITE_ATTEMPT_VERSION
     && inputVersion !== WRITE_ATTEMPT_VERSION
   ) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
-      message: "Expected write attempt journal version 1 or 2.",
+      message: "Expected write attempt journal version 1, 2, or 3.",
     });
   }
   if (planId !== undefined && planId !== plan.planId) {
@@ -422,6 +451,12 @@ function decodeWriteAttempt(
     operation?.kind,
     issues,
   );
+  const baseline = decodeStoredBaseline(
+    inputVersion,
+    value["baseline"],
+    operation?.kind,
+    issues,
+  );
 
   if (issues.length > 0) {
     return { ok: false, kind: "invalid", issues };
@@ -432,6 +467,7 @@ function decodeWriteAttempt(
     || typeof operationIndex !== "number"
     || (phase !== "attempting" && phase !== "confirmed")
     || receipt === undefined
+    || baseline === undefined
   ) {
     return invalidFailure(
       "$",
@@ -449,8 +485,58 @@ function decodeWriteAttempt(
       operationIndex,
       phase,
       receipt,
+      baseline,
     },
   };
+}
+
+function decodeAttemptBaseline(
+  value: unknown,
+  operationKind: "set" | "question",
+):
+  | {
+      readonly ok: true;
+      readonly value: BlooketWriteVerificationBaseline | null;
+    }
+  | {
+      readonly ok: false;
+      readonly issues: readonly ValidationIssue[];
+    } {
+  if (value === null) {
+    return { ok: true, value: null };
+  }
+  return decodeBlooketWriteVerificationBaseline(
+    value,
+    verificationBaselineKindForOperation(operationKind),
+  );
+}
+
+function decodeStoredBaseline(
+  version: unknown,
+  value: unknown,
+  operationKind: "set" | "question" | undefined,
+  issues: ValidationIssue[],
+): BlooketWriteVerificationBaseline | null | undefined {
+  if (
+    version === LEGACY_WRITE_ATTEMPT_VERSION
+    || version === RECEIPT_WRITE_ATTEMPT_VERSION
+  ) {
+    return null;
+  }
+  if (operationKind === undefined) {
+    return null;
+  }
+  const decoded = decodeAttemptBaseline(value, operationKind);
+  if (!decoded.ok) {
+    issues.push(...decoded.issues.map((issue) => ({
+      ...issue,
+      path: issue.path === "$"
+        ? "$.baseline"
+        : "$.baseline" + issue.path.slice(1),
+    })));
+    return undefined;
+  }
+  return decoded.value;
 }
 
 function decodeConfirmedReceipt(

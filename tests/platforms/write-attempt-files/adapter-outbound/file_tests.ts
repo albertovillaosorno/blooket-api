@@ -104,12 +104,13 @@ test("begin creates an attempting journal without overwriting it", async () => {
     assert.deepEqual(begun, {
       ok: true,
       record: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         planId: plan.planId,
         operationId: "plan:attempt-test:set",
         operationIndex: 0,
         phase: "attempting",
         receipt: null,
+        baseline: null,
       },
     });
     assert.deepEqual(await beginWriteAttempt(path, plan, 0), {
@@ -117,6 +118,101 @@ test("begin creates an attempting journal without overwriting it", async () => {
       kind: "conflict",
       code: "write-attempt-exists",
     });
+  });
+});
+
+test("begin persists only validated digest baselines", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "attempt.json");
+    const baseline = {
+      schemaVersion: 1,
+      kind: "set-list" as const,
+      itemCount: 4,
+      sha256: "a".repeat(64),
+    };
+
+    const begun = await beginWriteAttempt(path, plan, 0, baseline);
+    assert.equal(begun.ok, true);
+    if (begun.ok) {
+      assert.deepEqual(begun.record?.baseline, baseline);
+    }
+
+    const confirmed = await confirmWriteAttempt(
+      path,
+      plan,
+      "plan:attempt-test:set",
+      { kind: "set-created", remoteSetId: "remote-set-1" },
+    );
+    assert.equal(confirmed.ok, true);
+    if (confirmed.ok) {
+      assert.deepEqual(confirmed.record?.baseline, baseline);
+    }
+  });
+});
+
+test(
+  "begin rejects mismatched or malformed baselines before writing",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    for (const [index, baseline] of [
+      [
+        0,
+        {
+          schemaVersion: 1,
+          kind: "question-list",
+          itemCount: 1,
+          sha256: "a".repeat(64),
+        },
+      ],
+      [
+        1,
+        {
+          schemaVersion: 1,
+          kind: "question-list",
+          itemCount: 1,
+          sha256: "not-a-digest",
+        },
+      ],
+    ] as const) {
+      const path = join(directory, "attempt-" + index + ".json");
+      const result = await beginWriteAttempt(
+        path,
+        questionPlan,
+        index,
+        baseline,
+      );
+      assert.equal(result.ok, false);
+      if (!result.ok && result.kind === "invalid") {
+        assert.equal(result.issues.length > 0, true);
+      }
+      await assert.rejects(readFile(path, "utf8"));
+    }
+  });
+  },
+);
+
+test("version-two journals migrate with no invented baseline", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "attempt.json");
+    await writeFile(path, JSON.stringify({
+      schemaVersion: 2,
+      planId: plan.planId,
+      operationId: "plan:attempt-test:set",
+      operationIndex: 0,
+      phase: "confirmed",
+      receipt: {
+        kind: "set-created",
+        remoteSetId: "remote-set-1",
+      },
+    }));
+
+    const loaded = await loadWriteAttemptFile(path, plan);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok && loaded.kind === "record") {
+      assert.equal(loaded.record.schemaVersion, 3);
+      assert.equal(loaded.record.baseline, null);
+      assert.equal(loaded.record.phase, "confirmed");
+    }
   });
 });
 

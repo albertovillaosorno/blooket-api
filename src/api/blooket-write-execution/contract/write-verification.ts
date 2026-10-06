@@ -33,11 +33,32 @@ import type { ObservedBlooketNavigationStateKind } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import type { BlooketWriteReceipt } from
   "../../../projects/blooket-write-plans/domain/checkpoint.ts";
+import type { BlooketWriteVerificationBaseline } from
+  "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
 import type { BlooketWriteOperation } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { BlooketBrowserFailureCode } from
   "../../blooket-session/contract/browser-session.ts";
 import type { BlooketWriteTarget } from "./write-execution.ts";
+
+export type BlooketWriteVerificationObservationFailure =
+  | {
+      readonly ok: false;
+      readonly kind: "navigation";
+      readonly state: ObservedBlooketNavigationStateKind;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "browser";
+      readonly code: BlooketBrowserFailureCode;
+    };
+
+export type BlooketWriteVerificationBaselineResult =
+  | {
+      readonly ok: true;
+      readonly baseline: BlooketWriteVerificationBaseline;
+    }
+  | BlooketWriteVerificationObservationFailure;
 
 export type BlooketWriteVerificationResult =
   | {
@@ -53,20 +74,17 @@ export type BlooketWriteVerificationResult =
       readonly ok: true;
       readonly outcome: "inconclusive";
     }
-  | {
-      readonly ok: false;
-      readonly kind: "navigation";
-      readonly state: ObservedBlooketNavigationStateKind;
-    }
-  | {
-      readonly ok: false;
-      readonly kind: "browser";
-      readonly code: BlooketBrowserFailureCode;
-    };
+  | BlooketWriteVerificationObservationFailure;
 
 export interface BlooketWriteVerificationPort {
+  captureBaseline(
+    operation: BlooketWriteOperation,
+    target: BlooketWriteTarget,
+  ): Promise<BlooketWriteVerificationBaselineResult>;
+
   verify(
     operation: BlooketWriteOperation,
     target: BlooketWriteTarget,
+    baseline: BlooketWriteVerificationBaseline | null,
   ): Promise<BlooketWriteVerificationResult>;
 }

@@ -230,6 +230,7 @@ async function verifyPersistedBlooketWriteUnderLock(
     verifier,
     operation,
     recovery.checkpoint.remoteSetId,
+    recovery.attempt.baseline,
   );
   if (!verified.ok) {
     if (verified.kind === "browser") {
@@ -349,9 +350,14 @@ async function safeVerify(
   verifier: BlooketWriteVerificationPort,
   operation: Parameters<BlooketWriteVerificationPort["verify"]>[0],
   remoteSetId: string | null,
+  baseline: Parameters<BlooketWriteVerificationPort["verify"]>[2],
 ): Promise<BlooketWriteVerificationResult> {
   try {
-    return await verifier.verify(operation, { remoteSetId });
+    return await verifier.verify(
+      operation,
+      { remoteSetId },
+      baseline,
+    );
   } catch {
     return {
       ok: false,
