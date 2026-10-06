@@ -1,0 +1,219 @@
+// Copyright:
+//   - Copyright © 2026 Alberto Villa Osorno.
+// SPDX-License-Identifier:
+//   - MIT
+// Confidential:
+//   - false
+// License-File:
+//   - LICENSE-MIT
+//
+// Boundary-Contract:
+// - Owns:
+//   - Behavioral tests for fail-closed project capability validation.
+// - Must-Not:
+//   - Probe Blooket or invent account capability facts.
+// - Allows:
+//   - Inputs: Fixed decoded project and capability fixtures.
+//   - Outputs: Deterministic compatibility issues.
+//   - Side effects: None.
+// - Split-When:
+//   - Feature families need separate compatibility suites.
+// - Merge-When:
+//   - Capability-bound project validation is removed.
+// - Summary:
+//   - Proves unknown/account-dependent features remain blocked.
+// - Description:
+//   - Mirrors src/projects/project-validation/domain/capabilities.ts.
+// - Usage:
+//   - Run through the repository Node test command.
+// - Defaults:
+//   - Only explicit supported availability admits optional features.
+//
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import type { BlooketCapabilitySnapshot } from
+  "../../../../src/ir/capability-snapshots/contract/blooket-capabilities.ts";
+import { decodeProjectDocument } from
+  "../../../../src/projects/project-documents/domain/project.ts";
+import { validateProjectCapabilities } from
+  "../../../../src/projects/project-validation/domain/capabilities.ts";
+
+const capabilities: BlooketCapabilitySnapshot = {
+  schemaVersion: 2,
+  verifiedOn: "2026-10-05",
+  evidence: [{ kind: "browser-observation", reference: "fixture" }],
+  questionTypes: {
+    multipleChoice: {
+      availability: "supported",
+      minAnswers: 2,
+      maxAnswers: 4,
+      requiresQuestionText: true,
+      allowsMultipleCorrect: true,
+    },
+    typingAnswer: {
+      availability: "supported",
+      matchModes: ["exact", "contains"],
+    },
+  },
+  features: {
+    questionImages: "supported",
+    answerImages: "supported",
+    audio: "unknown",
+  },
+  setMetadata: {
+    titleRequired: null,
+    descriptionRequired: null,
+    coverImageOptional: true,
+    visibility: ["public", "private"],
+  },
+  upload: {
+    maxBytes: null,
+    canvasWidth: null,
+    canvasHeight: null,
+    maxPixels: null,
+  },
+};
+
+function decodedProject() {
+  const result = decodeProjectDocument({
+    schemaVersion: 1,
+    title: "Science",
+    description: "Review.",
+    quizLanguage: "English",
+    visibility: "private",
+    mediaIndex: "media.jsonl",
+    coverImage: null,
+    questions: [{
+      id: "q1",
+      type: "multiple-choice",
+      prompt: "Pick one.",
+      timeLimitSeconds: 20,
+      randomOrder: false,
+      image: { description: "Question.", mediaId: "question-image" },
+      answers: [
+        {
+          text: "A",
+          correct: true,
+          image: { description: "Answer.", mediaId: "answer-image" },
+        },
+        { text: "B", correct: false, image: null },
+      ],
+    }],
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    throw new Error("Fixture project failed.");
+  }
+  return result.value;
+}
+
+test("explicit supported capabilities admit the project", () => {
+  assert.deepEqual(
+    validateProjectCapabilities(decodedProject(), capabilities),
+    [],
+  );
+});
+
+test("account-dependent answer images fail closed", () => {
+  const issues = validateProjectCapabilities(
+    decodedProject(),
+    {
+      ...capabilities,
+      features: {
+        ...capabilities.features,
+        answerImages: "account-dependent",
+      },
+    },
+  );
+  assert.equal(
+    issues.some((issue) => issue.code === "capability-not-supported"),
+    true,
+  );
+});
+
+test("unknown answer bounds block multiple-choice planning", () => {
+  const issues = validateProjectCapabilities(
+    decodedProject(),
+    {
+      ...capabilities,
+      questionTypes: {
+        ...capabilities.questionTypes,
+        multipleChoice: {
+          ...capabilities.questionTypes.multipleChoice,
+          minAnswers: null,
+        },
+      },
+    },
+  );
+  assert.equal(
+    issues.some((issue) => issue.code === "unknown-answer-bounds"),
+    true,
+  );
+});
+
+test("unverified multiple-correct behavior fails only when used", () => {
+  const project = decodedProject();
+  const oneCorrect = validateProjectCapabilities(project, {
+    ...capabilities,
+    questionTypes: {
+      ...capabilities.questionTypes,
+      multipleChoice: {
+        ...capabilities.questionTypes.multipleChoice,
+        allowsMultipleCorrect: null,
+      },
+    },
+  });
+  assert.equal(
+    oneCorrect.some(
+      (issue) => issue.code === "multiple-correct-not-verified",
+    ),
+    false,
+  );
+
+  const multi = {
+    ...project,
+    questions: [{
+      ...project.questions[0],
+      type: "multiple-choice" as const,
+      answers: project.questions[0]?.type === "multiple-choice"
+        ? project.questions[0].answers.map((answer) => ({
+            ...answer,
+            correct: true,
+          }))
+        : [],
+    }],
+  };
+  const issues = validateProjectCapabilities(multi, {
+    ...capabilities,
+    questionTypes: {
+      ...capabilities.questionTypes,
+      multipleChoice: {
+        ...capabilities.questionTypes.multipleChoice,
+        allowsMultipleCorrect: null,
+      },
+    },
+  });
+  assert.equal(
+    issues.some(
+      (issue) => issue.code === "multiple-correct-not-verified",
+    ),
+    true,
+  );
+});
+
+test("unknown cover optionality blocks omission", () => {
+  const issues = validateProjectCapabilities(decodedProject(), {
+    ...capabilities,
+    setMetadata: {
+      ...capabilities.setMetadata,
+      coverImageOptional: null,
+    },
+  });
+  assert.equal(
+    issues.some(
+      (issue) => issue.code === "unknown-or-required-cover-image",
+    ),
+    true,
+  );
+});

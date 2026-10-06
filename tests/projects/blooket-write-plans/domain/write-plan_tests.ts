@@ -32,6 +32,42 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+const capabilities = {
+  schemaVersion: 2,
+  verifiedOn: "2026-10-05",
+  evidence: [{ kind: "browser-observation", reference: "fixture" }],
+  questionTypes: {
+    multipleChoice: {
+      availability: "supported",
+      minAnswers: 2,
+      maxAnswers: 4,
+      requiresQuestionText: true,
+      allowsMultipleCorrect: true,
+    },
+    typingAnswer: {
+      availability: "supported",
+      matchModes: ["exact", "contains"],
+    },
+  },
+  features: {
+    questionImages: "supported",
+    answerImages: "supported",
+    audio: "unknown",
+  },
+  setMetadata: {
+    titleRequired: null,
+    descriptionRequired: null,
+    coverImageOptional: true,
+    visibility: ["public", "private"],
+  },
+  upload: {
+    maxBytes: null,
+    canvasWidth: null,
+    canvasHeight: null,
+    maxPixels: null,
+  },
+} as const;
+
 import { decodeOperationId } from
   "../../../../src/ir/operation-identifiers/domain/operation-id.ts";
 import { buildBlooketWritePlan } from
@@ -109,6 +145,7 @@ test("validated projects lower to ordered remote-neutral operations", () => {
   const result = buildBlooketWritePlan(
     JSON.stringify(project()),
     mediaJsonl,
+    capabilities,
   );
 
   assert.equal(result.ok, true);
@@ -160,10 +197,12 @@ test("plan and operation identities are deterministic and valid", () => {
   const first = buildBlooketWritePlan(
     JSON.stringify(project()),
     mediaJsonl,
+    capabilities,
   );
   const second = buildBlooketWritePlan(
     JSON.stringify(project()),
     mediaJsonl,
+    capabilities,
   );
 
   assert.deepEqual(second, first);
@@ -192,10 +231,12 @@ test("non-execution media metadata does not change plan identity", () => {
   const first = buildBlooketWritePlan(
     JSON.stringify(project()),
     mediaJsonl,
+    capabilities,
   );
   const changed = buildBlooketWritePlan(
     JSON.stringify(project()),
     changedMediaJsonl,
+    capabilities,
   );
 
   assert.equal(first.ok, true);
@@ -210,10 +251,12 @@ test("content changes produce a different plan identity", () => {
   const first = buildBlooketWritePlan(
     JSON.stringify(project()),
     mediaJsonl,
+    capabilities,
   );
   const changed = buildBlooketWritePlan(
     JSON.stringify(project("Changed review.")),
     mediaJsonl,
+    capabilities,
   );
 
   assert.equal(first.ok, true);
@@ -227,8 +270,44 @@ test("content changes produce a different plan identity", () => {
   }
 });
 
+test("account-dependent answer images block write planning", () => {
+  const result = buildBlooketWritePlan(
+    JSON.stringify(project()),
+    mediaJsonl,
+    {
+      ...capabilities,
+      features: {
+        ...capabilities.features,
+        answerImages: "account-dependent",
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.kind, "incompatible-capabilities");
+  }
+});
+
+test("invalid capability snapshots block write planning", () => {
+  const result = buildBlooketWritePlan(
+    JSON.stringify(project()),
+    mediaJsonl,
+    { schemaVersion: 999 },
+  );
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.kind, "invalid-capabilities");
+  }
+});
+
 test("invalid project input cannot produce a write plan", () => {
-  const result = buildBlooketWritePlan("{", mediaJsonl);
+  const result = buildBlooketWritePlan(
+    "{",
+    mediaJsonl,
+    capabilities,
+  );
 
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -248,6 +327,7 @@ test("unresolved images block plan creation", () => {
   const result = buildBlooketWritePlan(
     JSON.stringify(unresolved),
     mediaJsonl,
+    capabilities,
   );
 
   assert.deepEqual(result, {
@@ -261,6 +341,7 @@ test("media descriptions and vault paths do not enter plan payloads", () => {
   const result = buildBlooketWritePlan(
     JSON.stringify(project()),
     mediaJsonl,
+    capabilities,
   );
 
   assert.equal(result.ok, true);

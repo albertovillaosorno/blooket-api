@@ -32,12 +32,17 @@
 //
 import { createHash } from "node:crypto";
 
+import {
+  decodeBlooketCapabilitySnapshot,
+} from "../../../ir/capability-snapshots/contract/blooket-capabilities.ts";
 import type { ValidationIssue } from
   "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
   decodeProjectBundle,
   type ProjectBundle,
 } from "../../project-bundles/domain/project-bundle.ts";
+import { validateProjectCapabilities } from
+  "../../project-validation/domain/capabilities.ts";
 import { countUnresolvedProjectImages } from
   "../../project-validation/domain/media-references.ts";
 import type {
@@ -115,6 +120,16 @@ export type BuildBlooketWritePlanResult =
     }
   | {
       readonly ok: false;
+      readonly kind: "invalid-capabilities";
+      readonly issues: readonly ValidationIssue[];
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "incompatible-capabilities";
+      readonly issues: readonly ValidationIssue[];
+    }
+  | {
+      readonly ok: false;
       readonly kind: "unresolved-media";
       readonly count: number;
     };
@@ -122,6 +137,7 @@ export type BuildBlooketWritePlanResult =
 export function buildBlooketWritePlan(
   projectJson: string,
   mediaJsonl: string,
+  capabilities: unknown,
 ): BuildBlooketWritePlanResult {
   const decoded = decodeProjectBundle(projectJson, mediaJsonl);
   if (!decoded.ok) {
@@ -129,6 +145,27 @@ export function buildBlooketWritePlan(
       ok: false,
       kind: "invalid-project",
       issues: decoded.issues,
+    };
+  }
+
+  const decodedCapabilities = decodeBlooketCapabilitySnapshot(capabilities);
+  if (!decodedCapabilities.ok) {
+    return {
+      ok: false,
+      kind: "invalid-capabilities",
+      issues: decodedCapabilities.issues,
+    };
+  }
+
+  const capabilityIssues = validateProjectCapabilities(
+    decoded.value.project,
+    decodedCapabilities.value,
+  );
+  if (capabilityIssues.length > 0) {
+    return {
+      ok: false,
+      kind: "incompatible-capabilities",
+      issues: capabilityIssues,
     };
   }
 

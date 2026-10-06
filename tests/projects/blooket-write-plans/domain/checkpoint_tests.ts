@@ -32,6 +32,42 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+const capabilities = {
+  schemaVersion: 2,
+  verifiedOn: "2026-10-05",
+  evidence: [{ kind: "browser-observation", reference: "fixture" }],
+  questionTypes: {
+    multipleChoice: {
+      availability: "supported",
+      minAnswers: 2,
+      maxAnswers: 4,
+      requiresQuestionText: true,
+      allowsMultipleCorrect: true,
+    },
+    typingAnswer: {
+      availability: "supported",
+      matchModes: ["exact", "contains"],
+    },
+  },
+  features: {
+    questionImages: "supported",
+    answerImages: "supported",
+    audio: "unknown",
+  },
+  setMetadata: {
+    titleRequired: null,
+    descriptionRequired: null,
+    coverImageOptional: true,
+    visibility: ["public", "private"],
+  },
+  upload: {
+    maxBytes: null,
+    canvasWidth: null,
+    canvasHeight: null,
+    maxPixels: null,
+  },
+} as const;
+
 import {
   advanceBlooketWriteCheckpoint,
   decodeBlooketWriteCheckpoint,
@@ -67,7 +103,7 @@ const project = JSON.stringify({
 });
 
 function plan(): BlooketWritePlan {
-  const result = buildBlooketWritePlan(project, "");
+  const result = buildBlooketWritePlan(project, "", capabilities);
   assert.equal(result.ok, true);
   if (!result.ok) {
     throw new Error("Fixture write plan failed.");
@@ -141,6 +177,7 @@ test("checkpoints reject skipped or cross-plan operations", () => {
   const otherResult = buildBlooketWritePlan(
     project.replace("Math review.", "Changed."),
     "",
+    capabilities,
   );
   assert.equal(otherResult.ok, true);
   if (otherResult.ok) {
@@ -161,6 +198,7 @@ test("next operation rejects cross-plan checkpoints", () => {
   const changedResult = buildBlooketWritePlan(
     project.replace("Math review.", "Changed."),
     "",
+    capabilities,
   );
   assert.equal(changedResult.ok, true);
   if (!changedResult.ok) {
@@ -224,6 +262,7 @@ test("checkpoint decoding binds progress to one exact plan", () => {
   const changedResult = buildBlooketWritePlan(
     project.replace("Math review.", "Changed."),
     "",
+    capabilities,
   );
   assert.equal(changedResult.ok, true);
   if (changedResult.ok) {
