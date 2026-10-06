@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-session
+  name: blooket-session
+  path: src/api/blooket-session
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
