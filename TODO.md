@@ -35,10 +35,13 @@ Implement concrete browser probes for capability inspection, My Sets listing,
 and set metadata detail. Extend set retrieval to question and media content only
 after authenticated observations establish an exact versioned read shape.
 
-### TODO - Implement create and edit operations
+### TODO - Complete concrete create/edit execution and persistence
 
-Create and update sets and questions through the Blooket adapter, with bounded
-normal pacing, checkpoints, retry classification, and human stop conditions.
+Implement the browser mutation adapter for set/question operations, persist
+advanced checkpoints durably between steps, and add bounded normal pacing plus
+retry classification only from verified behavior. The one-step executor already
+fails closed on ambiguous outcomes and preserves checkpoints for retry or human
+recovery.
 
 ## P3 — Canonical CLI and localhost API
 

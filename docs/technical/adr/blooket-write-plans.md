@@ -44,6 +44,18 @@ operation index. A checkpoint advances only when the executor confirms the exact
 next operation ID. Cross-plan checkpoints, skipped operations, out-of-order
 operations, and advancement after completion all fail explicitly.
 
+Remote execution consumes at most one planned operation per application call.
+The checkpoint is decoded before any browser, credential, or mutation side
+effect. A completed checkpoint returns without touching the browser. A confirmed
+mutation advances exactly one operation; rate limiting, session expiry, human
+stop states, browser failures, and otherwise unconfirmed outcomes preserve the
+existing checkpoint.
+
+The executor intentionally does not sleep, loop, or auto-retry. Concrete pacing,
+retry classification, and durable checkpoint persistence remain adapter and
+application concerns that require verified browser behavior rather than guessed
+timing constants.
+
 ## Consequences
 
 - Raw or malformed project data cannot reach a write plan.
