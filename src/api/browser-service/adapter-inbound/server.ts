@@ -260,13 +260,15 @@ export async function startBrowserService(
         const size = (await lstat(path)).size;
         if (size > 25_000_000) throw new Error("media-byte-limit-exceeded");
         response.writeHead(200, {
-          "Content-Type": file.endsWith(".gif")
+          "Content-Type": file.toLowerCase().endsWith(".gif")
             ? "image/gif"
-            : file.endsWith(".png")
+            : file.toLowerCase().endsWith(".png")
               ? "image/png"
-              : file.endsWith(".webp")
+              : file.toLowerCase().endsWith(".webp")
                 ? "image/webp"
-                : "image/jpeg",
+                : file.toLowerCase().endsWith(".avif")
+                  ? "image/avif"
+                  : "image/jpeg",
         });
         response.end(await readFile(path));
         return;

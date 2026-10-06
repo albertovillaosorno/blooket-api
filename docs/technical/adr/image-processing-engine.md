@@ -28,8 +28,9 @@ authority, and keep direct Sharp access inside media adapter code.
 Sharp is justified because it provides maintained libvips-backed decoding and
 encoding for the required formats, prebuilt binaries for current macOS and Linux
 targets, frame metadata for animated GIF/WebP inputs, explicit pixel limits, and
-strict warning-level handling for untrusted input. It also avoids spawning
-image-processing child processes.
+strict warning-level handling for untrusted input. Sharp stays in repository
+adapters; production media entrypoints delegate untrusted native work to a
+temporary Node worker through the platform isolation boundary.
 
 The repository intentionally materializes packages below
 `.dependencies/pnpm/node_modules`. Node's ordinary package resolver does not
@@ -42,6 +43,17 @@ Source-image validation first checks repository-owned magic-byte rules. Sharp
 then parses metadata, which is used to enforce a caller-supplied total pixel
 ceiling across all frames before a complete pixel decode. Successful admission
 requires both the repository detector and Sharp to agree on the format.
+
+Workers receive bounded bytes and recipes over IPC, without filenames,
+descriptions, credentials, or inherited development variables. They disable
+Sharp caching and use one native processing thread; the caller enforces a
+20-second deadline and waits for worker exit on timeout, cancellation, or crash.
+Replies pass exact validation before being used by the application.
+
+The 256-MB JavaScript heap limit is not a native-memory sandbox. Source bytes,
+aggregate decoded pixels, at most 600 source frames, output pixels, and actual
+encoded bytes remain separate admission bounds. Native macOS packaging must
+include and exercise this worker entrypoint and its Sharp runtime.
 
 Product byte limits, pixel limits, rendition dimensions, and upload constraints
 are not Sharp defaults. They remain explicit caller or capability inputs so an
@@ -80,7 +92,7 @@ until equivalent preservation behavior is implemented and covered by tests.
   codec implementation is not a product differentiator and would increase the
   security surface substantially.
 - Shelling out to ImageMagick or similar host tools was rejected because it adds
-  a process boundary and an undeclared host dependency.
+  an undeclared host dependency beyond the bundled Node/Sharp worker.
 - Trusting extensions or MIME labels without decoder validation was rejected
   because media intake is untrusted input.
 - Creating a root `node_modules` solely for Node resolution was rejected because
@@ -94,3 +106,9 @@ payload rejection, and rejection before native decoding for unknown signatures.
 
 `jig versions refresh --authority sharp --root .` records the observed current
 Sharp release, and `jig check --root .` enforces the exact package projection.
+
+`tests/platforms/native-media/adapter-outbound/process_tests.ts` verifies real
+worker results, variable-delay fixed-FPS GIF output, legacy redaction, timeout,
+cancellation, crash cleanup, malformed replies, and environment secret
+exclusion.
+Portable results do not establish native macOS packaging compatibility.

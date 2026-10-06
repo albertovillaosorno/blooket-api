@@ -35,9 +35,8 @@ import {
   type ImageFormatInfo,
 } from "../../image-formats/domain/image-format.ts";
 
-import {
-  loadSharp,
-} from "../../sharp-runtime/adapter-outbound/sharp-runtime.ts";
+import { loadSharp } from
+  "../../sharp-runtime/adapter-outbound/sharp-runtime.ts";
 
 export interface DecodedSourceImage {
   readonly format: ImageFormatInfo;
@@ -57,6 +56,7 @@ export type ImageDecodeResult =
         | "invalid-pixel-limit"
         | "unsupported-image-format"
         | "image-pixel-limit-exceeded"
+        | "image-frame-limit-exceeded"
         | "image-decode-failed"
         | "decoder-format-mismatch"
         | "invalid-image-metadata";
@@ -95,27 +95,24 @@ export async function decodeSourceImage(
     const frameWidth = metadata.width;
     const frameHeight = metadata.pageHeight ?? metadata.height;
     if (
-      !isPositiveInteger(frameWidth)
-      || !isPositiveInteger(frameHeight)
-      || !isPositiveInteger(frameCount)
+      !isPositiveInteger(frameWidth) ||
+      !isPositiveInteger(frameHeight) ||
+      !isPositiveInteger(frameCount)
     ) {
       return { ok: false, code: "invalid-image-metadata" };
     }
 
+    if (frameCount > 600) {
+      return { ok: false, code: "image-frame-limit-exceeded" };
+    }
     if (
-      exceedsPixelLimit(
-        frameWidth,
-        frameHeight,
-        frameCount,
-        maxInputPixels,
-      )
+      exceedsPixelLimit(frameWidth, frameHeight, frameCount, maxInputPixels)
     ) {
       return { ok: false, code: "image-pixel-limit-exceeded" };
     }
 
-    const frameDelaysMs = frameCount > 1
-      ? normalizeDelays(metadata.delay, frameCount)
-      : [];
+    const frameDelaysMs =
+      frameCount > 1 ? normalizeDelays(metadata.delay, frameCount) : [];
     if (frameDelaysMs === undefined) {
       return { ok: false, code: "invalid-image-metadata" };
     }
@@ -127,7 +124,9 @@ export async function decodeSourceImage(
       animated: true,
       failOn: "warning",
       limitInputPixels: maxInputPixels,
-    }).raw().toBuffer();
+    })
+      .raw()
+      .toBuffer();
 
     const value: DecodedSourceImage = {
       format: detected,
@@ -151,10 +150,10 @@ function normalizeDecoderFormat(
   compression: string | undefined,
 ): ImageFormat | undefined {
   if (
-    format === "jpeg"
-    || format === "png"
-    || format === "webp"
-    || format === "gif"
+    format === "jpeg" ||
+    format === "png" ||
+    format === "webp" ||
+    format === "gif"
   ) {
     return format;
   }
@@ -190,7 +189,5 @@ function normalizeDelays(
 }
 
 function isPositiveInteger(value: number | undefined): value is number {
-  return value !== undefined
-    && Number.isSafeInteger(value)
-    && value > 0;
+  return value !== undefined && Number.isSafeInteger(value) && value > 0;
 }

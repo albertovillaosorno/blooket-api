@@ -259,7 +259,7 @@ function number(value: unknown, min: number, max: number): value is number {
 export function safeRelativeImage(value: string): boolean {
   return (
     value.length <= 1024 &&
-    /\.(png|jpe?g|gif|webp)$/iu.test(value) &&
+    /\.(png|jpe?g|gif|webp|avif)$/iu.test(value) &&
     !/[\\\x00-\x1f]/u.test(value) &&
     value
       .split("/")

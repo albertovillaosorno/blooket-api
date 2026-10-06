@@ -55,6 +55,9 @@ import {
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
 
+import { withLegacyMediaVaultLock } from
+  "../../media-vault-files/adapter-outbound/directory.ts";
+
 interface YamlRuntime {
   parse(
     source: string,
@@ -204,6 +207,7 @@ export interface LibraryTransaction {
 export async function commitLibraryTransaction(
   root: string,
   candidate: LibraryTransaction,
+  legacyLockHeld = false,
 ): Promise<void> {
   const transaction = decodeTransaction(candidate);
   const source = JSON.stringify(transaction) + "\n";
@@ -216,90 +220,101 @@ export async function commitLibraryTransaction(
     )) !== "created"
   )
     throw new Error("library-recovery-required");
-  await recoverLibraryTransaction(root);
+  await recoverLibraryTransaction(root, legacyLockHeld);
 }
-async function recoverLibraryTransaction(root: string): Promise<void> {
+async function recoverLibraryTransaction(
+  root: string,
+  legacyLockHeld = false,
+): Promise<void> {
   const journal = await safeLibraryPath(root, TRANSACTION_FILE);
   if (!(await exists(journal))) return;
   const transaction = decodeTransaction(
     JSON.parse((await boundedBytes(journal, 32_000_000)).toString("utf8")),
   );
-  if (transaction.kind === "migrate") {
-    const index = await safeLibraryPath(root, "media.jsonl");
-    const archive = await safeLibraryPath(root, "media.jsonl.migrated");
-    const existing = (await exists(index)) ? index : archive;
-    if (
-      digest(await boundedBytes(existing, 16_000_000)) !==
-      transaction.indexDigest
-    )
-      throw new Error("legacy-index-changed");
-  }
-  for (const transfer of transaction.transfers) {
-    const source = await safeLibraryPath(root, transfer.source);
-    const target = await safeLibraryPath(root, transfer.after.asset, true);
-    if (await exists(source)) {
-      const bytes = await boundedBytes(source, 25_000_000);
-      if (bytes.length !== transfer.bytes || digest(bytes) !== transfer.digest)
-        throw new Error("source-changed-during-transfer");
-      await writeDurableFileIfAbsent(target, bytes);
+  const replay = async () => {
+    if (transaction.kind === "migrate") {
+      const index = await safeLibraryPath(root, "media.jsonl");
+      const archive = await safeLibraryPath(root, "media.jsonl.migrated");
+      const existing = (await exists(index)) ? index : archive;
+      if (
+        digest(await boundedBytes(existing, 16_000_000)) !==
+        transaction.indexDigest
+      )
+        throw new Error("legacy-index-changed");
     }
-    const targetBytes = await boundedBytes(target, 25_000_000);
-    if (
-      targetBytes.length !== transfer.bytes ||
-      digest(targetBytes) !== transfer.digest
-    )
-      throw new Error("transfer-destination-conflict");
-    const metadata = await safeLibraryPath(
-      root,
-      metadataPath(transfer.after.asset),
-      true,
-    );
-    if (await exists(metadata)) {
-      const current = decodeLibraryMetadata(
-        (await yaml()).parse(
-          (await boundedBytes(metadata, 100_000)).toString("utf8"),
-          { maxAliasCount: 0, uniqueKeys: true, schema: "core" },
-        ),
-      );
-      if (JSON.stringify(current) !== JSON.stringify(transfer.after))
-        throw new Error("transfer-metadata-conflict");
-    } else await saveMetadata(root, transfer.after, true);
-    if (transfer.before !== null) {
-      const oldMetadata = await safeLibraryPath(
+    for (const transfer of transaction.transfers) {
+      const source = await safeLibraryPath(root, transfer.source);
+      const target = await safeLibraryPath(root, transfer.after.asset, true);
+      if (await exists(source)) {
+        const bytes = await boundedBytes(source, 25_000_000);
+        if (
+          bytes.length !== transfer.bytes ||
+          digest(bytes) !== transfer.digest
+        )
+          throw new Error("source-changed-during-transfer");
+        await writeDurableFileIfAbsent(target, bytes);
+      }
+      const targetBytes = await boundedBytes(target, 25_000_000);
+      if (
+        targetBytes.length !== transfer.bytes ||
+        digest(targetBytes) !== transfer.digest
+      )
+        throw new Error("transfer-destination-conflict");
+      const metadata = await safeLibraryPath(
         root,
-        metadataPath(transfer.before.asset),
+        metadataPath(transfer.after.asset),
+        true,
       );
-      if (await exists(oldMetadata)) {
+      if (await exists(metadata)) {
         const current = decodeLibraryMetadata(
           (await yaml()).parse(
-            (await boundedBytes(oldMetadata, 100_000)).toString("utf8"),
+            (await boundedBytes(metadata, 100_000)).toString("utf8"),
             { maxAliasCount: 0, uniqueKeys: true, schema: "core" },
           ),
         );
-        if (JSON.stringify(current) !== JSON.stringify(transfer.before))
+        if (JSON.stringify(current) !== JSON.stringify(transfer.after))
           throw new Error("transfer-metadata-conflict");
-        await removeDurableFile(oldMetadata);
+      } else await saveMetadata(root, transfer.after, true);
+      if (transfer.before !== null) {
+        const oldMetadata = await safeLibraryPath(
+          root,
+          metadataPath(transfer.before.asset),
+        );
+        if (await exists(oldMetadata)) {
+          const current = decodeLibraryMetadata(
+            (await yaml()).parse(
+              (await boundedBytes(oldMetadata, 100_000)).toString("utf8"),
+              { maxAliasCount: 0, uniqueKeys: true, schema: "core" },
+            ),
+          );
+          if (JSON.stringify(current) !== JSON.stringify(transfer.before))
+            throw new Error("transfer-metadata-conflict");
+          await removeDurableFile(oldMetadata);
+        }
+        if (await exists(source)) await removeDurableFile(source);
       }
-      if (await exists(source)) await removeDurableFile(source);
     }
-  }
-  if (transaction.kind === "migrate") {
-    const index = await safeLibraryPath(root, "media.jsonl");
-    const archive = await safeLibraryPath(root, "media.jsonl.migrated");
-    if (await exists(index)) {
-      const bytes = await boundedBytes(index, 16_000_000);
-      if (digest(bytes) !== transaction.indexDigest)
-        throw new Error("legacy-index-changed");
-      await writeDurableFileIfAbsent(archive, bytes);
-      if (
-        digest(await boundedBytes(archive, 16_000_000)) !==
-        transaction.indexDigest
-      )
-        throw new Error("legacy-archive-conflict");
-      await removeDurableFile(index);
+    if (transaction.kind === "migrate") {
+      const index = await safeLibraryPath(root, "media.jsonl");
+      const archive = await safeLibraryPath(root, "media.jsonl.migrated");
+      if (await exists(index)) {
+        const bytes = await boundedBytes(index, 16_000_000);
+        if (digest(bytes) !== transaction.indexDigest)
+          throw new Error("legacy-index-changed");
+        await writeDurableFileIfAbsent(archive, bytes);
+        if (
+          digest(await boundedBytes(archive, 16_000_000)) !==
+          transaction.indexDigest
+        )
+          throw new Error("legacy-archive-conflict");
+        await removeDurableFile(index);
+      }
     }
-  }
-  await removeDurableFile(journal);
+    await removeDurableFile(journal);
+  };
+  if (transaction.kind === "migrate" && !legacyLockHeld)
+    await withLegacyMediaVaultLock(root, replay);
+  else await replay();
 }
 function decodeTransaction(value: unknown): LibraryTransaction {
   const transaction = object(value);

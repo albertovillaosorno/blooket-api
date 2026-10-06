@@ -149,13 +149,17 @@ This historical verification is not an inferred language or AI translation.
 An explicit local import preflights the bounded JSONL index and actual images,
 preserves source files, and archives the exact index bytes. User rename/move
 preserves IDs, bytes, text, recipes, and provenance while clearing prepared
-status. A durable transfer journal is replayed under the library lock before
+status. Canonical legacy vault paths select the unique immutable source under
+`originals/`; the working `media/` rendition never replaces a missing original.
+Migration and its recovery acquire the legacy writer lock after the new library
+lock, recovering any old pending transaction before preflight or replay.
+
+A durable transfer journal is replayed under the library lock before
 other locked operations; ordinary reads refuse a pending transaction.
 
 Recovery checks source/destination hashes and metadata before removing old
-rename
-paths. Changed files stop recovery with the journal intact; no automatic merge
-or
+rename paths. Changed files stop recovery with the journal intact; no automatic
+merge or
 unrelated overwrite is admitted. Migration and filenames remain local user
 operations outside the remote command registry.
 

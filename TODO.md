@@ -306,15 +306,18 @@ files. Source changes retain the journal for repair instead of guessing success.
 
 Regression tests exercise interrupted publication/archival, unchanged source
 bytes, late invalid records, collisions, traversal, symlinks, concurrent
-renames,
-and forbidden remote commands. All 519 portable tests, strict TypeScript, and
+renames, and forbidden remote commands. All 519 portable tests, strict
+TypeScript, and
 browser-script syntax pass; Jig retains only its external evidence gap.
 
 **External blocker:** no recipient Mac or actual ChatGPT client is available.
 Native case/Unicode filesystem behavior and real skill/schema consumption remain
-unverified. The Chrome import button and confirmation opened, but subsequent
-browser inspection timed out; do not claim the complete visual workflow passed.
-Continue independent editor work in task 06; keep client acceptance pending.
+unverified.
+
+Chrome subsequently passed a user rename and prepared export using
+synthetic media. Its native migration confirmation stalled browser inspection;
+the complete visual migration workflow remains unverified. Continue independent
+editor work in task 06; keep client acceptance pending.
 
 Existing skill and draft tools have logical IDs, revision checks, and recovery
 copies; verify how the actual ChatGPT client reads skills and follows the
@@ -350,18 +353,23 @@ full-color PNG versus the standard GIF palette.
 Prepared downloads revalidate the current revision, rendition identity, actual
 bounded bytes, format, and canvas dimensions under the shared library lock.
 Regression checks reject stale URLs, incorrect format/size, mismatched asset
-identity, and a file at the exact 2,500,000-byte ceiling. All 520 portable tests,
-strict TypeScript, and browser-script syntax pass.
+identity, and a file at the exact 2,500,000-byte ceiling. All 520 portable
+tests, strict TypeScript, and browser-script syntax pass.
 
 Changing export defaults must not overwrite existing individual recipes.
-The browser framing preview explicitly directs the teacher to the prepared file
+The browser framing preview directs the teacher to the prepared file
 for final colors, compression, and GIF timing; it does not claim pixel parity.
 
-**External blocker:** Safari, target-browser interaction/accessibility,
-preview/export geometry, and responsive visual acceptance remain unverified.
-Chrome inspection stalled during task 05, so the newly added editor controls
-have not passed an interactive browser test. Continue independent export
-isolation in task 07 and retain these acceptance checks.
+Chrome subsequently passed zoom buttons, keyboard pan, solid-background
+selection, user filename/folder changes, preparation, and download readiness
+with synthetic media. Editing and rename controls freeze during preparation to
+prevent stale asynchronous results replacing a newer image or recipe. The
+prepared file was below the byte ceiling; this was not a real Blooket upload.
+
+**External blocker:** Safari interaction/accessibility, full preview/export
+geometry, GIF preview, color picking, and responsive visual acceptance remain
+unverified. Continue independent export work in task 07 and retain these
+acceptance checks.
 
 Complete when source bytes remain unchanged, per-image recipes save/reopen,
 preview/export agree, and import, zoom/drag, undo/redo, adjustments, both
@@ -375,11 +383,40 @@ Prepared GIF FPS is explicit, defaults to 10, and currently admits 1, 2, 5, 10,
 loop behavior, with duration/frame/pixel limits. Every output must remain
 strictly below 2,500,000 bytes; an equal-sized file is rejected.
 
-Expand tests for variable-delay GIFs, short clips, loop preservation, duration
-within one frame interval, alternate FPS, frame/pixel ceilings, and prepared
-cache invalidation. Add a bounded native-work timeout/isolation; rendering still
-runs native work inside the service process. Make failures actionable and keep
-independent service operations usable after an editor failure.
+Portable export isolation was implemented on 2026-10-06. Image intake,
+preparation, legacy editor commands, prepared-download checks, and the native
+first-use probe now run untrusted decoding/rendering in a temporary worker.
+It receives bytes and bounded values over IPC, without user paths, descriptions,
+credentials, or inherited development variables.
+
+Each job has a 20-second deadline, a minimal environment, a 256-MB JavaScript
+heap, disabled Sharp cache, and one native processing thread. Heap size is not
+a native-memory sandbox; source/output pixel and frame bounds remain explicit.
+Timeout, cancellation, malformed replies, and crashes wait for child cleanup
+before releasing the caller. Independent service requests remain usable.
+
+Tests cover variable-delay fixed-FPS output, preserved loop state, all admitted
+FPS values, duration within one frame interval, frame expansion limits,
+601-frame rejection before full decode, killed/stalled workers, cancellation,
+secret exclusion, malformed replies, and a successful job after timeout.
+Legacy redaction still renders correctly through the worker boundary.
+
+Migration preflight has a 120-second aggregate deadline and shares the legacy
+writer lock, including interrupted transfer replay. Canonical old vault records
+select their immutable original rather than the prepared working image.
+Missing or conflicting originals stop before publication; JPEG and AVIF bytes
+survive without conversion and the exact old index remains recoverable.
+
+All 533 portable tests, strict TypeScript, and browser-script syntax passed on
+2026-10-06 after these changes. Jig reports only the external
+`scalability.repository-graph` evidence gap; repository checks were not
+weakened.
+Chrome editor acceptance used synthetic local data, without changing Blooket.
+
+**Pending:** native macOS worker/package behavior and accepted resource budgets
+need a real target host. Native memory is bounded by admitted work, not an OS
+quota. The eventual Blooket upload must independently reject oversized or stale
+files in task 11; that concrete upload boundary is not implemented yet.
 
 Provide bounded optimization or clear controls when media exceeds the ceiling;
 block preparation/upload continuation until valid. Never silently change the

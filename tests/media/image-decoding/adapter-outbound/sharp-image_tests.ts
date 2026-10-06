@@ -36,52 +36,52 @@ import { decodeSourceImage } from
   "../../../../src/media/image-decoding/adapter-outbound/sharp-image.ts";
 
 const JPEG_1X1 = Buffer.from(
-  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsj"
-    + "HBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgo"
-    + "KCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAAR"
-    + "CAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAA"
-    + "AAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAUEQEAAAAAAAAA"
-    + "AAAAAAAAAAAA/9oADAMBAAIRAxEAPwCfAFEB/9k=",
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsj" +
+    "HBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgo" +
+    "KCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAAR" +
+    "CAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAA" +
+    "AAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABAX/xAAUEQEAAAAAAAAA" +
+    "AAAAAAAAAAAA/9oADAMBAAIRAxEAPwCfAFEB/9k=",
   "base64",
 );
 
 const WEBP_1X1 = Buffer.from(
-  "UklGRjAAAABXRUJQVlA4ICQAAABQAQCdASoBAAEAAUAmJQBOgC6gAP77LkvF3Yjj"
-    + "J4dVU9ffoAA=",
+  "UklGRjAAAABXRUJQVlA4ICQAAABQAQCdASoBAAEAAUAmJQBOgC6gAP77LkvF3Yjj" +
+    "J4dVU9ffoAA=",
   "base64",
 );
 
 const AVIF_1X1 = Buffer.from(
-  "AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAAXBtZXRhAAAAAAAAACFoZGxy"
-    + "AAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAADRpbG9jAAAAAERAAAIAAQAAAAABlAAB"
-    + "AAAAAAAAACEAAgAAAAABtQABAAAAAAAAABQAAAA4aWluZgAAAAAAAgAAABVpbmZlAgAA"
-    + "AAABAABhdjAxAAAAABVpbmZlAgAAAAACAABhdjAxAAAAAA5waXRtAAAAAAABAAAAr2lw"
-    + "cnAAAACKaXBjbwAAAAxhdjFDgSACAAAAABRpc3BlAAAAAAAAAAEAAAABAAAAEHBpeGkA"
-    + "AAAAAwgICAAAAAxhdjFDgQAcAAAAAA5waXhpAAAAAAEIAAAAOGF1eEMAAAAAdXJuOm1w"
-    + "ZWc6bXBlZ0I6Y2ljcDpzeXN0ZW1zOmF1eGlsaWFyeTphbHBoYQAAAAAdaXBtYQAAAAAA"
-    + "AAACAAEDgQIDAAIEhAIFhgAAABppcmVmAAAAAAAAAA5hdXhsAAIAAQABAAAAPW1kYXQS"
-    + "AAoHOAAGkBDQaTIUGUJjBMAANAAAkEDJHGFCJoLojb0SAAoEGAAGFTIKGAAAAQACIRuj"
-    + "YA==",
+  "AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAAXBtZXRhAAAAAAAAACFoZGxy" +
+    "AAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAADRpbG9jAAAAAERAAAIAAQAAAAABlAAB" +
+    "AAAAAAAAACEAAgAAAAABtQABAAAAAAAAABQAAAA4aWluZgAAAAAAAgAAABVpbmZlAgAA" +
+    "AAABAABhdjAxAAAAABVpbmZlAgAAAAACAABhdjAxAAAAAA5waXRtAAAAAAABAAAAr2lw" +
+    "cnAAAACKaXBjbwAAAAxhdjFDgSACAAAAABRpc3BlAAAAAAAAAAEAAAABAAAAEHBpeGkA" +
+    "AAAAAwgICAAAAAxhdjFDgQAcAAAAAA5waXhpAAAAAAEIAAAAOGF1eEMAAAAAdXJuOm1w" +
+    "ZWc6bXBlZ0I6Y2ljcDpzeXN0ZW1zOmF1eGlsaWFyeTphbHBoYQAAAAAdaXBtYQAAAAAA" +
+    "AAACAAEDgQIDAAIEhAIFhgAAABppcmVmAAAAAAAAAA5hdXhsAAIAAQABAAAAPW1kYXQS" +
+    "AAoHOAAGkBDQaTIUGUJjBMAANAAAkEDJHGFCJoLojb0SAAoEGAAGFTIKGAAAAQACIRuj" +
+    "YA==",
   "base64",
 );
 
 const ANIMATED_WEBP_2_FRAME_1X1 = Buffer.from(
-  "UklGRpQAAABXRUJQVlA4WAoAAAACAAAAAAAAAAAAQU5JTQYAAAD/////AQBBTk1G"
-    + "MAAAAAAAAAAAAAAAAAAAAGQAAAJWUDggGAAAADABAJ0BKgEAAQABQCYlpAADcAD+"
-    + "/PQAAEFOTUYwAAAAAAAAAAAAAAAAAAAAeAAAAFZQOCAYAAAANAEAnQEqAQABAAAA"
-    + "JiWkAANwAP79NmgA",
+  "UklGRpQAAABXRUJQVlA4WAoAAAACAAAAAAAAAAAAQU5JTQYAAAD/////AQBBTk1G" +
+    "MAAAAAAAAAAAAAAAAAAAAGQAAAJWUDggGAAAADABAJ0BKgEAAQABQCYlpAADcAD+" +
+    "/PQAAEFOTUYwAAAAAAAAAAAAAAAAAAAAeAAAAFZQOCAYAAAANAEAnQEqAQABAAAA" +
+    "JiWkAANwAP79NmgA",
   "base64",
 );
 
 const PNG_1X1 = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPo"
-    + "AAAD6AG1e1JrAAAADUlEQVQImWP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPo" +
+    "AAAD6AG1e1JrAAAADUlEQVQImWP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
   "base64",
 );
 
 const PNG_2X1 = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAACXBIWXMAAAPo"
-    + "AAAD6AG1e1JrAAAADElEQVQImWNg+A+BAA/5A/2NJFz3AAAAAElFTkSuQmCC",
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAACXBIWXMAAAPo" +
+    "AAAD6AG1e1JrAAAADElEQVQImWNg+A+BAA/5A/2NJFz3AAAAAElFTkSuQmCC",
   "base64",
 );
 
@@ -129,12 +129,9 @@ test("JPEG WebP and AVIF sources fully decode by content", async () => {
 });
 
 test(
-  "animated WebP exposes frame timing without losing format identity",
+  "animated WebP exposes frame " + "timing without losing format identity",
   async () => {
-    const decoded = await decodeSourceImage(
-      ANIMATED_WEBP_2_FRAME_1X1,
-      2,
-    );
+    const decoded = await decodeSourceImage(ANIMATED_WEBP_2_FRAME_1X1, 2);
     assert.equal(decoded.ok, true);
     if (decoded.ok) {
       assert.equal(decoded.value.format.format, "webp");
@@ -149,7 +146,7 @@ test(
 );
 
 test(
-  "animated GIF metadata retains frame count delays and loop state",
+  "animated GIF metadata retains frame " + "count delays and loop state",
   async () => {
     assert.deepEqual(await decodeSourceImage(GIF_2_FRAME_1X1, 2), {
       ok: true,
@@ -195,10 +192,10 @@ test("pixel ceilings and malformed payloads fail closed", async () => {
     },
   });
 
-  assert.deepEqual(
-    await decodeSourceImage(PNG_1X1.subarray(0, 16), 100),
-    { ok: false, code: "image-decode-failed" },
-  );
+  assert.deepEqual(await decodeSourceImage(PNG_1X1.subarray(0, 16), 100), {
+    ok: false,
+    code: "image-decode-failed",
+  });
 });
 
 test("unsupported signatures fail before the native decoder", async () => {
@@ -206,4 +203,25 @@ test("unsupported signatures fail before the native decoder", async () => {
     await decodeSourceImage(Uint8Array.from([1, 2, 3, 4]), 100),
     { ok: false, code: "unsupported-image-format" },
   );
+});
+
+test("excessive source frames fail before full pixel decoding", async () => {
+  const { loadSharp } = await import(
+    "../../../../src/media/sharp-runtime/adapter-outbound/sharp-runtime.ts"
+  );
+  const sharp = await loadSharp();
+  const bytes = await sharp(new Uint8Array(601 * 4).fill(255), {
+    raw: { width: 1, height: 601, channels: 4, pageHeight: 1 },
+  })
+    .gif({
+      loop: 0,
+      delay: Array.from({ length: 601 }, () => 10),
+      keepDuplicateFrames: true,
+    })
+    .toBuffer();
+  assert.equal((await sharp(bytes, { animated: true }).metadata()).pages, 601);
+  assert.deepEqual(await decodeSourceImage(bytes, 2000), {
+    ok: false,
+    code: "image-frame-limit-exceeded",
+  });
 });

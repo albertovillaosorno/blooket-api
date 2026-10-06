@@ -59,3 +59,21 @@ test(
     assert.equal(resampleGifTimeline([1000], 50, 20), undefined);
   },
 );
+
+test("every admitted FPS keeps duration within one output interval", () => {
+  for (const fps of [1, 2, 5, 10, 20, 25, 50]) {
+    const timeline = resampleGifTimeline([80, 140, 70, 40], fps)!;
+    assert.ok(timeline);
+    assert.equal(timeline.delayMs, 1000 / fps);
+    assert.ok(
+      Math.abs(timeline.pages.length * timeline.delayMs - 330) <=
+        timeline.delayMs,
+    );
+  }
+  assert.equal(
+    resampleGifTimeline(Array.from({ length: 601 }, () => 10)),
+    undefined,
+  );
+  assert.equal(resampleGifTimeline([60_000], 10)!.pages.length, 600);
+  assert.equal(resampleGifTimeline([60_000], 20), undefined);
+});
