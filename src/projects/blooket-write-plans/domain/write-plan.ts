@@ -77,6 +77,7 @@ export interface BlooketQuestionOperation {
   readonly operationId: string;
   readonly kind: "question";
   readonly localQuestionId: string;
+  readonly questionNumber: number;
   readonly question: PlannedBlooketQuestion;
 }
 
@@ -195,9 +196,10 @@ function lowerBundle(bundle: ProjectBundle): BlooketWritePlan {
       visibility: bundle.project.visibility,
       coverMediaId: resolvedMediaId(bundle.project.coverImage),
     },
-    ...bundle.project.questions.map((question) => ({
+    ...bundle.project.questions.map((question, index) => ({
       kind: "question" as const,
       localQuestionId: question.id,
+      questionNumber: index + 1,
       question: lowerQuestion(question),
     })),
   ];

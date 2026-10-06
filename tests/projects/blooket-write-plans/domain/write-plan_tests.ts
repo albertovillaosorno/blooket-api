@@ -168,6 +168,7 @@ test("validated projects lower to ordered remote-neutral operations", () => {
     operationId: result.value.planId + ":q:0",
     kind: "question",
     localQuestionId: "q1",
+    questionNumber: 1,
     question: {
       type: "multiple-choice",
       prompt: "Which is a star?",
@@ -184,6 +185,7 @@ test("validated projects lower to ordered remote-neutral operations", () => {
     operationId: result.value.planId + ":q:1",
     kind: "question",
     localQuestionId: "q2",
+    questionNumber: 2,
     question: {
       type: "typing-answer",
       prompt: "Type moon.",

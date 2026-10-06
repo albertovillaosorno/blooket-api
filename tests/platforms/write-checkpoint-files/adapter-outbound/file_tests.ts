@@ -72,6 +72,7 @@ const plan: BlooketWritePlan = {
       operationId: "plan:checkpoint-test:q:0",
       kind: "question",
       localQuestionId: "q1",
+      questionNumber: 1,
       question: {
         type: "typing-answer",
         prompt: "2 + 2",

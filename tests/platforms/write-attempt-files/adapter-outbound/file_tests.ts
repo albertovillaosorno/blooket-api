@@ -73,6 +73,7 @@ const questionPlan: BlooketWritePlan = {
       operationId: "plan:attempt-test:q:0",
       kind: "question",
       localQuestionId: "q1",
+      questionNumber: 1,
       question: {
         type: "typing-answer",
         prompt: "2 + 2",
