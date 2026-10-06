@@ -61,11 +61,23 @@ and stores a confirmed advancement before returning success. If a remote write
 is confirmed but checkpoint persistence fails, it returns an explicit recovery
 state rather than treating the operation as retryable.
 
-A process crash can still occur after the remote service accepts a mutation but
-before local confirmation state is durable. Closing that ambiguity requires a
-write-ahead attempt journal plus reconciliation. Concrete pacing and retry
-classification also remain dependent on verified browser behavior rather than
-guessed timing constants.
+Write-ahead recovery uses a separate version-one attempt journal bound to the
+exact plan, operation ID, and operation index. A new attempt journal is created
+without overwrite in the `attempting` phase and may be atomically promoted to
+`confirmed`. Corrupt, cross-plan, or symbolic recovery evidence is never deleted
+automatically.
+
+Local recovery treats `attempting` as ambiguous and requires reconciliation.
+Only a durably `confirmed` journal may advance a missing checkpoint step
+automatically. If the checkpoint already contains that confirmed advancement,
+recovery clears the redundant valid journal.
+
+The remaining integration requirement is to place journal creation after the
+session is ready and immediately before the remote mutation, then confirm the
+journal immediately after remote success and before checkpoint persistence.
+This ordering must be wired without duplicating the canonical one-step executor.
+Concrete pacing and retry classification also remain dependent on verified
+browser behavior rather than guessed timing constants.
 
 ## Consequences
 

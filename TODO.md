@@ -35,13 +35,15 @@ Implement concrete browser probes for capability inspection, My Sets listing,
 and set metadata detail. Extend set retrieval to question and media content only
 after authenticated observations establish an exact versioned read shape.
 
-### TODO - Complete concrete create/edit execution and recovery
+### TODO - Complete concrete create/edit execution integration
 
-Implement the browser mutation adapter for set/question operations. Add a
-write-ahead attempt journal so a process crash between remote confirmation and
-checkpoint persistence becomes an explicit reconciliation state. Add bounded
-normal pacing and retry classification only from verified behavior. Durable
-checkpoint files and persisted one-step execution are already in place.
+Implement the browser mutation adapter for set/question operations and integrate
+the existing write-ahead journal around the canonical remote side effect:
+`attempting` only after session readiness and immediately before mutation,
+`confirmed` immediately after remote success, then checkpoint persistence and
+journal cleanup. Add bounded normal pacing and retry classification only from
+verified behavior. Durable checkpoints, journal primitives, and local recovery
+are already in place.
 
 ## P3 — Canonical CLI and localhost API
 
