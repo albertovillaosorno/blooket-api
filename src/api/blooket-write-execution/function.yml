@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-write-execution
+  name: blooket-write-execution
+  path: src/api/blooket-write-execution
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application
