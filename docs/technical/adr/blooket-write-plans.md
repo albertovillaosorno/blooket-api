@@ -75,7 +75,9 @@ recovery clears the redundant valid journal.
 Persisted execution serializes the full recovery-to-cleanup transaction with an
 exclusive execution lock. Standalone recovery acquires that same lock, whose
 path is derived by the attempt-journal adapter, so recovery cannot race a remote
-write using the same journal. The persisted path reuses the canonical executor
+write using the same journal.
+
+The persisted path reuses the canonical executor
 as explicit
 prepare/attempt/complete phases: session readiness is established first, the
 `attempting` journal is created immediately before the remote attempt, and
