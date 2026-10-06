@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-http-actions
+  name: blooket-http-actions
+  path: src/api/blooket-http-actions
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application

@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-flight-records
+  name: blooket-flight-records
+  path: src/ir/blooket-flight-records
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

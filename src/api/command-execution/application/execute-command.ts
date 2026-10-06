@@ -41,9 +41,17 @@ import { executeProjectValidationCommand } from
   "../../project-validation/application/project-validation-command.ts";
 import { commandFailure } from "./result.ts";
 
+import { LIBRARY_COMMANDS } from
+  "../../../ir/library-commands/contract/commands.ts";
+import { executeLibraryCommand } from
+  "../../teacher-library/application/library.ts";
+
 export async function executeCommand(
   command: CommandEnvelope,
+  dataRoot?: string,
 ): Promise<ResultEnvelope> {
+  if (LIBRARY_COMMANDS.some((name) => name === command.command))
+    return await executeLibraryCommand(command, dataRoot);
   switch (command.command) {
     case "media.search":
       return executeMediaSearchCommand(command);

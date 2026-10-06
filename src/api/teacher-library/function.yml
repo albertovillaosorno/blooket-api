@@ -1,0 +1,9 @@
+identity:
+  id: function:teacher-library
+  name: teacher-library
+  path: src/api/teacher-library
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: application

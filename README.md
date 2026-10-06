@@ -419,9 +419,27 @@ persistence.
 
 A repository-root `.env` may be used for development and tests only. It is
 ignored by Git and is not part of end-user configuration. The supported
-development variables are `EMAIL`, `PASSWORD`, and `LOCAL_PORT`. Production
-credentials continue to use the host secret store, and persisted local-service
-settings remain authoritative outside development/test entry points.
+development variables are `BLOOKET_EMAIL`, `BLOOKET_PASSWORD`,
+`LOCAL_HTTP_PORT`, `MCP_PUBLIC_URL`, and `CLOUDFLARE_TUNNEL_TOKEN`. See
+`.env.example` for quoted fields and a full URL example.
+
+Run `pnpm run dev` to read this file explicitly; normal `pnpm start` does not
+load it.
+
+Development credentials are held only in memory. Ordinary development values
+initialize saved preferences at each development startup; subsequent local UI
+saves remain effective until another startup. Production credentials use the
+host secret store.
+
+For a local UI on port 2607, configure the Cloudflare hostname with service
+`http://127.0.0.1:2608` and leave its Path filter empty. The gateway needs
+`/mcp`, `/.well-known/` discovery, and `/oauth/` authorization routes. It
+rejects local UI, settings, and general API routes.
+
+`MCP_PUBLIC_URL` is the full public HTTPS MCP URL, such as
+`https://your-host.example/mcp`; it is not the tunnel origin. Providing both
+this URL and a development tunnel token enables the gateway. The user provisions
+the hostname and tunnel; this service creates neither.
 
 The repository uses a pnpm workspace and strict TypeScript. Dependencies belong
 at the narrowest owning package and require a concrete reason to exist.
@@ -443,3 +461,10 @@ agent working rules.
 
 [browser-mcp-adr]: docs/technical/adr/macos-browser-ui-and-online-mcp.md
 [teacher-library-adr]: docs/technical/adr/teacher-settings-and-media-library.md
+
+## License
+
+This project is licensed under the [MIT License](LICENSE-MIT).
+
+For third-party trademarks, brand assets (such as Blooket logos), and dependency
+ notices, see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

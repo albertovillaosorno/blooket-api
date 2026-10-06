@@ -96,3 +96,18 @@ source = "https://registry.npmjs.org/typescript/latest"
 kind = "package"
 target = "typescript"
 template = "{version}"
+
+[authority.yaml]
+current = "2.9.1"
+stable = "2.9.1"
+
+[authority.yaml.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/yaml/latest"
+
+[authority.yaml.projection.package]
+kind = "package"
+target = "yaml"
+template = "{version}"

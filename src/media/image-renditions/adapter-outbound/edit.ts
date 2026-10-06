@@ -49,6 +49,8 @@ import {
 import { loadSharp } from
   "../../sharp-runtime/adapter-outbound/sharp-runtime.ts";
 
+import { resampleGifTimeline } from "../../gif-timeline/domain/timeline.ts";
+
 type DecodeFailureCode = Extract<
   ImageDecodeResult,
   { readonly ok: false }
@@ -56,6 +58,12 @@ type DecodeFailureCode = Extract<
 
 export interface EditorRenditionOptions {
   readonly blurSigma: number;
+  readonly gifFps?: number;
+  readonly background?: {
+    readonly mode: "blur" | "solid";
+    readonly color: string;
+  };
+  readonly compression?: "lossless" | "compact";
 }
 
 export type EditorRenditionResult =
@@ -79,9 +87,12 @@ export async function renderEditedImageRendition(
   options: EditorRenditionOptions,
 ): Promise<EditorRenditionResult> {
   if (
-    !validCanvasAndLimits(canvas, limits)
-    || !validEditorState(state)
-    || !validBlurSigma(options.blurSigma)
+    !validCanvasAndLimits(canvas, limits) ||
+    !validEditorState(state) ||
+    !validBlurSigma(options.blurSigma) ||
+    (options.background !== undefined &&
+      (!/^(#[0-9a-f]{6})$/iu.test(options.background.color) ||
+        !["blur", "solid"].includes(options.background.mode)))
   ) {
     return { ok: false, code: "invalid-editor-rendition" };
   }
@@ -94,20 +105,22 @@ export async function renderEditedImageRendition(
       sourceCode: decoded.code,
     };
   }
+  const timeline = decoded.value.animated
+    ? resampleGifTimeline(decoded.value.frameDelaysMs, options.gifFps ?? 10)
+    : { pages: [0], delayMs: 100 };
+  if (timeline === undefined)
+    return { ok: false, code: "invalid-editor-rendition" };
   if (
     exceedsPixelLimit(
       canvas.width,
       canvas.height,
-      decoded.value.frameCount,
+      timeline.pages.length,
       limits.maxOutputPixels,
     )
   ) {
     return { ok: false, code: "rendition-pixel-limit-exceeded" };
   }
-  if (
-    decoded.value.animated
-    && decoded.value.format.format !== "gif"
-  ) {
+  if (decoded.value.animated && decoded.value.format.format !== "gif") {
     return { ok: false, code: "editor-animation-unsupported" };
   }
 
@@ -115,28 +128,23 @@ export async function renderEditedImageRendition(
     const animated = decoded.value.animated;
     const rendered = animated
       ? await renderAnimatedGif(
-        source,
-        state,
-        canvas,
-        limits,
-        options.blurSigma,
-        {
-          frameCount: decoded.value.frameCount,
-          frameDelaysMs: decoded.value.frameDelaysMs,
-          ...(decoded.value.loopCount === undefined
-            ? {}
-            : { loopCount: decoded.value.loopCount }),
-        },
-      )
-      : await renderFrame(
-        source,
-        state,
-        canvas,
-        limits,
-        options.blurSigma,
-      );
+          source,
+          state,
+          canvas,
+          limits,
+          options,
+          timeline,
+          {
+            frameCount: decoded.value.frameCount,
+            frameDelaysMs: decoded.value.frameDelaysMs,
+            ...(decoded.value.loopCount === undefined
+              ? {}
+              : { loopCount: decoded.value.loopCount }),
+          },
+        )
+      : await renderFrame(source, state, canvas, limits, options);
 
-    if (rendered.byteLength > limits.maxOutputBytes) {
+    if (rendered.byteLength > Math.min(limits.maxOutputBytes, 2_499_999)) {
       return { ok: false, code: "rendition-byte-limit-exceeded" };
     }
 
@@ -148,7 +156,7 @@ export async function renderEditedImageRendition(
         mediaType: animated ? "image/gif" : "image/png",
         width: canvas.width,
         height: canvas.height,
-        frameCount: decoded.value.frameCount,
+        frameCount: timeline.pages.length,
         animated,
       },
     };
@@ -162,7 +170,7 @@ async function renderFrame(
   state: MediaEditorState,
   canvas: RenditionCanvas,
   limits: RenditionLimits,
-  blurSigma: number,
+  options: EditorRenditionOptions,
   page?: number,
 ): Promise<Uint8Array> {
   const adjusted = await adjustSource(
@@ -196,14 +204,20 @@ async function renderFrame(
     canvas,
     limits,
     sample.value,
+    options.background,
   );
-  return await applyRegions(
+  const final = await applyRegions(
     base,
     state.regions,
     canvas,
     limits.maxOutputPixels,
-    blurSigma,
+    options.blurSigma,
   );
+  if (options.compression !== "compact") return final;
+  const sharp = await loadSharp();
+  return await sharp(final, { limitInputPixels: limits.maxOutputPixels })
+    .png({ palette: true, quality: 90, compressionLevel: 9 })
+    .toBuffer();
 }
 
 async function renderAnimatedGif(
@@ -211,7 +225,8 @@ async function renderAnimatedGif(
   state: MediaEditorState,
   canvas: RenditionCanvas,
   limits: RenditionLimits,
-  blurSigma: number,
+  options: EditorRenditionOptions,
+  timeline: { readonly pages: readonly number[]; readonly delayMs: number },
   decoded: {
     readonly frameCount: number;
     readonly frameDelaysMs: readonly number[];
@@ -219,41 +234,46 @@ async function renderAnimatedGif(
   },
 ): Promise<Uint8Array> {
   const rawFrames: Uint8Array[] = [];
-  for (let page = 0; page < decoded.frameCount; page += 1) {
+  const cache = new Map<number, Uint8Array>();
+  for (const page of timeline.pages) {
+    const cached = cache.get(page);
+    if (cached !== undefined) {
+      rawFrames.push(cached);
+      continue;
+    }
     const rendered = await renderFrame(
       source,
       state,
       canvas,
       limits,
-      blurSigma,
+      options,
       page,
     );
-    rawFrames.push(
-      await renderedFrameToRgba(
-        rendered,
-        canvas,
-        limits.maxOutputPixels,
-      ),
+    const raw = await renderedFrameToRgba(
+      rendered,
+      canvas,
+      limits.maxOutputPixels,
     );
+    cache.set(page, raw);
+    rawFrames.push(raw);
   }
 
   const sharp = await loadSharp();
-  return await sharp(
-    concatenate(rawFrames),
-    {
-      failOn: "warning",
-      limitInputPixels: limits.maxOutputPixels,
-      raw: {
-        width: canvas.width,
-        height: canvas.height * decoded.frameCount,
-        channels: 4,
-        pageHeight: canvas.height,
-      },
+  return await sharp(concatenate(rawFrames), {
+    failOn: "warning",
+    limitInputPixels: limits.maxOutputPixels,
+    raw: {
+      width: canvas.width,
+      height: canvas.height * timeline.pages.length,
+      channels: 4,
+      pageHeight: canvas.height,
     },
-  )
+  })
     .gif({
       loop: decoded.loopCount ?? 0,
-      delay: decoded.frameDelaysMs,
+      delay: timeline.pages.map(() => timeline.delayMs),
+      effort: 7,
+      ...(options.compression === "compact" ? { colours: 128 } : {}),
       keepDuplicateFrames: true,
     })
     .toBuffer();
@@ -306,9 +326,7 @@ async function adjustSource(
   const normalized = await sharp(source, {
     failOn: "warning",
     limitInputPixels: maxInputPixels,
-    ...(page === undefined
-      ? {}
-      : { page, pages: 1 }),
+    ...(page === undefined ? {} : { page, pages: 1 }),
   })
     .rotate()
     .toColourspace("srgb")
@@ -320,10 +338,7 @@ async function adjustSource(
     failOn: "warning",
     limitInputPixels: maxInputPixels,
   })
-    .linear(
-      [contrast, contrast, contrast, 1],
-      [offset, offset, offset, 0],
-    )
+    .linear([contrast, contrast, contrast, 1], [offset, offset, offset, 0])
     .modulate({ saturation: state.transform.saturation })
     .png()
     .toBuffer();
@@ -337,22 +352,37 @@ async function renderStaticBase(
     readonly source: PixelRectangle;
     readonly canvas: PixelRectangle;
   } | null,
+  fill?: EditorRenditionOptions["background"],
 ): Promise<Uint8Array> {
   const sharp = await loadSharp();
   const transparent = { r: 0, g: 0, b: 0, alpha: 0 };
 
-  const background = await sharp(adjusted, {
-    failOn: "warning",
-    limitInputPixels: limits.maxInputPixels,
-  })
-    .resize({
-      width: canvas.width,
-      height: canvas.height,
-      fit: "cover",
-    })
-    .blur(20)
-    .png()
-    .toBuffer();
+  const background =
+    fill?.mode === "solid"
+      ? await sharp(
+          new Uint8Array([
+            Number.parseInt(fill.color.slice(1, 3), 16),
+            Number.parseInt(fill.color.slice(3, 5), 16),
+            Number.parseInt(fill.color.slice(5, 7), 16),
+            255,
+          ]),
+          { raw: { width: 1, height: 1, channels: 4 } },
+        )
+          .resize({ width: canvas.width, height: canvas.height, fit: "fill" })
+          .png()
+          .toBuffer()
+      : await sharp(adjusted, {
+          failOn: "warning",
+          limitInputPixels: limits.maxInputPixels,
+        })
+          .resize({
+            width: canvas.width,
+            height: canvas.height,
+            fit: "cover",
+          })
+          .blur(20)
+          .png()
+          .toBuffer();
 
   if (sample === null) {
     return background;
@@ -376,11 +406,13 @@ async function renderStaticBase(
     failOn: "warning",
     limitInputPixels: limits.maxOutputPixels,
   })
-    .composite([{
-      input: foreground,
-      top: sample.canvas.top,
-      left: sample.canvas.left,
-    }])
+    .composite([
+      {
+        input: foreground,
+        top: sample.canvas.top,
+        left: sample.canvas.left,
+      },
+    ])
     .png()
     .toBuffer();
 }
@@ -402,18 +434,20 @@ async function applyRegions(
         failOn: "warning",
         limitInputPixels: maxOutputPixels,
       })
-        .composite([{
-          input: {
-            create: {
-              width: rectangle.width,
-              height: rectangle.height,
-              channels: 4,
-              background: { r: 0, g: 0, b: 0, alpha: 1 },
+        .composite([
+          {
+            input: {
+              create: {
+                width: rectangle.width,
+                height: rectangle.height,
+                channels: 4,
+                background: { r: 0, g: 0, b: 0, alpha: 1 },
+              },
             },
+            top: rectangle.top,
+            left: rectangle.left,
           },
-          top: rectangle.top,
-          left: rectangle.left,
-        }])
+        ])
         .png()
         .toBuffer();
       continue;
@@ -431,11 +465,13 @@ async function applyRegions(
       failOn: "warning",
       limitInputPixels: maxOutputPixels,
     })
-      .composite([{
-        input: blurred,
-        top: rectangle.top,
-        left: rectangle.left,
-      }])
+      .composite([
+        {
+          input: blurred,
+          top: rectangle.top,
+          left: rectangle.left,
+        },
+      ])
       .png()
       .toBuffer();
   }
@@ -469,31 +505,37 @@ function validCanvasAndLimits(
   canvas: RenditionCanvas,
   limits: RenditionLimits,
 ): boolean {
-  return positiveSafeInteger(canvas.width)
-    && positiveSafeInteger(canvas.height)
-    && positiveSafeInteger(limits.maxInputPixels)
-    && positiveSafeInteger(limits.maxOutputPixels)
-    && positiveSafeInteger(limits.maxOutputBytes);
+  return (
+    positiveSafeInteger(canvas.width) &&
+    positiveSafeInteger(canvas.height) &&
+    positiveSafeInteger(limits.maxInputPixels) &&
+    positiveSafeInteger(limits.maxOutputPixels) &&
+    positiveSafeInteger(limits.maxOutputBytes)
+  );
 }
 
 function validEditorState(state: MediaEditorState): boolean {
-  return finite(state.transform.panX)
-    && finite(state.transform.panY)
-    && positiveFinite(state.transform.zoom)
-    && nonNegativeFinite(state.transform.contrast)
-    && nonNegativeFinite(state.transform.saturation)
-    && state.regions.every(validRegion);
+  return (
+    finite(state.transform.panX) &&
+    finite(state.transform.panY) &&
+    positiveFinite(state.transform.zoom) &&
+    nonNegativeFinite(state.transform.contrast) &&
+    nonNegativeFinite(state.transform.saturation) &&
+    state.regions.every(validRegion)
+  );
 }
 
 function validRegion(region: MediaEditorRegion): boolean {
-  return region.id.length > 0
-    && (region.mode === "blur" || region.mode === "redact")
-    && unit(region.x)
-    && unit(region.y)
-    && positiveUnit(region.width)
-    && positiveUnit(region.height)
-    && region.x + region.width <= 1
-    && region.y + region.height <= 1;
+  return (
+    region.id.length > 0 &&
+    (region.mode === "blur" || region.mode === "redact") &&
+    unit(region.x) &&
+    unit(region.y) &&
+    positiveUnit(region.width) &&
+    positiveUnit(region.height) &&
+    region.x + region.width <= 1 &&
+    region.y + region.height <= 1
+  );
 }
 
 function validBlurSigma(value: number): boolean {

@@ -1,0 +1,9 @@
+identity:
+  id: function:teacher-tools
+  name: teacher-tools
+  path: src/mcp/teacher-tools
+classification:
+  repository: blooket-api
+  domain: mcp
+architecture:
+  kind: adapter-inbound

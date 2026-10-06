@@ -6,6 +6,9 @@ overlapping_roles = "deny"
 spaces_in_paths = "deny"
 unknown_paths = "deny"
 
+[role.assets]
+paths = ["assets/"]
+
 [role.api]
 paths = ["src/api/"]
 
@@ -34,7 +37,8 @@ paths = ["src/platforms/"]
 paths = ["src/projects/"]
 
 [role.root_governance]
-paths = [".editorconfig", ".env.example", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE-MIT", "README.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
+# jig-ignore-next-line: Root governance is one exact TOML path array.
+paths = [".editorconfig", ".env.example", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE-MIT", "README.md", "THIRD-PARTY-NOTICES.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
 
 [role.security]
 paths = ["src/security/"]
@@ -47,3 +51,6 @@ paths = ["tests/"]
 
 [role.ui]
 paths = ["src/ui/"]
+
+[role.service]
+paths = ["src/service/"]

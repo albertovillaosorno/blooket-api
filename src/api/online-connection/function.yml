@@ -1,0 +1,9 @@
+identity:
+  id: function:online-connection
+  name: online-connection
+  path: src/api/online-connection
+classification:
+  repository: blooket-api
+  domain: api
+architecture:
+  kind: contract

@@ -1,0 +1,9 @@
+identity:
+  id: function:background-service
+  name: background-service
+  path: src/service/background-service
+classification:
+  repository: blooket-api
+  domain: service
+architecture:
+  kind: adapter-inbound

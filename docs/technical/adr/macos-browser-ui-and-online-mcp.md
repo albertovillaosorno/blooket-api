@@ -2,8 +2,10 @@
 
 ## Status
 
-Accepted product direction. Browser UI hosting, tunnel configuration, remote
-MCP, packaging, and first-run diagnostics are not yet implemented.
+Accepted product direction; partially implemented as of 2026-10-06. The local
+browser UI/API, development tunnel, OAuth/PKCE MCP gateway, and lightweight
+diagnostics exist. Packaging, actual ChatGPT acceptance, macOS verification, and
+complete Blooket publication remain pending; see `TODO.md`.
 
 This decision replaces the initial native-desktop-first presentation plan, Linux
 product test baseline, and deferred remote-relay scope. Existing portable
@@ -147,14 +149,35 @@ seen in the older capture, but matching IDs do not establish a durable API. The
 runtime implementation constructs a POST to the current route with `Next-Action`
 and encoded Flight arguments rather than a discovered public REST CRUD route.
 
-No create/edit action was invoked and no quiz was changed. A read attempt on the
-observed Unsplash search route was blocked by the browser client; no JSON
-response contract was recovered from that attempt. No usable beta quiz API was
-verified; absence of evidence is not evidence that no other service exists.
+During this initial inspection no create/edit action was invoked and no quiz was
+changed. A read attempt on the observed Unsplash search route was blocked by the
+browser client; no JSON response contract was recovered from that attempt. No
+usable beta quiz API was verified; absence of evidence is not evidence that no
+other service exists.
 
 Candidate HTTP operations still need authenticated payload/response validation
 and explicit mutation confirmation. A failed or timed-out primary mutation does
 not permit automatic browser fallback without reconciliation.
+
+### Development verification on 2026-10-06
+
+The user-configured development tunnel passed OAuth/PKCE with local consent, MCP
+initialization/tool discovery, and a read through the canonical CLI using a
+synthetic client. Public requests to local UI/settings routes returned 404;
+unauthorized MCP requests returned 401. This does not establish actual ChatGPT
+compatibility or a completed security review.
+
+A private one-question quiz was subsequently created through the authorized
+Blooket UI. Its question was changed to typing with a 15-second limit and the
+change persisted after reload. Multipart create/add/update request fields were
+observed, but the action response body was not recovered and application-driven
+publication remains unimplemented.
+
+The user prefers additional owner-password verification during local connection
+approval. Preserve OAuth/PKCE and review client/redirect identity, scopes,
+revocation, and phishing behavior; a password alone does not establish client
+identity. `MCP_PASSWORD` is not yet consumed or enforced. Track implementation
+and actual-client verification in `TODO.md`.
 
 ## Consequences
 

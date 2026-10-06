@@ -1,0 +1,9 @@
+identity:
+  id: function:user-storage
+  name: user-storage
+  path: src/platforms/user-storage
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

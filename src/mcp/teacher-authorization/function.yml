@@ -1,0 +1,9 @@
+identity:
+  id: function:teacher-authorization
+  name: teacher-authorization
+  path: src/mcp/teacher-authorization
+classification:
+  repository: blooket-api
+  domain: mcp
+architecture:
+  kind: adapter-inbound

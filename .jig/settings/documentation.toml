@@ -1,7 +1,7 @@
 domain = "documentation"
 schema_version = 1
 paragraph_sentence_limit = 4
-path_style = "lower-kebab"
+path_style = "repository"
 required_paths = []
 roots = ["docs/"]
 
@@ -14,3 +14,10 @@ kind = "adr"
 paths = ["docs/technical/adr/"]
 section_mode = "exact"
 sections = ["Status", "Decision ID", "Context", "Decision", "Consequences", "Rejected Alternatives", "Verification"]
+
+[profile.agent-instructions]
+kind = "adr"
+paths = ["docs/agents/"]
+decision_id = "none"
+section_mode = "required"
+sections = []
