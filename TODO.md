@@ -92,12 +92,12 @@ is not returned.
 
 Skill text remains guidance and cannot broaden access.
 
-### TODO 02 - Establish a clean validation baseline
+### DONE 02 - Establish a clean validation baseline
 
 The implementation originated as working-tree changes on the committed baseline
-`7f237b3`. Preserve and review the complete change set, then make the previously
-requested DCO-signed commit once its checks are ready. Do not bypass hooks or
-force-add private references, `.env`, or `.temp/`.
+`7f237b3` and was reviewed and committed with DCO signoff as `3247ac9`. The
+commit hook was not bypassed, and private references, `.env`, and `.temp/` were
+not staged.
 
 `jig check --root .` is not green only because of the pre-existing
 `JIG-RULE-GAP-001` described below. Introduced text-width, documentation,
@@ -112,10 +112,10 @@ external Jig 26.3.0 at `~/.local/bin/jig`. Do not weaken repository rules to
 hide this validator evidence gap. The canonical dependencies remain intact under
 `.dependencies/`.
 
-Repair inaccurate copied boundary headers in the two new Blooket HTTP/Flight
-candidate modules and review the other newly authored boundary descriptions.
-Include browser JavaScript in appropriate static validation; current strict
-TypeScript compilation does not cover `app.js`.
+The Blooket HTTP/Flight candidate headers and other new boundary descriptions
+were reviewed and corrected. Browser JavaScript receives an explicit
+`node --check` validation because strict TypeScript compilation does not cover
+`app.js`.
 
 The installed pnpm launcher remains an external workstation issue: the launcher
 under the user's pnpm home tries to execute the repository store's pnpm ELF
@@ -125,10 +125,11 @@ repository-owned TypeScript compiler work normally. Fresh validation passes 485
 portable tests plus strict TypeScript and `node --check` for the browser script;
 these do not establish unfinished macOS behavior.
 
-Complete when introduced validation failures are repaired, remaining external or
-pre-existing blockers have reproducible evidence, and the reviewed changes have
-the authorized DCO-signed commit. Record the checks actually run; do not claim a
-green repository while Jig is failing.
+Completed on 2026-10-06 with commit `3247ac9`. Strict TypeScript,
+`node --check src/ui/teacher-workspace/adapter-inbound/app.js`, and all 485
+portable tests pass on the committed HEAD. Jig configuration is valid and every
+introduced finding is repaired; Jig itself remains non-green only for the
+external `JIG-RULE-GAP-001` evidence gap documented above.
 
 ### TODO 03 - Finish settings and the development configuration contract
 
