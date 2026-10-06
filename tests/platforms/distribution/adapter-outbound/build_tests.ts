@@ -92,9 +92,18 @@ test("release invokes the single CI workflow and publishes only last",
   const commands = release.jobs.packages.steps.flatMap(
     (step: { run?: string }) => (step.run ? [step.run] : []),
   );
-  assert.ok(commands.includes('npm run package:verify -- "$PACKAGE_TARGET"'));
+  const packageVerify = commands.find((command: string) =>
+    command.includes("npm run package:verify"),
+  );
+  assert.equal(
+    commands.filter((command: string) => command.includes("package:verify")).length,
+    1,
+  );
+  assert.ok(packageVerify?.includes('npm run package:verify -- "$PACKAGE_TARGET"'));
   assert.ok(
-    commands.includes('npm run package:verify -- "$PACKAGE_TARGET" --release'),
+    packageVerify?.includes(
+      'npm run package:verify -- "$PACKAGE_TARGET" --release',
+    ),
   );
   for (const value of [ci, release]) {
     const visit = (node: unknown): void => {
