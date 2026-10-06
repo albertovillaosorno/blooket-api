@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-write-submissions
+  name: blooket-write-submissions
+  path: src/ir/blooket-write-submissions
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract
