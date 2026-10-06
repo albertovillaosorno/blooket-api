@@ -96,10 +96,14 @@ test("release invokes the single CI workflow and publishes only last",
     command.includes("npm run package:verify"),
   );
   assert.equal(
-    commands.filter((command: string) => command.includes("package:verify")).length,
+    commands.filter((command: string) =>
+      command.includes("package:verify"),
+    ).length,
     1,
   );
-  assert.ok(packageVerify?.includes('npm run package:verify -- "$PACKAGE_TARGET"'));
+  assert.ok(
+    packageVerify?.includes('npm run package:verify -- "$PACKAGE_TARGET"'),
+  );
   assert.ok(
     packageVerify?.includes(
       'npm run package:verify -- "$PACKAGE_TARGET" --release',
