@@ -41,8 +41,10 @@ import {
   nextBlooketWriteOperation,
   type BlooketWriteCheckpoint,
 } from "../../../projects/blooket-write-plans/domain/checkpoint.ts";
-import type { BlooketWritePlan } from
-  "../../../projects/blooket-write-plans/domain/write-plan.ts";
+import type {
+  BlooketWriteOperation,
+  BlooketWritePlan,
+} from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import {
@@ -120,6 +122,21 @@ export type ExecuteNextBlooketWriteResult =
         | "blooket-write-not-confirmed";
     };
 
+export type PrepareNextBlooketWriteResult =
+  | Exclude<
+      ExecuteNextBlooketWriteResult,
+      {
+        readonly ok: true;
+        readonly kind: "advanced";
+      }
+    >
+  | {
+      readonly ok: true;
+      readonly kind: "ready";
+      readonly checkpoint: BlooketWriteCheckpoint;
+      readonly operation: BlooketWriteOperation;
+    };
+
 export async function executeNextBlooketWrite(
   plan: BlooketWritePlan,
   checkpointCandidate: unknown,
@@ -127,6 +144,34 @@ export async function executeNextBlooketWrite(
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
 ): Promise<ExecuteNextBlooketWriteResult> {
+  const prepared = await prepareNextBlooketWrite(
+    plan,
+    checkpointCandidate,
+    browser,
+    secrets,
+  );
+  if (!prepared.ok || prepared.kind !== "ready") {
+    return prepared;
+  }
+
+  const attempted = await attemptBlooketWrite(
+    writes,
+    prepared.operation,
+  );
+  return completeBlooketWriteAttempt(
+    plan,
+    prepared.checkpoint,
+    prepared.operation,
+    attempted,
+  );
+}
+
+export async function prepareNextBlooketWrite(
+  plan: BlooketWritePlan,
+  checkpointCandidate: unknown,
+  browser: BlooketBrowserSessionPort,
+  secrets: HostSecretStore,
+): Promise<PrepareNextBlooketWriteResult> {
   const decodedCheckpoint = decodeBlooketWriteCheckpoint(
     checkpointCandidate,
     plan,
@@ -177,12 +222,32 @@ export async function executeNextBlooketWrite(
     };
   }
 
-  const attempted = await safeExecute(writes, next.operation);
+  return {
+    ok: true,
+    kind: "ready",
+    checkpoint,
+    operation: next.operation,
+  };
+}
+
+export async function attemptBlooketWrite(
+  writes: BlooketWriteExecutionPort,
+  operation: BlooketWriteOperation,
+): Promise<BlooketWriteAttemptResult> {
+  return await safeExecute(writes, operation);
+}
+
+export function completeBlooketWriteAttempt(
+  plan: BlooketWritePlan,
+  checkpoint: BlooketWriteCheckpoint,
+  operation: BlooketWriteOperation,
+  attempted: BlooketWriteAttemptResult,
+): ExecuteNextBlooketWriteResult {
   if (attempted.ok) {
     const advanced = advanceBlooketWriteCheckpoint(
       plan,
       checkpoint,
-      next.operation.operationId,
+      operation.operationId,
     );
     if (!advanced.ok) {
       return {
@@ -194,7 +259,7 @@ export async function executeNextBlooketWrite(
     return {
       ok: true,
       kind: "advanced",
-      operationId: next.operation.operationId,
+      operationId: operation.operationId,
       checkpoint: advanced.value,
     };
   }

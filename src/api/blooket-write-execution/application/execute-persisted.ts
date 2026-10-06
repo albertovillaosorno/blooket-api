@@ -9,51 +9,73 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Load/execute/persist composition for one resumable Blooket write step.
+//   - Journaled one-step execution for a resumable Blooket write plan.
 // - Must-Not:
-//   - Loop, auto-retry confirmed writes, or hide post-write
-//     persistence failure.
+//   - Loop, auto-retry, infer ambiguous success, or choose persistence paths.
 // - Allows:
-//   - Inputs: Trusted checkpoint path plus one plan and execution dependencies.
-//   - Outputs: One-step execution results or explicit recovery-required
-//     failure.
-//   - Side effects: Checkpoint reads/writes and at most one remote write
-//     attempt.
+//   - Inputs: Trusted checkpoint/journal paths, plan, and execution
+//     dependencies.
+//   - Outputs: Durable advancement, explicit recovery, or stable failures.
+//   - Side effects: Local recovery plus at most one journaled remote write.
 // - Split-When:
-//   - Crash-intent journaling requires an independently versioned workflow.
+//   - Pacing or provider reconciliation becomes independently versioned.
 // - Merge-When:
-//   - Write execution and checkpoint persistence become one lower-level port.
+//   - Remote and local progress become one transactional provider primitive.
 // - Summary:
-//   - Persists confirmed progress before reporting an advanced write as
-//     durable.
+//   - Journals the exact mutation window before persisting confirmed progress.
 // - Description:
-//   - Post-confirmation save failure is never classified as safe to retry.
+//   - Recovery precedes browser work; ambiguous attempts block future writes.
 // - Usage:
-//   - Prefer this composition when local resumability is required.
+//   - Supply trusted sibling or otherwise owned checkpoint and journal paths.
 // - Defaults:
-//   - Missing checkpoint files begin at operation index zero.
+//   - No retry or pacing delay is guessed.
 //
+import { tryAcquireFileLock } from
+  "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
+import {
+  beginWriteAttempt,
+  clearWriteAttempt,
+  confirmWriteAttempt,
+  type WriteAttemptFileMutationResult,
+  type WriteAttemptRecord,
+} from
+  "../../../platforms/write-attempt-files/adapter-outbound/file.ts";
+import {
+  saveWriteCheckpointFile,
+  type WriteCheckpointFileSaveResult,
+} from
+  "../../../platforms/write-checkpoint-files/adapter-outbound/file.ts";
+import type { BlooketWriteCheckpoint } from
+  "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
-import {
-  loadWriteCheckpointFile,
-  saveWriteCheckpointFile,
-  type WriteCheckpointFileLoadResult,
-  type WriteCheckpointFileSaveResult,
-} from
-  "../../../platforms/write-checkpoint-files/adapter-outbound/file.ts";
 import type { BlooketBrowserSessionPort } from
   "../../blooket-session/contract/browser-session.ts";
 import {
-  executeNextBlooketWrite,
+  attemptBlooketWrite,
+  completeBlooketWriteAttempt,
+  prepareNextBlooketWrite,
   type ExecuteNextBlooketWriteResult,
+  type PrepareNextBlooketWriteResult,
 } from "./execute-next.ts";
+import {
+  recoverPersistedBlooketWrite,
+  type RecoverPersistedBlooketWriteResult,
+} from "./recover-persisted.ts";
 import type { BlooketWriteExecutionPort } from
   "../contract/write-execution.ts";
 
-type ExecuteNonAdvanced = Exclude<
+type PrepareTerminal = Exclude<
+  PrepareNextBlooketWriteResult,
+  {
+    readonly ok: true;
+    readonly kind: "ready";
+  }
+>;
+
+type AdvancedWrite = Extract<
   ExecuteNextBlooketWriteResult,
   {
     readonly ok: true;
@@ -61,88 +83,279 @@ type ExecuteNonAdvanced = Exclude<
   }
 >;
 
+type RecoveryTerminal = Extract<
+  RecoverPersistedBlooketWriteResult,
+  {
+    readonly ok: true;
+    readonly kind: "recovered" | "reconciliation-required";
+  }
+>;
+
+type RecoveryFailure = Extract<
+  RecoverPersistedBlooketWriteResult,
+  { readonly ok: false }
+>;
+
+export interface BlooketWritePersistencePaths {
+  readonly checkpoint: string;
+  readonly attempt: string;
+  readonly executionLock: string;
+}
+
 export type ExecutePersistedBlooketWriteResult =
-  | ExecuteNonAdvanced
-  | Extract<
-      ExecuteNextBlooketWriteResult,
-      {
-        readonly ok: true;
-        readonly kind: "advanced";
-      }
-    >
+  | PrepareTerminal
+  | AdvancedWrite
+  | RecoveryTerminal
+  | RecoveryFailure
+  | {
+      readonly ok: true;
+      readonly kind: "reconciliation-required";
+      readonly reason: "write-not-confirmed";
+      readonly attempt: WriteAttemptRecord;
+      readonly checkpoint: BlooketWriteCheckpoint;
+      readonly outcome: ExecuteNextBlooketWriteResult;
+    }
   | {
       readonly ok: false;
-      readonly stage: "checkpoint-load";
-      readonly code: "checkpoint-load-failed";
+      readonly stage: "attempt-begin";
+      readonly code: "write-attempt-not-started";
       readonly cause: Exclude<
-        WriteCheckpointFileLoadResult,
+        WriteAttemptFileMutationResult,
         { readonly ok: true }
       >;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "attempt-confirm-after-confirmed-write";
+      readonly code: "confirmed-write-not-journaled";
+      readonly operationId: string;
+      readonly cause: Exclude<
+        WriteAttemptFileMutationResult,
+        { readonly ok: true }
+      >;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "checkpoint-after-confirmed-write";
+      readonly code: "confirmed-write-checkpoint-invariant";
+      readonly operationId: string;
     }
   | {
       readonly ok: false;
       readonly stage: "checkpoint-save-after-confirmed-write";
       readonly code: "confirmed-write-not-persisted";
       readonly operationId: string;
-      readonly checkpoint: Extract<
-        ExecuteNextBlooketWriteResult,
-        {
-          readonly ok: true;
-          readonly kind: "advanced";
-        }
-      >["checkpoint"];
+      readonly checkpoint: BlooketWriteCheckpoint;
       readonly cause: Exclude<
         WriteCheckpointFileSaveResult,
         { readonly ok: true }
       >;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "attempt-cleanup-after-checkpoint";
+      readonly code: "confirmed-write-journal-not-cleared";
+      readonly operationId: string;
+      readonly checkpoint: BlooketWriteCheckpoint;
+      readonly cause: Exclude<
+        WriteAttemptFileMutationResult,
+        { readonly ok: true }
+      >;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "execution-lock";
+      readonly code:
+        | "write-execution-locked"
+        | "write-execution-lock-unsafe"
+        | "write-execution-lock-failed";
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "execution-lock-release";
+      readonly code: "write-execution-lock-release-failed";
     };
 
 export async function executePersistedBlooketWrite(
-  checkpointPath: string,
+  paths: BlooketWritePersistencePaths,
   plan: BlooketWritePlan,
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
 ): Promise<ExecutePersistedBlooketWriteResult> {
-  const loaded = await loadWriteCheckpointFile(
-    checkpointPath,
-    plan,
-  );
-  if (!loaded.ok) {
+  const acquired = await tryAcquireFileLock(paths.executionLock);
+  if (!acquired.ok) {
     return {
       ok: false,
-      stage: "checkpoint-load",
-      code: "checkpoint-load-failed",
-      cause: loaded,
+      stage: "execution-lock",
+      code: acquired.reason === "busy"
+        ? "write-execution-locked"
+        : acquired.reason === "unsafe"
+          ? "write-execution-lock-unsafe"
+          : "write-execution-lock-failed",
     };
   }
 
-  const executed = await executeNextBlooketWrite(
+  let result: ExecutePersistedBlooketWriteResult;
+  let unexpected: unknown;
+  try {
+    result = await executePersistedBlooketWriteLocked(
+      paths,
+      plan,
+      browser,
+      secrets,
+      writes,
+    );
+  } catch (error: unknown) {
+    unexpected = error;
+    result = {
+      ok: false,
+      stage: "execution-lock",
+      code: "write-execution-lock-failed",
+    };
+  }
+
+  try {
+    await acquired.lock.release();
+  } catch {
+    return {
+      ok: false,
+      stage: "execution-lock-release",
+      code: "write-execution-lock-release-failed",
+    };
+  }
+
+  if (unexpected !== undefined) {
+    throw unexpected;
+  }
+  return result;
+}
+
+async function executePersistedBlooketWriteLocked(
+  paths: BlooketWritePersistencePaths,
+  plan: BlooketWritePlan,
+  browser: BlooketBrowserSessionPort,
+  secrets: HostSecretStore,
+  writes: BlooketWriteExecutionPort,
+): Promise<ExecutePersistedBlooketWriteResult> {
+  const recovery = await recoverPersistedBlooketWrite(
+    paths.checkpoint,
+    paths.attempt,
     plan,
-    loaded.checkpoint,
+  );
+  if (!recovery.ok || recovery.kind !== "ready") {
+    return recovery;
+  }
+
+  const prepared = await prepareNextBlooketWrite(
+    plan,
+    recovery.checkpoint,
     browser,
     secrets,
-    writes,
   );
-  if (!executed.ok || executed.kind !== "advanced") {
-    return executed;
+  if (!prepared.ok || prepared.kind !== "ready") {
+    return prepared;
+  }
+
+  const begun = await beginWriteAttempt(
+    paths.attempt,
+    plan,
+    prepared.checkpoint.nextOperationIndex,
+  );
+  if (!begun.ok) {
+    return {
+      ok: false,
+      stage: "attempt-begin",
+      code: "write-attempt-not-started",
+      cause: begun,
+    };
+  }
+  if (begun.record === undefined) {
+    return {
+      ok: false,
+      stage: "attempt-begin",
+      code: "write-attempt-not-started",
+      cause: {
+        ok: false,
+        kind: "io",
+        code: "write-attempt-write-failed",
+      },
+    };
+  }
+
+  const attempted = await attemptBlooketWrite(
+    writes,
+    prepared.operation,
+  );
+  const completed = completeBlooketWriteAttempt(
+    plan,
+    prepared.checkpoint,
+    prepared.operation,
+    attempted,
+  );
+
+  if (!attempted.ok) {
+    return {
+      ok: true,
+      kind: "reconciliation-required",
+      reason: "write-not-confirmed",
+      attempt: begun.record,
+      checkpoint: prepared.checkpoint,
+      outcome: completed,
+    };
+  }
+
+  const confirmed = await confirmWriteAttempt(
+    paths.attempt,
+    plan,
+    prepared.operation.operationId,
+  );
+  if (!confirmed.ok) {
+    return {
+      ok: false,
+      stage: "attempt-confirm-after-confirmed-write",
+      code: "confirmed-write-not-journaled",
+      operationId: prepared.operation.operationId,
+      cause: confirmed,
+    };
+  }
+
+  if (!completed.ok || completed.kind !== "advanced") {
+    return {
+      ok: false,
+      stage: "checkpoint-after-confirmed-write",
+      code: "confirmed-write-checkpoint-invariant",
+      operationId: prepared.operation.operationId,
+    };
   }
 
   const saved = await saveWriteCheckpointFile(
-    checkpointPath,
+    paths.checkpoint,
     plan,
-    executed.checkpoint,
+    completed.checkpoint,
   );
   if (!saved.ok) {
     return {
       ok: false,
       stage: "checkpoint-save-after-confirmed-write",
       code: "confirmed-write-not-persisted",
-      operationId: executed.operationId,
-      checkpoint: executed.checkpoint,
+      operationId: completed.operationId,
+      checkpoint: completed.checkpoint,
       cause: saved,
     };
   }
 
-  return executed;
+  const cleared = await clearWriteAttempt(paths.attempt, plan);
+  if (!cleared.ok) {
+    return {
+      ok: false,
+      stage: "attempt-cleanup-after-checkpoint",
+      code: "confirmed-write-journal-not-cleared",
+      operationId: completed.operationId,
+      checkpoint: completed.checkpoint,
+      cause: cleared,
+    };
+  }
+
+  return completed;
 }

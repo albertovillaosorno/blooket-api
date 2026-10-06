@@ -34,6 +34,7 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -50,6 +51,8 @@ import type {
   BlooketWriteExecutionPort,
 } from
   "../../../../src/api/blooket-write-execution/contract/write-execution.ts";
+import { loadWriteAttemptFile } from
+  "../../../../src/platforms/write-attempt-files/adapter-outbound/file.ts";
 import { tryAcquireFileLock } from
   "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 import type { FileLock } from
@@ -136,17 +139,38 @@ async function withTemporaryDirectory(
   }
 }
 
+function persistence(path: string) {
+  return {
+    checkpoint: path,
+    attempt: path + ".attempt",
+    executionLock: path + ".execution.lock",
+  };
+}
+
 test("confirmed writes persist before advanced success returns", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
     const writeCalls: string[] = [];
 
+    const attemptPath = path + ".attempt";
+    const browserCalls: string[] = [];
     const result = await executePersistedBlooketWrite(
-      path,
+      {
+        ...persistence(path),
+        attempt: attemptPath,
+      },
       plan,
-      browser([]),
+      browser(browserCalls),
       secrets(),
-      writes({ ok: true }, writeCalls),
+      writes({ ok: true }, writeCalls, async () => {
+        assert.deepEqual(browserCalls, ["observe"]);
+        const attempt = await loadWriteAttemptFile(attemptPath, plan);
+        assert.equal(attempt.ok, true);
+        if (attempt.ok && attempt.kind === "record") {
+          assert.equal(attempt.record.phase, "attempting");
+          assert.equal(attempt.record.operationIndex, 0);
+        }
+      }),
     );
 
     assert.deepEqual(result, {
@@ -166,6 +190,10 @@ test("confirmed writes persist before advanced success returns", async () => {
         : null,
     );
     assert.deepEqual(writeCalls, ["plan:persisted-test:set"]);
+    assert.deepEqual(
+      await loadWriteAttemptFile(attemptPath, plan),
+      { ok: true, kind: "missing" },
+    );
   });
 });
 
@@ -180,7 +208,7 @@ test("persisted progress resumes at the exact next operation", async () => {
     const writeCalls: string[] = [];
 
     const result = await executePersistedBlooketWrite(
-      path,
+      persistence(path),
       plan,
       browser([]),
       secrets(),
@@ -205,7 +233,7 @@ test(
     const writeCalls: string[] = [];
 
     const result = await executePersistedBlooketWrite(
-      path,
+      persistence(path),
       plan,
       browser(browserCalls),
       secrets(),
@@ -228,7 +256,7 @@ test(
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
     const result = await executePersistedBlooketWrite(
-      path,
+      persistence(path),
       plan,
       browser([]),
       secrets(),
@@ -241,9 +269,41 @@ test(
 
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.equal(result.kind, "wait");
+      assert.equal(result.kind, "reconciliation-required");
+      if (result.kind === "reconciliation-required") {
+        assert.equal(result.reason, "write-not-confirmed");
+        assert.equal(result.attempt.phase, "attempting");
+        assert.equal(result.outcome.ok, true);
+        if (result.outcome.ok) {
+          assert.equal(result.outcome.kind, "wait");
+        }
+      }
     }
     await assert.rejects(readFile(path, "utf8"));
+    const attempt = await loadWriteAttemptFile(path + ".attempt", plan);
+    assert.equal(attempt.ok, true);
+    if (attempt.ok && attempt.kind === "record") {
+      assert.equal(attempt.record.phase, "attempting");
+    }
+
+    const browserCalls: string[] = [];
+    const writeCalls: string[] = [];
+    const resumed = await executePersistedBlooketWrite(
+      persistence(path),
+      plan,
+      browser(browserCalls),
+      secrets(),
+      writes({ ok: true }, writeCalls),
+    );
+    assert.equal(resumed.ok, true);
+    if (resumed.ok) {
+      assert.equal(resumed.kind, "reconciliation-required");
+      if (resumed.kind === "reconciliation-required") {
+        assert.equal(resumed.reason, "ambiguous-attempt");
+      }
+    }
+    assert.deepEqual(browserCalls, []);
+    assert.deepEqual(writeCalls, []);
   });
   },
 );
@@ -255,7 +315,7 @@ test(
       const path = join(directory, "checkpoint.json");
       let heldLock: FileLock | undefined;
       const result = await executePersistedBlooketWrite(
-        path,
+        persistence(path),
         plan,
         browser([]),
         secrets(),
@@ -288,7 +348,197 @@ test(
         }
       }
       await assert.rejects(readFile(path, "utf8"));
+      const attempt = await loadWriteAttemptFile(path + ".attempt", plan);
+      assert.equal(attempt.ok, true);
+      if (attempt.ok && attempt.kind === "record") {
+        assert.equal(attempt.record.phase, "confirmed");
+      }
+
       await heldLock?.release();
+
+      const writeCalls: string[] = [];
+      const recovered = await executePersistedBlooketWrite(
+        persistence(path),
+        plan,
+        browser([]),
+        secrets(),
+        writes({ ok: true }, writeCalls),
+      );
+      assert.equal(recovered.ok, true);
+      if (recovered.ok) {
+        assert.equal(recovered.kind, "recovered");
+      }
+      assert.deepEqual(writeCalls, []);
+      assert.deepEqual(
+        JSON.parse(await readFile(path, "utf8")),
+        {
+          schemaVersion: 1,
+          planId: plan.planId,
+          nextOperationIndex: 1,
+        },
+      );
+      assert.deepEqual(
+        await loadWriteAttemptFile(path + ".attempt", plan),
+        { ok: true, kind: "missing" },
+      );
     });
   },
 );
+
+test("execution lock prevents stale concurrent duplicate writes", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const persistencePaths = persistence(path);
+    const firstBrowserCalls: string[] = [];
+    const firstWriteCalls: string[] = [];
+    const secondBrowserCalls: string[] = [];
+    const secondWriteCalls: string[] = [];
+
+    let markEntered = () => {};
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    let releaseWrite = () => {};
+    const holdWrite = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+
+    const first = executePersistedBlooketWrite(
+      persistencePaths,
+      plan,
+      browser(firstBrowserCalls),
+      secrets(),
+      {
+        execute: async (operation) => {
+          firstWriteCalls.push(operation.operationId);
+          markEntered();
+          await holdWrite;
+          return { ok: true };
+        },
+      },
+    );
+
+    await entered;
+
+    const second = await executePersistedBlooketWrite(
+      persistencePaths,
+      plan,
+      browser(secondBrowserCalls),
+      secrets(),
+      writes({ ok: true }, secondWriteCalls),
+    );
+
+    assert.deepEqual(second, {
+      ok: false,
+      stage: "execution-lock",
+      code: "write-execution-locked",
+    });
+    assert.deepEqual(secondBrowserCalls, []);
+    assert.deepEqual(secondWriteCalls, []);
+
+    releaseWrite();
+    const firstResult = await first;
+    assert.equal(firstResult.ok, true);
+    if (firstResult.ok) {
+      assert.equal(firstResult.kind, "advanced");
+    }
+    assert.deepEqual(firstBrowserCalls, ["observe"]);
+    assert.deepEqual(
+      firstWriteCalls,
+      ["plan:persisted-test:set"],
+    );
+    assert.deepEqual(
+      JSON.parse(await readFile(path, "utf8")),
+      {
+        schemaVersion: 1,
+        planId: plan.planId,
+        nextOperationIndex: 1,
+      },
+    );
+  });
+});
+
+test("session stop states never create an attempt journal", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const browserCalls: string[] = [];
+    const writeCalls: string[] = [];
+    const stoppedBrowser: BlooketBrowserSessionPort = {
+      observe: async () => {
+        browserCalls.push("observe");
+        return { ok: true, state: "rate-limited" };
+      },
+      authenticate: async () => {
+        browserCalls.push("authenticate");
+        return { ok: true };
+      },
+    };
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      stoppedBrowser,
+      secrets(),
+      writes({ ok: true }, writeCalls),
+    );
+
+    assert.deepEqual(result, {
+      ok: true,
+      kind: "wait",
+      state: "rate-limited",
+      checkpoint: {
+        schemaVersion: 1,
+        planId: plan.planId,
+        nextOperationIndex: 0,
+      },
+    });
+    assert.deepEqual(browserCalls, ["observe"]);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
+test("journal confirmation failure blocks checkpoint persistence", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const outside = join(directory, "outside.json");
+    await writeFile(outside, "{}");
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes({ ok: true }, [], async () => {
+        await rm(paths.attempt);
+        await symlink(outside, paths.attempt);
+      }),
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(
+        result.stage,
+        "attempt-confirm-after-confirmed-write",
+      );
+      if (
+        result.stage
+        === "attempt-confirm-after-confirmed-write"
+      ) {
+        assert.equal(result.code, "confirmed-write-not-journaled");
+        assert.equal(result.operationId, "plan:persisted-test:set");
+        assert.deepEqual(result.cause, {
+          ok: false,
+          kind: "io",
+          code: "write-attempt-file-unsafe",
+        });
+      }
+    }
+    await assert.rejects(readFile(path, "utf8"));
+  });
+});
