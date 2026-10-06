@@ -471,10 +471,11 @@ reproduces the pre-write collection. Unchanged state is `not-confirmed`; media
 writes, concurrent edits, malformed reads, and ambiguous additions remain
 `inconclusive`.
 
-All 552 portable tests, strict TypeScript, and browser-script syntax pass after
-this read/reconciliation work. The concrete browser/extension extractor is
-still missing, so this does not complete task 08 or claim live question
-read-back.
+The local browser bridge now has a versioned request/response contract, bounded
+in-memory broker, bearer-authenticated loopback routes, and API adapters for
+session, capability, set, and question reads. The concrete WebExtension worker,
+page extractor, and service composition are still missing, so this does not
+complete task 08 or claim live question read-back.
 
 Complete when fresh validated remote state can be read reliably, capability
 changes are detected, and a missing/challenged session returns the appropriate

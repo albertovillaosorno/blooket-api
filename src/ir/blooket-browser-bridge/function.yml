@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-browser-bridge
+  name: blooket-browser-bridge
+  path: src/ir/blooket-browser-bridge
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

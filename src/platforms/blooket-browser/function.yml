@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-browser
+  name: blooket-browser
+  path: src/platforms/blooket-browser
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
