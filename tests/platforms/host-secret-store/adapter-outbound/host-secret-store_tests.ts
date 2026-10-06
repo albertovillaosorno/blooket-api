@@ -264,6 +264,56 @@ test("command infrastructure failures become stable store codes", async () => {
   );
 });
 
+test(
+  "stored envelopes require canonical base64url and exact UTF-8",
+  async () => {
+  const padded = STORED + "=";
+  const invalidUtf8 = "v1."
+    + Buffer.from([0xff]).toString("base64url");
+  const newline = Buffer.from([0x0a]).toString("utf8");
+  const doubledNewline = STORED + newline + newline;
+
+  for (const stored of [padded, invalidUtf8, doubledNewline]) {
+    const fake = fakeRunner([result(0, stored)]);
+    assert.deepEqual(
+      await readHostSecret("blooket-password", {
+        platform: "linux",
+        runner: fake.run,
+      }),
+      { ok: false, code: "host-secret-data-invalid" },
+    );
+  }
+  },
+);
+
+test("stored envelopes accept one platform line ending", async () => {
+  const lineEndings = [
+    Buffer.from([0x0a]).toString("utf8"),
+    Buffer.from([0x0d, 0x0a]).toString("utf8"),
+  ];
+  for (const ending of lineEndings) {
+    const fake = fakeRunner([result(0, STORED + ending)]);
+    assert.deepEqual(
+      await readHostSecret("blooket-password", {
+        platform: "linux",
+        runner: fake.run,
+      }),
+      { ok: true, kind: "found", secret: SECRET },
+    );
+  }
+});
+
+test("Linux delete errors are not mistaken for missing secrets", async () => {
+  const fake = fakeRunner([result(1, "", 9)]);
+  assert.deepEqual(
+    await deleteHostSecret("blooket-password", {
+      platform: "linux",
+      runner: fake.run,
+    }),
+    { ok: false, code: "host-secret-store-failed" },
+  );
+});
+
 test("invalid stored payloads never become caller secrets", async () => {
   const fake = fakeRunner([result(0, "not-our-data\n")]);
   assert.deepEqual(
