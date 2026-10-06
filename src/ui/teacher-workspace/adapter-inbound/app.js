@@ -1,6 +1,17 @@
 const words = {
   es: {
     library: "Biblioteca",
+    migrateLibrary: "Importar la biblioteca anterior",
+    migrationConfirm:
+      "Importar los archivos anteriores de esta carpeta? " +
+      "Se conservarán los originales y una copia del índice.",
+    renameImage: "Cambiar nombre o carpeta",
+    renameHelp: "El ID, los textos y los bytes de la imagen se conservan.",
+    relativeFilename: "Nombre con extensión, o carpeta/nombre con extensión",
+    invalidFilename: "Usa una ruta relativa y conserva el formato de imagen.",
+    recoveryRequired:
+      "Hay una transferencia pendiente. Reinicia el servicio " +
+      "para recuperar su registro antes de continuar.",
     retryOnline: "Reconectar",
     connectionRequests: "Conexiones de IA",
     consentHelp:
@@ -133,6 +144,17 @@ const words = {
   },
   en: {
     library: "Library",
+    migrateLibrary: "Import the previous library",
+    migrationConfirm:
+      "Import previous files from this folder? " +
+      "Original files and a copy of the index will be preserved.",
+    renameImage: "Change filename or folder",
+    renameHelp: "The image ID, text and source bytes are preserved.",
+    relativeFilename: "Filename with extension, or folder/filename",
+    invalidFilename: "Use a relative path and keep the actual image format.",
+    recoveryRequired:
+      "A transfer is pending. Restart the service to recover " +
+      "its journal before continuing.",
     retryOnline: "Reconnect",
     connectionRequests: "AI connections",
     consentHelp:
@@ -299,6 +321,9 @@ function report(error) {
     "rendition-pixel-limit-exceeded": "tooLarge",
     "revision-conflict": "conflict",
     "filename-already-exists": "collision",
+    "invalid-user-filename": "invalidFilename",
+    "filename-format-mismatch": "invalidFilename",
+    "library-recovery-required": "recoveryRequired",
     "folder-picker-macos-only": "folderMac",
   };
   toast(t(messages[error.message] ?? "operationFailed"));
@@ -336,7 +361,50 @@ async function command(name, payload) {
 async function refresh() {
   records = await api("/api/media");
   renderGallery();
+  const status = await api("/api/library-status");
+  $("#migrateLibrary").hidden = !status.legacyAvailable;
 }
+$("#migrateLibrary").addEventListener("click", async () => {
+  if (!window.confirm(t("migrationConfirm"))) return;
+  const button = $("#migrateLibrary");
+  button.disabled = true;
+  try {
+    await api("/api/library-migrate", { confirm: true });
+    await refresh();
+  } catch (error) {
+    report(error);
+  } finally {
+    button.disabled = false;
+  }
+});
+$("#renameImage").addEventListener("click", () => {
+  field($("#renameForm"), "relativePath").value = selected.asset.slice(
+    "photos/".length,
+  );
+  $("#renameDialog").showModal();
+});
+$("#renameForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#renameForm").querySelector("[type=submit]");
+  button.disabled = true;
+  try {
+    const updated = await api("/api/media-rename", {
+      id: selected.id,
+      revision: selected.revision,
+      relativePath: field($("#renameForm"), "relativePath").value,
+    });
+    selected.asset = updated.asset;
+    selected.revision = updated.revision;
+    selected.prepared = null;
+    showPrepared();
+    $("#renameDialog").close();
+    await refresh();
+  } catch (error) {
+    report(error);
+  } finally {
+    button.disabled = false;
+  }
+});
 function renderGallery() {
   const query = $("#search").value.toLocaleLowerCase();
   const filtered = records.filter((record) =>

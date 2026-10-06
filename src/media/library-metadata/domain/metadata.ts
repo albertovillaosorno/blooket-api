@@ -50,7 +50,13 @@ export interface EditRecipe {
   readonly compression: "lossless" | "compact";
 }
 export interface LibraryMetadata {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
+  readonly legacy?: {
+    readonly englishVerified: boolean;
+    readonly sourceRevision: number;
+    readonly sourcePath: string;
+    readonly indexDigest: string;
+  };
   readonly id: string;
   readonly asset: string;
   readonly revision: number;
@@ -122,9 +128,10 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
     "generatedEnglish",
     "edit",
     "prepared",
+    ...(m["schemaVersion"] === 2 ? ["legacy"] : []),
   ]);
   if (
-    m["schemaVersion"] !== 1 ||
+    (m["schemaVersion"] !== 1 && m["schemaVersion"] !== 2) ||
     typeof m["id"] !== "string" ||
     !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(m["id"]) ||
     typeof m["asset"] !== "string" ||
@@ -132,6 +139,28 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
     !integer(m["revision"], 1, Number.MAX_SAFE_INTEGER)
   )
     throw new Error("invalid-media-metadata");
+  if (m["schemaVersion"] === 2) {
+    const legacy = object(m["legacy"]);
+    exact(legacy, [
+      "englishVerified",
+      "sourceRevision",
+      "sourcePath",
+      "indexDigest",
+    ]);
+    if (
+      typeof legacy["englishVerified"] !== "boolean" ||
+      !integer(
+        legacy["sourceRevision"],
+        1,
+        Number(object(m["original"])["revision"]),
+      ) ||
+      typeof legacy["sourcePath"] !== "string" ||
+      !safeRelativeImage(legacy["sourcePath"]) ||
+      typeof legacy["indexDigest"] !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(legacy["indexDigest"])
+    )
+      throw new Error("invalid-legacy-provenance");
+  }
   const original = object(m["original"]);
   exact(original, ["revision", "name", "description", "language"]);
   if (
@@ -224,5 +253,19 @@ function number(value: unknown, min: number, max: number): value is number {
     Number.isFinite(value) &&
     value >= min &&
     value <= max
+  );
+}
+
+export function safeRelativeImage(value: string): boolean {
+  return (
+    value.length <= 1024 &&
+    /\.(png|jpe?g|gif|webp)$/iu.test(value) &&
+    !/[\\\x00-\x1f]/u.test(value) &&
+    value
+      .split("/")
+      .every(
+        (part) =>
+          part.length > 0 && part.length <= 240 && !part.startsWith("."),
+      )
   );
 }
