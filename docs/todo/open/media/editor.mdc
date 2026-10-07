@@ -166,7 +166,7 @@ browser-script syntax, and all 709 portable tests passed at this checkpoint.
 ## Blockers
 
 **Pending:** Safari accessibility/responsive behavior, file chooser and
-drag-and-drop intake, full animation preview replay, and native/fallback selection
-remain unverified. Chrome exposed the native eyedropper control but automation
+drag-and-drop intake, animation preview replay, and eyedropper selection remain
+unverified. Chrome exposed the native eyedropper control but automation
 did not produce a confirmed color selection. Continue independent export work
 in task 07 and retain these target-browser acceptance checks.
