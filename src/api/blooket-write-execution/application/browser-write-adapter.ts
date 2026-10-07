@@ -35,6 +35,8 @@ import type {
   BlooketAddQuestionSubmission,
   BlooketCreateSetSubmission,
 } from "../../../ir/blooket-write-submissions/contract/write-submission.ts";
+import { blooketWriteOperationMediaIds } from
+  "./admit-prepared-media.ts";
 import type {
   BlooketWriteAttemptResult,
   BlooketWriteExecutionPort,
@@ -50,17 +52,34 @@ export function blooketBrowserWriteExecutionPort(
   surface: BlooketBrowserWriteSurfacePort,
 ): BlooketWriteExecutionPort {
   return {
-    execute: async (operation, target) => {
+    execute: async (operation, target, context) => {
       const lowered = lowerBlooketWriteSubmission(operation, target);
       if (!lowered.ok) {
+        return browserFailure();
+      }
+      const expectedMediaIds = blooketWriteOperationMediaIds(operation);
+      if (
+        context.preparedMedia.length !== expectedMediaIds.length
+        || context.preparedMedia.some(
+          (item, index) => item.mediaId !== expectedMediaIds[index],
+        )
+      ) {
         return browserFailure();
       }
 
       try {
         if (lowered.value.kind === "create-set") {
-          return await executeCreateSet(surface, lowered.value);
+          return await executeCreateSet(
+            surface,
+            lowered.value,
+            context.preparedMedia,
+          );
         }
-        return await executeAddQuestion(surface, lowered.value);
+        return await executeAddQuestion(
+          surface,
+          lowered.value,
+          context.preparedMedia,
+        );
       } catch {
         return browserFailure();
       }
@@ -71,8 +90,9 @@ export function blooketBrowserWriteExecutionPort(
 async function executeCreateSet(
   surface: BlooketBrowserWriteSurfacePort,
   submission: BlooketCreateSetSubmission,
+  media: Parameters<BlooketBrowserWriteSurfacePort["createSet"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
-  const result = await surface.createSet(submission);
+  const result = await surface.createSet(submission, media);
   if (!result.ok) {
     return preserveFailure(result);
   }
@@ -93,8 +113,9 @@ async function executeCreateSet(
 async function executeAddQuestion(
   surface: BlooketBrowserWriteSurfacePort,
   submission: BlooketAddQuestionSubmission,
+  media: Parameters<BlooketBrowserWriteSurfacePort["addQuestion"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
-  const result = await surface.addQuestion(submission);
+  const result = await surface.addQuestion(submission, media);
   return result.ok
     ? { ok: true, receipt: null }
     : preserveFailure(result);

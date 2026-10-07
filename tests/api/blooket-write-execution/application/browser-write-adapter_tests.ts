@@ -79,7 +79,11 @@ test(
   const writes = blooketBrowserWriteExecutionPort(surface);
 
   assert.deepEqual(
-    await writes.execute(setOperation, { remoteSetId: null }),
+    await writes.execute(
+      setOperation,
+      { remoteSetId: null },
+      { preparedMedia: [] },
+    ),
     {
       ok: true,
       receipt: {
@@ -109,6 +113,7 @@ test(
     await writes.execute(
       questionOperation,
       { remoteSetId: "remote-set-1" },
+      { preparedMedia: [] },
     ),
     { ok: true, receipt: null },
   );
@@ -144,7 +149,11 @@ test("navigation stops pass through without becoming success", async () => {
   const writes = blooketBrowserWriteExecutionPort(surface);
 
   assert.deepEqual(
-    await writes.execute(setOperation, { remoteSetId: null }),
+    await writes.execute(
+      setOperation,
+      { remoteSetId: null },
+      { preparedMedia: [] },
+    ),
     {
       ok: false,
       kind: "navigation",
@@ -161,7 +170,11 @@ test(
     addQuestion: async () => ({ ok: true }),
   });
   assert.deepEqual(
-    await malformed.execute(setOperation, { remoteSetId: null }),
+    await malformed.execute(
+      setOperation,
+      { remoteSetId: null },
+      { preparedMedia: [] },
+    ),
     {
       ok: false,
       kind: "browser",
@@ -176,7 +189,11 @@ test(
     addQuestion: async () => ({ ok: true }),
   });
   assert.deepEqual(
-    await throwing.execute(setOperation, { remoteSetId: null }),
+    await throwing.execute(
+      setOperation,
+      { remoteSetId: null },
+      { preparedMedia: [] },
+    ),
     {
       ok: false,
       kind: "browser",
@@ -188,6 +205,7 @@ test(
     await malformed.execute(
       questionOperation,
       { remoteSetId: null },
+      { preparedMedia: [] },
     ),
     {
       ok: false,
@@ -195,5 +213,85 @@ test(
       code: "blooket-browser-failed",
     },
   );
+  },
+);
+
+test(
+  "browser surface receives the exact admitted prepared media snapshot",
+  async () => {
+  const operation: BlooketWriteOperation = {
+    ...setOperation,
+    coverMediaId: "cover",
+  };
+  const bytes = new Uint8Array([1, 2, 3, 4]);
+  const snapshots: unknown[] = [];
+  const writes = blooketBrowserWriteExecutionPort({
+    createSet: async (_submission, media) => {
+      snapshots.push(media);
+      return { ok: true, remoteSetId: "remote-set-1" };
+    },
+    addQuestion: async () => ({ ok: true }),
+  });
+
+  const result = await writes.execute(
+    operation,
+    { remoteSetId: null },
+    {
+      preparedMedia: [{
+        mediaId: "cover",
+        revision: 4,
+        format: "png",
+        bytes,
+      }],
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(snapshots.length, 1);
+  const snapshot = snapshots[0] as Array<{ bytes: Uint8Array }>;
+  assert.equal(snapshot[0]?.bytes, bytes);
+  },
+);
+
+test(
+  "browser surface is never called with missing or extra prepared media",
+  async () => {
+  const operation: BlooketWriteOperation = {
+    ...setOperation,
+    coverMediaId: "cover",
+  };
+  const calls: string[] = [];
+  const writes = blooketBrowserWriteExecutionPort({
+    createSet: async () => {
+      calls.push("create");
+      return { ok: true, remoteSetId: "remote-set-1" };
+    },
+    addQuestion: async () => ({ ok: true }),
+  });
+  const valid = {
+    mediaId: "cover",
+    revision: 1,
+    format: "jpeg" as const,
+    bytes: new Uint8Array(1),
+  };
+
+  for (const preparedMedia of [
+    [],
+    [valid, { ...valid, mediaId: "extra" }],
+  ]) {
+    assert.deepEqual(
+      await writes.execute(
+        operation,
+        { remoteSetId: null },
+        { preparedMedia },
+      ),
+      {
+        ok: false,
+        kind: "browser",
+        code: "blooket-browser-failed",
+      },
+    );
+  }
+  assert.deepEqual(calls, []);
   },
 );

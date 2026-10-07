@@ -13,7 +13,8 @@
 // - Must-Not:
 //   - Retry, sleep, persist checkpoints, or reinterpret write-plan semantics.
 // - Allows:
-//   - Inputs: One validated immutable Blooket write operation.
+//   - Inputs: One validated operation, target, and admitted prepared-media
+//     snapshot.
 //   - Outputs: Confirmed success, observed navigation stop, or browser failure.
 //   - Side effects: One remote set/question mutation attempt.
 // - Split-When:
@@ -37,9 +38,14 @@ import type { BlooketWriteOperation } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { BlooketBrowserFailureCode } from
   "../../blooket-session/contract/browser-session.ts";
+import type { BlooketPreparedMedia } from "./prepared-media.ts";
 
 export interface BlooketWriteTarget {
   readonly remoteSetId: string | null;
+}
+
+export interface BlooketWriteExecutionContext {
+  readonly preparedMedia: readonly BlooketPreparedMedia[];
 }
 
 export type BlooketWriteAttemptResult =
@@ -62,5 +68,6 @@ export interface BlooketWriteExecutionPort {
   execute(
     operation: BlooketWriteOperation,
     target: BlooketWriteTarget,
+    context: BlooketWriteExecutionContext,
   ): Promise<BlooketWriteAttemptResult>;
 }

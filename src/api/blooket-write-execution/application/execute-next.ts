@@ -59,6 +59,8 @@ import type {
   BlooketWriteAttemptResult,
   BlooketWriteExecutionPort,
 } from "../contract/write-execution.ts";
+import type { BlooketPreparedMedia } from
+  "../contract/prepared-media.ts";
 
 type SessionFailure = Extract<
   EnsureBlooketSessionResult,
@@ -158,6 +160,7 @@ export async function executeNextBlooketWrite(
     writes,
     prepared.operation,
     prepared.checkpoint.remoteSetId,
+    [],
   );
   return completeBlooketWriteAttempt(
     plan,
@@ -235,8 +238,14 @@ export async function attemptBlooketWrite(
   writes: BlooketWriteExecutionPort,
   operation: BlooketWriteOperation,
   remoteSetId: string | null,
+  preparedMedia: readonly BlooketPreparedMedia[],
 ): Promise<BlooketWriteAttemptResult> {
-  return await safeExecute(writes, operation, remoteSetId);
+  return await safeExecute(
+    writes,
+    operation,
+    remoteSetId,
+    preparedMedia,
+  );
 }
 
 export function completeBlooketWriteAttempt(
@@ -285,9 +294,14 @@ async function safeExecute(
   writes: BlooketWriteExecutionPort,
   operation: Parameters<BlooketWriteExecutionPort["execute"]>[0],
   remoteSetId: string | null,
+  preparedMedia: readonly BlooketPreparedMedia[],
 ): Promise<BlooketWriteAttemptResult> {
   try {
-    return await writes.execute(operation, { remoteSetId });
+    return await writes.execute(
+      operation,
+      { remoteSetId },
+      { preparedMedia },
+    );
   } catch {
     return {
       ok: false,
