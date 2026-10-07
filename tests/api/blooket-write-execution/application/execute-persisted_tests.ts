@@ -47,8 +47,10 @@ import { executePersistedBlooketWrite } from
   "../../../../src/api/blooket-write-execution/application/execute-persisted.ts";
 import type { BlooketMutationPacer } from
   "../../../../src/api/blooket-write-execution/application/mutation-pacing.ts";
-import type { BlooketBrowserSessionPort } from
-  "../../../../src/api/blooket-session/contract/browser-session.ts";
+import type {
+  BlooketBrowserObservationResult,
+  BlooketBrowserSessionPort,
+} from "../../../../src/api/blooket-session/contract/browser-session.ts";
 import type {
   BlooketWriteAttemptResult,
   BlooketWriteExecutionPort,
@@ -131,6 +133,27 @@ function browser(calls: string[]): BlooketBrowserSessionPort {
     authenticate: async () => {
       calls.push("authenticate");
       return { ok: true };
+    },
+  };
+}
+
+function browserSequence(
+  observations: readonly BlooketBrowserObservationResult[],
+  calls: string[],
+): BlooketBrowserSessionPort {
+  let index = 0;
+  return {
+    observe: async () => {
+      calls.push("observe");
+      const observation = observations[index];
+      index += 1;
+      if (observation === undefined)
+        throw new Error("fixture browser sequence exhausted");
+      return observation;
+    },
+    authenticate: async () => {
+      calls.push("authenticate");
+      throw new Error("revalidation must not authenticate");
     },
   };
 }
@@ -579,6 +602,86 @@ test(
 );
 
 test(
+  "session changes during pacing stop without auth budget journal or write",
+  async () => {
+    const cases = [
+      {
+        state: "expired-session" as const,
+        kind: "session-required" as const,
+      },
+      {
+        state: "security-challenge" as const,
+        kind: "human-action-required" as const,
+      },
+      {
+        state: "rate-limited" as const,
+        kind: "wait" as const,
+      },
+    ];
+
+    for (const entry of cases) {
+      await withTemporaryDirectory(async (directory) => {
+        const checkpoint = join(directory, "checkpoint.json");
+        const paths = persistence(checkpoint);
+        const budgetPath = join(directory, "budget.json");
+        const browserCalls: string[] = [];
+        const pacingEvents: string[] = [];
+        const writeCalls: string[] = [];
+        const verificationCalls: Array<{
+          readonly operationId: string;
+          readonly remoteSetId: string | null;
+        }> = [];
+
+        const result = await executePersistedBlooketWrite(
+          paths,
+          plan,
+          browserSequence([
+            { ok: true, state: "dashboard" },
+            { ok: true, state: entry.state },
+          ], browserCalls),
+          secrets(),
+          writes(SET_SUCCESS, writeCalls),
+          verificationSequence([
+            { ok: true, baseline: SET_BASELINE },
+          ], verificationCalls),
+          {
+            pacer: immediatePacer(pacingEvents),
+            budget: {
+              path: budgetPath,
+              policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+              now: () => 92_000,
+            },
+          },
+        );
+
+        assert.equal(result.ok, true);
+        if (result.ok) {
+          assert.equal(result.kind, entry.kind);
+          if (
+            result.kind === "session-required"
+            || result.kind === "human-action-required"
+            || result.kind === "wait"
+          )
+            assert.equal(result.state, entry.state);
+        }
+        assert.deepEqual(browserCalls, ["observe", "observe"]);
+        assert.deepEqual(pacingEvents, ["acquire", "release"]);
+        assert.deepEqual(writeCalls, []);
+        assert.equal(verificationCalls.length, 1);
+        assert.deepEqual(
+          await loadMutationBudgetFile(budgetPath, plan.planId),
+          { ok: true, state: null },
+        );
+        assert.deepEqual(
+          await loadWriteAttemptFile(paths.attempt, plan),
+          { ok: true, kind: "missing" },
+        );
+      });
+    }
+  },
+);
+
+test(
   "invalid second baseline releases pacing before budget or journal",
   async () => {
     await withTemporaryDirectory(async (directory) => {
@@ -945,7 +1048,7 @@ test("confirmed writes persist before advanced success returns", async () => {
       browser(browserCalls),
       secrets(),
       writes(SET_SUCCESS, writeCalls, async () => {
-        assert.deepEqual(browserCalls, ["observe"]);
+        assert.deepEqual(browserCalls, ["observe", "observe"]);
         const attempt = await loadWriteAttemptFile(attemptPath, plan);
         assert.equal(attempt.ok, true);
         if (attempt.ok && attempt.kind === "record") {
@@ -1396,7 +1499,7 @@ test("execution lock prevents stale concurrent duplicate writes", async () => {
     if (firstResult.ok) {
       assert.equal(firstResult.kind, "advanced");
     }
-    assert.deepEqual(firstBrowserCalls, ["observe"]);
+    assert.deepEqual(firstBrowserCalls, ["observe", "observe"]);
     assert.deepEqual(
       firstWriteCalls,
       ["plan:persisted-test:set"],

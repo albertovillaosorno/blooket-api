@@ -70,6 +70,8 @@ import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
+import { inspectBlooketSession } from
+  "../../blooket-session/application/inspect-session.ts";
 import type {
   BlooketBrowserFailureCode,
   BlooketBrowserSessionPort,
@@ -302,6 +304,92 @@ export async function executePersistedBlooketWrite(
   return result;
 }
 
+type RevalidatedWriteSession =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly result: ExecutePersistedBlooketWriteResult;
+    };
+
+async function revalidateWriteSession(
+  browser: BlooketBrowserSessionPort,
+  checkpoint: BlooketWriteCheckpoint,
+): Promise<RevalidatedWriteSession> {
+  const inspected = await inspectBlooketSession(browser);
+  if (!inspected.ok) {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        stage: "session",
+        code: inspected.code,
+      },
+    };
+  }
+
+  switch (inspected.action) {
+    case "continue":
+      return { ok: true };
+    case "wait":
+      if (inspected.state !== "rate-limited") {
+        return sessionRevalidationFailure();
+      }
+      return {
+        ok: false,
+        result: {
+          ok: true,
+          kind: "wait",
+          state: inspected.state,
+          checkpoint,
+        },
+      };
+    case "human-action-required":
+      if (
+        inspected.state !== "organization-prompt"
+        && inspected.state !== "security-challenge"
+        && inspected.state !== "unexpected-page"
+      ) {
+        return sessionRevalidationFailure();
+      }
+      return {
+        ok: false,
+        result: {
+          ok: true,
+          kind: "human-action-required",
+          state: inspected.state,
+          checkpoint,
+        },
+      };
+    case "authenticate":
+      if (
+        inspected.state !== "signed-out"
+        && inspected.state !== "expired-session"
+      ) {
+        return sessionRevalidationFailure();
+      }
+      return {
+        ok: false,
+        result: {
+          ok: true,
+          kind: "session-required",
+          state: inspected.state,
+          checkpoint,
+        },
+      };
+  }
+}
+
+function sessionRevalidationFailure(): RevalidatedWriteSession {
+  return {
+    ok: false,
+    result: {
+      ok: false,
+      stage: "session",
+      code: "blooket-browser-failed",
+    },
+  };
+}
+
 type CapturedVerificationBaseline =
   | {
       readonly ok: true;
@@ -481,6 +569,15 @@ async function executePersistedBlooketWriteLocked(
       stage: "mutation-pacing",
       code: "mutation-pacing-cancelled",
     };
+  }
+
+  const currentSession = await revalidateWriteSession(
+    browser,
+    prepared.checkpoint,
+  );
+  if (!currentSession.ok) {
+    lease?.release();
+    return currentSession.result;
   }
 
   const currentBaseline = await captureVerificationBaseline(
