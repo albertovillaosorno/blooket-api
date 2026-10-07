@@ -52,8 +52,10 @@ import type {
 } from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { BlooketQuestionReadPort } from
   "../../blooket-set-reads/contract/question-reads.ts";
-import type { BlooketSetReadPort } from
-  "../../blooket-set-reads/contract/set-reads.ts";
+import type {
+  BlooketSetListCompleteness,
+  BlooketSetReadPort,
+} from "../../blooket-set-reads/contract/set-reads.ts";
 import type { BlooketWriteTarget } from "../contract/write-execution.ts";
 import type {
   BlooketWriteVerificationPort,
@@ -84,6 +86,9 @@ export function blooketSetReadWriteVerifier(
 
       const listed = await safeList(reads);
       if (!listed.ok) return listed;
+      if (listed.completeness !== "complete") {
+        return { ok: true, baseline: null };
+      }
       return {
         ok: true,
         baseline: setBaselineFor(listed.value),
@@ -105,6 +110,9 @@ export function blooketSetReadWriteVerifier(
 
       const listed = await safeList(reads);
       if (!listed.ok) return listed;
+      if (listed.completeness !== "complete") {
+        return { ok: true, outcome: "inconclusive" };
+      }
       const currentBaseline = setBaselineFor(listed.value);
       if (sameBlooketWriteVerificationBaseline(currentBaseline, baseline)) {
         return { ok: true, outcome: "not-confirmed" };
@@ -234,7 +242,11 @@ function questionMatches(
 async function safeList(
   reads: BlooketSetReadPort,
 ): Promise<
-  | { readonly ok: true; readonly value: readonly BlooketSetSummary[] }
+  | {
+      readonly ok: true;
+      readonly value: readonly BlooketSetSummary[];
+      readonly completeness: BlooketSetListCompleteness;
+    }
   | Extract<BlooketWriteVerificationResult, { readonly ok: false }>
 > {
   try {
@@ -242,9 +254,19 @@ async function safeList(
     if (!probed.ok) {
       return { ok: false, kind: "browser", code: probed.code };
     }
+    if (
+      probed.completeness !== "complete"
+      && probed.completeness !== "unknown"
+    ) {
+      return browserFailure();
+    }
     const decoded = decodeBlooketSetList(probed.value);
     return decoded.ok
-      ? { ok: true, value: decoded.value }
+      ? {
+          ok: true,
+          value: decoded.value,
+          completeness: probed.completeness,
+        }
       : browserFailure();
   } catch {
     return browserFailure();

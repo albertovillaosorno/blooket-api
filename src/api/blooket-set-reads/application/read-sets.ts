@@ -54,6 +54,8 @@ import type {
   BlooketBrowserSessionPort,
 } from "../../blooket-session/contract/browser-session.ts";
 import type {
+  BlooketSetListCompleteness,
+  BlooketSetListProbeResult,
   BlooketSetProbeResult,
   BlooketSetReadPort,
 } from "../contract/set-reads.ts";
@@ -103,6 +105,7 @@ export type ListBlooketSetsResult =
       readonly ok: true;
       readonly kind: "sets";
       readonly session: ReadySessionSummary;
+      readonly completeness: BlooketSetListCompleteness;
       readonly value: readonly BlooketSetSummary[];
     }
   | SessionStop
@@ -171,13 +174,20 @@ export async function listBlooketSets(
     return session;
   }
 
-  const probed = await safeProbe(() => reads.list());
+  const probed = await safeListProbe(() => reads.list());
   if (!probed.ok) {
     return {
       ok: false,
       stage: "read",
       code: probed.code,
     };
+  }
+
+  if (
+    probed.completeness !== "complete"
+    && probed.completeness !== "unknown"
+  ) {
+    return { ok: false, stage: "read", code: "blooket-browser-failed" };
   }
 
   const decoded = decodeBlooketSetList(probed.value);
@@ -197,6 +207,7 @@ export async function listBlooketSets(
       state: session.state,
       reused: session.reused,
     },
+    completeness: probed.completeness,
     value: decoded.value,
   };
 }
@@ -335,6 +346,19 @@ async function ensureReadySession(
     };
   }
   return session;
+}
+
+async function safeListProbe(
+  probe: () => Promise<BlooketSetListProbeResult>,
+): Promise<BlooketSetListProbeResult> {
+  try {
+    return await probe();
+  } catch {
+    return {
+      ok: false,
+      code: "blooket-browser-failed",
+    };
+  }
 }
 
 async function safeProbe(

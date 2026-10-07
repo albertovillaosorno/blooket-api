@@ -103,8 +103,12 @@ export function createBlooketBrowserBridgeAdapters(
     },
 
     sets: {
-      list: async () =>
-        await safeRequest(transport, { kind: "sets.list" }),
+      list: async () => {
+        const result = await safeRequest(transport, { kind: "sets.list" });
+        return result.ok
+          ? { ...result, completeness: "unknown" as const }
+          : result;
+      },
       get: async (setId) =>
         await safeRequest(transport, { kind: "sets.get", setId }),
     },

@@ -52,6 +52,12 @@ title. Set detail adds description and public/private visibility. The ID has no
 repository-invented grammar. Empty observed descriptions are admitted because
 current evidence does not establish that descriptions must be non-empty.
 
+Set-list probes also carry explicit `complete` or `unknown` collection
+completeness. The current browser bridge reports `unknown` because client-side
+My Sets evidence does not prove server-side completeness. Higher callers may
+return those observational rows, but unknown collections cannot establish a
+publication baseline or a reconciliation outcome.
+
 Question payloads, cover-image read representation, remote-ID syntax, and other
 set fields remain outside the read contract until authenticated browser evidence
 establishes their shape.

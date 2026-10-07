@@ -32,6 +32,8 @@
 import type { BlooketBrowserFailureCode } from
   "../../blooket-session/contract/browser-session.ts";
 
+export type BlooketSetListCompleteness = "complete" | "unknown";
+
 export type BlooketSetProbeResult =
   | {
       readonly ok: true;
@@ -42,7 +44,15 @@ export type BlooketSetProbeResult =
       readonly code: BlooketBrowserFailureCode;
     };
 
+export type BlooketSetListProbeResult =
+  | {
+      readonly ok: true;
+      readonly value: unknown;
+      readonly completeness: BlooketSetListCompleteness;
+    }
+  | Extract<BlooketSetProbeResult, { readonly ok: false }>;
+
 export interface BlooketSetReadPort {
-  list(): Promise<BlooketSetProbeResult>;
+  list(): Promise<BlooketSetListProbeResult>;
   get(setId: string): Promise<BlooketSetProbeResult>;
 }

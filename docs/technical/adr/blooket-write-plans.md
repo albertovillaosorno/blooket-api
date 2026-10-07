@@ -124,8 +124,10 @@ question write from a matching toast, current page, or duplicate-able content.
 A concrete verifier should compare a post-attempt collection against the
 persisted pre-attempt count/digest. It may confirm only when removing the one
 expected effect reproduces the exact baseline and all other observed state is
-unchanged. Multiple candidates, concurrent changes, absent baselines, or weak
-page matches remain `inconclusive`.
+unchanged. Set-list baselines additionally require an explicitly complete
+collection; `unknown` completeness produces no baseline and cannot confirm or
+disconfirm an ambiguous write. Multiple candidates, concurrent changes, absent
+baselines, or weak page matches remain `inconclusive`.
 
 Subsequent question writes receive the checkpoint's remote set ID explicitly.
 Recovery refuses legacy advanced checkpoints, legacy confirmed Create Set

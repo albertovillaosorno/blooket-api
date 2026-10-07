@@ -79,6 +79,7 @@ test("bridge adapters map session and opaque read calls exactly", async () => {
   assert.deepEqual(await adapters.sets.list(), {
     ok: true,
     value: [{ remote: "set" }],
+    completeness: "unknown",
   });
   assert.deepEqual(await adapters.sets.get("opaque/set id?"), {
     ok: true,
