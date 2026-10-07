@@ -43,6 +43,9 @@ import {
   openBlooketQuestionPanel,
 } from
   "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
+import { createBlooketBrowserWriteSurface } from
+  "../../../platforms/blooket-browser/adapter-outbound/write-surface.ts";
+import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
 
@@ -99,7 +102,8 @@ let connection: Connection | undefined;
 let generation = 0;
 let status = "waiting-for-workspace";
 let pendingUiAction = Promise.resolve();
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const pause = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function configured(value: unknown): Connection | undefined {
   if (!value || typeof value !== "object") return undefined;
@@ -332,8 +336,25 @@ async function relay(current: Connection, activeGeneration: number) {
             job.command.kind === "sets.list" ||
             job.command.kind === "sets.get" ||
             job.command.kind === "questions.list"
-          )
+          ) {
             result = await read(current, job.command);
+          } else if (job.command.kind === "sets.create") {
+            const host = createExtensionCreateSetHost(
+              chrome,
+              current.tabId,
+              pause,
+            );
+            const surface = createBlooketBrowserWriteSurface(host);
+            const created = await surface.createSet({
+              schemaVersion: 1,
+              kind: "create-set",
+              title: job.command.title,
+              description: job.command.description,
+              private: job.command.private,
+              coverImage: null,
+            }, []);
+            result = { ok: true, value: created };
+          }
         } catch {
           status = "blooket-attention-required";
         }

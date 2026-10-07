@@ -102,6 +102,103 @@ test("bridge adapters map session and opaque read calls exactly", async () => {
   ]);
 });
 
+test("bridge write adapter admits only text Create Set", async () => {
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const adapters = createBlooketBrowserBridgeAdapters(transport([
+    {
+      ok: true,
+      value: { ok: true, remoteSetId: "remote-set-1" },
+    },
+    {
+      ok: true,
+      value: {
+        ok: false,
+        kind: "navigation",
+        state: "security-challenge",
+      },
+    },
+  ], commands));
+
+  const submission = {
+    schemaVersion: 1 as const,
+    kind: "create-set" as const,
+    title: "Synthetic set",
+    description: "Description",
+    private: true,
+    coverImage: null,
+  };
+  assert.deepEqual(await adapters.writes.createSet(submission, []), {
+    ok: true,
+    remoteSetId: "remote-set-1",
+  });
+  assert.deepEqual(await adapters.writes.createSet(submission, []), {
+    ok: false,
+    kind: "navigation",
+    state: "security-challenge",
+  });
+  assert.deepEqual(commands, [
+    {
+      kind: "sets.create",
+      title: "Synthetic set",
+      description: "Description",
+      private: true,
+    },
+    {
+      kind: "sets.create",
+      title: "Synthetic set",
+      description: "Description",
+      private: true,
+    },
+  ]);
+
+  assert.deepEqual(
+    await adapters.writes.createSet(
+      { ...submission, coverImage: { mediaId: "cover" } },
+      [{
+        mediaId: "cover",
+        revision: 1,
+        format: "png",
+        bytes: new Uint8Array([1]),
+      }],
+    ),
+    {
+      ok: false,
+      kind: "browser",
+      code: "blooket-browser-failed",
+    },
+  );
+  assert.equal(commands.length, 2);
+});
+
+test("bridge write adapter rejects malformed surface values", async () => {
+  for (const value of [
+    { ok: true },
+    { ok: true, remoteSetId: "id", extra: true },
+    { ok: false, kind: "navigation", state: "authenticated" },
+    { ok: false, kind: "navigation", state: "security-challenge", extra: true },
+    { ok: false, kind: "browser", code: "raw-error" },
+  ]) {
+    const adapters = createBlooketBrowserBridgeAdapters({
+      request: async () => ({ ok: true, value }),
+    });
+    assert.deepEqual(
+      await adapters.writes.createSet({
+        schemaVersion: 1,
+        kind: "create-set",
+        title: "Synthetic",
+        description: "",
+        private: true,
+        coverImage: null,
+      }, []),
+      {
+        ok: false,
+        kind: "browser",
+        code: "blooket-browser-failed",
+      },
+    );
+  }
+});
+
 test("invalid states and transport exceptions fail closed", async () => {
   const invalid = createBlooketBrowserBridgeAdapters({
     request: async () => ({ ok: true, value: "authenticated" }),

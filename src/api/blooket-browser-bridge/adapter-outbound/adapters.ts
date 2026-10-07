@@ -31,12 +31,16 @@
 //
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
+import type { ObservedBlooketNavigationStateKind } from
+  "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import type { BlooketCapabilityInspectionPort } from
   "../../blooket-capability-inspection/contract/capability-inspection.ts";
 import type { BlooketBrowserSessionPort } from
   "../../blooket-session/contract/browser-session.ts";
 import type { BlooketQuestionReadPort } from
   "../../blooket-set-reads/contract/question-reads.ts";
+import type { BlooketBrowserWriteSurfacePort } from
+  "../../blooket-write-execution/contract/browser-write-surface.ts";
 import type { BlooketSetReadPort } from
   "../../blooket-set-reads/contract/set-reads.ts";
 import type { BlooketBrowserBridgeTransport } from
@@ -58,6 +62,7 @@ export function createBlooketBrowserBridgeAdapters(
   readonly capabilities: BlooketCapabilityInspectionPort;
   readonly sets: BlooketSetReadPort;
   readonly questions: BlooketQuestionReadPort;
+  readonly writes: BlooketBrowserWriteSurfacePort;
 } {
   return {
     session: {
@@ -108,6 +113,22 @@ export function createBlooketBrowserBridgeAdapters(
       list: async (setId) =>
         await safeRequest(transport, { kind: "questions.list", setId }),
     },
+
+    writes: {
+      createSet: async (submission, media) => {
+        if (submission.coverImage !== null || media.length !== 0)
+          return browserFailureWithKind();
+        const result = await safeRequest(transport, {
+          kind: "sets.create",
+          title: submission.title,
+          description: submission.description,
+          private: submission.private,
+        });
+        if (!result.ok) return browserFailureWithKind(result.code);
+        return decodeCreateSetSurfaceResult(result.value);
+      },
+      addQuestion: async () => browserFailureWithKind(),
+    },
   };
 }
 
@@ -127,4 +148,53 @@ function browserFailure() {
     ok: false as const,
     code: "blooket-browser-failed" as const,
   };
+}
+
+function browserFailureWithKind(
+  code:
+    | "blooket-browser-unavailable"
+    | "blooket-browser-failed" = "blooket-browser-failed",
+) {
+  return {
+    ok: false as const,
+    kind: "browser" as const,
+    code,
+  };
+}
+
+function decodeCreateSetSurfaceResult(value: unknown) {
+  if (!value || typeof value !== "object") return browserFailureWithKind();
+  const result = value as Record<string, unknown>;
+  if (
+    result["ok"] === true &&
+    Object.keys(result).sort().join() === "ok,remoteSetId" &&
+    Object.prototype.hasOwnProperty.call(result, "remoteSetId")
+  )
+    return {
+      ok: true as const,
+      remoteSetId: result["remoteSetId"],
+    };
+  if (
+    result["ok"] === false &&
+    result["kind"] === "navigation" &&
+    typeof result["state"] === "string" &&
+    OBSERVED_STATES.has(result["state"]) &&
+    Object.keys(result).sort().join() === "kind,ok,state"
+  )
+    return {
+      ok: false as const,
+      kind: "navigation" as const,
+      state: result["state"] as ObservedBlooketNavigationStateKind,
+    };
+  if (
+    result["ok"] === false &&
+    result["kind"] === "browser" &&
+    (
+      result["code"] === "blooket-browser-unavailable" ||
+      result["code"] === "blooket-browser-failed"
+    ) &&
+    Object.keys(result).sort().join() === "code,kind,ok"
+  )
+    return browserFailureWithKind(result["code"]);
+  return browserFailureWithKind();
 }

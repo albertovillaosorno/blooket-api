@@ -60,7 +60,7 @@ export interface CreateSetChromePort {
     executeScript(options: {
       readonly target: { readonly tabId: number };
       readonly func: (...args: never[]) => unknown;
-      readonly args?: readonly unknown[];
+      readonly args?: unknown[];
     }): Promise<readonly { readonly result?: unknown }[]>;
   };
 }
@@ -86,7 +86,7 @@ export function createExtensionCreateSetHost(
 ): BlooketCreateSetBrowserHost {
   const script = async (
     func: (...args: never[]) => unknown,
-    args: readonly unknown[] = [],
+    args: unknown[] = [],
   ): Promise<unknown> => {
     const replies = await chrome.scripting.executeScript({
       target: { tabId },
@@ -188,7 +188,7 @@ export function createExtensionCreateSetHost(
 async function observe(
   script: (
     func: (...args: never[]) => unknown,
-    args?: readonly unknown[],
+    args?: unknown[],
   ) => Promise<unknown>,
 ): Promise<string | undefined> {
   const result = await script(
