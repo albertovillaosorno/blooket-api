@@ -168,27 +168,18 @@ test(
           capabilityPanelReady = false;
           return [{ result: true }];
         }
-        if (func.name === "prepareBlooketLoginForm") {
-          assert.deepEqual(args[0], {
+        if (func.name === "runBlooketLoginPageAction") {
+          assert.deepEqual(args[1], {
             loginIdentifier: "teacher@example.invalid",
             password: "synthetic-password",
           });
-          return [{ result: { ok: true } }];
-        }
-        if (func.name === "isBlooketLoginFormPrepared") {
-          assert.deepEqual(args[0], {
-            loginIdentifier: "teacher@example.invalid",
-            password: "synthetic-password",
-          });
-          return [{ result: true }];
-        }
-        if (func.name === "submitBlooketLoginForm") {
-          assert.deepEqual(args[0], {
-            loginIdentifier: "teacher@example.invalid",
-            password: "synthetic-password",
-          });
-          tabUrl = "https://dashboard.blooket.com/my-sets";
-          return [{ result: { ok: true } }];
+          if (args[0] === "prepare") return [{ result: { ok: true } }];
+          if (args[0] === "is-prepared") return [{ result: true }];
+          if (args[0] === "submit") {
+            tabUrl = "https://dashboard.blooket.com/my-sets";
+            return [{ result: { ok: true } }];
+          }
+          throw new Error("unexpected-login-action");
         }
         if (func.name === "prepareBlooketAddQuestionForm") {
           assert.deepEqual(args[0], {
@@ -501,8 +492,8 @@ test(
       false,
     );
     assert.equal(
-      scripts.filter((name) => name === "submitBlooketLoginForm").length,
-      1,
+      scripts.filter((name) => name === "runBlooketLoginPageAction").length,
+      3,
     );
     assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
     const ready = await expectReply({ kind: "session.observe" });

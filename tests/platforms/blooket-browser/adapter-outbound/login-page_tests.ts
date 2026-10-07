@@ -35,6 +35,7 @@ import test from "node:test";
 import {
   isBlooketLoginFormPrepared,
   prepareBlooketLoginForm,
+  runBlooketLoginPageAction,
   submitBlooketLoginForm,
 } from
   "../../../../src/platforms/blooket-browser/adapter-outbound/login-page.ts";
@@ -148,6 +149,19 @@ const credentials = {
   loginIdentifier: "teacher@example.test",
   password: "synthetic-password",
 };
+
+test("serialized login runner preserves injected-browser semantics", () => {
+  const page = fixture();
+  const serialized = Function(
+    "return (" + runBlooketLoginPageAction.toString() + ")",
+  )() as typeof runBlooketLoginPageAction;
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(serialized("prepare", credentials), { ok: true });
+    assert.equal(serialized("is-prepared", credentials), true);
+    assert.deepEqual(serialized("submit", credentials), { ok: true });
+    assert.equal(page.submit.clicked, 1);
+  });
+});
 
 test("login preparation fills exact controls without submitting", () => {
   const page = fixture();

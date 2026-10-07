@@ -40,71 +40,17 @@ export type BlooketLoginPageResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly code: "blooket-browser-failed" };
 
-export function prepareBlooketLoginForm(
+export type BlooketLoginPageAction = "prepare" | "is-prepared" | "submit";
+
+export function runBlooketLoginPageAction(
+  action: BlooketLoginPageAction,
   input: BlooketLoginPageInput,
-): BlooketLoginPageResult {
+): BlooketLoginPageResult | boolean {
   const failed = (): BlooketLoginPageResult => ({
     ok: false,
     code: "blooket-browser-failed",
   });
-  try {
-    if (!validInput(input)) return failed();
-    const controls = loginControls();
-    if (controls === null) return failed();
-    const descriptor = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    );
-    if (descriptor?.set === undefined) return failed();
-    descriptor.set.call(controls.identifier, input.loginIdentifier);
-    controls.identifier.dispatchEvent(new Event("input", { bubbles: true }));
-    controls.identifier.dispatchEvent(new Event("change", { bubbles: true }));
-    descriptor.set.call(controls.password, input.password);
-    controls.password.dispatchEvent(new Event("input", { bubbles: true }));
-    controls.password.dispatchEvent(new Event("change", { bubbles: true }));
-    return { ok: true };
-  } catch {
-    return failed();
-  }
-}
-
-export function isBlooketLoginFormPrepared(
-  input: BlooketLoginPageInput,
-): boolean {
-  try {
-    if (!validInput(input)) return false;
-    const controls = loginControls();
-    return (
-      controls !== null &&
-      controls.identifier.value === input.loginIdentifier &&
-      controls.password.value === input.password &&
-      !controls.submit.disabled
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function submitBlooketLoginForm(
-  input: BlooketLoginPageInput,
-): BlooketLoginPageResult {
-  const failed = (): BlooketLoginPageResult => ({
-    ok: false,
-    code: "blooket-browser-failed",
-  });
-  try {
-    if (!isBlooketLoginFormPrepared(input)) return failed();
-    const controls = loginControls();
-    if (controls === null || controls.submit.disabled) return failed();
-    controls.submit.click();
-    return { ok: true };
-  } catch {
-    return failed();
-  }
-}
-
-function validInput(input: BlooketLoginPageInput): boolean {
-  return (
+  const validInput = () =>
     typeof input.loginIdentifier === "string" &&
     input.loginIdentifier.length >= 1 &&
     input.loginIdentifier.length <= 254 &&
@@ -112,69 +58,115 @@ function validInput(input: BlooketLoginPageInput): boolean {
     typeof input.password === "string" &&
     input.password.length >= 1 &&
     input.password.length <= 2048 &&
-    !input.password.includes("\0")
-  );
+    !input.password.includes("\0");
+  const controls = (): {
+    readonly identifier: HTMLInputElement;
+    readonly password: HTMLInputElement;
+    readonly submit: HTMLButtonElement;
+  } | null => {
+    const url = new URL(location.href);
+    if (
+      url.origin !== "https://id.blooket.com" ||
+      url.pathname !== "/login"
+    )
+      return null;
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const challenged = Array.from(
+      document.querySelectorAll(
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+      ),
+    ).some((frame) => {
+      if (!visible(frame)) return false;
+      const source = frame.getAttribute("src");
+      if (!source) return true;
+      if (source.includes("hcaptcha")) return true;
+      try {
+        const challengeUrl = new URL(source, location.href);
+        return challengeUrl.searchParams.get("size") !== "invisible";
+      } catch {
+        return true;
+      }
+    });
+    if (challenged) return null;
+    const headings = Array.from(document.querySelectorAll("h1, h2, h3")).filter(
+      (heading) => visible(heading) && heading.textContent?.trim() === "Log in",
+    );
+    const identifiers = Array.from(
+      document.querySelectorAll('input[placeholder="Username or email"]'),
+    ).filter(visible);
+    const passwords = Array.from(
+      document.querySelectorAll(
+        'input[type="password"][placeholder="Password"]',
+      ),
+    ).filter(visible);
+    const submits = Array.from(document.querySelectorAll("button")).filter(
+      (button) => visible(button) && button.textContent?.trim() === "Let's go!",
+    );
+    if (
+      headings.length !== 1 ||
+      identifiers.length !== 1 ||
+      passwords.length !== 1 ||
+      submits.length !== 1 ||
+      identifiers[0]?.tagName !== "INPUT" ||
+      passwords[0]?.tagName !== "INPUT" ||
+      submits[0]?.tagName !== "BUTTON"
+    )
+      return null;
+    return {
+      identifier: identifiers[0] as HTMLInputElement,
+      password: passwords[0] as HTMLInputElement,
+      submit: submits[0] as HTMLButtonElement,
+    };
+  };
+
+  try {
+    if (!validInput()) return action === "is-prepared" ? false : failed();
+    const page = controls();
+    if (page === null) return action === "is-prepared" ? false : failed();
+    if (action === "prepare") {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      );
+      if (descriptor?.set === undefined) return failed();
+      descriptor.set.call(page.identifier, input.loginIdentifier);
+      page.identifier.dispatchEvent(new Event("input", { bubbles: true }));
+      page.identifier.dispatchEvent(new Event("change", { bubbles: true }));
+      descriptor.set.call(page.password, input.password);
+      page.password.dispatchEvent(new Event("input", { bubbles: true }));
+      page.password.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true };
+    }
+    const prepared =
+      page.identifier.value === input.loginIdentifier &&
+      page.password.value === input.password &&
+      !page.submit.disabled;
+    if (action === "is-prepared") return prepared;
+    if (!prepared) return failed();
+    page.submit.click();
+    return { ok: true };
+  } catch {
+    return action === "is-prepared" ? false : failed();
+  }
 }
 
-function loginControls(): {
-  readonly identifier: HTMLInputElement;
-  readonly password: HTMLInputElement;
-  readonly submit: HTMLButtonElement;
-} | null {
-  const url = new URL(location.href);
-  if (
-    url.origin !== "https://id.blooket.com" ||
-    url.pathname !== "/login"
-  )
-    return null;
-  const visible = (element: Element) => {
-    const bounds = element.getBoundingClientRect();
-    return bounds.width > 0 && bounds.height > 0;
-  };
-  const challenged = Array.from(
-    document.querySelectorAll(
-      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
-    ),
-  ).some((frame) => {
-    if (!visible(frame)) return false;
-    const source = frame.getAttribute("src");
-    if (!source) return true;
-    if (source.includes("hcaptcha")) return true;
-    try {
-      const challengeUrl = new URL(source, location.href);
-      return challengeUrl.searchParams.get("size") !== "invisible";
-    } catch {
-      return true;
-    }
-  });
-  if (challenged) return null;
-  const headings = Array.from(document.querySelectorAll("h1, h2, h3")).filter(
-    (heading) => visible(heading) && heading.textContent?.trim() === "Log in",
-  );
-  const identifiers = Array.from(
-    document.querySelectorAll('input[placeholder="Username or email"]'),
-  ).filter(visible);
-  const passwords = Array.from(
-    document.querySelectorAll(
-      'input[type="password"][placeholder="Password"]',
-    ),
-  ).filter(visible);
-  const submits = Array.from(document.querySelectorAll("button")).filter(
-    (button) => visible(button) && button.textContent?.trim() === "Let's go!",
-  );
-  if (
-    headings.length !== 1 ||
-    identifiers.length !== 1 ||
-    passwords.length !== 1 ||
-    submits.length !== 1 ||
-    identifiers[0]?.tagName !== "INPUT" ||
-    passwords[0]?.tagName !== "INPUT" ||
-    submits[0]?.tagName !== "BUTTON"
-  )
-    return null;
-  return {
-    identifier: identifiers[0] as HTMLInputElement,
-    password: passwords[0] as HTMLInputElement,
-    submit: submits[0] as HTMLButtonElement,
-  };
+export function prepareBlooketLoginForm(
+  input: BlooketLoginPageInput,
+): BlooketLoginPageResult {
+  return runBlooketLoginPageAction("prepare", input) as BlooketLoginPageResult;
+}
+
+export function isBlooketLoginFormPrepared(
+  input: BlooketLoginPageInput,
+): boolean {
+  return runBlooketLoginPageAction("is-prepared", input) === true;
+}
+
+export function submitBlooketLoginForm(
+  input: BlooketLoginPageInput,
+): BlooketLoginPageResult {
+  return runBlooketLoginPageAction("submit", input) as BlooketLoginPageResult;
 }
