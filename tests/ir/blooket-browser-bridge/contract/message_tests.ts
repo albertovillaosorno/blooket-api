@@ -112,6 +112,68 @@ test("Create Set bridge commands are exact bounded and text-only", () => {
     );
 });
 
+test("Add Question bridge commands admit exact text-only semantics", () => {
+  const valid = {
+    kind: "questions.create",
+    setId: "set-fixture",
+    number: 1,
+    question: "Type sun.",
+    answers: [{ text: "sun", correct: true }],
+    qType: "typing",
+    random: true,
+    answerTypes: ["exactly"],
+    timeLimit: 15,
+  };
+  assert.equal(
+    decodeBlooketBrowserBridgeRequest(request(valid)).ok,
+    true,
+  );
+  for (const command of [
+    { ...valid, setId: "" },
+    { ...valid, number: 0 },
+    { ...valid, question: "" },
+    { ...valid, answers: [] },
+    {
+      ...valid,
+      answers: [
+        { text: "sun", correct: true },
+        { text: "sun", correct: true },
+      ],
+      answerTypes: ["exactly", "exactly"],
+    },
+    {
+      ...valid,
+      answers: [{ text: "sun", correct: false }],
+    },
+    { ...valid, random: false },
+    { ...valid, answerTypes: null },
+    { ...valid, timeLimit: 0 },
+    { ...valid, image: "not-admitted" },
+    {
+      ...valid,
+      answers: [{ text: "sun", correct: true, image: "extra" }],
+    },
+  ])
+    assert.equal(
+      decodeBlooketBrowserBridgeRequest(request(command)).ok,
+      false,
+    );
+
+  assert.equal(
+    decodeBlooketBrowserBridgeRequest(request({
+      ...valid,
+      qType: "mc",
+      random: false,
+      answers: [
+        { text: "Sun", correct: true },
+        { text: "Moon", correct: false },
+      ],
+      answerTypes: null,
+    })).ok,
+    true,
+  );
+});
+
 test("invalid authentication requests never echo secret values", () => {
   const password = "synthetic-secret-that-must-not-be-returned";
   const result = decodeBlooketBrowserBridgeRequest(

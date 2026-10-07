@@ -127,7 +127,30 @@ export function createBlooketBrowserBridgeAdapters(
         if (!result.ok) return browserFailureWithKind(result.code);
         return decodeCreateSetSurfaceResult(result.value);
       },
-      addQuestion: async () => browserFailureWithKind(),
+      addQuestion: async (submission, media) => {
+        if (
+          submission.image !== null ||
+          media.length !== 0 ||
+          submission.answers.some((answer) => answer.kind !== "text")
+        )
+          return browserFailureWithKind();
+        const result = await safeRequest(transport, {
+          kind: "questions.create",
+          setId: submission.remoteSetId,
+          number: submission.number,
+          question: submission.question,
+          answers: submission.answers.map((answer) => ({
+            text: answer.kind === "text" ? answer.text : "",
+            correct: answer.correct,
+          })),
+          qType: submission.qType,
+          random: submission.random,
+          answerTypes: submission.answerTypes,
+          timeLimit: submission.timeLimit,
+        });
+        if (!result.ok) return browserFailureWithKind(result.code);
+        return decodeAddQuestionSurfaceResult(result.value);
+      },
     },
   };
 }
@@ -174,6 +197,39 @@ function decodeCreateSetSurfaceResult(value: unknown) {
       ok: true as const,
       remoteSetId: result["remoteSetId"],
     };
+  if (
+    result["ok"] === false &&
+    result["kind"] === "navigation" &&
+    typeof result["state"] === "string" &&
+    OBSERVED_STATES.has(result["state"]) &&
+    Object.keys(result).sort().join() === "kind,ok,state"
+  )
+    return {
+      ok: false as const,
+      kind: "navigation" as const,
+      state: result["state"] as ObservedBlooketNavigationStateKind,
+    };
+  if (
+    result["ok"] === false &&
+    result["kind"] === "browser" &&
+    (
+      result["code"] === "blooket-browser-unavailable" ||
+      result["code"] === "blooket-browser-failed"
+    ) &&
+    Object.keys(result).sort().join() === "code,kind,ok"
+  )
+    return browserFailureWithKind(result["code"]);
+  return browserFailureWithKind();
+}
+
+function decodeAddQuestionSurfaceResult(value: unknown) {
+  if (!value || typeof value !== "object") return browserFailureWithKind();
+  const result = value as Record<string, unknown>;
+  if (
+    result["ok"] === true &&
+    Object.keys(result).sort().join() === "ok"
+  )
+    return { ok: true as const };
   if (
     result["ok"] === false &&
     result["kind"] === "navigation" &&

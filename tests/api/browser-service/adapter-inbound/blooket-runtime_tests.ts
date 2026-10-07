@@ -62,6 +62,21 @@ const operation: BlooketWriteOperation = {
   coverMediaId: null,
 };
 
+const questionOperation: BlooketWriteOperation = {
+  operationId: "plan:runtime:q:0",
+  kind: "question",
+  localQuestionId: "q1",
+  questionNumber: 1,
+  question: {
+    type: "typing-answer",
+    prompt: "Type sun.",
+    timeLimitSeconds: 15,
+    imageMediaId: null,
+    matchMode: "exact",
+    answer: "sun",
+  },
+};
+
 test(
   "runtime composes bridge Create Set through canonical write execution",
   async () => {
@@ -347,42 +362,172 @@ test(
 );
 
 test(
-  "runtime Add Question remains fail-closed without bridge mutation",
+  "runtime composes text Add Question through canonical write execution",
   async () => {
-  const commands: BlooketBrowserBridgeCommand[] = [];
-  const runtime = createBlooketRuntimePorts({
-    request: async (command) => {
-      commands.push(command);
-      return { ok: false, code: "blooket-browser-failed" };
-    },
-  }, "/synthetic-unused-root");
+    const commands: BlooketBrowserBridgeCommand[] = [];
+    const runtime = createBlooketRuntimePorts({
+      request: async (command) => {
+        commands.push(command);
+        if (command.kind === "questions.create")
+          return { ok: true, value: { ok: true } };
+        return { ok: false, code: "blooket-browser-failed" };
+      },
+    }, "/synthetic-unused-root");
 
-  const question: BlooketWriteOperation = {
-    operationId: "plan:runtime:q:0",
-    kind: "question",
-    localQuestionId: "q1",
-    questionNumber: 1,
-    question: {
-      type: "typing-answer",
-      prompt: "Type sun.",
-      timeLimitSeconds: 15,
-      imageMediaId: null,
-      matchMode: "exact",
-      answer: "sun",
-    },
-  };
-  assert.deepEqual(
-    await runtime.writeExecution.execute(
-      question,
-      { remoteSetId: "remote-set-1" },
-      { preparedMedia: [] },
-    ),
-    {
-      ok: false,
-      kind: "browser",
-      code: "blooket-browser-failed",
-    },
-  );
-  assert.deepEqual(commands, []);
+    assert.deepEqual(
+      await runtime.writeExecution.execute(
+        questionOperation,
+        { remoteSetId: "remote-set-1" },
+        { preparedMedia: [] },
+      ),
+      {
+        ok: true,
+        receipt: null,
+      },
+    );
+    assert.deepEqual(commands, [{
+      kind: "questions.create",
+      setId: "remote-set-1",
+      number: 1,
+      question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing",
+      random: true,
+      answerTypes: ["exactly"],
+      timeLimit: 15,
+    }]);
+  },
+);
+
+test(
+  "persisted runtime advances Create Set then Add Question through one bridge",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "blooket-runtime-full-"));
+    try {
+      const commands: BlooketBrowserBridgeCommand[] = [];
+      const runtime = createBlooketRuntimePorts({
+        request: async (command) => {
+          commands.push(command);
+          if (command.kind === "session.observe")
+            return { ok: true, value: "my-sets" };
+          if (command.kind === "sets.create")
+            return {
+              ok: true,
+              value: { ok: true, remoteSetId: "remote-set-1" },
+            };
+          if (command.kind === "questions.create")
+            return { ok: true, value: { ok: true } };
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+      }, directory);
+      const plan: BlooketWritePlan = {
+        schemaVersion: 1,
+        planId: "plan:runtime-full",
+        desiredStateSha256: "synthetic-full",
+        operations: [
+          { ...operation, operationId: "plan:runtime-full:set" },
+          {
+            ...questionOperation,
+            operationId: "plan:runtime-full:q:0",
+          },
+        ],
+      };
+      const checkpoint = join(directory, "checkpoint.json");
+      const attempt = join(directory, "attempt.json");
+      const budget = join(directory, "budget.json");
+      const secrets: HostSecretStore = {
+        read: async () => ({ ok: true, kind: "missing" }),
+        write: async () => ({ ok: true }),
+        delete: async () => ({ ok: true }),
+      };
+      const persistence = { checkpoint, attempt };
+      const policy = {
+        maximumStarts: 3,
+        maximumDurationMs: 60_000,
+      };
+
+      const first = await executePersistedBlooketWrite(
+        persistence,
+        plan,
+        runtime.session,
+        secrets,
+        runtime.writeExecution,
+        undefined,
+        {
+          budget: { path: budget, policy, now: () => 10_000 },
+          media: runtime.preparedMedia,
+        },
+      );
+      assert.equal(first.ok, true);
+      if (first.ok && first.kind === "advanced") {
+        assert.equal(first.checkpoint.nextOperationIndex, 1);
+        assert.equal(first.checkpoint.remoteSetId, "remote-set-1");
+      } else {
+        assert.fail("Create Set did not advance.");
+      }
+
+      const second = await executePersistedBlooketWrite(
+        persistence,
+        plan,
+        runtime.session,
+        secrets,
+        runtime.writeExecution,
+        undefined,
+        {
+          budget: { path: budget, policy, now: () => 20_000 },
+          media: runtime.preparedMedia,
+        },
+      );
+      assert.deepEqual(second, {
+        ok: true,
+        kind: "advanced",
+        operationId: "plan:runtime-full:q:0",
+        checkpoint: {
+          schemaVersion: 2,
+          planId: "plan:runtime-full",
+          nextOperationIndex: 2,
+          remoteSetId: "remote-set-1",
+        },
+      });
+      assert.deepEqual(
+        await loadMutationBudgetFile(budget, plan.planId),
+        {
+          ok: true,
+          state: { version: 1, startedAtMs: 10_000, starts: 2 },
+        },
+      );
+      assert.deepEqual(await loadWriteAttemptFile(attempt, plan), {
+        ok: true,
+        kind: "missing",
+      });
+      assert.deepEqual(
+        commands.filter(
+          (command) =>
+            command.kind === "sets.create" ||
+            command.kind === "questions.create",
+        ),
+        [
+          {
+            kind: "sets.create",
+            title: "Synthetic set",
+            description: "Synthetic description",
+            private: true,
+          },
+          {
+            kind: "questions.create",
+            setId: "remote-set-1",
+            number: 1,
+            question: "Type sun.",
+            answers: [{ text: "sun", correct: true }],
+            qType: "typing",
+            random: true,
+            answerTypes: ["exactly"],
+            timeLimit: 15,
+          },
+        ],
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   },
 );
