@@ -106,6 +106,14 @@ registered,
 so this new transport cannot bypass persisted write plans, task budgets, pacing,
 journals, or reconciliation.
 
+Synthetic persisted-runtime coverage now exercises the complete guarded
+Create Set path. It reobserves the browser session, durably reserves the task
+budget, opens the attempt journal, crosses the local bridge once, converts the
+observed remote ID into a receipt, advances the checkpoint, and clears the
+journal. A challenge before mutation creates neither budget nor journal; a
+challenge during the bridge mutation consumes one budget start and preserves
+the attempting journal for reconciliation without replay.
+
 ## Blockers
 
 Add Question browser mechanics and media upload remain deliberately unsupported,
