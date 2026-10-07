@@ -31,6 +31,10 @@
 //
 import { createBlooketBrowserBridgeAdapters } from
   "../../blooket-browser-bridge/adapter-outbound/adapters.ts";
+import {
+  createApplicationUpdateChecker,
+  type ApplicationUpdateChecker,
+} from "../../application-updates/application/checker.ts";
 import type { OnlineConnectionController } from
   "../../online-connection/contract/controller.ts";
 import {
@@ -130,6 +134,7 @@ export async function startBrowserService(
     instance?: string;
     stop?: () => Promise<void>;
     browserBridge?: BlooketBrowserBridgeBroker;
+    updates?: ApplicationUpdateChecker;
   } = {},
 ) {
   const root = options.root ?? userDataRoot();
@@ -149,6 +154,7 @@ export async function startBrowserService(
   const csrf = randomBytes(32).toString("base64url");
   const browserBridge =
     options.browserBridge ?? createBlooketBrowserBridgeBroker();
+  const updates = options.updates ?? createApplicationUpdateChecker();
   const blooket = {
     ...createBlooketBrowserBridgeAdapters(browserBridge),
     secrets,
@@ -244,6 +250,7 @@ export async function startBrowserService(
       if (url.pathname === "/api/bootstrap") {
         json(response, 200, {
           csrf,
+          updates: updates.status(),
           ...(await configurationStatus(root, secrets)),
           diagnostic,
           service: {
@@ -264,6 +271,10 @@ export async function startBrowserService(
             ...browserBridge.status(),
           },
         });
+        return;
+      }
+      if (url.pathname === "/api/update-status") {
+        json(response, 200, updates.status());
         return;
       }
       if (url.pathname === "/api/connections") {
@@ -381,7 +392,9 @@ export async function startBrowserService(
       }
       const body = await readBody(
         request,
-        [
+        url.pathname === "/api/update-check"
+          ? 1_000
+          : [
           "/api/import",
           "/api/media-color-samples",
           "/api/media-admission",
@@ -389,6 +402,17 @@ export async function startBrowserService(
           ? 36_000_000
           : 1_000_000,
       );
+      if (url.pathname === "/api/update-check") {
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          Object.keys(body).length !== 0
+        )
+          throw new Error("invalid-update-check-request");
+        json(response, 200, await updates.check());
+        return;
+      }
       if (url.pathname === "/api/browser-pairing-reset") {
         if (
           !body ||
@@ -624,7 +648,10 @@ export async function startBrowserService(
     });
     throw new Error("settings-save-failed");
   }
-  server.once("close", () => browserBridge.close());
+  server.once("close", () => {
+    browserBridge.close();
+    updates.close();
+  });
   return {
     server,
     origin,

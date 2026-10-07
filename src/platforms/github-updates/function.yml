@@ -1,0 +1,9 @@
+identity:
+  id: function:github-updates
+  name: github-updates
+  path: src/platforms/github-updates
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

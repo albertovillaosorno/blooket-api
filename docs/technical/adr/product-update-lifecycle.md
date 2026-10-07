@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted policy; automatic updates and native launch-at-login acceptance remain
-unimplemented. This decision governs their open records, not shipped behavior.
+Accepted policy with a portable manual public-release checker. Automatic
+installation and native launch-at-login acceptance remain pending.
 
 ## Decision ID
 
@@ -86,7 +86,8 @@ Version tests cover canonical syntax, numeric ordering, UTC quarter boundaries,
 tag/source matching, and bounded package projections. Roadmap integrity checks
 verify record identity, dependencies, links, and completion status/path.
 
-The deterministic updater matrix and real Mac/release acceptance are pending in
+Portable catalog and local manual-check tests are implemented. The remaining
+updater matrix and real Mac/release acceptance are pending in
 [the update record](../../todo/open/delivery/updates.mdc). Portable tests do
 not establish Safari, Keychain, signing, notarization, or recipient acceptance.
 

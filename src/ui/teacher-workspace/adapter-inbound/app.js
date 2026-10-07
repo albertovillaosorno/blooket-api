@@ -8,6 +8,27 @@ import {
 
 const words = {
   es: {
+    updates: "Actualizaciones",
+    currentVersion: "Versión instalada",
+    checkUpdates: "Buscar actualizaciones",
+    viewReleases: "Ver versiones publicadas",
+    updateIdle: "Busca actualizaciones cuando quieras.",
+    updateChecking: "Buscando actualizaciones…",
+    updateCurrent: "No hay una nueva versión disponible.",
+    updateAvailable: "Hay una nueva versión disponible: ",
+    updateTrustPending: "La instalación automática aún está en preparación.",
+    updateIncompatible:
+      "La nueva versión no tiene un archivo compatible con este equipo.",
+    updateUnsupported:
+      "Este paquete de desarrollo para Linux no admite actualizaciones.",
+    updateUnavailable:
+      "No se pudo consultar GitHub. Puedes volver a intentarlo más tarde.",
+    updateTimeout: "La consulta a GitHub tardó demasiado.",
+    updateCancelled: "La consulta se canceló.",
+    updateUntrusted: "La información de la versión no es válida. No se usará.",
+    updateLastCheck: "Última consulta",
+    updateRetryAt: "Puedes volver a consultar a partir de",
+
     library: "Biblioteca",
     save: "Guardar",
     migrateLibrary: "Importar la biblioteca anterior",
@@ -197,6 +218,26 @@ const words = {
     normalizationStale: "Análisis AI desactualizado",
   },
   en: {
+    updates: "Updates",
+    currentVersion: "Installed version",
+    checkUpdates: "Check for updates",
+    viewReleases: "View published releases",
+    updateIdle: "Check for updates whenever you want.",
+    updateChecking: "Checking for updates…",
+    updateCurrent: "No new version is available.",
+    updateAvailable: "A new version is available: ",
+    updateTrustPending: "Automatic installation is still in preparation.",
+    updateIncompatible:
+      "The new version has no compatible file for this computer.",
+    updateUnsupported:
+      "This Linux development package does not support updates.",
+    updateUnavailable: "GitHub could not be checked. You can try again later.",
+    updateTimeout: "The GitHub check took too long.",
+    updateCancelled: "The check was cancelled.",
+    updateUntrusted: "Release information is invalid and will not be used.",
+    updateLastCheck: "Last checked",
+    updateRetryAt: "You can check again after",
+
     library: "Library",
     save: "Save",
     migrateLibrary: "Import the previous library",
@@ -404,6 +445,7 @@ let editorBusy = false,
   admissionKnown = false,
   admissionFeasible = true,
   highQualityAdmitted = false;
+let updateDisplayTimer;
 let clipboardReading = false;
 let suggestions = [],
   searchIndex = [],
@@ -1348,7 +1390,50 @@ function fillSettings() {
   $("#onlineFields").disabled = !settings.online.enabled;
   renderSettingsState();
 }
+function renderUpdates() {
+  clearTimeout(updateDisplayTimer);
+  const updates = bootstrap.updates;
+  if (!updates) return;
+  const result = updates.result;
+  let message = "updateIdle";
+  if (updates.phase === "checking") message = "updateChecking";
+  else if (result) {
+    const messages = {
+      current: "updateCurrent",
+      available: "updateAvailable",
+      "incompatible-asset": "updateIncompatible",
+      "unsupported-platform": "updateUnsupported",
+      "untrusted-metadata": "updateUntrusted",
+      "source-unavailable":
+        result.reason === "timeout"
+          ? "updateTimeout"
+          : result.reason === "cancelled"
+            ? "updateCancelled"
+            : "updateUnavailable",
+    };
+    message = messages[result.status] ?? "updateUntrusted";
+  }
+  $("#updateVersion").textContent =
+    t("currentVersion") + ": " + updates.currentVersion;
+  $("#updateState").textContent =
+    t(message) +
+    (updates.phase !== "checking" && result?.status === "available"
+      ? result.version + ". " + t("updateTrustPending")
+      : "");
+  const date = (value) => new Date(value).toLocaleString(locale);
+  $("#updateChecked").textContent = updates.checkedAt
+    ? t("updateLastCheck") + ": " + date(updates.checkedAt)
+    : "";
+  const wait = updates.nextCheckAt
+    ? Date.parse(updates.nextCheckAt) - Date.now()
+    : 0;
+  $("#checkUpdates").disabled = updates.phase === "checking" || wait > 0;
+  $("#updateRetry").textContent =
+    wait > 0 ? t("updateRetryAt") + ": " + date(updates.nextCheckAt) : "";
+  if (wait > 0) updateDisplayTimer = setTimeout(renderUpdates, wait + 1);
+}
 function renderSettingsState() {
+  renderUpdates();
   $("#passwordState").textContent = t(
     bootstrap.secrets.passwordConfigured ? "configured" : "missing",
   );
@@ -1444,6 +1529,21 @@ $("#folder").addEventListener("click", async () => {
   } catch (error) {
     report(error);
   }
+});
+$("#checkUpdates").addEventListener("click", async () => {
+  const previous = bootstrap.updates;
+  bootstrap.updates = { ...previous, phase: "checking" };
+  renderUpdates();
+  try {
+    bootstrap.updates = await api("/api/update-check", {});
+  } catch {
+    bootstrap.updates = {
+      ...previous,
+      phase: "idle",
+      result: { status: "source-unavailable", reason: "network" },
+    };
+  }
+  renderUpdates();
 });
 $("#rerun").addEventListener("click", async () => {
   try {

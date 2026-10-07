@@ -1,0 +1,9 @@
+identity:
+  id: function:application-updates
+  name: application-updates
+  path: src/ir/application-updates
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

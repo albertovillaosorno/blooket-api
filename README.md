@@ -431,6 +431,12 @@ record in [docs/todo/open](docs/todo/open/). Criteria, blockers, and evidence
 belong in those records; completion moves them to `docs/todo/completed/` and
 removes the index entry. See [the record workflow](docs/todo/README.md).
 
+Configuration includes a manual “Check for updates” action with current
+version, last-check time, and EN/ES status. It uses anonymous public metadata
+with bounded requests, runs only when requested, and distinguishes unavailable
+GitHub from “no new version”. Linux remains a developer package and has no
+automatic update installer.
+
 [Automatic updates](docs/todo/open/delivery/updates.mdc) are planned, not
 implemented. They will use final public GitHub Releases without a teacher GitHub
 account, with independent opt-in update and launch-at-login preferences, trusted

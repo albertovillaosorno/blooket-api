@@ -18,6 +18,10 @@ contracts:
   - docs/technical/adr/macos-browser-ui-and-online-mcp.md
   - docs/technical/adr/atomic-local-persistence.md
 scope:
+  - src/ir/application-updates/
+  - src/api/application-updates/
+  - src/api/browser-service/
+  - src/platforms/github-updates/
   - src/settings/teacher-preferences/
   - src/api/teacher-configuration/
   - src/service/
@@ -176,19 +180,60 @@ task authorizes no release.
 
 The launcher already owns service startup and duplicate-instance protection.
 `launchAtLogin` defaults false, but native registration remains unimplemented.
-There is no updater or automatic-update preference yet.
+Manual public catalog checking is implemented; automatic installation and its
+preference remain pending.
 
 The public [release page][releases] had no releases when inspected without
 authentication on 2026-10-06. An empty catalog is a valid state. Protocol
 references are GitHub's [release API][api] and [asset API][assets].
+
+### Portable catalog checking
+
+The local Configuration page shows product version, last-check time, a manual
+check button, and distinct EN/ES current, available, unsupported-host,
+incompatible-asset, source-failure, and invalid-metadata states. No startup
+check, automatic polling, download, installer, or remote MCP tool is enabled.
+
+The IR decoder and selector enforce the fixed repository, canonical product
+versions, final-release selection, numeric ordering, UTC future rejection,
+actual host architecture, unique assets, and `verificationRequired: true`.
+The anonymous HTTPS adapter bounds the entire request to ten seconds, two
+50-entry pages, and one megabyte total; redirects and foreign pagination fail
+closed. Abort cancels both request/body handling and a hanging injected port.
+
+The application controller coalesces concurrent manual checks, caches a check
+for at least thirty seconds, and honors admitted server retry intervals. Reads
+of bootstrap/status stay offline. The local POST requires exact empty input,
+same origin, and CSRF; remote callers cannot select URLs, target, or version.
+Closing the service cancels its outstanding check without reporting success.
+
+Deterministic portable tests cover metadata, asset authority, pagination,
+timeouts, active cancellation, exact local input, CSRF, coalescing, retry
+intervals, and offline startup. On 2026-10-07 an anonymous real API check
+returned a `current` result. This is protocol evidence, not an
+installation or published-artifact acceptance.
+
+An isolated local page in Chrome was exercised with deterministic current,
+timeout, and available fixtures. EN/ES messages, last-check time, and the
+thirty-second button cooldown were observed without using teacher credentials
+or modifying the running developer service. Fixture Mac targets are not native
+Mac evidence.
+
+Automatic preferences, scheduling/backoff, trusted manifests, verification,
+staging, installation/recovery, and actual Mac/release acceptance remain open.
+Do not mark this record completed based on the manual checker.
+
+Validation on 2026-10-07 passed strict TypeScript, roadmap integrity, and the
+full portable suite (671 tests at that snapshot). Jig reported only the known
+external `JIG-RULE-GAP-001`; no local validation finding remains.
 
 ## Blockers
 
 Tasks 03, 11, 13, and 14 own configuration, write recovery, lifecycle, and
 trusted packaging prerequisites. Actual Macs, signing/notarization, trusted
 manifest metadata, and a separately authorized published artifact remain
-necessary. Neither implementation nor native/production update acceptance is
-claimed here.
+necessary. Automatic installation and native/production update acceptance remain
+unverified.
 
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
 [api]: https://docs.github.com/en/rest/releases/releases
