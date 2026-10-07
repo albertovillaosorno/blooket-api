@@ -594,6 +594,55 @@ test(
   },
 );
 
+test("a concurrent edit prevents stale preparation publication", async () => {
+  const { root, input } = await setup();
+  try {
+    const imported = await importLibraryImage(root, {
+      ...input,
+      edit: { ...input.edit, width: 1920, height: 1920 },
+    });
+    const preparing = prepareLibraryImage(root, imported.id).then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    );
+    let edited = false;
+    for (let attempt = 0; attempt < 100 && !edited; attempt += 1) {
+      try {
+        await editLibraryImage(root, {
+          id: imported.id,
+          revision: imported.revision,
+          edit: {
+            ...imported.edit,
+            panX: 0.2,
+          },
+          original: {
+            name: imported.original.name,
+            description: imported.original.description,
+          },
+        });
+        edited = true;
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "library-busy")
+          throw error;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+    assert.equal(edited, true);
+    const outcome = await preparing;
+    assert.equal(outcome.ok, false);
+    if (outcome.ok) return;
+    assert.match(String(outcome.error), /prepared-revision-conflict/u);
+    const library = (await loadPreferences(root)).mediaRoot;
+    const current = (await listLibrary(library)).find(
+      (record) => record.id === imported.id,
+    );
+    assert.equal(current?.revision, 2);
+    assert.equal(current?.prepared, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("cancelled preparation publishes no prepared metadata", async () => {
   const { root, input } = await setup();
   try {
