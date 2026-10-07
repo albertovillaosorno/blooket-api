@@ -318,9 +318,10 @@ function matchesQuestion(
     match: input.answerTypes?.[index] ?? null,
   }));
   return (
-    value["schemaVersion"] === 2 &&
+    value["schemaVersion"] === 3 &&
     value["number"] === input.number &&
     value["question"] === input.question &&
+    value["equation"] === null &&
     value["qType"] === input.qType &&
     value["random"] === input.random &&
     value["timeLimit"] === input.timeLimit &&
