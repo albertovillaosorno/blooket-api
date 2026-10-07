@@ -35,6 +35,7 @@ import test from "node:test";
 import {
   decodeBlooketWriteVerificationBaseline,
   frameBlooketWriteVerificationCollection,
+  sameBlooketWriteVerificationBaseline,
   verificationBaselineKindForOperation,
 } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
@@ -161,3 +162,35 @@ test(
   );
   },
 );
+
+test("baseline equality is exact and null-aware", () => {
+  const baseline = {
+    schemaVersion: 1 as const,
+    kind: "set-list" as const,
+    itemCount: 2,
+    sha256: DIGEST,
+  };
+  assert.equal(
+    sameBlooketWriteVerificationBaseline(baseline, { ...baseline }),
+    true,
+  );
+  assert.equal(
+    sameBlooketWriteVerificationBaseline(
+      baseline,
+      { ...baseline, itemCount: 3 },
+    ),
+    false,
+  );
+  assert.equal(
+    sameBlooketWriteVerificationBaseline(
+      baseline,
+      { ...baseline, sha256: "b".repeat(64) },
+    ),
+    false,
+  );
+  assert.equal(sameBlooketWriteVerificationBaseline(null, null), true);
+  assert.equal(
+    sameBlooketWriteVerificationBaseline(baseline, null),
+    false,
+  );
+});
