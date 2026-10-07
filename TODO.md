@@ -2,6 +2,8 @@
 
 Only unfinished work is indexed here. Read the linked record for acceptance,
 dependencies, blockers, and evidence; preserve its stable ID when completing it.
+Execute entries in the displayed order; reordering or splitting requires
+synchronized record metadata and dependencies.
 
 ## Foundations
 
@@ -88,15 +90,15 @@ checks, service ownership, and tunnel lifecycle on the Mac.
 
 ### TODO - Native packages and release acceptance
 
-Complete Safari, signing, notarization, native installation, and both Mac
-architectures while retaining Linux package tests and gated releases.
+Complete real macOS and Safari acceptance, Apple signing/notarization, and both
+Mac architectures while retaining Linux package tests and gated releases.
 
 [Record](docs/todo/open/delivery/packaging.mdc)
 
 ### TODO - Safe automatic application updates
 
-Add opt-in public GitHub updates with trusted artifacts, safe restart, retained
-teacher data, and independent login-startup preferences.
+Implement and verify opt-in public GitHub updates with trusted artifacts, safe
+restart, retained data, and independent login-startup preferences.
 
 [Record](docs/todo/open/delivery/updates.mdc)
 

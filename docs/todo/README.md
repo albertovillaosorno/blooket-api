@@ -17,10 +17,24 @@ sections are Objective, Acceptance, and Evidence; add notes/blockers as needed.
 Evidence names actual checks and dates, never assumed success or native proof
 from portable tests. External blockers keep records active.
 
-Priorities p0–p3 cover foundations, publication, delivery, and recipient
-acceptance. Execution order preserves tasks 03–16; update task 17 has order 145,
-between packaging and teacher acceptance. Dependencies gate completion while
-allowing independently verified foundations when external acceptance is blocked.
+The displayed sequence in `TODO.md` owns execution order. Start at the first
+unfinished entry; priority/horizon and numeric `order` are synchronized
+metadata, not competing authorities. Dependencies gate completion; external
+blockers may permit independently verified foundations as documented in the
+developer profile.
+
+## Reorder and split
+
+Reorder tasks when actual scope or dependencies justify it, updating the
+index, record order/priority, and affected dependencies together. Descriptive
+file names remain independent of sequence; stable IDs are identity rather than
+ranking.
+
+To split a task, retain its ID for the continuing record, assign new stable
+IDs to additional records, and give each one distinct acceptance and owned
+scope. Move the relevant evidence/blockers without losing history and retarget
+dependent records to their actual prerequisites. Never mark a task complete
+merely because its scope was divided.
 
 ## Completion transaction
 

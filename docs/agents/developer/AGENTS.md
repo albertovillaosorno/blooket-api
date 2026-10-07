@@ -37,10 +37,20 @@ Before product changes:
 
 ## Work order and agent profiles
 
-Read `TODO.md` as the unfinished index and the linked typed record before
-working. Follow priority, execution order, and actual `depends_on` gates; do not
-choose unrelated later work merely because it is easier. Each record owns its
-acceptance, blockers, implementation notes, and evidence.
+Execute unfinished tasks in the displayed order of `TODO.md`, starting with the
+first entry. The index is execution-order authority; record priorities and
+`order` metadata must agree with it. Read each owning record before working and
+respect its actual `depends_on` completion gates.
+
+Tasks may be reordered or split when scope or dependencies justify it. Update
+`TODO.md`, affected record order/priority metadata, and real dependencies in the
+same change; do not bypass a prerequisite or pick easier work silently. File
+names describe scope and never encode sequence numbers.
+
+When splitting, keep the original stable ID for the continuing record and give
+additional records fresh IDs. Distribute acceptance, blockers, and evidence
+without loss or duplicate ownership, and update dependent records to the actual
+prerequisites. A split does not prove completion.
 
 When an external prerequisite blocks completion, record it in the owning record
 and keep dependent completion pending. Independent portable foundations may

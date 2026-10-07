@@ -98,6 +98,11 @@ records; Finder appearance still requires macOS acceptance.
 
 ## Blockers
 
+Real macOS ARM64/Intel installation and lifecycle checks, installed Safari
+behavior, Apple signing, Gatekeeper, and notarization remain unverified.
+Complete these checks on native hosts and retain actual evidence before
+closing this record; Linux/package fixtures do not satisfy them.
+
 **Release blockers:** implement and compile the real shared Safari extension;
 configure Apple signing and notarization; then run the release workflow and
 native acceptance. Release-mode CI currently rejects missing Safari or untrusted

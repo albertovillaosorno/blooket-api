@@ -59,6 +59,9 @@ restart, retained data, and launch-at-login behavior on the recipient Mac.
 
 ## Evidence
 
+Actual recipient-Mac and ChatGPT end-to-end acceptance has not been performed.
+Portable fixtures and synthetic OAuth clients do not prove this workflow.
+
 ## Blockers
 
 Acceptance remains open until the checks above run through the actual owning
