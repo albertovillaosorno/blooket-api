@@ -96,6 +96,12 @@ export function inspectBlooketPage(
     }
     if (url.origin !== "https://dashboard.blooket.com") return failed();
     const main = document.querySelector("main");
+    const mySetsNavigation = document.querySelector('nav a[href="/my-sets"]');
+    const logoutLinks = Array.from(
+      document.querySelectorAll('a[href="https://id.blooket.com/logout"]'),
+    ).filter((link) => link.textContent?.trim() === "Logout");
+    const authenticatedShell =
+      main !== null && mySetsNavigation !== null && logoutLinks.length === 1;
     const organizationPrompt = Array.from(
       document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
@@ -114,7 +120,7 @@ export function inspectBlooketPage(
         return { ok: true, value: "organization-prompt" };
       if (document.querySelector('input[type="password"]'))
         return { ok: true, value: "signed-out" };
-      if (!main || !document.querySelector('nav a[href="/my-sets"]'))
+      if (!authenticatedShell)
         return { ok: true, value: "unexpected-page" };
       const heading = main.querySelector("h1");
       if (
@@ -144,8 +150,7 @@ export function inspectBlooketPage(
     if (
       visibleChallenges ||
       organizationPrompt ||
-      !main ||
-      !document.querySelector('nav a[href="/my-sets"]')
+      !authenticatedShell
     )
       return failed();
     if (operation.kind === "sets.list") {

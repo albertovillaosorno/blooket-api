@@ -266,6 +266,15 @@ read-only session inspection; signed-out or expired sessions return
 browser authentication. Real Chrome/Safari acceptance of this capability probe
 remains pending, so portable coverage is not promoted to live account evidence.
 
+Curated dashboard HTML for My Sets, Create, and Edit each contains exactly one
+visible Logout link to `https://id.blooket.com/logout`. Dashboard session
+observation and set reads now require that recovered authenticated-shell marker
+in addition to the route-specific navigation/form controls. Missing, duplicate,
+or differently labeled logout controls become `unexpected-page` or a failed
+read rather than being treated as authenticated. This deliberately does not
+claim `expired-session`: the curated evidence does not distinguish expiry from
+a normal signed-out redirect.
+
 Recovered module 89770 further bounds the remaining question-media gap. The
 question editor initializes separate image and audio strings plus an optional
 math suffix embedded in `question` with the established math marker. Its media
