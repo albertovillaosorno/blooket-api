@@ -715,7 +715,14 @@ Recovered dashboard HTML and module 88289 confirm a visible modal headed
 dialog as organization-prompt, and set reads stop while it is present. The
 adapter does not choose, submit, or infer an organization.
 
-Still pending: observed pagination contracts; capabilities and complete
+The recovered My Sets client receives one `sets` collection, then filters and
+sorts it locally. No cursor, offset, page, limit, load-more control, or
+pagination UI appears in the captured route/client modules. The removed server
+Flight data means this does not prove the server never truncates, so server-side
+completeness remains an explicit observation gap rather than an invented
+pagination contract.
+
+Still pending: server-side set-list completeness; capabilities and complete
 question/media facts; login and the outcome of organization selection; Safari
 worker lifecycle. These prevent completion of task 08 and publication tasks
 09-12. Portable doubles are not browser acceptance, and no live question
@@ -804,9 +811,9 @@ Blooket publication.
 
 The development service restarted normally, the workspace reconnected
 without configuration, and the configured tunnel returned to connected.
-Native Safari, complete questions/media, capabilities, empty accounts,
-pagination, public detail, and login remain pending. Their absence still blocks
-publication; do not expose unsupported read or write tools as if validated.
+Native Safari, complete questions/media, capabilities, server-side set-list
+completeness, and login remain pending. Their absence still blocks publication;
+do not expose unsupported read or write tools as if validated.
 
 Complete when fresh validated remote state can be read reliably, capability
 changes are detected, and a missing/challenged session returns the appropriate
@@ -838,10 +845,18 @@ contract. Capture and validate actual response shapes before activating HTTP
 writes, and never treat `SUCCESS` inferred from client code as observed
 evidence.
 
-Complete bounded Flight decoding: strict primitive validation, text byte-length
-syntax, shared-reference resolution, cycles/limits, error/redirect records, and
-synthetic tests. The current candidate coerces status through `String()` and
-replaces repeated graph objects with null; neither is production-ready.
+Bounded Flight candidate decoding was hardened on 2026-10-06 against the
+recovered production runtime. IDs, JSON rows, UTF-8 byte-length `T` rows,
+duplicate IDs, row/graph limits, direct `$<hex>` references, shared references,
+cycles, and unsupported reference/tag kinds are now explicit and fail closed.
+
+Action-state status is type-checked without coercion, field errors are bounded,
+and malformed JSON is rejected rather than replaced with null. `E` records
+expose only their bounded digest. The same-build Next action reducer establishes
+that
+redirects arrive through `x-action-redirect`, so redirect metadata is decoded
+separately and restricted to same-origin HTTPS instead of being invented as a
+Flight row. Synthetic tests cover all of these cases.
 
 Implement concrete write surfaces using the session/read adapters from task 08.
 Confirm authentication, current build, account capabilities, and the exact
