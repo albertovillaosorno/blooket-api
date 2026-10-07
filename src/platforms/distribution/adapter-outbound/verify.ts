@@ -301,6 +301,7 @@ export async function verifyDistribution(
       ["session", "inspect", "--json"],
       ["sets", "list", "--json"],
       ["sets", "get", "package-fixture", "--json"],
+      ["questions", "list", "package-fixture", "--json"],
     ]) {
       let finished = false;
       const read = execute(node, [
@@ -318,12 +319,21 @@ export async function verifyDistribution(
         assert.equal(next.status, 200);
         const { job } = await next.json();
         if (job) {
-          assert.ok(["session.observe", "sets.list", "sets.get"].includes(
-            job.command.kind,
-          ));
+          assert.ok([
+            "session.observe",
+            "sets.list",
+            "sets.get",
+            "questions.list",
+          ].includes(job.command.kind));
           const value = job.command.kind === "session.observe" ? "my-sets"
             : job.command.kind === "sets.list" ? [{ schemaVersion: 1,
               id: "package-fixture", title: "Synthetic quiz" }]
+            : job.command.kind === "questions.list" ? [{
+              schemaVersion: 1, number: 1, question: "Type sun.",
+              qType: "typing", random: true, timeLimit: 15,
+              answers: ["sun"], correctAnswers: ["sun"],
+              answerTypes: ["exactly"], hasImage: false, hasAudio: false,
+            }]
             : { schemaVersion: 1, id: "package-fixture",
               title: "Synthetic quiz", description: "Synthetic package data",
               visibility: "private" };
@@ -345,8 +355,12 @@ export async function verifyDistribution(
       assert.equal(result.ok, true);
       assert.equal(result.value.ok, true);
       if (args[0] === "session") assert.equal(result.value.state, "my-sets");
-      else assert.equal(result.value.kind,
-        args[1] === "list" ? "sets" : "set");
+      else assert.equal(
+        result.value.kind,
+        args[0] === "questions"
+          ? "questions"
+          : args[1] === "list" ? "sets" : "set",
+      );
       assert.ok(!captured.value.stdout.includes(bootstrap.browserBridge.token));
     }
     await launch(["--stop"]);
