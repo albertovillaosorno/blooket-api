@@ -224,6 +224,9 @@ Mac evidence.
 Automatic preferences, scheduling/backoff, trusted manifests, verification,
 staging, installation/recovery, and actual Mac/release acceptance remain open.
 Do not mark this record completed based on the manual checker.
+The page hides unsupported update controls when an older running service
+omits update status; this compatibility state was observed in isolated Chrome
+without restarting the active development service.
 
 Validation on 2026-10-07 passed strict TypeScript, roadmap integrity, and the
 full portable suite (671 tests at that snapshot). Jig reported only the known
@@ -258,6 +261,11 @@ release mismatches, changed bytes, and interrupted bytes. Ephemeral fixture
 keys are not production trust roots and no signing secret was configured.
 Strict TypeScript and the full portable suite passed (690 tests at that
 snapshot); Jig retains the known external evidence gap.
+
+A fixed checkout at `0f7eccd` subsequently passed strict TypeScript, roadmap
+integrity, all 692 portable tests, and Linux package assembly/extracted checks.
+The shared checkout has only the pre-existing external Jig evidence gap after
+the other agent committed the test-format correction.
 
 These helpers are not connected to downloading or installation. CI still must
 publish the signed envelope after archive signing/notarization and validation,

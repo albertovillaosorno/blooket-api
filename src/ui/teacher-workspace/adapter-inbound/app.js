@@ -1393,6 +1393,7 @@ function fillSettings() {
 function renderUpdates() {
   clearTimeout(updateDisplayTimer);
   const updates = bootstrap.updates;
+  $("#updatePanel").hidden = !updates;
   if (!updates) return;
   const result = updates.result;
   let message = "updateIdle";
@@ -1532,6 +1533,7 @@ $("#folder").addEventListener("click", async () => {
 });
 $("#checkUpdates").addEventListener("click", async () => {
   const previous = bootstrap.updates;
+  if (!previous) return;
   bootstrap.updates = { ...previous, phase: "checking" };
   renderUpdates();
   try {
