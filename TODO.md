@@ -687,8 +687,18 @@ credentials, or a Connect action. The popup shows state and page shortcuts.
 Authorized Chrome DOM inspection on 2026-10-06 confirmed My Sets article/h3/Edit
 link structure and the detail controls: input#title[name="title"],
 textarea#desc[name="desc"], and input#private[name="private"] with role=switch.
-The observed unchecked switch displays "Private (Only playable by you)";
-the adapter admits only that combination. No public mapping was inferred.
+The observed unchecked switch displays "Private (Only playable by you)".
+
+Recovered edit module 31017 establishes both exact visibility states:
+private renders with the inverted switch unchecked and "Private (Only playable
+by you)", while public renders with the switch checked and "Public (Playable by
+everyone)". The adapter requires the matching visible label and switch state.
+
+Recovered My Sets module 52644 and its captured route HTML establish the true
+empty-library state as "You'll need a question set to host!" plus the visible
+"Create a Set" action. The adapter returns an empty set list only with both
+markers; zero cards alone, folder-empty text, and search-empty text still fail
+closed so loading cannot masquerade as an empty account.
 
 Inspecting the existing synthetic typing question confirmed its visible text,
 answer, match mode, and seconds, but did not establish every required question
@@ -705,12 +715,11 @@ Recovered dashboard HTML and module 88289 confirm a visible modal headed
 dialog as organization-prompt, and set reads stop while it is present. The
 adapter does not choose, submit, or infer an organization.
 
-Still pending: observed empty-account and pagination contracts; public set
-details; capabilities and complete question/media facts; login and the outcome
-of organization selection; Safari worker lifecycle. These prevent completion of
-task 08 and publication tasks 09-12. Portable doubles are not browser
-acceptance,
-and no live question read-back is claimed.
+Still pending: observed pagination contracts; capabilities and complete
+question/media facts; login and the outcome of organization selection; Safari
+worker lifecycle. These prevent completion of task 08 and publication tasks
+09-12. Portable doubles are not browser acceptance, and no live question
+read-back is claimed.
 
 The worker now has an explicit regression for that evidence boundary:
 capability inspection, question listing, and browser authentication remain
