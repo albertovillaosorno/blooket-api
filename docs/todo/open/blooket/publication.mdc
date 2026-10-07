@@ -66,7 +66,35 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+Persisted execution now closes the pacing conflict window before mutation. It
+captures the verification baseline, waits for its shared mutation lease, then
+re-observes the session without authenticating and revalidates remote state.
+Changed digests return an explicit remote-precondition conflict; expired,
+rate-limited, and human-challenge states stop before task-budget reservation or
+the attempt journal.
+
+Write-time media admission now enumerates stable media IDs in canonical
+operation order and deduplicates repeated references. Every referenced item must
+resolve to a current prepared revision, admitted GIF/JPEG/PNG bytes, and a
+positive revision, with the canonical exclusive 2,500,000-byte ceiling applied
+to the actual byte snapshot. Missing, stale, malformed, oversized, or
+unavailable media stops before budget reservation and journaling.
+
+The browser-service composition adapts the current teacher library into this
+media port using the current configured canvas and the existing strict prepared
+read. That read already validates current recipe revision, rendition identity,
+actual byte count, decoded dimensions, and file format. The exact admitted
+Uint8Array snapshot is carried through the write execution port into the browser
+surface so publication does not re-resolve a different file after the journal
+opens.
+
 ## Blockers
+
+A concrete production BlooketBrowserWriteSurfacePort still does not exist, so
+no media bytes are uploaded to Blooket yet. Canonical publication entrypoints
+and the approved MCP/CLI end-to-end create/edit/read-back run also remain
+pending; these portable and local-composition foundations do not complete this
+record.
 
 Acceptance remains open until the checks above run through the actual owning
 product surfaces; portable foundations alone do not complete this record.
