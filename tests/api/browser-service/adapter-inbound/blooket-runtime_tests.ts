@@ -30,14 +30,28 @@
 //   - Add Question remains unsupported by the current bridge surface.
 //
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { createBlooketRuntimePorts } from
   "../../../../src/api/browser-service/adapter-inbound/blooket-runtime.ts";
+import { executePersistedBlooketWrite } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/application/execute-persisted.ts";
 import type { BlooketBrowserBridgeCommand } from
   "../../../../src/ir/blooket-browser-bridge/contract/message.ts";
 import type { BlooketWriteOperation } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
+import { loadWriteAttemptFile } from
+  "../../../../src/platforms/write-attempt-files/adapter-outbound/file.ts";
+import { loadMutationBudgetFile } from
+  "../../../../src/platforms/mutation-budget-files/adapter-outbound/file.ts";
+import type { BlooketWritePlan } from
+  "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
+import type { HostSecretStore } from
+  "../../../../src/security/host-secrets/domain/host-secret.ts";
 
 const operation: BlooketWriteOperation = {
   operationId: "plan:runtime:set",
@@ -85,6 +99,250 @@ test(
     description: "Synthetic description",
     private: true,
   }]);
+  },
+);
+
+test(
+  "persisted runtime journals budgets and confirms one bridge Create Set",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "blooket-runtime-"));
+    try {
+      const commands: BlooketBrowserBridgeCommand[] = [];
+      const runtime = createBlooketRuntimePorts({
+        request: async (command) => {
+          commands.push(command);
+          if (command.kind === "session.observe")
+            return { ok: true, value: "my-sets" };
+          if (command.kind === "sets.create")
+            return {
+              ok: true,
+              value: { ok: true, remoteSetId: "remote-set-1" },
+            };
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+      }, directory);
+      const plan: BlooketWritePlan = {
+        schemaVersion: 1,
+        planId: "plan:runtime-persisted",
+        desiredStateSha256: "synthetic",
+        operations: [operation],
+      };
+      const checkpoint = join(directory, "checkpoint.json");
+      const attempt = join(directory, "attempt.json");
+      const budget = join(directory, "budget.json");
+      const secrets: HostSecretStore = {
+        read: async () => ({ ok: true, kind: "missing" }),
+        write: async () => ({ ok: true }),
+        delete: async () => ({ ok: true }),
+      };
+
+      const result = await executePersistedBlooketWrite(
+        { checkpoint, attempt },
+        plan,
+        runtime.session,
+        secrets,
+        runtime.writeExecution,
+        undefined,
+        {
+          budget: {
+            path: budget,
+            policy: {
+              maximumStarts: 2,
+              maximumDurationMs: 60_000,
+            },
+            now: () => 10_000,
+          },
+          media: runtime.preparedMedia,
+        },
+      );
+
+      assert.deepEqual(result, {
+        ok: true,
+        kind: "advanced",
+        operationId: "plan:runtime:set",
+        checkpoint: {
+          schemaVersion: 2,
+          planId: "plan:runtime-persisted",
+          nextOperationIndex: 1,
+          remoteSetId: "remote-set-1",
+        },
+      });
+      assert.deepEqual(
+        JSON.parse(await readFile(checkpoint, "utf8")),
+        result.ok && result.kind === "advanced"
+          ? result.checkpoint
+          : null,
+      );
+      assert.deepEqual(
+        await loadMutationBudgetFile(budget, plan.planId),
+        {
+          ok: true,
+          state: { version: 1, startedAtMs: 10_000, starts: 1 },
+        },
+      );
+      assert.deepEqual(await loadWriteAttemptFile(attempt, plan), {
+        ok: true,
+        kind: "missing",
+      });
+      assert.deepEqual(commands, [
+        { kind: "session.observe" },
+        { kind: "session.observe" },
+        {
+          kind: "sets.create",
+          title: "Synthetic set",
+          description: "Synthetic description",
+          private: true,
+        },
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "persisted runtime challenge before mutation consumes no budget or write",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "blooket-runtime-"));
+    try {
+      const commands: BlooketBrowserBridgeCommand[] = [];
+      const runtime = createBlooketRuntimePorts({
+        request: async (command) => {
+          commands.push(command);
+          if (command.kind === "session.observe")
+            return { ok: true, value: "security-challenge" };
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+      }, directory);
+      const plan: BlooketWritePlan = {
+        schemaVersion: 1,
+        planId: "plan:runtime-challenge",
+        desiredStateSha256: "synthetic",
+        operations: [operation],
+      };
+      const checkpoint = join(directory, "checkpoint.json");
+      const attempt = join(directory, "attempt.json");
+      const budget = join(directory, "budget.json");
+      const secrets: HostSecretStore = {
+        read: async () => ({ ok: true, kind: "missing" }),
+        write: async () => ({ ok: true }),
+        delete: async () => ({ ok: true }),
+      };
+
+      const result = await executePersistedBlooketWrite(
+        { checkpoint, attempt },
+        plan,
+        runtime.session,
+        secrets,
+        runtime.writeExecution,
+        undefined,
+        {
+          budget: {
+            path: budget,
+            policy: {
+              maximumStarts: 2,
+              maximumDurationMs: 60_000,
+            },
+            now: () => 10_000,
+          },
+        },
+      );
+
+      assert.equal(result.ok, true);
+      if (result.ok) assert.equal(result.kind, "human-action-required");
+      assert.deepEqual(commands, [{ kind: "session.observe" }]);
+      assert.deepEqual(
+        await loadMutationBudgetFile(budget, plan.planId),
+        { ok: true, state: null },
+      );
+      assert.deepEqual(await loadWriteAttemptFile(attempt, plan), {
+        ok: true,
+        kind: "missing",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "challenge during bridge mutation retains budget and reconciliation journal",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "blooket-runtime-"));
+    try {
+      const commands: BlooketBrowserBridgeCommand[] = [];
+      const runtime = createBlooketRuntimePorts({
+        request: async (command) => {
+          commands.push(command);
+          if (command.kind === "session.observe")
+            return { ok: true, value: "my-sets" };
+          if (command.kind === "sets.create")
+            return {
+              ok: true,
+              value: {
+                ok: false,
+                kind: "navigation",
+                state: "security-challenge",
+              },
+            };
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+      }, directory);
+      const plan: BlooketWritePlan = {
+        schemaVersion: 1,
+        planId: "plan:runtime-ambiguous",
+        desiredStateSha256: "synthetic",
+        operations: [operation],
+      };
+      const checkpoint = join(directory, "checkpoint.json");
+      const attempt = join(directory, "attempt.json");
+      const budget = join(directory, "budget.json");
+      const secrets: HostSecretStore = {
+        read: async () => ({ ok: true, kind: "missing" }),
+        write: async () => ({ ok: true }),
+        delete: async () => ({ ok: true }),
+      };
+
+      const result = await executePersistedBlooketWrite(
+        { checkpoint, attempt },
+        plan,
+        runtime.session,
+        secrets,
+        runtime.writeExecution,
+        undefined,
+        {
+          budget: {
+            path: budget,
+            policy: {
+              maximumStarts: 2,
+              maximumDurationMs: 60_000,
+            },
+            now: () => 20_000,
+          },
+        },
+      );
+
+      assert.equal(result.ok, true);
+      if (result.ok) assert.equal(result.kind, "reconciliation-required");
+      assert.equal(
+        commands.filter((command) => command.kind === "sets.create").length,
+        1,
+      );
+      assert.deepEqual(
+        await loadMutationBudgetFile(budget, plan.planId),
+        {
+          ok: true,
+          state: { version: 1, startedAtMs: 20_000, starts: 1 },
+        },
+      );
+      const journal = await loadWriteAttemptFile(attempt, plan);
+      assert.equal(journal.ok, true);
+      if (journal.ok && journal.kind === "record")
+        assert.equal(journal.record.phase, "attempting");
+      await assert.rejects(readFile(checkpoint, "utf8"));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   },
 );
 
