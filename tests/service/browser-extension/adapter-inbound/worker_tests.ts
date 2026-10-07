@@ -239,17 +239,18 @@ test(
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
     const before = scripts.length;
-    assert.equal(
-      (
-        await expectReply({
-          kind: "session.authenticate",
-          loginIdentifier: "teacher@example.invalid",
-          password: "synthetic-password",
-        })
-      ).ok,
-      false,
-    );
-    assert.equal(scripts.length, before);
+    for (const unsupported of [
+      {
+        kind: "session.authenticate",
+        loginIdentifier: "teacher@example.invalid",
+        password: "synthetic-password",
+      },
+      { kind: "capabilities.inspect" },
+      { kind: "questions.list", setId: "set-fixture" },
+    ]) {
+      assert.equal((await expectReply(unsupported)).ok, false);
+      assert.equal(scripts.length, before);
+    }
     tabUrl = "https://id.blooket.com/login";
     assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
     assert.equal(scripts.length, before);

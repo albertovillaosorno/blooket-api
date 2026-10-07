@@ -690,6 +690,11 @@ organization-selection states; Safari worker lifecycle. These prevent completion
 of task 08 and publication tasks 09-12. Portable doubles are not browser
 acceptance, and no live question read-back is claimed.
 
+The worker now has an explicit regression for that evidence boundary:
+capability inspection, question listing, and browser authentication remain
+fail-closed without running a page script until their required browser semantics
+are observed and implemented. Supported set/session reads are unaffected.
+
 Initial validation: 572 portable tests, strict TypeScript, browser-script
 syntax, and compiled-extension assembly passed. Manual pairing controls were
 removed at the human's request; that workflow is superseded by automatic local
