@@ -43,6 +43,11 @@ export interface FlightActionRedirect {
   readonly search: string;
   readonly hash: string;
 }
+export interface FlightActionRevalidated {
+  readonly paths: readonly string[];
+  readonly tag: 0 | 1;
+  readonly cookie: 0 | 1;
+}
 
 const MAX_FLIGHT_BYTES = 5_000_000;
 const MAX_FLIGHT_ROWS = 20_000;
@@ -221,6 +226,41 @@ export function flightErrorRecords(
   source: string,
 ): readonly FlightErrorRecord[] {
   return [...decodeFlightRows(source).values()].filter(isFlightError);
+}
+
+export function decodeFlightActionRevalidated(
+  value: string | null,
+): FlightActionRevalidated {
+  if (value === null) return { paths: [], tag: 0, cookie: 0 };
+  if (encodedBytes(value) < 1 || encodedBytes(value) > 100_000)
+    throw new Error("invalid-flight-revalidated");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    throw new Error("invalid-flight-revalidated");
+  }
+  if (!Array.isArray(parsed) || parsed.length !== 3)
+    throw new Error("invalid-flight-revalidated");
+  const [paths, tag, cookie] = parsed;
+  if (
+    !Array.isArray(paths) ||
+    paths.length > 1_000 ||
+    !paths.every(
+      (path) =>
+        typeof path === "string" &&
+        encodedBytes(path) >= 1 &&
+        encodedBytes(path) <= 8_192,
+    ) ||
+    (tag !== 0 && tag !== 1) ||
+    (cookie !== 0 && cookie !== 1)
+  )
+    throw new Error("invalid-flight-revalidated");
+  return {
+    paths: paths as readonly string[],
+    tag,
+    cookie,
+  };
 }
 
 export function decodeFlightActionRedirect(
