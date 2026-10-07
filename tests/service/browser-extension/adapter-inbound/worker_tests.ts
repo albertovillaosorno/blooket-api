@@ -135,13 +135,21 @@ test(
           return [{ result: questionPanelCloses }];
         if (func.name === "isBlooketQuestionPanelClosed")
           return [{ result: questionPanelCloses }];
-        if (func.name === "openBlooketAddQuestionPanel") {
-          assert.equal(args[0], "set-fixture");
-          addQuestionPanelReady = true;
-          return [{ result: true }];
+        if (func.name === "runBlooketAddQuestionPageAction") {
+          if (args[0] === "open") {
+            assert.equal(args[1], "set-fixture");
+            addQuestionPanelReady = true;
+            return [{ result: true }];
+          }
+          if (args[0] === "is-ready")
+            return [{ result: addQuestionPanelReady }];
+          if (args[0] === "prepare") return [{ result: { ok: true } }];
+          if (args[0] === "submit") {
+            addQuestionPanelReady = false;
+            return [{ result: { ok: true } }];
+          }
+          throw new Error("unexpected-add-question-action");
         }
-        if (func.name === "isBlooketAddQuestionPanelReady")
-          return [{ result: addQuestionPanelReady }];
         if (func.name === "openBlooketCapabilityQuestionPanel") {
           assert.equal(args[0], "set-fixture");
           capabilityPanelReady = true;
@@ -180,33 +188,6 @@ test(
             return [{ result: { ok: true } }];
           }
           throw new Error("unexpected-login-action");
-        }
-        if (func.name === "prepareBlooketAddQuestionForm") {
-          assert.deepEqual(args[0], {
-            setId: "set-fixture",
-            number: 1,
-            question: "Type sun.",
-            answers: [{ text: "sun", correct: true }],
-            qType: "typing",
-            random: true,
-            answerTypes: ["exactly"],
-            timeLimit: 15,
-          });
-          return [{ result: { ok: true } }];
-        }
-        if (func.name === "submitBlooketAddQuestionForm") {
-          assert.deepEqual(args[0], {
-            setId: "set-fixture",
-            number: 1,
-            question: "Type sun.",
-            answers: [{ text: "sun", correct: true }],
-            qType: "typing",
-            random: true,
-            answerTypes: ["exactly"],
-            timeLimit: 15,
-          });
-          addQuestionPanelReady = false;
-          return [{ result: { ok: true } }];
         }
         if (func.name === "prepareBlooketCreateSetForm") {
           assert.deepEqual(args[0], {
@@ -446,10 +427,11 @@ test(
     });
     assert.deepEqual(added.value, { ok: true });
     assert.equal(
-      scripts.filter((name) => name === "submitBlooketAddQuestionForm").length,
-      1,
+      scripts.filter((name) => name === "runBlooketAddQuestionPageAction")
+        .length >= 4,
+      true,
     );
-    assert.ok(scripts.includes("prepareBlooketAddQuestionForm"));
+    assert.ok(scripts.includes("runBlooketAddQuestionPageAction"));
     assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
 
     const beforeCapabilitiesUrl = tabUrl;

@@ -32,10 +32,7 @@
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import {
-  isBlooketAddQuestionPanelReady,
-  openBlooketAddQuestionPanel,
-  prepareBlooketAddQuestionForm,
-  submitBlooketAddQuestionForm,
+  runBlooketAddQuestionPageAction,
   type BlooketTextQuestionPageInput,
 } from
   "../../../platforms/blooket-browser/adapter-outbound/add-question-page.ts";
@@ -138,16 +135,16 @@ export function createExtensionAddQuestionHost(
         if (!ready.ok) return ready;
 
         const opened = await script(
-          openBlooketAddQuestionPanel as (...args: never[]) => unknown,
-          [input.setId],
+          runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+          ["open", input.setId],
         );
         if (opened !== true) return browserFailure();
 
         let panelReady = false;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const result = await script(
-            isBlooketAddQuestionPanelReady as (...args: never[]) => unknown,
-            [input.setId],
+            runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+            ["is-ready", input.setId],
           );
           if (result === true) {
             panelReady = true;
@@ -158,14 +155,14 @@ export function createExtensionAddQuestionHost(
         if (!panelReady) return browserFailure();
 
         const prepared = await script(
-          prepareBlooketAddQuestionForm as (...args: never[]) => unknown,
-          [input],
+          runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+          ["prepare", input],
         );
         if (!exactOk(prepared)) return browserFailure();
 
         const submittedResult = await script(
-          submitBlooketAddQuestionForm as (...args: never[]) => unknown,
-          [input],
+          runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+          ["submit", input],
         );
         if (!exactOk(submittedResult)) return browserFailure();
         return await observeQuestion(
@@ -223,8 +220,8 @@ async function observeQuestion(
     }
 
     const panel = await script(
-      isBlooketAddQuestionPanelReady as (...args: never[]) => unknown,
-      [input.setId],
+      runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+      ["is-ready", input.setId],
     );
     if (panel === true) {
       await pause(POLL_MS);
