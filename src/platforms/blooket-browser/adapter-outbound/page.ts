@@ -58,8 +58,22 @@ export function inspectBlooketPage(
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
+    const organizationPrompt = Array.from(
+      document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"] h3',
+      ),
+    ).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return (
+        bounds.width > 0 &&
+        bounds.height > 0 &&
+        heading.textContent?.trim() === "Select your organization"
+      );
+    });
     if (operation.kind === "session.observe") {
       if (visibleChallenges) return { ok: true, value: "security-challenge" };
+      if (organizationPrompt)
+        return { ok: true, value: "organization-prompt" };
       if (document.querySelector('input[type="password"]'))
         return { ok: true, value: "signed-out" };
       if (!main || !document.querySelector('nav a[href="/my-sets"]'))
@@ -82,6 +96,7 @@ export function inspectBlooketPage(
     }
     if (
       visibleChallenges ||
+      organizationPrompt ||
       !main ||
       !document.querySelector('nav a[href="/my-sets"]')
     )

@@ -700,11 +700,17 @@ popup senders, exact loopback configuration, bounded replies, navigation,
 unsupported commands, and signed-out page stops. Artifact tests verify emitted
 JavaScript imports and the narrow permission set, with no server/secret modules.
 
-Still pending: observed empty-account and pagination contracts;
-public set details; capabilities and complete question/media facts; login and
-organization-selection states; Safari worker lifecycle. These prevent completion
-of task 08 and publication tasks 09-12. Portable doubles are not browser
-acceptance, and no live question read-back is claimed.
+Recovered dashboard HTML and module 88289 confirm a visible modal headed
+"Select your organization". Session observation now treats that exact visible
+dialog as organization-prompt, and set reads stop while it is present. The
+adapter does not choose, submit, or infer an organization.
+
+Still pending: observed empty-account and pagination contracts; public set
+details; capabilities and complete question/media facts; login and the outcome
+of organization selection; Safari worker lifecycle. These prevent completion of
+task 08 and publication tasks 09-12. Portable doubles are not browser
+acceptance,
+and no live question read-back is claimed.
 
 The worker now has an explicit regression for that evidence boundary:
 capability inspection, question listing, and browser authentication remain

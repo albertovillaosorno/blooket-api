@@ -207,6 +207,24 @@ test(
 });
 
 test(
+  "organization selection is a human stop before set reads",
+  () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  document.selectors[
+    '[role="dialog"][aria-modal="true"] h3'
+  ] = [node("H3", "Select your organization")];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "organization-prompt",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+  },
+);
+
+test(
   "challenge and unknown origin observations never proceed to set reads",
   () => {
   const { document, main } = base();
