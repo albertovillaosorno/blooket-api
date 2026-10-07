@@ -24,7 +24,8 @@
 // - Summary:
 //   - Journals the exact mutation window before persisting confirmed progress.
 // - Description:
-//   - Recovery precedes browser work; ambiguous attempts block future writes.
+//   - Recovery precedes browser work; pre-write state is revalidated after
+//     pacing and ambiguous attempts block future writes.
 // - Usage:
 //   - Supply owned persistence paths and one shared pacer when configured.
 // - Defaults:
@@ -58,6 +59,11 @@ import type { BlooketWriteCheckpoint } from
   "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import type { BlooketMutationTaskBudgetPolicy } from
   "../../../projects/blooket-write-plans/domain/mutation-budget.ts";
+import {
+  sameBlooketWriteVerificationBaseline,
+  type BlooketWriteVerificationBaseline,
+} from
+  "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { HostSecretStore } from
@@ -148,6 +154,12 @@ export type ExecutePersistedBlooketWriteResult =
       readonly code:
         | "mutation-pacing-cancelled"
         | "mutation-pacing-failed";
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "remote-precondition";
+      readonly code: "blooket-remote-state-changed";
+      readonly operationId: string;
     }
   | {
       readonly ok: false;
@@ -290,7 +302,7 @@ export async function executePersistedBlooketWrite(
 type CapturedVerificationBaseline =
   | {
       readonly ok: true;
-      readonly value: unknown;
+      readonly value: BlooketWriteVerificationBaseline | null;
     }
   | {
       readonly ok: false;
@@ -448,6 +460,30 @@ async function executePersistedBlooketWriteLocked(
       ok: false,
       stage: "mutation-pacing",
       code: "mutation-pacing-cancelled",
+    };
+  }
+
+  const currentBaseline = await captureVerificationBaseline(
+    verifier,
+    prepared.operation,
+    prepared.checkpoint,
+  );
+  if (!currentBaseline.ok) {
+    lease?.release();
+    return currentBaseline.result;
+  }
+  if (
+    !sameBlooketWriteVerificationBaseline(
+      baseline.value,
+      currentBaseline.value,
+    )
+  ) {
+    lease?.release();
+    return {
+      ok: false,
+      stage: "remote-precondition",
+      code: "blooket-remote-state-changed",
+      operationId: prepared.operation.operationId,
     };
   }
 

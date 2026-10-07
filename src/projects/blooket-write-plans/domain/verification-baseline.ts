@@ -173,3 +173,14 @@ export function frameBlooketWriteVerificationCollection(
     ...items,
   ]);
 }
+
+export function sameBlooketWriteVerificationBaseline(
+  left: BlooketWriteVerificationBaseline | null,
+  right: BlooketWriteVerificationBaseline | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  return left.schemaVersion === right.schemaVersion
+    && left.kind === right.kind
+    && left.itemCount === right.itemCount
+    && left.sha256 === right.sha256;
+}

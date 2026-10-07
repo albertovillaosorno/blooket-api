@@ -160,6 +160,33 @@ function writes(
   };
 }
 
+function verificationSequence(
+  results: readonly BlooketWriteVerificationBaselineResult[],
+  calls: Array<{
+    readonly operationId: string;
+    readonly remoteSetId: string | null;
+  }> = [],
+): BlooketWriteVerificationPort {
+  let index = 0;
+  return {
+    captureBaseline: async (operation, target) => {
+      calls.push({
+        operationId: operation.operationId,
+        remoteSetId: target.remoteSetId,
+      });
+      const result = results[index];
+      index += 1;
+      if (result === undefined)
+        throw new Error("fixture baseline sequence exhausted");
+      return result;
+    },
+    verify: async () => ({
+      ok: true,
+      outcome: "inconclusive",
+    }),
+  };
+}
+
 function verification(
   result: BlooketWriteVerificationBaselineResult | "throw",
   calls: Array<{
@@ -475,6 +502,119 @@ test("pacing lease releases when journal admission fails", async () => {
     );
   });
 });
+
+test(
+  "remote state changes during pacing stop before budget and journal",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const pacingEvents: string[] = [];
+    const writeCalls: string[] = [];
+    const verificationCalls: Array<{
+      readonly operationId: string;
+      readonly remoteSetId: string | null;
+    }> = [];
+    const changedBaseline = {
+      ...SET_BASELINE,
+      sha256: "c".repeat(64),
+    };
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      verificationSequence([
+        { ok: true, baseline: SET_BASELINE },
+        { ok: true, baseline: changedBaseline },
+      ], verificationCalls),
+      {
+        pacer: immediatePacer(pacingEvents),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 70_000,
+        },
+      },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "remote-precondition",
+      code: "blooket-remote-state-changed",
+      operationId: "plan:persisted-test:set",
+    });
+    assert.deepEqual(pacingEvents, ["acquire", "release"]);
+    assert.deepEqual(writeCalls, []);
+    assert.equal(verificationCalls.length, 2);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+  },
+);
+
+test(
+  "challenge during pre-write revalidation stops without budget or journal",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const pacingEvents: string[] = [];
+    const writeCalls: string[] = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      verificationSequence([
+        { ok: true, baseline: SET_BASELINE },
+        {
+          ok: false,
+          kind: "navigation",
+          state: "security-challenge",
+        },
+      ]),
+      {
+        pacer: immediatePacer(pacingEvents),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 80_000,
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.kind, "human-action-required");
+      if (result.kind === "human-action-required")
+        assert.equal(result.state, "security-challenge");
+    }
+    assert.deepEqual(pacingEvents, ["acquire", "release"]);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+  },
+);
 
 test("durable budget reservation precedes journaled mutation", async () => {
   await withTemporaryDirectory(async (directory) => {
@@ -801,10 +941,16 @@ test("captured set baseline is durable before remote mutation", async () => {
 
     assert.equal(result.ok, true);
     assert.deepEqual(writeCalls, ["plan:persisted-test:set"]);
-    assert.deepEqual(verificationCalls, [{
-      operationId: "plan:persisted-test:set",
-      remoteSetId: null,
-    }]);
+    assert.deepEqual(verificationCalls, [
+      {
+        operationId: "plan:persisted-test:set",
+        remoteSetId: null,
+      },
+      {
+        operationId: "plan:persisted-test:set",
+        remoteSetId: null,
+      },
+    ]);
   });
 });
 
@@ -925,10 +1071,16 @@ test("persisted progress resumes at the exact next operation", async () => {
     }
     assert.deepEqual(writeCalls, ["plan:persisted-test:q:0"]);
     assert.deepEqual(targets, ["remote-set-1"]);
-    assert.deepEqual(verificationCalls, [{
-      operationId: "plan:persisted-test:q:0",
-      remoteSetId: "remote-set-1",
-    }]);
+    assert.deepEqual(verificationCalls, [
+      {
+        operationId: "plan:persisted-test:q:0",
+        remoteSetId: "remote-set-1",
+      },
+      {
+        operationId: "plan:persisted-test:q:0",
+        remoteSetId: "remote-set-1",
+      },
+    ]);
   });
 });
 

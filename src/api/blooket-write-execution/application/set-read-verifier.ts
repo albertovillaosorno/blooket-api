@@ -43,6 +43,7 @@ import {
 } from "../../../ir/blooket-set-reads/contract/set-read.ts";
 import {
   frameBlooketWriteVerificationCollection,
+  sameBlooketWriteVerificationBaseline,
   type BlooketWriteVerificationBaseline,
 } from
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
@@ -105,7 +106,7 @@ export function blooketSetReadWriteVerifier(
       const listed = await safeList(reads);
       if (!listed.ok) return listed;
       const currentBaseline = setBaselineFor(listed.value);
-      if (sameBaseline(currentBaseline, baseline)) {
+      if (sameBlooketWriteVerificationBaseline(currentBaseline, baseline)) {
         return { ok: true, outcome: "not-confirmed" };
       }
       if (listed.value.length !== baseline.itemCount + 1) {
@@ -118,7 +119,7 @@ export function blooketSetReadWriteVerifier(
       const candidates = listed.value
         .map((set, index) => ({ set, index }))
         .filter(({ set }) => set.title === operation.title)
-        .filter(({ index }) => sameBaseline(
+        .filter(({ index }) => sameBlooketWriteVerificationBaseline(
           setBaselineFor(withoutIndex(listed.value, index)),
           baseline,
         ));
@@ -170,7 +171,7 @@ async function verifyQuestion(
   const listed = await safeQuestions(reads, target.remoteSetId);
   if (!listed.ok) return listed;
   const currentBaseline = questionBaselineFor(listed.value);
-  if (sameBaseline(currentBaseline, baseline)) {
+  if (sameBlooketWriteVerificationBaseline(currentBaseline, baseline)) {
     return { ok: true, outcome: "not-confirmed" };
   }
   if (listed.value.length !== baseline.itemCount + 1) {
@@ -193,7 +194,7 @@ async function verifyQuestion(
       question,
       lowered.value,
     ))
-    .filter(({ index }) => sameBaseline(
+    .filter(({ index }) => sameBlooketWriteVerificationBaseline(
       questionBaselineFor(withoutIndex(listed.value, index)),
       baseline,
     ));
@@ -341,15 +342,6 @@ function withoutIndex<T>(
     ...items.slice(0, index),
     ...items.slice(index + 1),
   ];
-}
-
-function sameBaseline(
-  left: BlooketWriteVerificationBaseline,
-  right: BlooketWriteVerificationBaseline,
-): boolean {
-  return left.kind === right.kind
-    && left.itemCount === right.itemCount
-    && left.sha256 === right.sha256;
 }
 
 function equalArray<T>(
