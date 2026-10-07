@@ -60,11 +60,17 @@ between mutation starts and at most 20 starts in a rolling minute. These are
 application choices, not verified Blooket limits or a guarantee against account
 restrictions; use stricter verified provider limits when known.
 
-Pacing remains intentionally unwired from publication: task 09 still blocks real
-HTTP writes, and the future composition must acquire pacing, durably save the
-incremented task budget, then open the existing attempt journal immediately
-before mutation. Durable budget-file ownership and shared MCP/CLI/UI wiring
-remain pending, so restart acceptance is not yet claimed.
+Persisted execution can now accept one shared cancellable pacer. It acquires
+after session and verification baseline admission, then durably reserves the
+plan-bound task budget before opening the existing attempt journal and remote
+mutation. Session/human stops consume neither pacing nor budget. Ambiguous
+mutations retain the consumed budget start, and budget exhaustion stops before a
+journal or remote write.
+
+The durable budget adapter is lock-protected, plan-bound, strictly decoded, and
+atomically persisted; restart reloads the same start count and deadline. Shared
+MCP/CLI/UI product composition remains pending because those publication
+entrypoints are not yet active, so owning-surface acceptance is still open.
 
 Make pacing, mutations per minute, task mutation budget, and maximum task
 duration configurable within bounded ranges. Persist progress and yield with a
@@ -96,10 +102,12 @@ exclusive mutation lease at a time, enforces the two-second and 20-per-minute
 defaults with an injected clock, permits only stricter configuration, and
 cancels queued work without consuming a start.
 
-A strict task-budget state now counts attempted mutation starts and has bounded
-maximum-start and maximum-duration policies. Its versioned state round-trips
-through serialization so a future durable owner can resume it without inventing
-progress; clock rollback and malformed state fail closed.
+A strict task-budget state counts attempted mutation starts with bounded
+maximum-start and maximum-duration policies. Its value object now lives with the
+write-plan domain, while a dedicated adapter reserves the next state atomically
+under a file lock. Tests cover restart, exhaustion, clock rollback, plan
+mismatch, symlinks, malformed/oversized files, lock contention, cancellation,
+and serialization across distinct persisted write paths.
 
 ## Blockers
 

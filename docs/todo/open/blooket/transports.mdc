@@ -89,6 +89,19 @@ that redirects arrive through `x-action-redirect`, so redirect metadata is
 decoded separately and restricted to same-origin HTTPS instead of being invented
 as a Flight row. Synthetic tests cover all of these cases.
 
+Same-build action response metadata now has an explicit candidate decoder:
+`text/x-component` must match exactly before Flight parsing, redirects remain
+same-origin HTTPS, and revalidation flags preserve their wire-level zero/one
+values. HTTP status, `SUCCESS`, redirects, revalidation, and error digests are
+returned only as response evidence; the candidate shape has no confirmation or
+receipt field.
+
+Pre-mutation transport selection is also explicit. While the HTTP response
+contract remains unverified, even lowerable HTTP payloads select the browser
+before mutation. Unsupported HTTP operations also select browser before
+mutation, while any already-ambiguous primary mutation requires reconciliation
+and cannot fall back or retry.
+
 A private one-question quiz was created through the authorized Blooket UI and
 changed from multiple choice to typing with a 15-second limit. Its final type
 and time persisted after reload. Request fields were observed; the action
