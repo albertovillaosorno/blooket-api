@@ -125,7 +125,9 @@ function readPort(
         if (listResult === "throw") {
           throw new Error("fixture list failure");
         }
-        return listResult;
+        return listResult.ok
+          ? { ...listResult, completeness: "unknown" as const }
+          : listResult;
       },
       get: async (setId) => {
         calls.push("sets:get:" + setId);

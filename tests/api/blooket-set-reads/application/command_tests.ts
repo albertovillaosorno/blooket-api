@@ -76,6 +76,7 @@ function dependencies(state: ObservedBlooketNavigationStateKind) {
         return {
           ok: true,
           value: [{ schemaVersion: 1, id: "fixture", title: "Synthetic quiz" }],
+          completeness: "unknown" as const,
         };
       },
       get: async (setId) => {
@@ -116,6 +117,7 @@ test("canonical reads reuse a ready session without secret access",
       ok: true,
       kind: "sets",
       session: { state: "my-sets", reused: true },
+      completeness: "unknown",
       value: [{ schemaVersion: 1, id: "fixture", title: "Synthetic quiz" }],
     });
   assert.equal(

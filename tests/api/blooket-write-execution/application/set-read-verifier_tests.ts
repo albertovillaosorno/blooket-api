@@ -82,6 +82,7 @@ test("Create Set verifies only one exact post-state addition", async () => {
     list: async () => ({
       ok: true,
       value: lists++ === 0 ? before : after,
+      completeness: "complete",
     }),
     get: async (id) => ({
       ok: true,
@@ -119,7 +120,11 @@ test("Create Set verifies only one exact post-state addition", async () => {
 test("unchanged set collection proves non-confirmation", async () => {
   const sets = [summary("old-1", "Existing")];
   const reads: BlooketSetReadPort = {
-    list: async () => ({ ok: true, value: sets }),
+    list: async () => ({
+      ok: true,
+      value: sets,
+      completeness: "complete",
+    }),
     get: async () => {
       throw new Error("detail should not be read");
     },
@@ -154,7 +159,11 @@ test(
     summary("other", "Concurrent"),
   ];
   const reads: BlooketSetReadPort = {
-    list: async () => ({ ok: true, value: current }),
+    list: async () => ({
+      ok: true,
+      value: current,
+      completeness: "complete",
+    }),
     get: async (id) => ({
       ok: true,
       value: detail(id, "Astronomy", "Different"),
@@ -163,7 +172,11 @@ test(
   const verifier = blooketSetReadWriteVerifier(reads);
 
   const captureReads: BlooketSetReadPort = {
-    list: async () => ({ ok: true, value: before }),
+    list: async () => ({
+      ok: true,
+      value: before,
+      completeness: "complete",
+    }),
     get: reads.get,
   };
   const captured = await blooketSetReadWriteVerifier(
@@ -212,6 +225,7 @@ test(
     list: async () => ({
       ok: true,
       value: lists++ === 0 ? before : after,
+      completeness: "complete",
     }),
     get: async (id) => {
       detailReads += 1;
@@ -372,7 +386,11 @@ test("exact text question addition is confirmed from differential reads",
 
 test("unchanged question collection proves non-confirmation", async () => {
   const sets: BlooketSetReadPort = {
-    list: async () => ({ ok: true, value: [] }),
+    list: async () => ({
+      ok: true,
+      value: [],
+      completeness: "complete",
+    }),
     get: async () => ({ ok: true, value: {} }),
   };
   const verifier = blooketSetReadWriteVerifier(
@@ -393,7 +411,11 @@ test("unchanged question collection proves non-confirmation", async () => {
 
 test("question media and concurrent edits remain inconclusive", async () => {
   const sets: BlooketSetReadPort = {
-    list: async () => ({ ok: true, value: [] }),
+    list: async () => ({
+      ok: true,
+      value: [],
+      completeness: "complete",
+    }),
     get: async () => ({ ok: true, value: {} }),
   };
   const mediaVerifier = blooketSetReadWriteVerifier(
@@ -446,3 +468,48 @@ test("question media and concurrent edits remain inconclusive", async () => {
     { ok: true, outcome: "inconclusive" },
   );
 });
+
+test(
+  "unknown set-list completeness cannot prove reconciliation",
+  async () => {
+    let lists = 0;
+    let details = 0;
+    const reads: BlooketSetReadPort = {
+      list: async () => {
+        lists++;
+        return {
+          ok: true,
+          value: [summary("new-1", "Astronomy")],
+          completeness: "unknown",
+        };
+      },
+      get: async () => {
+        details++;
+        return {
+          ok: true,
+          value: detail("new-1", "Astronomy"),
+        };
+      },
+    };
+    const verifier = blooketSetReadWriteVerifier(reads);
+    assert.deepEqual(
+      await verifier.captureBaseline(operation, { remoteSetId: null }),
+      { ok: true, baseline: null },
+    );
+    assert.deepEqual(
+      await verifier.verify(
+        operation,
+        { remoteSetId: null },
+        {
+          schemaVersion: 1,
+          kind: "set-list",
+          itemCount: 0,
+          sha256: "0".repeat(64),
+        },
+      ),
+      { ok: true, outcome: "inconclusive" },
+    );
+    assert.equal(lists, 2);
+    assert.equal(details, 0);
+  },
+);

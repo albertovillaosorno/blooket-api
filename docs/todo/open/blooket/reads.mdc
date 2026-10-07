@@ -148,6 +148,13 @@ Flight data means this does not prove the server never truncates, so server-side
 completeness remains an explicit observation gap rather than an invented
 pagination contract.
 
+Set-list probes now carry collection completeness explicitly. The concrete
+browser bridge marks My Sets as `unknown`, canonical reads preserve that fact,
+and differential Create Set verification refuses to capture or consume a
+set-list baseline unless the source declares the collection `complete`.
+Synthetic complete-list tests preserve the exact-difference verifier for a
+future evidence-backed source; unknown live lists remain observational only.
+
 Still pending: server-side set-list completeness; capabilities and complete
 question/media facts; login and the outcome of organization selection; Safari
 worker lifecycle. These prevent completion of task 08 and publication tasks
