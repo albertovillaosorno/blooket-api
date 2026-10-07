@@ -802,6 +802,71 @@ test(
 );
 
 test(
+  "cancellation during media admission stops before budget journal or write",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const path = join(directory, "checkpoint.json");
+      const paths = persistence(path);
+      const budgetPath = join(directory, "budget.json");
+      const controller = new AbortController();
+      const pacingEvents: string[] = [];
+      const writeCalls: string[] = [];
+
+      const result = await executePersistedBlooketWrite(
+        paths,
+        mediaPlan,
+        browser([]),
+        secrets(),
+        writes(SET_SUCCESS, writeCalls),
+        verification({
+          ok: true,
+          baseline: SET_BASELINE,
+        }),
+        {
+          signal: controller.signal,
+          pacer: immediatePacer(pacingEvents),
+          media: {
+            read: async (mediaId) => {
+              controller.abort();
+              return {
+                ok: true,
+                value: {
+                  mediaId,
+                  revision: 1,
+                  format: "png",
+                  bytes: new Uint8Array([1]),
+                },
+              };
+            },
+          },
+          budget: {
+            path: budgetPath,
+            policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+            now: () => 97_000,
+          },
+        },
+      );
+
+      assert.deepEqual(result, {
+        ok: false,
+        stage: "mutation-pacing",
+        code: "mutation-pacing-cancelled",
+      });
+      assert.deepEqual(pacingEvents, ["acquire", "release"]);
+      assert.deepEqual(writeCalls, []);
+      assert.deepEqual(
+        await loadMutationBudgetFile(budgetPath, mediaPlan.planId),
+        { ok: true, state: null },
+      );
+      assert.deepEqual(
+        await loadWriteAttemptFile(paths.attempt, mediaPlan),
+        { ok: true, kind: "missing" },
+      );
+    });
+  },
+);
+
+test(
   "media-required write stops before budget journal when resolver is absent",
   async () => {
     await withTemporaryDirectory(async (directory) => {
