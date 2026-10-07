@@ -36,8 +36,6 @@ import type {
   BlooketAddQuestionSubmission,
   BlooketCreateSetSubmission,
 } from "../../../ir/blooket-write-submissions/contract/write-submission.ts";
-import type { BlooketBrowserFailureCode } from
-  "../../blooket-session/contract/browser-session.ts";
 import type { BlooketPreparedMedia } from "./prepared-media.ts";
 
 export type BlooketBrowserWriteSurfaceFailure =
@@ -49,7 +47,9 @@ export type BlooketBrowserWriteSurfaceFailure =
   | {
       readonly ok: false;
       readonly kind: "browser";
-      readonly code: BlooketBrowserFailureCode;
+      readonly code:
+        | "blooket-browser-unavailable"
+        | "blooket-browser-failed";
     };
 
 export type BlooketCreateSetSurfaceResult =
