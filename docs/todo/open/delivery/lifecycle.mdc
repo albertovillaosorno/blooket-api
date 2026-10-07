@@ -88,6 +88,31 @@ on shutdown. Linux archive verification passed launch/reuse, native preparation,
 the actual packaged CLI, foreign-origin rejection, and owned shutdown with
 synthetic data. The real development service and `.env` were not changed.
 
+On 2026-10-07, persisted first-use state gained an exact IR decoder and a
+16-KB read ceiling. Startup refuses malformed schemas, unknown fields,
+duplicate/missing checks, unsafe log paths, contradictory outcomes, symlink
+targets, and non-files rather than returning unvalidated cached JSON.
+
+A dedicated aggregate lock serializes fresh checks, cached reads, and explicit
+reruns, preserving the storage probe and preventing another writer's log/state
+replacement. Valid cached results are reused unchanged; a live owner returns a
+bounded busy diagnostic and its lock is not stolen.
+
+The explicit launcher `--diagnostics` option repairs corrupt cached state
+without starting the background service or opening a browser. It returns
+validated diagnostic JSON, refreshes the fixed local log, and fails with a
+nonzero exit status when a check fails. Conflicting lifecycle options are
+rejected; ordinary startup still fails closed on unreadable cached state.
+
+Eight portable regression checks cover exact decoding, corrupted-state repair,
+cached reuse, bounded/symbolic reads, occupied-lock ownership, and actual
+launcher execution under a disposable data root. These checks do not prove
+macOS launch-at-login, Keychain behavior, or recipient acceptance.
+
+Strict TypeScript, roadmap validation, and all 723 portable tests passed at this
+checkpoint. Jig reported only the existing external `JIG-RULE-GAP-001`; its
+missing upstream evidence was not weakened or substituted.
+
 ## Blockers
 
 Acceptance remains open until the checks above run through the actual owning

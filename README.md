@@ -80,9 +80,23 @@ applied again on the next development startup.
 `npm start` uses saved preferences and the host secret store without reading
 `.env`. It is the normal service entrypoint, not a finished macOS installer.
 
+Startup reuses a validated `diagnostics.json`; it does not rerun native checks
+on every launch. Configuration provides an explicit diagnostic rerun. If the
+cached file is corrupt and startup cannot open the UI, repair it using the same
+data root:
+
+```sh
+BLOOKET_DATA_HOME="$PWD/.temp/dev-data" npm run launch -- --diagnostics
+```
+
+This explicit launcher action returns bounded diagnostic JSON and refreshes its
+local log without starting the service or opening a browser. A failed check
+produces a nonzero exit status; portable success does not prove Mac acceptance.
+
 The current workstation's pnpm launcher has a documented external failure;
-npm scripts work with installed dependencies. See task 02 in [TODO.md](TODO.md)
-before changing dependency layout or validators.
+npm scripts work with installed dependencies. Read the
+[configuration record](docs/todo/open/settings/configuration.mdc) before
+changing dependency layout or validators.
 
 ## Use the local workspace
 

@@ -1,0 +1,9 @@
+identity:
+  id: function:first-use-diagnostics
+  name: first-use-diagnostics
+  path: src/ir/first-use-diagnostics
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract
