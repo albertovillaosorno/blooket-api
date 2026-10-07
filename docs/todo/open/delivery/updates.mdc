@@ -24,6 +24,7 @@ scope:
   - src/api/browser-service/
   - src/platforms/github-updates/
   - src/platforms/update-signatures/
+  - src/platforms/update-downloads/
   - src/settings/teacher-preferences/
   - src/api/teacher-configuration/
   - src/service/
@@ -267,11 +268,47 @@ integrity, all 692 portable tests, and Linux package assembly/extracted checks.
 The shared checkout has only the pre-existing external Jig evidence gap after
 the other agent committed the test-format correction.
 
-These helpers are not connected to downloading or installation. CI still must
-publish the signed envelope after archive signing/notarization and validation,
+These helpers feed the staging adapter below, outside product UI/MCP authority.
+CI still must publish the signed envelope after signing/notarization and
+validation,
 and the installed application must pin its real publisher keys with a governed
 rotation policy. No production manifest, trust root, native installer, or
 published-artifact acceptance is claimed.
+
+### Signed archive staging foundation
+
+The portable `update-downloads` adapter authenticates signed metadata against
+the selected release and local public keys before disk or network activity.
+It streams only the signed initial GitHub asset URL, with anonymous requests,
+normal HTTPS validation, at most three redirects, and a two-minute overall
+network deadline. Redirects admit only the exact initial URL or
+`release-assets.githubusercontent.com`, the [documented release CDN][cdn].
+
+Actual streamed bytes must match the signed size and SHA-256 before the owned
+partial file is synced and renamed. Private generated staging directories and
+files use owner-only permissions; no archive is extracted or application
+replaced. Success still requires independent Apple verification and is never
+reported as an installed or update-ready application.
+
+A shared download lock refuses another live owner. Cancellation, timeouts,
+HTTP failures, forbidden redirects, incomplete/oversized bytes, and hash errors
+have bounded distinct results and remove owned partials. Cleanup failures are
+reported explicitly, and lock release is attempted even if partial cleanup
+fails; retained successful downloads still need governed lifecycle cleanup.
+
+Seven deterministic tests cover both Mac targets, streaming fidelity, private
+permissions, unknown publishers, signed size/hash failures, admitted/foreign
+redirects, redirect loops, hanging fetch/body handling, cancellation, writer
+ownership, and HTTP failures. They use ephemeral signing keys and local doubles,
+with no GitHub traffic, production keys, or downloaded Mac release acceptance.
+
+Strict TypeScript, roadmap integrity, and all 741 portable tests passed at this
+checkpoint. Jig retains only the known external evidence gap.
+
+This is an adapter foundation, not an enabled product updater. Production key
+provisioning, signed-manifest fetching/publication, opt-in scheduling and UI,
+Apple validation, extraction/installation/recovery, and real release acceptance
+remain pending.
 
 ## Blockers
 
@@ -284,3 +321,4 @@ unverified.
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
 [api]: https://docs.github.com/en/rest/releases/releases
 [assets]: https://docs.github.com/en/rest/releases/assets
+[cdn]: https://docs.github.com/en/actions/reference/runners/larger-runners
