@@ -55,6 +55,28 @@ export const TARGETS = ["linux-x64", "darwin-arm64"] as const;
 export type DistributionTarget = (typeof TARGETS)[number];
 const NODE_VERSION = "24.21.0";
 const CLOUDFLARED_VERSION = "2026.10.0";
+export const MAC_LOGIN_AGENT_LABEL =
+  "com.albertovilla.blooket-api.background" as const;
+export const MAC_LOGIN_AGENT_PLIST = MAC_LOGIN_AGENT_LABEL + ".plist";
+export const MAC_LOGIN_AGENT_EXECUTABLE = "Blooket API Background" as const;
+export function macLoginAgentPlist(): string {
+  const bundleProgram =
+    "Contents/Resources/ServiceManagement/" + MAC_LOGIN_AGENT_EXECUTABLE;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${MAC_LOGIN_AGENT_LABEL}</string>
+  <key>BundleProgram</key>
+  <string>${bundleProgram}</string>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+`;
+}
 const CONNECTOR_ASSETS = {
   "linux-x64": [
     "cloudflared-linux-amd64",
@@ -347,6 +369,31 @@ export async function buildDistribution(target: DistributionTarget) {
           'adapter-inbound/launcher.ts" "$@"\n',
       );
       await chmod(executable, 0o755);
+      const loginAgentSource = join(
+        app,
+        "src/platforms/service-lifecycle/adapter-outbound/login-agent.swift",
+      );
+      const serviceManagement = join(resource, "ServiceManagement");
+      await mkdir(serviceManagement, { recursive: true });
+      const loginAgentExecutable = join(
+        serviceManagement,
+        MAC_LOGIN_AGENT_EXECUTABLE,
+      );
+      await run("xcrun", [
+        "swiftc",
+        loginAgentSource,
+        "-target",
+        "arm64-apple-macos13.5",
+        "-o",
+        loginAgentExecutable,
+      ]);
+      await chmod(loginAgentExecutable, 0o755);
+      const launchAgents = join(bundle, "Library/LaunchAgents");
+      await mkdir(launchAgents, { recursive: true });
+      await writeFile(
+        join(launchAgents, MAC_LOGIN_AGENT_PLIST),
+        macLoginAgentPlist(),
+      );
       await writeFile(
         join(bundle, "Info.plist"),
         `<?xml version="1.0"?>
