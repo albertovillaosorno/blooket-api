@@ -224,6 +224,22 @@ read-only session inspection; signed-out or expired sessions return
 browser authentication. Real Chrome/Safari acceptance of this capability probe
 remains pending, so portable coverage is not promoted to live account evidence.
 
+Recovered module 89770 further bounds the remaining question-media gap. The
+question editor initializes separate image and audio strings plus an optional
+math suffix embedded in `question` with the established math marker. Its media
+dropzone is disabled whenever image, equation, or audio state is present, and
+the shared delete path clears image/audio and removes the math suffix. This
+establishes the editor's mutually exclusive media slot without establishing a
+stable remote media identity.
+
+The current read IR therefore continues to expose only `hasImage` and `hasAudio`
+for question-level media. Retaining the provider strings, hashing them as a
+substitute identity, or treating presence as content equality would exceed the
+evidence and could falsely confirm a media write. The project document also has
+no independent question-audio or equation representation today, so those facts
+remain an explicit modeling/evidence blocker rather than being guessed into the
+write plan.
+
 Initial validation: 572 portable tests, strict TypeScript, browser-script
 syntax, and compiled-extension assembly passed. Manual pairing controls were
 removed at the human's request; that workflow is superseded by automatic local
