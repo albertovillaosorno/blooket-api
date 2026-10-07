@@ -31,9 +31,7 @@
 //     closed.
 //
 import {
-  isBlooketLoginFormPrepared,
-  prepareBlooketLoginForm,
-  submitBlooketLoginForm,
+  runBlooketLoginPageAction,
   type BlooketLoginPageInput,
 } from "../../../platforms/blooket-browser/adapter-outbound/login-page.ts";
 
@@ -96,23 +94,23 @@ export function createExtensionSessionAuthenticationHost(
         const tab = await chrome.tabs.get(tabId);
         if (!exactLoginTab(tab)) return browserFailure();
         const prepared = await script(
-          prepareBlooketLoginForm as (...args: never[]) => unknown,
-          [input],
+          runBlooketLoginPageAction as (...args: never[]) => unknown,
+          ["prepare", input],
         );
         if (!exactOk(prepared)) return browserFailure();
         let ready = false;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           ready = await script(
-            isBlooketLoginFormPrepared as (...args: never[]) => unknown,
-            [input],
+            runBlooketLoginPageAction as (...args: never[]) => unknown,
+            ["is-prepared", input],
           ) === true;
           if (ready) break;
           await pause(POLL_MS);
         }
         if (!ready) return browserFailure();
         const submitted = await script(
-          submitBlooketLoginForm as (...args: never[]) => unknown,
-          [input],
+          runBlooketLoginPageAction as (...args: never[]) => unknown,
+          ["submit", input],
         );
         return exactOk(submitted)
           ? { ok: true, value: null }

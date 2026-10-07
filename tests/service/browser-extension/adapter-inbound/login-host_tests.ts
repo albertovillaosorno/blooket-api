@@ -61,14 +61,16 @@ function fixture(options: {
         readonly func: (...args: never[]) => unknown;
         readonly args?: unknown[];
       }) => {
-        calls.push(request.func.name);
-        argumentsSeen.push(...(request.args ?? []));
-        switch (request.func.name) {
-          case "prepareBlooketLoginForm":
+        const args = request.args ?? [];
+        const action = args[0];
+        calls.push(String(action));
+        argumentsSeen.push(...args);
+        switch (action) {
+          case "prepare":
             return [{ result: options.prepareReply ?? { ok: true } }];
-          case "isBlooketLoginFormPrepared":
+          case "is-prepared":
             return [{ result: polls.shift() ?? false }];
-          case "submitBlooketLoginForm":
+          case "submit":
             return [{ result: options.submitReply ?? { ok: true } }];
           default:
             throw new Error("unexpected-script");
@@ -89,15 +91,12 @@ test("host prepares verifies and submits exactly once", async () => {
   const result = await host.authenticate(credentials);
   assert.deepEqual(result, { ok: true, value: null });
   assert.deepEqual(page.calls, [
-    "prepareBlooketLoginForm",
-    "isBlooketLoginFormPrepared",
-    "isBlooketLoginFormPrepared",
-    "submitBlooketLoginForm",
+    "prepare",
+    "is-prepared",
+    "is-prepared",
+    "submit",
   ]);
-  assert.equal(
-    page.calls.filter((name) => name === "submitBlooketLoginForm").length,
-    1,
-  );
+  assert.equal(page.calls.filter((name) => name === "submit").length, 1);
   assert.equal(JSON.stringify(result).includes(credentials.password), false);
 });
 
@@ -129,7 +128,7 @@ test(
       async () => undefined,
     ).authenticate(credentials);
     assert.equal(result.ok, false);
-    assert.equal(page.calls.includes("submitBlooketLoginForm"), false);
+    assert.equal(page.calls.includes("submit"), false);
   }
   },
 );
