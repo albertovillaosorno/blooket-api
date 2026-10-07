@@ -42,8 +42,8 @@ import {
   object,
   exact,
   text,
-  topics,
   decodeEditRecipe,
+  normalizationStatus,
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
 import {
@@ -73,6 +73,13 @@ import {
   commandSuccess,
   commandFailure,
 } from "../../command-execution/application/result.ts";
+
+export function libraryRecordView(record: LibraryMetadata) {
+  return {
+    ...record,
+    normalizationStatus: normalizationStatus(record),
+  };
+}
 
 export async function executeLibraryCommand(
   command: CommandEnvelope,
@@ -119,7 +126,10 @@ export async function executeLibraryCommand(
             Buffer.byteLength(JSON.stringify(matches)) > 750_000
           )
             throw new Error("use-paginated-library-search");
-          return commandSuccess(command.operationId, matches);
+          return commandSuccess(
+            command.operationId,
+            matches.map(libraryRecordView),
+          );
         }
         const remaining = matches.filter(
           (item) => payload.after === null || item.id > payload.after,
@@ -135,7 +145,7 @@ export async function executeLibraryCommand(
         if (remaining.length > 0 && page.length === 0)
           throw new Error("media-metadata-response-too-large");
         return commandSuccess(command.operationId, {
-          records: page,
+          records: page.map(libraryRecordView),
           nextCursor: remaining.length > page.length ? page.at(-1)!.id : null,
           total: matches.length,
         });
@@ -145,7 +155,7 @@ export async function executeLibraryCommand(
       if (payload.kind === "get") {
         const record = records.find((item) => item.id === payload.id);
         if (!record) throw new Error("media-not-found");
-        return commandSuccess(command.operationId, record);
+        return commandSuccess(command.operationId, libraryRecordView(record));
       }
       return await withLibraryLock(preferences.mediaRoot, async () => {
         const record = (await listLibrary(preferences.mediaRoot)).find(
@@ -157,6 +167,10 @@ export async function executeLibraryCommand(
         const updated = {
           ...record,
           revision: record.revision + 1,
+          original: {
+            ...record.original,
+            language: payload.language,
+          },
           topics: payload.topics,
           generatedEnglish: {
             name: payload.name,
@@ -167,7 +181,10 @@ export async function executeLibraryCommand(
           },
         };
         await saveMetadata(preferences.mediaRoot, updated);
-        return commandSuccess(command.operationId, updated);
+        return commandSuccess(
+          command.operationId,
+          libraryRecordView(updated),
+        );
       });
     }
     const folder = command.command.startsWith("skills.") ? "skills" : "drafts";
@@ -259,14 +276,8 @@ export async function importLibraryImage(
   input: unknown,
 ): Promise<LibraryMetadata> {
   const request = object(input);
-  exact(request, [
-    "name",
-    "description",
-    "base64",
-    ...("filename" in request ? ["filename"] : []),
-  ]);
+  exact(request, ["name", "description", "base64"]);
   if (
-    ("filename" in request && !text(request["filename"], 240)) ||
     !text(request["name"], 200) ||
     !text(request["description"], 10_000) ||
     !text(request["base64"], 35_000_000)
@@ -329,15 +340,13 @@ export async function editLibraryImage(
   input: unknown,
 ): Promise<LibraryMetadata> {
   const request = object(input);
-  exact(request, ["id", "revision", "edit", "original", "topics"]);
+  exact(request, ["id", "revision", "edit", "original"]);
   const recipe = decodeEditRecipe(request["edit"]);
-  topics(request["topics"]);
   const original = object(request["original"]);
-  exact(original, ["name", "description", "language"]);
+  exact(original, ["name", "description"]);
   if (
     !text(original["name"], 200) ||
-    !text(original["description"], 10_000) ||
-    !text(original["language"], 35)
+    !text(original["description"], 10_000)
   )
     throw new Error("invalid-original-metadata");
   const library = (await loadPreferences(root)).mediaRoot;
@@ -350,18 +359,17 @@ export async function editLibraryImage(
       throw new Error("revision-conflict");
     const changed =
       original["name"] !== record.original.name ||
-      original["description"] !== record.original.description ||
-      original["language"] !== record.original.language;
+      original["description"] !== record.original.description;
     const next: LibraryMetadata = {
       ...record,
       revision: record.revision + 1,
       edit: recipe,
-      topics: request["topics"] as string[],
+      topics: changed ? [] : record.topics,
       prepared: null,
       original: {
         name: original["name"] as string,
         description: original["description"] as string,
-        language: original["language"] as string,
+        language: changed ? "" : record.original.language,
         revision: record.original.revision + (changed ? 1 : 0),
       },
     };

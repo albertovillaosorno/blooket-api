@@ -13,9 +13,6 @@ const words = {
     migrationConfirm:
       "Importar los archivos anteriores de esta carpeta? " +
       "Se conservarán los originales y una copia del índice.",
-    renameImage: "Cambiar nombre o carpeta",
-    renameHelp: "El ID, los textos y los bytes de la imagen se conservan.",
-    relativeFilename: "Nombre con extensión, o carpeta/nombre con extensión",
     invalidFilename: "Usa una ruta relativa y conserva el formato de imagen.",
     recoveryRequired:
       "Hay una transferencia pendiente. Reinicia el servicio " +
@@ -186,7 +183,10 @@ const words = {
     noDrafts: "Los borradores de la IA aparecerán aquí.",
     sourceLanguage: "Original",
     english: "Inglés generado",
-    stale: "Traducción pendiente de actualizar",
+    stale: "Normalización pendiente de actualizar",
+    normalizationPending: "Análisis AI pendiente",
+    normalizationCompleted: "Análisis AI listo",
+    normalizationStale: "Análisis AI desactualizado",
   },
   en: {
     library: "Library",
@@ -195,9 +195,6 @@ const words = {
     migrationConfirm:
       "Import previous files from this folder? " +
       "Original files and a copy of the index will be preserved.",
-    renameImage: "Change filename or folder",
-    renameHelp: "The image ID, text and optimized media bytes are preserved.",
-    relativeFilename: "Filename with extension, or folder/filename",
     invalidFilename: "Use a relative path and keep the actual image format.",
     recoveryRequired:
       "A transfer is pending. Restart the service to recover " +
@@ -361,7 +358,10 @@ const words = {
     noDrafts: "Your AI drafts will appear here.",
     sourceLanguage: "Original",
     english: "Generated English",
-    stale: "Translation needs updating",
+    stale: "English normalization needs updating",
+    normalizationPending: "AI analysis pending",
+    normalizationCompleted: "AI analysis ready",
+    normalizationStale: "AI analysis stale",
   },
 };
 const $ = (selector) => document.querySelector(selector);
@@ -505,37 +505,6 @@ $("#migrateLibrary").addEventListener("click", async () => {
     button.disabled = false;
   }
 });
-$("#renameImage").addEventListener("click", () => {
-  field($("#renameForm"), "relativePath").value = selected.asset.slice(
-    "photos/".length,
-  );
-  $("#renameDialog").showModal();
-});
-$("#renameForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (editorBusy) return;
-  const button = $("#renameForm").querySelector("[type=submit]");
-  button.disabled = true;
-  setEditorBusy(true);
-  try {
-    const updated = await api("/api/media-rename", {
-      id: selected.id,
-      revision: selected.revision,
-      relativePath: field($("#renameForm"), "relativePath").value,
-    });
-    selected.asset = updated.asset;
-    selected.revision = updated.revision;
-    selected.prepared = null;
-    showPrepared();
-    $("#renameDialog").close();
-    await refresh();
-  } catch (error) {
-    report(error);
-  } finally {
-    button.disabled = false;
-    setEditorBusy(false);
-  }
-});
 function renderGallery() {
   const query = $("#search").value.trim().toLocaleLowerCase();
   const filtered = query
@@ -580,7 +549,17 @@ function renderGallery() {
     const badge = document.createElement("span");
     badge.className = "badge" + (record.prepared ? "" : " pending");
     badge.textContent = t(record.prepared ? "ready" : "pending");
-    caption.append(name, description, badge);
+    const normalization = document.createElement("span");
+    normalization.className =
+      "badge" + (record.normalizationStatus === "completed" ? "" : " pending");
+    normalization.textContent = t(
+      record.normalizationStatus === "completed"
+        ? "normalizationCompleted"
+        : record.normalizationStatus === "stale"
+          ? "normalizationStale"
+          : "normalizationPending",
+    );
+    caption.append(name, description, badge, normalization);
     if (record.generatedEnglish) {
       const translated = document.createElement("p");
       translated.textContent =
@@ -743,9 +722,8 @@ function openEditor(record) {
   future = [];
   picking = false;
   recipeGesture = undefined;
-  for (const name of ["name", "description", "language"])
+  for (const name of ["name", "description"])
     field(editForm, name).value = record.original[name];
-  field(editForm, "topics").value = record.topics.join(", ");
   $("#editorTitle").textContent = record.original.name;
   $("#foreground").src = $("#background").src = "/media/" + record.id;
   syncRecipe();
@@ -1022,12 +1000,7 @@ editForm.addEventListener("submit", async (event) => {
       original: {
         name: field(editForm, "name").value,
         description: field(editForm, "description").value,
-        language: field(editForm, "language").value,
       },
-      topics: field(editForm, "topics")
-        .value.split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
     });
     selected = await api("/api/prepare", { id: selected.id });
     showPrepared();

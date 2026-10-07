@@ -49,6 +49,8 @@ export interface EditRecipe {
   readonly gifFps: number;
   readonly compression: "lossless" | "compact";
 }
+export type NormalizationStatus = "pending" | "completed" | "stale";
+
 export interface LibraryMetadata {
   readonly schemaVersion: 1 | 2;
   readonly legacy?: {
@@ -81,6 +83,15 @@ export interface LibraryMetadata {
     readonly recipeRevision: number;
   };
 }
+export function normalizationStatus(
+  record: LibraryMetadata,
+): NormalizationStatus {
+  if (!record.generatedEnglish) return "pending";
+  if (record.generatedEnglish.sourceRevision !== record.original.revision)
+    return "stale";
+  return record.original.language ? "completed" : "pending";
+}
+
 export function decodeEditRecipe(value: unknown): EditRecipe {
   const recipe = object(value);
   exact(recipe, [

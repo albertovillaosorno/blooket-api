@@ -207,13 +207,18 @@ test(
         .toBuffer();
       const imported = (await (
         await post("/api/import", {
-          filename: "Sample.png",
           name: "Sample",
           description: "Sample image",
           base64: Buffer.from(source).toString("base64"),
         })
       ).json()) as { id: string };
       assert.ok(imported.id);
+      const media = (await (
+        await fetch(service.origin + "/api/media")
+      ).json()) as { id: string; normalizationStatus: string }[];
+      assert.equal(media.length, 1);
+      assert.equal(media[0]!.id, imported.id);
+      assert.equal(media[0]!.normalizationStatus, "pending");
       const prepared = (await (
         await post("/api/prepare", { id: imported.id })
       ).json()) as { prepared: { file: string; bytes: number } };
@@ -267,9 +272,13 @@ test(
           command: "library.list",
           payload: { query: "Sample" },
         })
-      ).json()) as { ok: boolean; value: unknown[] };
+      ).json()) as {
+        ok: boolean;
+        value: { normalizationStatus: string }[];
+      };
       assert.equal(command.ok, true);
       assert.equal(command.value.length, 1);
+      assert.equal(command.value[0]!.normalizationStatus, "pending");
     } finally {
       await new Promise<void>((resolve) => {
         service.server.close(() => resolve());

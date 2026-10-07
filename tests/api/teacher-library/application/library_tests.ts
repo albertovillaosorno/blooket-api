@@ -62,7 +62,6 @@ async function setup() {
     .png()
     .toBuffer();
   const input = {
-    filename: "Mi foto.png",
     name: "Mi foto",
     description: "Un ejemplo",
     base64: Buffer.from(bytes).toString("base64"),
@@ -97,6 +96,7 @@ test(
             revision: record.revision,
             name: "My photo",
             description: "An example",
+            language: "es",
             topics: ["example", "photo"],
           },
         },
@@ -105,17 +105,22 @@ test(
       assert.equal(result.ok, true);
       const enriched = (await listLibrary(library))[0]!;
       assert.equal(enriched.original.name, "Mi foto");
+      assert.equal(enriched.original.language, "es");
       assert.equal(enriched.generatedEnglish?.name, "My photo");
+      assert.deepEqual(enriched.topics, ["example", "photo"]);
       assert.deepEqual(enriched.edit, record.edit);
+      if (!result.ok) throw new Error("expected-enrichment-success");
+      assert.equal(
+        (result.value as { normalizationStatus: string }).normalizationStatus,
+        "completed",
+      );
       const edited = await editLibraryImage(root, {
         id: record.id,
         revision: enriched.revision,
         original: {
           name: "Mi foto",
           description: "Otro ejemplo",
-          language: "es",
         },
-        topics: ["photo"],
         edit: {
           ...record.edit,
           width: 160,
@@ -127,6 +132,49 @@ test(
       assert.notEqual(
         edited.original.revision,
         edited.generatedEnglish?.sourceRevision,
+      );
+      assert.equal(edited.original.language, "");
+      assert.deepEqual(edited.topics, []);
+      const staleRead = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:stale",
+          command: "library.get",
+          payload: { id: record.id },
+        },
+        root,
+      );
+      assert.equal(staleRead.ok, true);
+      if (!staleRead.ok) throw new Error("expected-library-read");
+      assert.equal(
+        (
+          staleRead.value as { normalizationStatus: string }
+        ).normalizationStatus,
+        "stale",
+      );
+      const oldEnrichment = await executeLibraryCommand(
+        {
+          version: 1,
+          operationId: "test:old-enrichment",
+          command: "library.enrich",
+          payload: {
+            id: record.id,
+            revision: enriched.revision,
+            name: "Obsolete",
+            description: "Obsolete English description",
+            language: "es",
+            topics: ["obsolete"],
+          },
+        },
+        root,
+      );
+      assert.equal(oldEnrichment.ok, false);
+      const afterConflict = (await listLibrary(library))[0]!;
+      assert.equal(afterConflict.original.language, "");
+      assert.deepEqual(afterConflict.topics, []);
+      assert.equal(
+        afterConflict.generatedEnglish?.description,
+        "An example",
       );
       const prepared = await prepareLibraryImage(root, record.id);
       assert.ok(prepared.prepared!.bytes < 2_500_000);
@@ -142,8 +190,7 @@ test(
         editLibraryImage(root, {
           id: record.id,
           revision: 1,
-          original: { name: "x", description: "x", language: "es" },
-          topics: [],
+          original: { name: "x", description: "x" },
           edit: edited.edit,
         }),
         /revision-conflict/u,
@@ -170,6 +217,7 @@ test(
             revision: 1,
             name: "AI",
             description: "AI",
+            language: "en",
             topics: [],
             asset: "photos/AI.png",
           },
@@ -182,11 +230,13 @@ test(
           .revision,
         1,
       );
-      const ignoredFilename = await importLibraryImage(root, {
-        ...input,
-        filename: "../outside.png",
-      });
-      assert.notEqual(ignoredFilename.asset, "../outside.png");
+      await assert.rejects(
+        importLibraryImage(root, {
+          ...input,
+          filename: "../outside.png",
+        }),
+        /unknown-or-missing-field/u,
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -376,6 +426,13 @@ test(
         await readFile(join(root, "skills", "media-analysis.md"), "utf8"),
         /ephemeral/u,
       );
+      assert.match(
+        await readFile(
+          join(root, "skills", "media-description-normalization.md"),
+          "utf8",
+        ),
+        /semantic order/u,
+      );
       await writeFile(path, "Personal guidance");
       await installInitialSkills(root);
       assert.equal(await readFile(path, "utf8"), "Personal guidance");
@@ -474,7 +531,7 @@ test(
 );
 
 test(
-  "same-stem sources with different extensions " + "have distinct metadata",
+  "different source encodings receive distinct canonical metadata",
   async () => {
     const { root, input, bytes } = await setup();
     try {
@@ -483,7 +540,6 @@ test(
       const jpeg = await sharp(bytes).jpeg().toBuffer();
       const jpg = await importLibraryImage(root, {
         ...input,
-        filename: "Mi foto.jpg",
         base64: Buffer.from(jpeg).toString("base64"),
       });
       assert.notEqual(jpg.id, png.id);

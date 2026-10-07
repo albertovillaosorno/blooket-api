@@ -33,9 +33,13 @@ second when relevant, and color/encoding optimization afterward. The editor
 must retain that shared final geometry throughout optimization.
 
 These are pending product changes, not claims about the current implementation.
-Keep the original files and teacher text intact, retain actual-byte validation,
-and never label an oversized or unverified candidate ready for download or
-publication. The detailed acceptance checks belong to the owning tasks below.
+Keep teacher-authored text intact. New intake source blobs are ephemeral and the
+library retains only its optimized canonical WebP/GIF asset; legacy migration
+continues preserving historical files for recovery.
+
+Retain actual-byte validation and never label an oversized or unverified
+candidate ready for download or publication. The detailed acceptance checks
+belong below.
 
 ## Current development state
 
@@ -225,7 +229,8 @@ tunnel credential, owner password, and Blooket password independent.
 file selection, dragging, and clipboard image/link import, asks only for name
 and description. Remove the language selector and comma-separated topic field
 from intake; do not move the same questions into another required dialog.
-Original text and user-owned filenames remain unchanged in mirrored metadata.
+Teacher-authored text remains unchanged; canonical asset paths are internal and
+must not become another teacher-facing naming task.
 
 Do not infer the original text language from the workspace's EN/ES setting.
 Language identification and topics belong to AI enrichment; missing analysis
@@ -254,15 +259,23 @@ accepts no language or topics, records original language as unknown (empty
 string), and starts topics empty instead of inferring either value from the UI
 locale.
 
-AI-owned language identification, topic generation, normalized English output,
-and revision-safe normalization completion remain pending. This implementation
-does not claim those enrichment checks are complete.
+Revision-safe AI enrichment was implemented on 2026-10-06. `library.enrich`
+requires detected language, normalized English name/description, topics, and the
+exact current record revision. Completion is derived only after the atomic save:
+current generated English plus detected language is `completed`; missing
+analysis is `pending`; an older source revision is `stale`.
 
-Mirrored `metadata/<full-original-filename>.yaml` and immutable user-named
-`photos/` assets are implemented with bounded YAML parsing, atomic saves,
-revision protection, stable IDs, and separate generated English metadata.
-Explicit local JSONL migration and user rename/move now use a durable transfer
-journal, collision checks, preserved bytes/IDs, and mirrored paths.
+Teacher text edits clear derived language/topics and make older English stale.
+The local media UI shows that state, and manual language/topic maintenance was
+removed.
+
+New intake rejects filename authority and keeps only service-owned canonical
+WebP/GIF assets with UUID-backed paths. Temporary upload, drag/drop, clipboard,
+and downloaded source blobs are discarded after canonicalization. The ordinary
+editor no longer exposes filename/folder renaming. Legacy JSONL migration and
+its local rename/recovery machinery remain intentionally separate: they preserve
+historical files, IDs, paths, and provenance through the durable transfer
+journal.
 
 Portable library foundations were extended on 2026-10-06. Logical IDs now admit
 legacy dots and 128-character IDs while preserving current UUIDs. MCP search
@@ -306,8 +319,9 @@ browser-script syntax pass; Jig retains only its external evidence gap.
 Native case/Unicode filesystem behavior and real skill/schema consumption remain
 unverified.
 
-Chrome subsequently passed a user rename and prepared export using
-synthetic media. Its native migration confirmation stalled browser inspection;
+Chrome previously passed the now-legacy local rename operation and a prepared
+export using synthetic media. Its native migration confirmation stalled browser
+inspection;
 the complete visual migration workflow remains unverified. Continue independent
 editor work in task 06; keep client acceptance pending.
 
@@ -317,10 +331,10 @@ project
 schema. Validate media/account semantics before publication, beyond draft
 JSON syntax.
 
-Complete when legacy IDs/bytes/text migrate without loss, user rename/move can
-recover from interruption, AI updates preserve user-owned fields, and initial
-skills are installed without overwriting personal skills. Verify the user
-profile from task 01 can discover and read the resulting skills.
+Complete when legacy IDs/bytes/text migrate without loss, legacy rename/move
+can recover from interruption, AI updates preserve teacher-authored text, and
+initial skills are installed without overwriting personal skills. Verify the
+user profile from task 01 can discover and read the resulting skills.
 
 ### TODO 06 - Polish the existing image/GIF editor
 
@@ -354,7 +368,7 @@ plus/minus and slider zoom in both directions, drag pan, automatic solid-color
 selection and manual overrides, animated previews, and matching final geometry
 for static images and GIFs. Preserve keyboard/accessibility checks below.
 
-The prototype already has import naming/descriptions/topics, source previews,
+The prototype already has two-field import, canonical media, source previews,
 zoom minus/plus and slider, drag pan, wheel zoom, saturation/contrast, blurred
 or solid backgrounds, color input, native eyedropper/fallback canvas picker,
 undo/redo, preparation, preview, and download. Preserve canonical optimized
@@ -384,7 +398,7 @@ The browser framing preview directs the teacher to the prepared file
 for final colors, compression, and GIF timing; it does not claim pixel parity.
 
 Chrome subsequently passed zoom buttons, keyboard pan, solid-background
-selection, user filename/folder changes, preparation, and download readiness
+selection, the legacy rename path, preparation, and download readiness
 with synthetic media. Editing and rename controls freeze during preparation to
 prevent stale asynchronous results replacing a newer image or recipe. The
 prepared file was below the byte ceiling; this was not a real Blooket upload.
@@ -782,15 +796,17 @@ MCP, CLI, HTTP, and browser entrypoints.
 ### TODO 12 - Finish AI media intake and browser quiz review
 
 Apply the two-field intake and normalization requirements from tasks 05-07 to
-AI-assisted review. The AI supplies topics and structured normalized English
-metadata through admitted enrichment operations, preserving the teacher's
-original name, description, and filename. It must not treat import, English
-source text, or an unsaved generated response as completed normalization.
+AI-assisted review. The AI supplies detected language, topics, and structured
+normalized English metadata through admitted enrichment operations, preserving
+the teacher's original name and description. Canonical asset paths remain
+service-owned. Import, English source text, or an unsaved generated response is
+not completed normalization.
 
 Verify actual AI image delivery: ChatGPT attachments do not automatically reach
 an MCP server. Define the admitted upload/intake workflow, bounds, local review,
-and metadata creation. The model enriches YAML English fields/topics; it never
-chooses source filenames or overwrites original names/descriptions.
+and metadata creation. The model enriches detected language, YAML English
+fields, and topics; it never chooses asset paths or overwrites original
+names/descriptions.
 
 Expose validated quiz list/read/create/edit, question type/seconds/media,
 progress, and recovery through registered CLI commands and MCP tools. Keep local
@@ -1015,15 +1031,17 @@ original-text change invalidates completion for that older source revision.
 
 Verify already-English inputs are genuinely normalized and saved, missing AI
 work remains pending, failed saves do not set completion, and original text,
-filenames, and human-verification flags remain intact.
+canonical asset identity, and human-verification flags remain intact.
 
 Portable skill foundations were implemented on 2026-10-06. Startup now seeds a
 small master index plus workflow-learning, human-validation, browser-image
-search, image-bank research, media-analysis, and Codex-access guidance without
-overwriting personal changes. The teacher profile reads the master first and may
-store clearly scoped reusable defaults with optimistic revisions; ambiguous
-corrections still require one short scope question. Actual client behavior and
-long-term teacher acceptance remain pending.
+search, image-bank research, media-analysis, media-description-normalization,
+and Codex-access guidance without overwriting personal changes. The description
+skill normalizes English and non-English source text with a fixed semantic
+ordering, requires admitted evidence for visual claims, and persists only
+through revision-protected `library.enrich`. Actual client behavior and
+long-term
+teacher acceptance remain pending.
 
 Build a lightweight `master-workflow` skill that indexes stable teacher defaults
 and points to narrower task-specific skills. Do not put personal information,

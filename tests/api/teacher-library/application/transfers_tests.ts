@@ -76,7 +76,6 @@ async function setup() {
     .png()
     .toBuffer();
   const record = await importLibraryImage(root, {
-    filename: "Original.png",
     name: "Original",
     description: "Texto original",
     base64: Buffer.from(sourceBytes).toString("base64"),

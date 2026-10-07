@@ -139,15 +139,20 @@ const tools = [
   tool(
     "library_enrich",
     "library.enrich",
-    "Add English names/descriptions and topics using " +
-      "the current record revision. Preserves filenames, " +
-      "original text and image edits. Generated text is " +
-      "not human verified.",
+    "Save detected source language, normalized English name/description, " +
+      "and topics using the current record revision. Preserves canonical " +
+      "asset identity, original text and image edits. Completion is " +
+      "revision-bound and generated text is not human verified.",
     {
       id,
       revision: { type: "integer", minimum: 1 },
       name: string,
       description: string,
+      language: {
+        type: "string",
+        maxLength: 35,
+        pattern: "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$",
+      },
       topics: { type: "array", items: string, maxItems: 50 },
     },
     false,

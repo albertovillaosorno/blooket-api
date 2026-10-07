@@ -62,6 +62,7 @@ import {
   editLibraryImage,
   prepareLibraryImage,
   readPreparedLibraryImage,
+  libraryRecordView,
   safeCode,
 } from "../../teacher-library/application/library.ts";
 import {
@@ -283,7 +284,9 @@ export async function startBrowserService(
         json(
           response,
           200,
-          await listLibrary((await loadPreferences(root)).mediaRoot),
+          (await listLibrary(
+            (await loadPreferences(root)).mediaRoot,
+          )).map(libraryRecordView),
         );
         return;
       }

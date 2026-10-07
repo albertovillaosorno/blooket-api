@@ -149,11 +149,17 @@ MCP enablement, public HTTPS MCP URL, Cloudflare token, and a selectable media
 root. Cloudflare Tunnel is the only online provider. Enable online fields only
 while online MCP is enabled, and keep the general API/settings private.
 
-The target library uses user-owned filenames under `photos/` and mirrored
-`metadata/<full-original-filename>.yaml` documents under the selected media
-root. AI tools identify media by stable ID and update admitted YAML
-enrichment/topics; they never choose filenames, asset paths, or original text.
-JSONL may remain a rebuildable search cache, not a second metadata authority.
+New intake stores service-owned canonical assets under `photos/` with stable
+internal IDs and mirrored YAML under `metadata/`. Upload, drag/drop, clipboard,
+and downloaded source bytes are temporary and are discarded after successful
+canonicalization. The teacher owns the original name and description, not the
+filesystem path.
+
+AI tools identify media by stable ID, may update admitted
+language/enrichment/topics, and never choose asset paths or overwrite original
+text. Legacy migration may preserve historical source files and filenames for
+recovery; that compatibility path is not ordinary intake. JSONL may remain a
+rebuildable search cache, not a second metadata authority.
 
 Store personal skill text beside settings under `skills/` and expose bounded,
 authorized logical-ID operations. Verify how the actual remote AI retrieves it.
