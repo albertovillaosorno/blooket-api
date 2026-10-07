@@ -131,6 +131,23 @@ test(
       const boot = (await (
         await fetch(service.origin + "/api/bootstrap")
       ).json()) as { csrf: string };
+      const rerun = await fetch(service.origin + "/api/diagnostics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": boot.csrf,
+          Origin: service.origin,
+        },
+        body: "{}",
+      });
+      assert.equal(rerun.status, 200);
+      const rerunState = await rerun.json() as {
+        checks: { name: string; status: string; code: string }[];
+      };
+      assert.deepEqual(
+        rerunState.checks.find((check) => check.name === "settings"),
+        { name: "settings", status: "passed", code: "settings-valid" },
+      );
       const response = await fetch(service.origin + "/api/settings", {
         method: "POST",
         headers: {
