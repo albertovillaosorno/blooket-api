@@ -893,10 +893,17 @@ one exclusive mutation lease at a time, enforces the two-second and
 20-per-minute defaults with an injected clock, permits only stricter
 configuration, and cancels queued work without consuming a start.
 
-It is intentionally not wired into publication yet: task 09 still blocks real
-HTTP writes, and journaling must begin only after pacing grants the actual
-mutation window. Persisted task budgets, restart behavior, and one shared
-composition across future MCP/CLI/UI write surfaces remain pending.
+A strict task-budget state now counts attempted mutation starts and has bounded
+maximum-start and maximum-duration policies. Its versioned state round-trips
+through serialization so a future durable owner can resume it without inventing
+progress; clock rollback and malformed state fail closed.
+
+Pacing remains intentionally unwired from publication: task 09 still blocks real
+HTTP writes, and the future composition must acquire pacing, durably save the
+incremented task budget, then open the existing attempt journal immediately
+before mutation. Durable budget-file ownership and shared MCP/CLI/UI wiring
+remain
+pending, so restart acceptance is not yet claimed.
 
 Make pacing, mutations per minute, task mutation budget, and maximum task
 duration configurable within bounded ranges. Persist progress and yield with a

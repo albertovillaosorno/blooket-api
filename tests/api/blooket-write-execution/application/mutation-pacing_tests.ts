@@ -33,7 +33,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_BLOOKET_MUTATION_PACING,
+  admitBlooketMutationTaskStart,
   createBlooketMutationPacer,
+  decodeBlooketMutationTaskBudgetState,
   type BlooketMutationPacingRuntime,
 } from
   "../../../../src/api/blooket-write-execution/application/mutation-pacing.ts";
@@ -138,3 +140,67 @@ test("a cancelled queued lease never consumes a mutation start", async () => {
   assert.equal(next.lease.startedAtMs, 2_000);
   next.lease.release();
 });
+
+test("task budgets count attempts and survive a serialized restart", () => {
+  const policy = { maximumStarts: 2, maximumDurationMs: 60_000 };
+  const first = admitBlooketMutationTaskStart(null, policy, 10_000);
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.deepEqual(first.state, {
+    version: 1,
+    startedAtMs: 10_000,
+    starts: 1,
+  });
+  const restored = decodeBlooketMutationTaskBudgetState(
+    JSON.parse(JSON.stringify(first.state)),
+  );
+  assert.deepEqual(restored, first.state);
+  const second = admitBlooketMutationTaskStart(restored, policy, 12_000);
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  assert.equal(second.state.starts, 2);
+  assert.deepEqual(
+    admitBlooketMutationTaskStart(second.state, policy, 14_000),
+    {
+      ok: false,
+      code: "mutation-task-start-budget-exhausted",
+    },
+  );
+});
+
+test("task duration expires at its exact bounded deadline", () => {
+  const policy = { maximumStarts: 10, maximumDurationMs: 5_000 };
+  const state = { version: 1 as const, startedAtMs: 20_000, starts: 1 };
+  assert.equal(admitBlooketMutationTaskStart(state, policy, 24_999).ok, true);
+  assert.deepEqual(admitBlooketMutationTaskStart(state, policy, 25_000), {
+    ok: false,
+    code: "mutation-task-duration-exhausted",
+  });
+  assert.deepEqual(admitBlooketMutationTaskStart(state, policy, 19_999), {
+    ok: false,
+    code: "mutation-task-budget-invalid",
+  });
+});
+
+test(
+  "task budget decoding rejects coercion unknown fields and unsafe policy",
+  () => {
+  assert.equal(decodeBlooketMutationTaskBudgetState(null), null);
+  for (const candidate of [
+    {},
+    { version: 1, startedAtMs: "0", starts: 0 },
+    { version: 1, startedAtMs: 0, starts: -1 },
+    { version: 1, startedAtMs: 0, starts: 0, extra: true },
+    { version: 2, startedAtMs: 0, starts: 0 },
+  ])
+    assert.equal(decodeBlooketMutationTaskBudgetState(candidate), undefined);
+  assert.deepEqual(
+    admitBlooketMutationTaskStart(
+      null,
+      { maximumStarts: 0, maximumDurationMs: 60_000 },
+      0,
+    ),
+    { ok: false, code: "mutation-task-budget-invalid" },
+  );
+  },
+);
