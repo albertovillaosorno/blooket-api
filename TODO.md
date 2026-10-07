@@ -888,6 +888,16 @@ between mutation starts and at most 20 starts in a rolling minute. These are
 application choices, not verified Blooket limits or a guarantee against account
 restrictions; use stricter verified provider limits when known.
 
+A portable in-process pacing foundation was added on 2026-10-06. It grants
+one exclusive mutation lease at a time, enforces the two-second and
+20-per-minute defaults with an injected clock, permits only stricter
+configuration, and cancels queued work without consuming a start.
+
+It is intentionally not wired into publication yet: task 09 still blocks real
+HTTP writes, and journaling must begin only after pacing grants the actual
+mutation window. Persisted task budgets, restart behavior, and one shared
+composition across future MCP/CLI/UI write surfaces remain pending.
+
 Make pacing, mutations per minute, task mutation budget, and maximum task
 duration configurable within bounded ranges. Persist progress and yield with a
 clear status when a task budget is exhausted; do not silently drop operations.
