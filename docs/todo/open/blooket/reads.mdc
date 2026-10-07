@@ -78,7 +78,8 @@ acceptance run.
 The development service restarted normally, the workspace reconnected without
 configuration, and the configured tunnel returned to connected. Native Safari,
 complete question-level media facts, capability/login live browser acceptance,
-and server-side set-list completeness remain pending. Their absence still
+and non-empty server-side set-list completeness remain pending. Their absence
+still
 blocks publication; do not expose unsupported read or write tools as if
 validated.
 
@@ -183,18 +184,21 @@ not choose, submit, or infer an organization.
 The recovered My Sets client receives one `sets` collection, then filters and
 sorts it locally. No cursor, offset, page, limit, load-more control, or
 pagination UI appears in the captured route/client modules. The removed server
-Flight data means this does not prove the server never truncates, so server-side
-completeness remains an explicit observation gap rather than an invented
-pagination contract.
+Flight data means this does not prove the server never truncates, so non-empty
+server-side completeness remains an explicit observation gap rather than an
+invented pagination contract.
 
 Set-list probes now carry collection completeness explicitly. The concrete
-browser bridge marks My Sets as `unknown`, canonical reads preserve that fact,
-and differential Create Set verification refuses to capture or consume a
-set-list baseline unless the source declares the collection `complete`.
-Synthetic complete-list tests preserve the exact-difference verifier for a
-future evidence-backed source; unknown live lists remain observational only.
+browser boundary marks only the exact recovered empty-account state as
+`complete`; non-empty My Sets card lists remain `unknown`, and canonical reads
+preserve that fact. Differential Create Set verification refuses to capture or
+consume a set-list baseline unless the source declares the collection
+`complete`. Synthetic complete-list tests preserve the exact-difference verifier
+for a future evidence-backed non-empty source; unknown live lists remain
+observational only.
 
-Still pending: server-side set-list completeness; live browser acceptance of
+Still pending: non-empty server-side set-list completeness; live browser
+acceptance of
 capability inspection and credential submission; complete question-level media
 facts beyond the bounded presence currently observed; the outcome of
 organization selection; Safari worker lifecycle. These prevent completion of
