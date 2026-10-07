@@ -377,7 +377,9 @@ let locale = "es",
 let editorBusy = false,
   preparedDirty = false,
   preparing = false,
-  hadPreparedPreview = false;
+  hadPreparedPreview = false,
+  editorSession = 0,
+  preparationController;
 let clipboardReading = false;
 let suggestions = [],
   searchIndex = [],
@@ -455,9 +457,8 @@ function report(error) {
   };
   toast(t(messages[error.message] ?? "operationFailed"));
 }
-async function api(path, body) {
-  const response = await fetch(
-    path,
+async function api(path, body, signal) {
+  const request =
     body === undefined
       ? {}
       : {
@@ -467,8 +468,9 @@ async function api(path, body) {
             "X-CSRF-Token": bootstrap.csrf,
           },
           body: JSON.stringify(body),
-        },
-  );
+        };
+  if (signal) request.signal = signal;
+  const response = await fetch(path, request);
   const value = await response.json();
   if (!response.ok || value.ok === false)
     throw new Error(
@@ -777,6 +779,7 @@ function openEditor(record, sourceUrl) {
     toast(t("exportBusy"));
     return;
   }
+  editorSession += 1;
   selected = structuredClone(record);
   preparedDirty = false;
   preparing = false;
@@ -1118,6 +1121,7 @@ editForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (editorBusy) return;
   setEditorBusy(true);
+  const session = editorSession;
   drag = undefined;
   preparing = true;
   showPrepared();
@@ -1135,6 +1139,7 @@ editForm.addEventListener("submit", async (event) => {
         base64,
         edit: selected.edit,
       });
+      if (session !== editorSession || !$("#editor").open) return;
       const canonicalUrl = "/media/" + selected.id;
       $("#foreground").src = $("#background").src = canonicalUrl;
       $("#editorTitle").textContent = selected.original.name;
@@ -1146,19 +1151,33 @@ editForm.addEventListener("submit", async (event) => {
         edit: selected.edit,
         original,
       });
+      if (session !== editorSession || !$("#editor").open) return;
     }
-    selected = await api("/api/prepare", { id: selected.id });
+    const controller = new AbortController();
+    preparationController = controller;
+    selected = await api(
+      "/api/prepare",
+      { id: selected.id },
+      controller.signal,
+    );
+    if (session !== editorSession || !$("#editor").open) return;
     preparedDirty = false;
     preparing = false;
     showPrepared();
     await refresh();
   } catch (error) {
+    if (session !== editorSession || preparationController?.signal.aborted)
+      return;
     preparing = false;
     showPrepared();
     await refresh().catch(() => {});
     report(error);
   } finally {
-    setEditorBusy(false);
+    preparationController = undefined;
+    if (session === editorSession) {
+      preparing = false;
+      setEditorBusy(false);
+    }
   }
 });
 function fillSettings() {
@@ -1295,10 +1314,15 @@ $("#search").addEventListener("input", () => {
   renderGallery();
 });
 $("#editor").addEventListener("close", () => {
+  editorSession += 1;
+  preparationController?.abort();
+  preparationController = undefined;
+  preparing = false;
   clearSourceDraft();
   selected = undefined;
   drag = undefined;
   picking = false;
+  setEditorBusy(false);
 });
 document
   .querySelectorAll("[data-close]")
