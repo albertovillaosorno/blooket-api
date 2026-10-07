@@ -157,7 +157,13 @@ test("closed and challenged sessions stop before reads or secrets",
       undefined,
       fixture.ports,
     );
+    const questions = await executeCommand(
+      envelope("blooket.questions.list", { setId: "fixture" }),
+      undefined,
+      fixture.ports,
+    );
     assert.equal(fixture.reads(), 0);
+    assert.equal(questions.ok, result.ok);
     if (state === "signed-out" || state === "expired-session") {
       assert.equal(result.ok, false);
       if (!result.ok)

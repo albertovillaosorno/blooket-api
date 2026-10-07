@@ -265,6 +265,7 @@ export async function listBlooketQuestions(
   secrets: HostSecretStore,
   reads: BlooketQuestionReadPort,
   setId: unknown,
+  options: { readonly readOnly?: boolean } = {},
 ): Promise<ListBlooketQuestionsResult> {
   const decodedId = decodeBlooketSetId(setId);
   if (!decodedId.ok) {
@@ -276,7 +277,7 @@ export async function listBlooketQuestions(
     };
   }
 
-  const session = await ensureReadySession(browser, secrets);
+  const session = await ensureReadySession(browser, secrets, options.readOnly);
   if (!session.ok || session.kind !== "ready") {
     return session;
   }
