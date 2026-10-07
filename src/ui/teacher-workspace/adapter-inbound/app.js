@@ -161,6 +161,8 @@ const words = {
     saved: "Guardado. Reinicia el servicio si cambiaste el puerto.",
     ready: "Listo",
     pending: "Por preparar",
+    effectiveDetail: "detalle",
+    higherQuality: "mayor calidad",
     pickPixel: "Haz clic sobre la imagen para elegir un color.",
     noImages: "Agrega tu primera foto para empezar.",
     operationFailed:
@@ -335,6 +337,8 @@ const words = {
     saved: "Saved. Restart the service if you changed the port.",
     ready: "Ready",
     pending: "Needs preparation",
+    effectiveDetail: "detail",
+    higherQuality: "higher quality",
     pickPixel: "Click the image to pick a color.",
     noImages: "Add your first photo to get started.",
     operationFailed:
@@ -813,6 +817,18 @@ function syncRecipe() {
   field(editForm, "color").value = selected.edit.background.color;
   preview();
 }
+function effectivePreparedLabel(prepared) {
+  const effective = prepared?.effective;
+  if (!effective) return "";
+  const parts = [
+    Math.round(effective.detailScale * 100) + "% " + t("effectiveDetail"),
+  ];
+  if (effective.gifFps !== null) parts.push(effective.gifFps + " FPS");
+  parts.push(
+    effective.compression === "compact" ? t("compact") : t("higherQuality"),
+  );
+  return " · " + parts.join(" · ");
+}
 function showPrepared() {
   const prepared = selected.prepared;
   const current = Boolean(prepared) && !preparedDirty && !preparing;
@@ -821,7 +837,11 @@ function showPrepared() {
   $("#preparedState").textContent = preparing
     ? t("processing")
     : current
-      ? t("ready") + " · " + (prepared.bytes / 1_000_000).toFixed(3) + " MB"
+      ? t("ready") +
+        " · " +
+        (prepared.bytes / 1_000_000).toFixed(3) +
+        " MB" +
+        effectivePreparedLabel(prepared)
       : t("pending");
   if (current) {
     const url =
