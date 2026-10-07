@@ -299,7 +299,9 @@ test("abort after pacing grant still stops before journal", async () => {
   });
 });
 
-test("pacing exceptions fail stably before budget journal or mutation", async () => {
+test(
+  "pacing exceptions fail stably before budget journal or mutation",
+  async () => {
   await withTemporaryDirectory(async (directory) => {
     const checkpoint = join(directory, "checkpoint.json");
     const paths = persistence(checkpoint);
@@ -343,9 +345,12 @@ test("pacing exceptions fail stably before budget journal or mutation", async ()
       { ok: true, kind: "missing" },
     );
   });
-});
+  },
+);
 
-test("budget clock exceptions fail stably before journal or mutation", async () => {
+test(
+  "budget clock exceptions fail stably before journal or mutation",
+  async () => {
   await withTemporaryDirectory(async (directory) => {
     const checkpoint = join(directory, "checkpoint.json");
     const paths = persistence(checkpoint);
@@ -388,7 +393,8 @@ test("budget clock exceptions fail stably before journal or mutation", async () 
       { ok: true, kind: "missing" },
     );
   });
-});
+  },
+);
 
 test("pacing cancellation stops before journal and mutation", async () => {
   await withTemporaryDirectory(async (directory) => {
