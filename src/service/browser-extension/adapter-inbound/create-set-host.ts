@@ -32,8 +32,6 @@
 //
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
-import type { BlooketCreateSetBrowserHost } from
-  "../../../platforms/blooket-browser/adapter-outbound/write-surface.ts";
 import {
   observeBlooketCreateSetSuccess,
   prepareBlooketCreateSetForm,
@@ -46,6 +44,44 @@ import { inspectBlooketPage } from
 interface BrowserTab {
   readonly url?: string;
   readonly status?: string;
+}
+
+export type ExtensionCreateSetFailure =
+  | {
+      readonly ok: false;
+      readonly kind: "navigation";
+      readonly state:
+        | "signed-out"
+        | "organization-prompt"
+        | "expired-session"
+        | "rate-limited"
+        | "security-challenge"
+        | "unexpected-page";
+    }
+  | {
+      readonly ok: false;
+      readonly kind: "browser";
+      readonly code:
+        | "blooket-browser-unavailable"
+        | "blooket-browser-failed";
+    };
+
+export interface ExtensionCreateSetHost {
+  openCreateSet(): Promise<{ readonly ok: true } | ExtensionCreateSetFailure>;
+  prepareCreateSet(input: {
+    readonly title: string;
+    readonly description: string;
+    readonly private: boolean;
+  }): Promise<{ readonly ok: true } | ExtensionCreateSetFailure>;
+  submitCreateSet(expected: {
+    readonly title: string;
+    readonly description: string;
+    readonly private: boolean;
+  }): Promise<{ readonly ok: true } | ExtensionCreateSetFailure>;
+  observeCreateSet(): Promise<
+    | { readonly ok: true; readonly remoteSetId: unknown }
+    | ExtensionCreateSetFailure
+  >;
 }
 
 export interface CreateSetChromePort {
@@ -83,7 +119,7 @@ export function createExtensionCreateSetHost(
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
-): BlooketCreateSetBrowserHost {
+): ExtensionCreateSetHost {
   const script = async (
     func: (...args: never[]) => unknown,
     args: unknown[] = [],

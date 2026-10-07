@@ -43,8 +43,6 @@ import {
   openBlooketQuestionPanel,
 } from
   "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
-import { createBlooketBrowserWriteSurface } from
-  "../../../platforms/blooket-browser/adapter-outbound/write-surface.ts";
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -344,16 +342,28 @@ async function relay(current: Connection, activeGeneration: number) {
               current.tabId,
               pause,
             );
-            const surface = createBlooketBrowserWriteSurface(host);
-            const created = await surface.createSet({
-              schemaVersion: 1,
-              kind: "create-set",
+            const input = {
               title: job.command.title,
               description: job.command.description,
               private: job.command.private,
-              coverImage: null,
-            }, []);
-            result = { ok: true, value: created };
+            };
+            const opened = await host.openCreateSet();
+            if (!opened.ok) {
+              result = { ok: true, value: opened };
+            } else {
+              const prepared = await host.prepareCreateSet(input);
+              if (!prepared.ok) {
+                result = { ok: true, value: prepared };
+              } else {
+                const submitted = await host.submitCreateSet(input);
+                result = submitted.ok
+                  ? {
+                      ok: true,
+                      value: await host.observeCreateSet(),
+                    }
+                  : { ok: true, value: submitted };
+              }
+            }
           }
         } catch {
           status = "blooket-attention-required";
