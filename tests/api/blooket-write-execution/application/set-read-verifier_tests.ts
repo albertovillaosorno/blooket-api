@@ -422,6 +422,52 @@ test("exact text question addition is confirmed from differential reads",
   );
   },);
 
+test("question equations change baselines and cannot confirm text writes",
+  async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => { throw new Error("set list must not be used"); },
+    get: async () => { throw new Error("set detail must not be used"); },
+  };
+  const plainVerifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([[remoteTyping()]]),
+  );
+  const equationQuestion = remoteTyping({
+    question: "Type sun.`*`x^2`*`",
+  });
+  const equationVerifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([[equationQuestion], [], [equationQuestion]]),
+  );
+  const target = { remoteSetId: "remote-set-1" };
+  const plain = await plainVerifier.captureBaseline(typingOperation(), target);
+  const equation = await equationVerifier.captureBaseline(
+    typingOperation(),
+    target,
+  );
+  assert.equal(plain.ok, true);
+  assert.equal(equation.ok, true);
+  if (
+    !plain.ok ||
+    !equation.ok ||
+    plain.baseline === null ||
+    equation.baseline === null
+  ) return;
+  assert.notEqual(plain.baseline.sha256, equation.baseline.sha256);
+
+  const empty = await equationVerifier.captureBaseline(
+    typingOperation(),
+    target,
+  );
+  assert.equal(empty.ok, true);
+  if (!empty.ok) return;
+  assert.deepEqual(
+    await equationVerifier.verify(typingOperation(), target, empty.baseline),
+    { ok: true, outcome: "inconclusive" },
+  );
+  },
+);
+
 test("answer-image reads cannot confirm an expected text write", async () => {
   const sets: BlooketSetReadPort = {
     list: async () => {

@@ -233,6 +233,7 @@ function questionMatches(
 
   return actual.number === expected.number
     && actual.question === expected.question
+    && actual.equation === null
     && actual.qType === expected.qType
     && actual.random === expected.random
     && actual.timeLimit === expected.timeLimit
@@ -335,6 +336,20 @@ function questionBaselineFor(
 }
 
 function questionBaselineItem(question: BlooketQuestionRead): string {
+  if (question.equation !== null) {
+    return JSON.stringify([
+      "v3",
+      question.number,
+      question.question,
+      question.equation,
+      question.qType,
+      question.random,
+      question.timeLimit,
+      question.answers,
+      question.hasImage,
+      question.hasAudio,
+    ]);
+  }
   if (question.answers.every((answer) => answer.kind === "text")) {
     const answers = question.answers.map((answer) => answer.content);
     const correctAnswers = question.answers
