@@ -4,6 +4,12 @@
   "name": "Blooket Studio",
   "version": "0.1.0",
   "description": "Connect Blooket to your local teaching workspace.",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
   "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://dashboard.blooket.com/*",
@@ -22,6 +28,10 @@
     }
   ],
   "action": {
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    },
     "default_title": "Blooket Studio",
     "default_popup": "src/ui/browser-extension/adapter-inbound/popup.html"
   },

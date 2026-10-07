@@ -1,0 +1,9 @@
+identity:
+  id: function:remote-images
+  name: remote-images
+  path: src/platforms/remote-images
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

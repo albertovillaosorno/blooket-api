@@ -76,6 +76,10 @@ import { resolveConfiguredTcpPort } from
   "../../../platforms/tcp-ports/adapter-outbound/tcp-port.ts";
 import { installInitialSkills } from
   "../../teacher-library/application/initial-skills.ts";
+import { decodeImageSourceRequest } from
+  "../../../ir/image-intake/contract/request.ts";
+import { downloadImage } from
+  "../../../platforms/remote-images/adapter-outbound/download.ts";
 import {
   createBlooketBrowserBridgeBroker,
   type BlooketBrowserBridgeBroker,
@@ -168,10 +172,8 @@ export async function startBrowserService(
     );
     response.setHeader("Referrer-Policy", "no-referrer");
     response.setHeader("Cache-Control", "no-store");
-    const requestPath = new URL(
-      request.url ?? "/",
-      "http://loopback.invalid",
-    ).pathname;
+    const requestPath = new URL(request.url ?? "/", "http://loopback.invalid")
+      .pathname;
     if (requestPath.startsWith("/api/browser-bridge/")) {
       await handleBrowserBridgeRequest(
         request,
@@ -194,6 +196,7 @@ export async function startBrowserService(
       const files: Record<string, [string, string]> = {
         "/": ["index.html", "text/html"],
         "/app.js": ["app.js", "text/javascript"],
+        "/library.js": ["library.js", "text/javascript"],
         "/style.css": ["style.css", "text/css"],
       };
       const asset = files[url.pathname];
@@ -204,6 +207,19 @@ export async function startBrowserService(
         response.end(
           await readFile(fileURLToPath(new URL(asset[0], staticRoot))),
         );
+        return;
+      }
+      const icons: Record<string, [string, string]> = {
+        "/icon.svg": ["blooket.svg", "image/svg+xml"],
+        "/mcp-icon.png": ["blooket-mcp.png", "image/png"],
+      };
+      const icon = icons[url.pathname];
+      if (icon) {
+        const bytes = await readFile(
+          new URL("../../../../assets/icon/" + icon[0], import.meta.url),
+        );
+        response.writeHead(200, { "Content-Type": icon[1] });
+        response.end(bytes);
         return;
       }
       if (url.pathname === "/api/service-status" && options.instance) {
@@ -351,8 +367,12 @@ export async function startBrowserService(
         url.pathname === "/api/import" ? 36_000_000 : 1_000_000,
       );
       if (url.pathname === "/api/browser-pairing-reset") {
-        if (!body || typeof body !== "object" || Array.isArray(body) ||
-            Object.keys(body).length !== 0)
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          Object.keys(body).length !== 0
+        )
           throw new Error("invalid-browser-pairing-request");
         browserBridge.resetPairing();
         json(response, 200, { ok: true });
@@ -448,6 +468,15 @@ export async function startBrowserService(
       }
       if (url.pathname === "/api/import") {
         json(response, 200, await importLibraryImage(root, body));
+        return;
+      }
+      if (url.pathname === "/api/image-source") {
+        const image = await downloadImage(decodeImageSourceRequest(body));
+        response.writeHead(200, {
+          "Content-Type": image.type,
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(image.bytes);
         return;
       }
       if (url.pathname === "/api/edit") {
@@ -553,9 +582,9 @@ async function handleBrowserBridgeRequest(
   }
   const extensionOrigin = request.headers.origin;
   const allowedOrigin =
-    extensionOrigin === undefined
-    || extensionOrigin.startsWith("chrome-extension://")
-    || extensionOrigin.startsWith("safari-web-extension://");
+    extensionOrigin === undefined ||
+    extensionOrigin.startsWith("chrome-extension://") ||
+    extensionOrigin.startsWith("safari-web-extension://");
   if (!allowedOrigin) {
     json(response, 403, { ok: false, code: "invalid-origin" });
     return;
@@ -583,10 +612,7 @@ async function handleBrowserBridgeRequest(
     json(response, 401, { ok: false, code: "invalid-browser-bridge-token" });
     return;
   }
-  const path = new URL(
-    request.url ?? "/",
-    "http://loopback.invalid",
-  ).pathname;
+  const path = new URL(request.url ?? "/", "http://loopback.invalid").pathname;
   if (path === "/api/browser-bridge/status" && request.method === "GET") {
     json(response, 200, { ok: true, ...bridge.status() });
     return;

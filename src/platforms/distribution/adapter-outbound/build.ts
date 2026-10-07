@@ -44,6 +44,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
 import { buildBrowserExtension } from "./extension.ts";
+import { buildMacIcon } from "./icons.ts";
 
 export const TARGETS = ["linux-x64", "darwin-arm64", "darwin-x64"] as const;
 export type DistributionTarget = (typeof TARGETS)[number];
@@ -209,6 +210,7 @@ export async function buildDistribution(target: DistributionTarget) {
     await buildBrowserExtension(repo, join(resource, "extensions/chrome"));
     for (const file of [
       "src",
+      "assets/icon",
       "docs/agents/user",
       "docs/skills",
       "LICENSE-MIT",
@@ -330,6 +332,7 @@ export async function buildDistribution(target: DistributionTarget) {
       ) + "\n",
     );
     if (mac) {
+      await buildMacIcon(repo, join(resource, "Blooket Studio.icns"));
       const executable = join(bundle, "MacOS/Blooket Studio");
       await mkdir(dirname(executable), { recursive: true });
       await writeFile(
@@ -348,6 +351,7 @@ export async function buildDistribution(target: DistributionTarget) {
 <key>CFBundleIdentifier</key><string>com.albertovilla.blooket-studio</string>
 <key>CFBundleName</key><string>Blooket Studio</string>
 <key>CFBundleExecutable</key><string>Blooket Studio</string>
+<key>CFBundleIconFile</key><string>Blooket Studio.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>LSMinimumSystemVersion</key><string>13.5</string>

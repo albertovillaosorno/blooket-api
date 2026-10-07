@@ -4,12 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Blooket Studio</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
     <header>
-      <a class="brand" href="/">Blooket <span>Studio</span></a>
+      <a class="brand" href="/">
+        <img src="/icon.svg" alt="" width="36" height="36" />
+        <span>Blooket <span>Studio</span></span>
+      </a>
       <nav aria-label="Main navigation">
         <button
           data-tab="library"
@@ -32,8 +36,19 @@
             <h1 data-i18n="library"></h1>
             <p data-i18n="libraryHelp"></p>
           </div>
-          <label class="button primary" for="file" data-i18n="addImage"></label
-          ><input
+          <div class="heading-actions">
+            <button
+              id="pasteImage"
+              data-i18n="pasteImage"
+              type="button"
+            ></button>
+            <label
+              class="button primary"
+              for="file"
+              data-i18n="addImage"
+            ></label>
+          </div>
+          <input
             id="file"
             type="file"
             accept="image/jpeg,image/png,image/gif,image/webp"
@@ -44,6 +59,19 @@
           <input type="search" id="search" data-placeholder="search" /><span
             id="count"
           ></span>
+          <button
+            id="shuffleLibrary"
+            type="button"
+            data-i18n="shuffleLibrary"
+          ></button>
+        </div>
+        <div id="searchPages" class="gallery-pages" hidden>
+          <button
+            id="previousPage"
+            type="button"
+            data-i18n="previousPage"
+          ></button>
+          <button id="nextPage" type="button" data-i18n="nextPage"></button>
         </div>
         <div id="drop" tabindex="0">
           <span class="drop-icon">＋</span><strong data-i18n="drop"></strong
@@ -121,7 +149,10 @@
             ></button>
           </article>
           <article>
-            <h2>Online MCP</h2>
+            <h2 class="mcp-heading">
+              <img src="/mcp-icon.png" alt="" width="28" height="28" />
+              Online MCP
+            </h2>
             <label class="switch"
               ><input name="online" type="checkbox" /><span
                 data-i18n="enableOnline"

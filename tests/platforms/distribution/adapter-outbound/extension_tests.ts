@@ -58,6 +58,12 @@ test(
     ]);
     assert.equal(manifest.background.type, "module");
     assert.equal(manifest.externally_connectable, undefined);
+    for (const size of [16, 32, 48, 128]) {
+      assert.equal(manifest.icons[size], `icons/${size}.png`);
+      assert.ok(
+        (await readFile(join(output, manifest.icons[size]))).length > 100,
+      );
+    }
     const files = await readdir(output, { recursive: true });
     const scripts = files.filter((file) => file.endsWith(".js"));
     assert.ok(scripts.includes(manifest.background.service_worker));

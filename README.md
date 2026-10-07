@@ -147,6 +147,28 @@ not automatically become accessible to MCP.
 
 ## Files and credentials
 
+The library opens with up to 12 randomly selected images. **Another selection**
+chooses a new set without sorting the collection. Search still covers the whole
+library, with at most 12 results per page.
+
+Use **Paste** to import a clipboard image or a direct HTTP/HTTPS image link.
+The usual Ctrl+V / ⌘V shortcut also works while the library is open.
+Pasting into an input keeps its normal text behavior. The import dialog lets
+you provide the original name and description before saving.
+
+Browsers may request clipboard
+permission; the keyboard shortcut remains available when button access is
+unavailable. A webpage link is not a direct image link.
+
+Remote images pass a local-only, CSRF-protected download boundary. Downloads
+have a 20-second deadline, three redirects, and a 25 MB source ceiling; each
+connection pins a public DNS answer and sends no local credentials. Imported
+bytes still pass the existing image decoder and export-size guard.
+
+Supplied artwork under `assets/icon/` appears in the workspace and MCP settings.
+Package assembly generates Chrome PNG sizes and the macOS ICNS from that
+artwork. The optional MCP display metadata still requires manual client setup.
+
 Normal macOS data lives in `~/Library/Application Support/blooket-api/`:
 
 ```text
