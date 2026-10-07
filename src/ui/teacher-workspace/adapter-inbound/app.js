@@ -86,8 +86,8 @@ const words = {
       "requiere autenticación; la UI permanece local.",
     exportDefaults: "Defaults de exportación",
     defaultsHelp:
-      "Se aplican a las imágenes nuevas. Los ajustes " +
-      "individuales se guardan en cada imagen.",
+      "Ancho y alto forman el lienzo global de toda la biblioteca. " +
+      "FPS y calidad son preferencias iniciales.",
     width: "Ancho (px)",
     height: "Alto (px)",
     fps: "FPS de GIF",
@@ -144,7 +144,9 @@ const words = {
     blur: "Difuminado",
     solid: "Color sólido",
     eyedropper: "Gotero",
-    exportOptions: "Opciones de esta exportación",
+    exportOptions: "Opciones de preparación",
+    canvasGlobal:
+      "El tamaño viene de Ajustes y se aplica por igual a toda la biblioteca.",
     undo: "Deshacer",
     redo: "Rehacer",
     prepare: "Guardar y preparar",
@@ -265,8 +267,8 @@ const words = {
       "requires authentication; the UI stays local.",
     exportDefaults: "Export defaults",
     defaultsHelp:
-      "Applied to new images. Individual adjustments are " +
-      "stored with each image.",
+      "Width and height form the global canvas for the whole library. " +
+      "FPS and quality are initial preferences.",
     width: "Width (px)",
     height: "Height (px)",
     fps: "GIF FPS",
@@ -322,7 +324,10 @@ const words = {
     blur: "Blurred",
     solid: "Solid color",
     eyedropper: "Eyedropper",
-    exportOptions: "Options for this export",
+    exportOptions: "Preparation options",
+    canvasGlobal:
+      "Canvas size comes from Settings and applies equally " +
+      "to the whole library.",
     undo: "Undo",
     redo: "Redo",
     prepare: "Save and prepare",

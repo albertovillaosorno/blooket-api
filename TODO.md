@@ -539,6 +539,10 @@ Direct preparation refuses an unmigrated recipe; saving that projected edit
 advances the normal optimistic revision, after which preparation can publish the
 current canvas. Prepared HTTP reads independently reject old-canvas artifacts.
 
+The editor exposes configured width and height as read-only context rather than
+per-image controls. Settings identifies them as the one library-wide canvas, so
+teachers cannot create a request the persistent API is guaranteed to reject.
+
 Editor cancellation is now wired through the full local stack. Each open editor
 gets a monotonic session identity; closing or replacing it invalidates late
 import/edit/prepare responses. Closing during native preparation aborts the

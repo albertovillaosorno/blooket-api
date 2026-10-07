@@ -173,6 +173,15 @@ test(
       assert.match(html, /Blooket Studio/u);
       assert.doesNotMatch(html, /id="importDialog"/u);
       assert.equal((html.match(/id="canvas"/gu) ?? []).length, 1);
+      assert.match(
+        html,
+        /name="width"[\s\S]{0,120}readonly/u,
+      );
+      assert.match(
+        html,
+        /name="height"[\s\S]{0,120}readonly/u,
+      );
+      assert.match(html, /data-i18n="canvasGlobal"/u);
       const app = await (await fetch(service.origin + "/app.js")).text();
       assert.match(app, /URL\.createObjectURL\(file\)/u);
       assert.match(app, /edit: selected\.edit/u);
