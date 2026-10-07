@@ -255,25 +255,6 @@
         </article>
       </section>
     </main>
-    <dialog id="importDialog">
-      <form id="importForm">
-        <h2 data-i18n="addImage"></h2>
-        <label
-          ><span data-i18n="name"></span
-          ><input name="name" required maxlength="200" /></label
-        ><label
-          ><span data-i18n="description"></span
-          ><textarea name="description" maxlength="10000"></textarea></label
-        <div class="actions">
-          <button
-            type="button"
-            data-close="importDialog"
-            data-i18n="cancel"
-          ></button
-          ><button type="submit" class="primary" data-i18n="import"></button>
-        </div>
-      </form>
-    </dialog>
     <dialog id="editor">
       <div class="editor-heading">
         <h2 id="editorTitle"></h2>
@@ -296,7 +277,7 @@
         <form id="editForm">
           <label
             ><span data-i18n="name"></span
-            ><input name="name" maxlength="200" /></label
+            ><input name="name" required maxlength="200" /></label
           ><label
             ><span data-i18n="description"></span
             ><textarea name="description" maxlength="10000"></textarea></label

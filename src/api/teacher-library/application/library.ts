@@ -276,7 +276,8 @@ export async function importLibraryImage(
   input: unknown,
 ): Promise<LibraryMetadata> {
   const request = object(input);
-  exact(request, ["name", "description", "base64"]);
+  exact(request, ["name", "description", "base64", "edit"]);
+  const recipe = decodeEditRecipe(request["edit"]);
   if (
     !text(request["name"], 200) ||
     !text(request["description"], 10_000) ||
@@ -316,15 +317,7 @@ export async function importLibraryImage(
         },
         topics: [],
         generatedEnglish: null,
-        edit: {
-          ...preferences.defaults,
-          panX: 0,
-          panY: 0,
-          zoom: 1,
-          contrast: 1,
-          saturation: 1,
-          background: { mode: "blur", color: "#ffffff" },
-        },
+        edit: recipe,
         prepared: null,
       };
       await saveMetadata(library, metadata, true);

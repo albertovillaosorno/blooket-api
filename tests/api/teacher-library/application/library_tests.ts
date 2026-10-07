@@ -65,6 +65,18 @@ async function setup() {
     name: "Mi foto",
     description: "Un ejemplo",
     base64: Buffer.from(bytes).toString("base64"),
+    edit: {
+      panX: 0.1,
+      panY: -0.1,
+      zoom: 0.8,
+      contrast: 1,
+      saturation: 1,
+      background: { mode: "blur" as const, color: "#ffffff" },
+      width: 1280,
+      height: 720,
+      gifFps: 10,
+      compression: "compact" as const,
+    },
   };
   return { root, bytes, input };
 }
@@ -86,6 +98,7 @@ test(
       );
       assert.equal(record.original.language, "");
       assert.deepEqual(record.topics, []);
+      assert.deepEqual(record.edit, input.edit);
       const result = await executeLibraryCommand(
         {
           version: 1,
@@ -235,6 +248,11 @@ test(
           ...input,
           filename: "../outside.png",
         }),
+        /unknown-or-missing-field/u,
+      );
+      const { edit: _edit, ...withoutEdit } = input;
+      await assert.rejects(
+        importLibraryImage(root, withoutEdit),
         /unknown-or-missing-field/u,
       );
     } finally {

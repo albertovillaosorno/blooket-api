@@ -83,12 +83,19 @@ credentials, tunnel access, or arbitrary filesystem roots.
 
 ### Canonical media and mirrored YAML
 
-New file, drag/drop, clipboard, and downloaded-image intake accepts only the
-teacher-authored name and description plus admitted image bytes. Decode and
-canonicalize those bytes immediately. Static media is stored as high-quality
-WebP and animated media as an optimized GIF. The temporary source blob is not a
-durable library artifact and must be discarded after successful
-canonicalization.
+New file, drag/drop, clipboard, and downloaded-image intake asks the teacher
+only for the original name and description. As soon as bytes are selected, show
+them in the same framing editor used for existing media. The local import
+request also carries that editor's validated `EditRecipe`; this is framing
+state,
+not another teacher metadata field.
+
+Decode and canonicalize admitted bytes only after the teacher confirms the
+editor. Static media is stored as high-quality WebP and animated media as an
+optimized GIF. Persist the exact validated recipe in the first metadata write so
+import and later edits have one geometry model. The temporary source blob and
+browser object URL are not durable library artifacts and must be discarded after
+successful canonicalization or cancel.
 
 Assign every new asset a stable ID and service-owned canonical path such as
 `photos/<uuid>.webp` or `photos/<uuid>.gif`. Mirror metadata at the matching

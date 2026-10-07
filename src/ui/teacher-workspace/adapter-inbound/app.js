@@ -370,7 +370,8 @@ let locale = "es",
   bootstrap,
   records = [],
   selected,
-  sourceFile;
+  sourceFile,
+  sourcePreviewUrl;
 let editorBusy = false;
 let clipboardReading = false;
 let suggestions = [],
@@ -643,13 +644,47 @@ $("#pasteImage").addEventListener("click", async () => {
     $("#pasteImage").disabled = clipboardBusy;
   }
 });
+function clearSourceDraft() {
+  sourceFile = undefined;
+  if (sourcePreviewUrl) URL.revokeObjectURL(sourcePreviewUrl);
+  sourcePreviewUrl = undefined;
+}
 function pickFile(file) {
   if (!file) return;
+  if (file.size > 25_000_000) {
+    report(new Error("source-too-large"));
+    return;
+  }
+  clearSourceDraft();
   sourceFile = file;
-  const form = $("#importForm");
-  field(form, "name").value = file.name.replace(/\.[^.]+$/, "");
-  field(form, "description").value = "";
-  $("#importDialog").showModal();
+  sourcePreviewUrl = URL.createObjectURL(file);
+  const defaults = bootstrap.preferences.defaults;
+  openEditor(
+    {
+      id: "",
+      asset: file.type === "image/gif" ? "draft.gif" : "draft.webp",
+      revision: 0,
+      original: {
+        revision: 1,
+        name: file.name.replace(/\.[^.]+$/, ""),
+        description: "",
+        language: "",
+      },
+      topics: [],
+      generatedEnglish: null,
+      edit: {
+        ...defaults,
+        panX: 0,
+        panY: 0,
+        zoom: 1,
+        contrast: 1,
+        saturation: 1,
+        background: { mode: "blur", color: "#ffffff" },
+      },
+      prepared: null,
+    },
+    sourcePreviewUrl,
+  );
 }
 $("#file").addEventListener("change", (event) => {
   pickFile(event.target.files[0]);
@@ -688,34 +723,7 @@ window.addEventListener("paste", (event) => {
   event.preventDefault();
   void pasteSource(image ? { image } : { url });
 });
-$("#importForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = event.target,
-    button = form.querySelector("[type=submit]");
-  button.disabled = true;
-  try {
-    if (sourceFile.size > 25_000_000) throw new Error("source-too-large");
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(sourceFile);
-    });
-    const record = await api("/api/import", {
-      name: field(form, "name").value,
-      description: field(form, "description").value,
-      base64,
-    });
-    $("#importDialog").close();
-    await refresh();
-    openEditor(record);
-  } catch (error) {
-    report(error);
-  } finally {
-    button.disabled = false;
-  }
-});
-function openEditor(record) {
+function openEditor(record, sourceUrl) {
   if (editorBusy) {
     toast(t("exportBusy"));
     return;
@@ -731,8 +739,9 @@ function openEditor(record) {
   recipeGesture = undefined;
   for (const name of ["name", "description"])
     field(editForm, name).value = record.original[name];
-  $("#editorTitle").textContent = record.original.name;
-  $("#foreground").src = $("#background").src = "/media/" + record.id;
+  $("#editorTitle").textContent = record.original.name || t("addImage");
+  const mediaUrl = sourceUrl ?? "/media/" + record.id;
+  $("#foreground").src = $("#background").src = mediaUrl;
   syncRecipe();
   showPrepared();
   $("#editor").showModal();
@@ -1035,15 +1044,36 @@ editForm.addEventListener("submit", async (event) => {
   drag = undefined;
   $("#download").hidden = true;
   try {
-    selected = await api("/api/edit", {
-      id: selected.id,
-      revision: selected.revision,
-      edit: selected.edit,
-      original: {
-        name: field(editForm, "name").value,
-        description: field(editForm, "description").value,
-      },
-    });
+    const original = {
+      name: field(editForm, "name").value,
+      description: field(editForm, "description").value,
+    };
+    if (sourceFile) {
+      if (sourceFile.size > 25_000_000) throw new Error("source-too-large");
+      const file = sourceFile;
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      selected = await api("/api/import", {
+        ...original,
+        base64,
+        edit: selected.edit,
+      });
+      const canonicalUrl = "/media/" + selected.id;
+      $("#foreground").src = $("#background").src = canonicalUrl;
+      $("#editorTitle").textContent = selected.original.name;
+      clearSourceDraft();
+    } else {
+      selected = await api("/api/edit", {
+        id: selected.id,
+        revision: selected.revision,
+        edit: selected.edit,
+        original,
+      });
+    }
     selected = await api("/api/prepare", { id: selected.id });
     showPrepared();
     await refresh();
@@ -1187,6 +1217,12 @@ field(settingsForm, "theme").addEventListener("change", (event) => {
 $("#search").addEventListener("input", () => {
   searchPage = 0;
   renderGallery();
+});
+$("#editor").addEventListener("close", () => {
+  clearSourceDraft();
+  selected = undefined;
+  drag = undefined;
+  picking = false;
 });
 document
   .querySelectorAll("[data-close]")

@@ -338,10 +338,17 @@ user profile from task 01 can discover and read the resulting skills.
 
 ### TODO 06 - Polish the existing image/GIF editor
 
-**Pending framing correction:** intake must show the image or animated GIF
-inside the enforced output aspect ratio immediately, together with its name
-and description. Reuse the same framing controls and recipe as the editor;
-there must not be a second geometry model between import, preview, and export.
+The intake framing correction was implemented on 2026-10-06. File selection,
+drag/drop, clipboard, and downloaded images now open directly in the same editor
+used by saved media, using a temporary browser object URL and the current export
+defaults. Name, description, zoom, pan, background, adjustments, and export
+recipe are visible together before the first durable write.
+
+The import request requires that exact validated `EditRecipe`, and the first
+metadata publication stores it atomically with the canonical asset. Cancel
+revokes the temporary object URL and publishes nothing. The separate import
+dialog and its second pre-editor phase were removed; one canvas/recipe now spans
+intake, preview, saved edits, and preparation.
 
 Provide visible minus/plus buttons and a zoom slider that support both
 shrinking and enlarging the foreground. A small foreground must remain usable
@@ -378,12 +385,12 @@ plus/minus and slider zoom in both directions, drag pan, automatic solid-color
 selection and manual overrides, animated previews, and matching final geometry
 for static images and GIFs. Preserve keyboard/accessibility checks below.
 
-The prototype already has two-field import, canonical media, source previews,
-zoom minus/plus and slider, drag pan, wheel zoom, saturation/contrast, blurred
-or solid backgrounds, color input, native eyedropper/fallback canvas picker,
-undo/redo, preparation, preview, and download. Preserve canonical optimized
-media and
-per-image edit recipes in YAML; global settings contain export defaults only.
+The prototype already has unified two-field intake/framing, canonical media,
+source previews, zoom minus/plus and slider, drag pan, wheel zoom,
+saturation/contrast, blurred or solid backgrounds, color input, native
+eyedropper/fallback canvas picker, undo/redo, preparation, preview, and
+download. Preserve canonical optimized media and per-image edit recipes in YAML;
+global settings contain export defaults only.
 
 Finish Safari behavior, keyboard/accessibility and responsive checks, file
 chooser/drag-and-drop, GIF preview parity, pixel picking, and both background

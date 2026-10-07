@@ -79,6 +79,18 @@ async function setup() {
     name: "Original",
     description: "Texto original",
     base64: Buffer.from(sourceBytes).toString("base64"),
+    edit: {
+      panX: 0,
+      panY: 0,
+      zoom: 1,
+      contrast: 1,
+      saturation: 1,
+      background: { mode: "blur", color: "#ffffff" },
+      width: 1280,
+      height: 720,
+      gifFps: 10,
+      compression: "compact",
+    },
   });
   const bytes = await readFile(join(library, record.asset));
   return { root, library, bytes, sourceBytes, record };
