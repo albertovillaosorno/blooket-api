@@ -61,8 +61,10 @@ const HELP = `blooket
 
 Usage:
   blooket session inspect [--json]
+  blooket capabilities inspect [--json]
   blooket sets list [--json]
   blooket sets get <set-id> [--json]
+  blooket questions list <set-id> [--json]
   blooket media search <query> [options]
   blooket project validate <project.json> [options]
 

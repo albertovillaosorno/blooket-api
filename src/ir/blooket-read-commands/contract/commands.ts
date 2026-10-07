@@ -40,6 +40,7 @@ import type { DecodeResult } from
 
 export const BLOOKET_READ_COMMANDS = [
   "blooket.session.inspect",
+  "blooket.capabilities.inspect",
   "blooket.sets.list",
   "blooket.sets.get",
   "blooket.questions.list",
@@ -47,6 +48,7 @@ export const BLOOKET_READ_COMMANDS = [
 export type BlooketReadCommandName = (typeof BLOOKET_READ_COMMANDS)[number];
 export type BlooketReadPayload =
   | { readonly kind: "session" }
+  | { readonly kind: "capabilities" }
   | { readonly kind: "list" }
   | { readonly kind: "get"; readonly setId: string }
   | { readonly kind: "questions"; readonly setId: string };
@@ -102,7 +104,11 @@ export function decodeBlooketReadCommand(
   return {
     ok: true,
     value: {
-      kind: name === "blooket.session.inspect" ? "session" : "list",
+      kind: name === "blooket.session.inspect"
+        ? "session"
+        : name === "blooket.capabilities.inspect"
+          ? "capabilities"
+          : "list",
     },
   };
 }

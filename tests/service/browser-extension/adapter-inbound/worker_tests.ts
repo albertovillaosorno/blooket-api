@@ -47,6 +47,8 @@ test(
   let validStatus = true;
   let questionPanelCloses = true;
   let addQuestionPanelReady = false;
+  let capabilityPanelReady = false;
+  let capabilityDrawerOpen = false;
   const jobs = [];
   const replies = [];
   const scripts = [];
@@ -139,6 +141,32 @@ test(
         }
         if (func.name === "isBlooketAddQuestionPanelReady")
           return [{ result: addQuestionPanelReady }];
+        if (func.name === "openBlooketCapabilityQuestionPanel") {
+          assert.equal(args[0], "set-fixture");
+          capabilityPanelReady = true;
+          return [{ result: true }];
+        }
+        if (func.name === "isBlooketCapabilityQuestionPanelReady")
+          return [{ result: capabilityPanelReady }];
+        if (func.name === "openBlooketAudioCapabilityDrawer") {
+          capabilityDrawerOpen = true;
+          return [{ result: true }];
+        }
+        if (func.name === "inspectBlooketAudioCapabilityDrawer")
+          return [{ result: { ok: true, value: "unsupported" } }];
+        if (func.name === "isBlooketAudioCapabilityDrawerClosed")
+          return [{ result: !capabilityDrawerOpen }];
+        if (func.name === "closeBlooketAudioCapabilityDrawer") {
+          capabilityDrawerOpen = false;
+          return [{ result: true }];
+        }
+        if (func.name === "isBlooketCapabilityQuestionPanelClosed")
+          return [{ result: !capabilityPanelReady && !capabilityDrawerOpen }];
+        if (func.name === "closeBlooketCapabilityQuestionPanel") {
+          if (capabilityDrawerOpen) return [{ result: false }];
+          capabilityPanelReady = false;
+          return [{ result: true }];
+        }
         if (func.name === "prepareBlooketAddQuestionForm") {
           assert.deepEqual(args[0], {
             setId: "set-fixture",
@@ -404,6 +432,18 @@ test(
     assert.ok(scripts.includes("prepareBlooketAddQuestionForm"));
     assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
 
+    const beforeCapabilitiesUrl = tabUrl;
+    const capabilities = await expectReply({ kind: "capabilities.inspect" });
+    assert.equal(capabilities.ok, true);
+    assert.equal(tabUrl, beforeCapabilitiesUrl);
+    assert.equal(capabilities.value.schemaVersion, 3);
+    assert.equal(capabilities.value.features.answerImages, "unsupported");
+    assert.equal(capabilities.value.features.audio, "unsupported");
+    assert.ok(scripts.includes("openBlooketCapabilityQuestionPanel"));
+    assert.ok(scripts.includes("openBlooketAudioCapabilityDrawer"));
+    assert.ok(scripts.includes("closeBlooketAudioCapabilityDrawer"));
+    assert.ok(scripts.includes("closeBlooketCapabilityQuestionPanel"));
+
     questionPanelCloses = false;
     assert.equal(
       (
@@ -423,7 +463,6 @@ test(
         loginIdentifier: "teacher@example.invalid",
         password: "synthetic-password",
       },
-      { kind: "capabilities.inspect" },
     ]) {
       assert.equal((await expectReply(unsupported)).ok, false);
       assert.equal(scripts.length, before);

@@ -80,6 +80,17 @@ const tools = [
     true,
   ),
   tool(
+    "blooket_capabilities_inspect",
+    "blooket.capabilities.inspect",
+    "Read a validated Blooket capability snapshot through the connected " +
+      "local browser. This does not sign in or publish. Account-dependent " +
+      "media stays explicit when no existing set is available to probe.",
+    {},
+    true,
+    [],
+    true,
+  ),
+  tool(
     "blooket_sets_list",
     "blooket.sets.list",
     "Read observed My Sets summaries through the connected local browser. " +
@@ -104,9 +115,9 @@ const tools = [
   tool(
     "blooket_questions_list",
     "blooket.questions.list",
-    "Read validated text-question state for one remote set through the " +
-      "connected local browser. Question and audio/image presence are read " +
-      "only; answer-image questions remain unsupported and fail closed.",
+    "Read normalized question state for one remote set through the " +
+      "connected local browser. Answer image/math kinds and question media " +
+      "presence are read without returning provider-owned media URLs.",
     { setId: { type: "string", minLength: 1, maxLength: 512 } },
     true,
     ["setId"],

@@ -48,6 +48,54 @@ function dependencies(state: ObservedBlooketNavigationStateKind) {
       observe: async () => ({ ok: true, state }),
       authenticate: secret,
     },
+    capabilities: {
+      inspect: async () => {
+        reads++;
+        return {
+          ok: true,
+          value: {
+            schemaVersion: 3,
+            verifiedOn: "2026-10-07",
+            evidence: [{
+              kind: "browser-observation",
+              reference: "synthetic capability fixture",
+            }],
+            questionTypes: {
+              multipleChoice: {
+                availability: "supported",
+                minAnswers: 2,
+                maxAnswers: 4,
+                requiresQuestionText: true,
+                allowsMultipleCorrect: true,
+              },
+              typingAnswer: {
+                availability: "supported",
+                matchModes: ["exact", "contains"],
+              },
+            },
+            features: {
+              questionImages: "supported",
+              answerImages: "unsupported",
+              audio: "unsupported",
+            },
+            setMetadata: {
+              titleRequired: true,
+              descriptionRequired: false,
+              titleMaxLength: 75,
+              descriptionMaxLength: 300,
+              coverImageOptional: true,
+              visibility: ["public", "private"],
+            },
+            upload: {
+              maxBytes: 2_500_000,
+              canvasWidth: null,
+              canvasHeight: null,
+              maxPixels: null,
+            },
+          },
+        };
+      },
+    },
     secrets: { read: secret, write: secret, delete: secret },
     questions: {
       list: async () => {
@@ -120,6 +168,20 @@ test("canonical reads reuse a ready session without secret access",
       completeness: "unknown",
       value: [{ schemaVersion: 1, id: "fixture", title: "Synthetic quiz" }],
     });
+  const capabilities = await executeCommand(
+    envelope("blooket.capabilities.inspect"),
+    undefined,
+    fixture.ports,
+  );
+  assert.equal(capabilities.ok, true);
+  if (capabilities.ok) {
+    const value = capabilities.value as {
+      readonly kind?: string;
+      readonly value?: { readonly features?: { readonly audio?: string } };
+    };
+    assert.equal(value.kind, "capabilities");
+    assert.equal(value.value?.features?.audio, "unsupported");
+  }
   assert.equal(
     (
       await executeCommand(
@@ -140,7 +202,7 @@ test("canonical reads reuse a ready session without secret access",
     ).ok,
     true,
   );
-  assert.equal(fixture.reads(), 3);
+  assert.equal(fixture.reads(), 4);
 });
 
 test("closed and challenged sessions stop before reads or secrets",
@@ -164,8 +226,14 @@ test("closed and challenged sessions stop before reads or secrets",
       undefined,
       fixture.ports,
     );
+    const capabilities = await executeCommand(
+      envelope("blooket.capabilities.inspect"),
+      undefined,
+      fixture.ports,
+    );
     assert.equal(fixture.reads(), 0);
     assert.equal(questions.ok, result.ok);
+    assert.equal(capabilities.ok, result.ok);
     if (state === "signed-out" || state === "expired-session") {
       assert.equal(result.ok, false);
       if (!result.ok)

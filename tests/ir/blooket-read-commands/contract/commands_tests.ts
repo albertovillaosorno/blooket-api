@@ -68,4 +68,14 @@ test("Blooket read payloads reject credentials, paths and coercion", () => {
     decodeBlooketReadCommand("blooket.session.inspect", {}).ok,
     true,
   );
+  assert.equal(
+    decodeBlooketReadCommand("blooket.capabilities.inspect", {}).ok,
+    true,
+  );
+  assert.equal(
+    decodeBlooketReadCommand("blooket.capabilities.inspect", {
+      setId: "not-admitted",
+    }).ok,
+    false,
+  );
 });

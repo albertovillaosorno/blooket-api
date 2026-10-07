@@ -114,6 +114,7 @@ test("unknown options fail before any file access", () => {
 test("read arguments preserve opaque IDs and reject extra authority", () => {
   for (const args of [
     ["session", "inspect", "--json"],
+    ["capabilities", "inspect", "--json"],
     ["sets", "list"],
     ["sets", "get", "opaque ID", "--json"],
     ["questions", "list", "opaque ID", "--json"],

@@ -44,6 +44,8 @@ import {
 } from
   "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
+import { createExtensionCapabilityInspectionHost } from
+  "./capability-inspection-host.ts";
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -337,6 +339,13 @@ async function relay(current: Connection, activeGeneration: number) {
             job.command.kind === "questions.list"
           ) {
             result = await read(current, job.command);
+          } else if (job.command.kind === "capabilities.inspect") {
+            const host = createExtensionCapabilityInspectionHost(
+              chrome,
+              current.tabId,
+              pause,
+            );
+            result = await host.inspect();
           } else if (job.command.kind === "sets.create") {
             const host = createExtensionCreateSetHost(
               chrome,
