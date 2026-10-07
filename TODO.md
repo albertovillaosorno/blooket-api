@@ -12,6 +12,31 @@ existing code and validated behavior, complete each task's acceptance checks,
 and update this file with evidence. A supplied configuration, connected tunnel,
 or passing portable suite does not complete an unfinished product workflow.
 
+## Accepted media corrections - implement before further feature work
+
+The human clarified the media workflow on 2026-10-06. Record these requirements
+first, then reopen the relevant parts of tasks 05-07, 12, and 16 in their
+existing order. The current four-field import form and manual oversize workflow
+do not satisfy this correction; previous passing checks do not complete it.
+
+Import asks only for an image name and description supplied by the teacher.
+The AI owns topic selection and English semantic normalization, including text
+originally
+written in English. The teacher must see the framed image/GIF immediately and
+be able to make it smaller or larger, drag it, and choose blurred or solid
+backgrounds before accepting the image.
+
+Static images and GIFs share one enforced output canvas resolution and aspect
+ratio. Automatic preparation must produce an actual file strictly below
+2,500,000 bytes; resolution/detail optimization comes first, GIF FPS reduction
+second when relevant, and color/encoding optimization afterward. The editor
+must retain that shared final geometry throughout optimization.
+
+These are pending product changes, not claims about the current implementation.
+Keep the original files and teacher text intact, retain actual-byte validation,
+and never label an oversized or unverified candidate ready for download or
+publication. The detailed acceptance checks belong to the owning tasks below.
+
 ## Current development state
 
 The user has prepared the repository-root `.env` and provisioned the Cloudflare
@@ -196,6 +221,32 @@ tunnel credential, owner password, and Blooket password independent.
 
 ### TODO 05 - Complete the library migration and personal skills
 
+**Pending import and enrichment correction:** every intake path, including
+file selection, dragging, and clipboard image/link import, asks only for name
+and description. Remove the language selector and comma-separated topic field
+from intake; do not move the same questions into another required dialog.
+Original text and user-owned filenames remain unchanged in mirrored metadata.
+
+Do not infer the original text language from the workspace's EN/ES setting.
+Language identification and topics belong to AI enrichment; missing analysis
+stays unknown rather than being invented during import. Review the admitted
+metadata contract before allowing an AI language update.
+
+Normalize every description into useful, generalized, descriptive English,
+even when the original is already English. Use the description skill from task
+16 for consistent semantic ordering and image-grounded topics. Keep normalized
+English name/description separate from the teacher's originals.
+
+An English original is not proof that AI normalization has occurred. Record
+normalization completion only after the AI's actual output has been validated
+and durably saved for the current original revision. Failed, absent, or stale
+outputs remain pending/stale; completion is distinct from human verification.
+Concurrent original edits must prevent an older result being marked current.
+
+Acceptance includes the two-field form on all intake paths, unchanged original
+English and non-English text, generated topics, actual English normalization,
+failed-save/revision-race handling, and correct pending/completed/stale states.
+
 Mirrored `metadata/<full-original-filename>.yaml` and immutable user-named
 `photos/` assets are implemented with bounded YAML parsing, atomic saves,
 revision protection, stable IDs, and separate generated English metadata.
@@ -262,6 +313,36 @@ profile from task 01 can discover and read the resulting skills.
 
 ### TODO 06 - Polish the existing image/GIF editor
 
+**Pending framing correction:** intake must show the image or animated GIF
+inside the enforced output aspect ratio immediately, together with its name
+and description. Reuse the same framing controls and recipe as the editor;
+there must not be a second geometry model between import, preview, and export.
+
+Provide visible minus/plus buttons and a zoom slider that support both
+shrinking and enlarging the foreground. A small foreground must remain usable
+inside the fixed canvas instead of being forced to cover it. Mouse dragging
+moves the foreground; wheel zoom may remain an additional gesture.
+
+Keep saturation and the other individual adjustments in the editor. Show a
+background choice between a full-canvas Gaussian-blurred version of the image,
+with the intended WhatsApp-like appearance, and a solid color. The foreground
+stays sharp and independent of the blurred background's fill transform.
+
+Choosing a solid background should generate a suitable initial color from the
+image immediately, using bounded deterministic color analysis. Specify and
+test its palette/contrast criteria; do not claim one universally optimal color.
+Keep a visible color picker and eyedropper, and preserve the teacher's manual
+color override in the recipe rather than replacing it on every preview.
+
+Use bounded representative sampling for animated inputs, without flashing the
+background color from frame to frame. Preview and preparation must use the
+same selected color, framing, blur, and adjustment recipe.
+
+Acceptance includes a reduced foreground surrounded by both background types,
+plus/minus and slider zoom in both directions, drag pan, automatic solid-color
+selection and manual overrides, animated previews, and matching final geometry
+for static images and GIFs. Preserve keyboard/accessibility checks below.
+
 The prototype already has import naming/descriptions/topics, source previews,
 zoom minus/plus and slider, drag pan, wheel zoom, saturation/contrast, blurred
 or solid backgrounds, color input, native eyedropper/fallback canvas picker,
@@ -309,6 +390,55 @@ checks explicitly pending where no macOS test host is available.
 
 ### TODO 07 - Finish bounded exports and the strict media ceiling
 
+**Pending automatic optimization correction:** the teacher should edit the
+image and receive a usable prepared result, without manually managing oversized
+files. Do not present an invalid candidate as a downloadable/prepared asset or
+ask the teacher to solve its byte size through trial and error.
+
+Enforce one configured final canvas width, height, and aspect ratio for both
+static images and animated GIFs. Image-specific zoom, pan, backgrounds, and
+adjustments remain individual recipes. Define a revision-safe transition for
+existing differently sized recipes and invalidate affected prepared results;
+never alter original media to migrate the shared canvas policy.
+
+Optimization follows the requested order: lower working/source raster detail
+first, then GIF FPS if necessary, then palette/color and encoder compression.
+Working-detail reduction must preserve the configured final canvas dimensions
+and framing; it must not silently produce different output resolutions for
+different files. Record effective parameters rather than claiming the requested
+quality/FPS was retained after automatic reduction.
+
+Normalize static prepared images to JPEG with the chosen background flattened.
+Keep animated media animated and detect actual source frame delays, duration,
+and cadence before choosing an explicit output FPS. Variable-delay sources
+must not be described as having one uniform detected FPS when they do not.
+Use the configured default, initially 10 FPS, and bounded automatic reductions
+when required; preserve duration/loop behavior within the documented tolerance.
+
+Make the compression/quality control dynamically admit only prepared choices
+that can satisfy the strict byte ceiling. Recompute admission when framing,
+background, adjustments, source, or output defaults change; an estimate alone
+cannot certify size. Use bounded candidate searches, cancellation, and revision
+checks so a slower old calculation cannot replace a newer edit.
+
+Keep the last valid result while a new candidate is being optimized. Show
+processing state until actual encoding and byte checks establish the new valid
+result; do not expose failed temporary files or enable continuation early.
+Remove the ordinary workflow's manual size-warning text once automatic
+optimization is implemented.
+
+The output must remain strictly below 2,500,000 bytes, including GIF animation;
+2,500,000 bytes exactly fails. If an input is malformed, exceeds admitted
+resources, or cannot be represented under the invariant canvas and bounded
+quality policy, explain that processing could not finish and retain editable
+source state. Do not relax the ceiling or fabricate a valid output.
+
+Acceptance covers static and animated oversize inputs, detected variable GIF
+timing, the ordered optimization stages, JPEG normalization, the same final
+resolution/aspect ratio for all outputs, dynamically admitted slider values,
+rapid edit cancellation, and actual-byte revalidation before every downstream
+use. This supersedes manual trial-and-error oversize handling below.
+
 Prepared GIF FPS is explicit, defaults to 10, and currently admits 1, 2, 5, 10,
 20, 25, and 50 FPS. The implemented renderer resamples source timing and keeps
 loop behavior, with duration/frame/pixel limits. Every output must remain
@@ -349,11 +479,11 @@ need a real target host. Native memory is bounded by admitted work, not an OS
 quota. The eventual Blooket upload must independently reject oversized or stale
 files in task 11; that concrete upload boundary is not implemented yet.
 
-Provide bounded optimization or clear controls when media exceeds the ceiling;
-block preparation/upload continuation until valid. Never silently change the
-requested animation, assume 10 FPS guarantees size, or invent Blooket
-dimensions. The current 1280-by-720 default is an application choice, not a
-verified upstream pixel requirement.
+Implement the automatic optimization correction above and block continuation
+until an actual valid file exists. Preserve animation while recording effective
+FPS reductions, and never assume 10 FPS alone guarantees size. The current
+1280-by-720 default is an application choice, not a verified upstream pixel
+requirement; the shared-canvas policy must remain explicit.
 
 Complete when explicit FPS, duration/loop/resource bounds, and failure recovery
 are tested, and an output of 2,500,000 bytes or more cannot advance to upload.
@@ -640,6 +770,12 @@ MCP, CLI, HTTP, and browser entrypoints.
 
 ### TODO 12 - Finish AI media intake and browser quiz review
 
+Apply the two-field intake and normalization requirements from tasks 05-07 to
+AI-assisted review. The AI supplies topics and structured normalized English
+metadata through admitted enrichment operations, preserving the teacher's
+original name, description, and filename. It must not treat import, English
+source text, or an unsaved generated response as completed normalization.
+
 Verify actual AI image delivery: ChatGPT attachments do not automatically reach
 an MCP server. Define the admitted upload/intake workflow, bounds, local review,
 and metadata creation. The model enriches YAML English fields/topics; it never
@@ -849,6 +985,26 @@ quizzes. Continue these implementations rather than recreating their already
 validated foundations.
 
 ### TODO 16 - Add adaptive teacher workflow skills
+
+**Pending description skill correction:** add a focused description-normalizing
+skill and link it from the master workflow and media-enrichment guidance. It
+must normalize English originals as well as other languages, without changing
+teacher-owned text or naming files.
+
+Use consistent semantic order: primary subject, visible attributes/actions,
+setting/composition, then relevant teaching context only when supported. Write
+generalized descriptive English suitable for search and quiz matching, derive
+useful topics, and avoid invented visual facts or guessed identities.
+
+The skill must read current original metadata and admitted image evidence,
+save actual normalized outputs with optimistic revision protection, and mark
+completion only after confirmed persistence. If image evidence is unavailable,
+report the limitation rather than claiming image-grounded analysis. A later
+original-text change invalidates completion for that older source revision.
+
+Verify already-English inputs are genuinely normalized and saved, missing AI
+work remains pending, failed saves do not set completion, and original text,
+filenames, and human-verification flags remain intact.
 
 Portable skill foundations were implemented on 2026-10-06. Startup now seeds a
 small master index plus workflow-learning, human-validation, browser-image
