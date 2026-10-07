@@ -137,7 +137,14 @@ test("local reads and MCP traverse the real CLI and service bridge",
                 hasImage: false,
                 hasAudio: false,
               }]
-            : [{ schemaVersion: 1, id: "fixture", title: "Synthetic quiz" }];
+            : {
+                items: [{
+                  schemaVersion: 1,
+                  id: "fixture",
+                  title: "Synthetic quiz",
+                }],
+                completeness: "unknown",
+              };
     assert.ok(
       bridge.complete(bridge.pairingToken(), {
         schemaVersion: 1,
