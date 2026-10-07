@@ -48,7 +48,13 @@ import { defaultTeacherPreferences } from
   "../../../settings/teacher-preferences/domain/preferences.ts";
 import { decodeServiceRuntime } from
   "../../service-lifecycle/adapter-outbound/runtime.ts";
-import { TARGETS, type DistributionTarget } from "./build.ts";
+import {
+  MAC_LOGIN_AGENT_EXECUTABLE,
+  MAC_LOGIN_AGENT_LABEL,
+  MAC_LOGIN_AGENT_PLIST,
+  TARGETS,
+  type DistributionTarget,
+} from "./build.ts";
 
 import { PRODUCT_VERSION, extensionVersion, appleBuildVersion } from
   "../../../ir/product-version/contract/version.ts";
@@ -128,6 +134,29 @@ export async function verifyDistribution(
       ));
       assert.ok(info.includes(`<key>CFBundleVersion</key>` +
         `<string>${appleBuildVersion(PRODUCT_VERSION)}</string>`));
+      const loginAgent = join(
+        resources,
+        "ServiceManagement",
+        MAC_LOGIN_AGENT_EXECUTABLE,
+      );
+      await access(loginAgent);
+      const loginAgentPlist = await readFile(
+        join(
+          root,
+          "Blooket API.app/Contents/Library/LaunchAgents",
+          MAC_LOGIN_AGENT_PLIST,
+        ),
+        "utf8",
+      );
+      assert.ok(loginAgentPlist.includes(
+        `<string>${MAC_LOGIN_AGENT_LABEL}</string>`,
+      ));
+      assert.ok(loginAgentPlist.includes(
+        "Contents/Resources/ServiceManagement/" +
+          MAC_LOGIN_AGENT_EXECUTABLE,
+      ));
+      assert.ok(loginAgentPlist.includes("<key>RunAtLoad</key>"));
+      assert.ok(!loginAgentPlist.includes("KeepAlive"));
     }
     const names = await readdir(app);
     assert.ok(!names.includes(".env") && !names.includes("reference"));
@@ -184,6 +213,19 @@ export async function verifyDistribution(
       }),
       { mode: 0o600 },
     );
+    if (mac) {
+      const loginAgent = join(
+        resources,
+        "ServiceManagement",
+        MAC_LOGIN_AGENT_EXECUTABLE,
+      );
+      await execute(loginAgent, [], {
+        env,
+        timeout: 40_000,
+        maxBuffer: 1_000_000,
+      });
+      started = true;
+    }
     const first = await launch(["--no-open"]);
     started = true;
     const runtime = decodeServiceRuntime(

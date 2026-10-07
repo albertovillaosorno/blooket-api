@@ -89,9 +89,15 @@ the helper immediately, so it must reuse the existing service lock and never
 open a second UI or replay a remote write.
 
 The native packaging work must compile/sign the Service Management helper and
-include its launch-agent plist inside the application bundle. Keep registration
-explicitly pending until that helper and real login behavior are tested. This
-design follows Apple's
+include its launch-agent plist inside the application bundle. The package
+builder now compiles an ARM64/macOS 13.5 login-agent helper and places its plist
+under `Contents/Library/LaunchAgents`. `BundleProgram` points at the helper
+inside `Contents/Resources/ServiceManagement`.
+
+The helper invokes the existing packaged launcher with `--no-open`; it does not
+register itself and the plist deliberately omits `KeepAlive`. Keep registration
+and signing explicitly pending until native CI and real login behavior establish
+those boundaries. This design follows Apple's
 <!-- jig-ignore-next-line: Preserve canonical Apple API URLs. -->
 [Service Management contract](https://developer.apple.com/documentation/servicemanagement/smappservice)
 and its
@@ -131,6 +137,15 @@ macOS launch-at-login, Keychain behavior, or recipient acceptance.
 Strict TypeScript, roadmap validation, and all 723 portable tests passed at this
 checkpoint. Jig reported only the existing external `JIG-RULE-GAP-001`; its
 missing upstream evidence was not weakened or substituted.
+
+On 2026-10-07, the ARM64 package definition gained the launch-agent packaging
+foundation described above. Portable tests pin the owned label, plist location,
+`BundleProgram`, `RunAtLoad`, absence of `KeepAlive`, and the helper's exact
+`--no-open` launcher path. Native package verification now requires the helper
+and plist and, on macOS, executes the helper before the ordinary launcher reuse
+check. This repository session has no local Swift compiler, so compilation,
+registration authorization, signing, and actual login startup remain unclaimed
+until the ARM64 macOS path runs.
 
 ## Blockers
 

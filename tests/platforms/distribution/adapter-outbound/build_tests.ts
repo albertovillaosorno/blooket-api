@@ -32,6 +32,12 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
+import {
+  MAC_LOGIN_AGENT_EXECUTABLE,
+  MAC_LOGIN_AGENT_LABEL,
+  MAC_LOGIN_AGENT_PLIST,
+  macLoginAgentPlist,
+} from "../../../../src/platforms/distribution/adapter-outbound/build.ts";
 
 const yaml = await import(
   new URL(
@@ -49,6 +55,40 @@ const workflow = async (name: string) =>
       "utf8",
     ),
   );
+
+test("Mac package defines a bounded non-keepalive login agent", async () => {
+  assert.equal(
+    MAC_LOGIN_AGENT_LABEL,
+    "com.albertovilla.blooket-api.background",
+  );
+  assert.equal(
+    MAC_LOGIN_AGENT_PLIST,
+    "com.albertovilla.blooket-api.background.plist",
+  );
+  assert.equal(MAC_LOGIN_AGENT_EXECUTABLE, "Blooket API Background");
+  const plist = macLoginAgentPlist();
+  assert.ok(plist.includes("<key>BundleProgram</key>"));
+  assert.ok(plist.includes(
+    "Contents/Resources/ServiceManagement/Blooket API Background",
+  ));
+  assert.ok(plist.includes("<key>RunAtLoad</key>"));
+  assert.ok(!plist.includes("KeepAlive"));
+  assert.ok(!plist.includes("ProgramArguments"));
+
+  const helper = await readFile(
+    new URL(
+      "../../../../src/platforms/service-lifecycle/adapter-outbound/" +
+        "login-agent.swift",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.ok(helper.includes("Resources/runtime/node"));
+  assert.ok(helper.includes("adapter-inbound/launcher.ts"));
+  assert.ok(helper.includes('[launcher.path, "--no-open"]'));
+  assert.ok(!helper.includes("SMAppService"));
+  assert.ok(!helper.includes("http"));
+});
 
 test("CI validates before ARM Safari and release only publishes", async () => {
   const ci = await workflow("ci");
