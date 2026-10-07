@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted policy with a portable manual public-release checker. Automatic
-installation and native launch-at-login acceptance remain pending.
+Accepted policy with portable catalog checking and signed-archive staging.
+Automatic installation and native launch-at-login acceptance remain pending.
 
 ## Decision ID
 
@@ -63,7 +63,13 @@ key by its SPKI DER SHA-256 fingerprint; it cannot introduce a trust root.
 publisher-key provisioning/rotation and CI manifest publication remain pending.
 Verified metadata must match the selected release; actual archive bytes must
 match its signed size/hash. Apple trust and transactional installation remain
-independent mandatory checks, with no download/install authority exposed here.
+independent mandatory checks.
+
+`src/platforms/update-downloads/` streams publisher-authenticated archives into
+private owned staging directories, with bounded anonymous HTTPS, exact signed
+size/hash, restricted redirects, cancellation, and partial cleanup. The product
+UI and MCP do not expose this adapter; real publisher-key provisioning, signed
+release metadata, Apple validation, and transactional installation are pending.
 
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;

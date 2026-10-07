@@ -1,0 +1,9 @@
+identity:
+  id: function:update-downloads
+  name: update-downloads
+  path: src/platforms/update-downloads
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound
