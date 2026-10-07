@@ -171,6 +171,34 @@ test("ready sessions list strictly decoded set summaries", async () => {
   assert.deepEqual(reads.calls, ["sets:list"]);
 });
 
+test("complete empty-account evidence survives application validation",
+  async () => {
+  const calls: string[] = [];
+  const reads: BlooketSetReadPort = {
+    list: async () => ({
+      ok: true,
+      value: [],
+      completeness: "complete",
+    }),
+    get: async () => ({ ok: false, code: "blooket-browser-failed" }),
+  };
+  const result = await listBlooketSets(
+    browser([{ ok: true, state: "my-sets" }], calls),
+    secretStore(calls),
+    reads,
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    kind: "sets",
+    session: { state: "my-sets", reused: true },
+    completeness: "complete",
+    value: [],
+  });
+  assert.deepEqual(calls, ["browser:observe"]);
+  },
+);
+
 test("signed-out list reads authenticate before the set probe", async () => {
   const calls: string[] = [];
   const reads = readPort({
