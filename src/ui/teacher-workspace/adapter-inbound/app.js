@@ -878,9 +878,10 @@ async function loadAnimatedColorSuggestion(target, id) {
     );
     if (!color || selected !== target || !$("#editor").open) return;
     animatedColorSuggestion = color;
-    if (selected.edit.background.mode === "solid") {
+    if (selected.edit.background.mode === "solid" && !editorBusy) {
+      const previousColor = selected.edit.background.color;
       suggestSolidColor();
-      preview();
+      if (selected.edit.background.color !== previousColor) invalidate();
     }
   } catch {}
 }

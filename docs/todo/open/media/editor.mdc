@@ -135,8 +135,38 @@ static-image edit with zoom and solid background. Preview/download worked.
 Import was exercised through the local API because the Chrome file chooser
 lacked file URL permission; no browser security setting was changed.
 
+Chrome acceptance on 2026-10-07 used an isolated temporary workspace and
+synthetic static/GIF assets, without development credentials or Blooket writes.
+The zoom range now has an explicit translated accessible name. Preparation and
+drop-area backgrounds follow the selected theme; the measured dark preparation
+text contrast increased from 1.71:1 to 6.08:1.
+
+Chrome verified zoom below one, plus/minus, keyboard pan, mouse drag, grouped
+undo/redo, saturation/contrast, blur and solid mode, initial color suggestion,
+and preservation of a manual color across mode changes. Saving and reopening
+retained the static recipe, teacher text, and prepared download. Its JPEG was
+890 bytes at 320-by-180, with the selected solid color surrounding the reduced
+foreground; this does not establish compressed pixel identity with the preview.
+
+The two-frame GIF prepared at the same 320-by-180 canvas, 16,034 actual bytes,
+and two 100-ms delays for explicit 10 FPS. Its automatic color previously failed
+because the browser admitted only one frame's sample; it now admits the worker's
+bounded five-frame sample and a regression test covers later-frame dominance.
+
+A late suggestion invalidates the previous admission check when it changes the
+active recipe and cannot change a recipe during preparation. Chrome confirmed
+the corrected GIF suggestion and its manual override. Portable tests also
+reject samples beyond the five-frame bound.
+
+Chrome visual checks at 390-by-844 and 1024-by-768 found no horizontal dialog
+overflow; framing and controls remained reachable through normal scrolling.
+The temporary viewport was reset afterward. Strict TypeScript, roadmap checks,
+browser-script syntax, and all 709 portable tests passed at this checkpoint.
+
 ## Blockers
 
-**Pending:** Safari accessibility, full preview/export geometry, GIF preview,
-color picking, and responsive visual acceptance remain unverified. Continue
-independent export work in task 07 and retain these acceptance checks.
+**Pending:** Safari accessibility/responsive behavior, file chooser and
+drag-and-drop intake, full animation preview replay, and native/fallback selection
+remain unverified. Chrome exposed the native eyedropper control but automation
+did not produce a confirmed color selection. Continue independent export work
+in task 07 and retain these target-browser acceptance checks.
