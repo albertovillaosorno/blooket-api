@@ -203,6 +203,45 @@ test(
   },
 );
 
+test("math answers require one exact provider delimiter pair", () => {
+  const malformedLegacy = decodeBlooketQuestionRead({
+    schemaVersion: 1,
+    number: 4,
+    question: "Pick math.",
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: ["`*`x`*`y`*`", "plain"],
+    correctAnswers: ["`*`x`*`y`*`"],
+    answerTypes: null,
+    hasImage: false,
+    hasAudio: false,
+  });
+  assert.equal(malformedLegacy.ok, false);
+  if (!malformedLegacy.ok)
+    assert.equal(
+      malformedLegacy.issues.some((issue) =>
+        issue.code === "invalid-legacy-math-answer"),
+      true,
+    );
+
+  assert.equal(decodeBlooketQuestionRead({
+    schemaVersion: 3,
+    number: 4,
+    question: "Pick math.",
+    equation: null,
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: [
+      { kind: "math", content: "x`*`y", correct: true, match: null },
+      { kind: "text", content: "plain", correct: false, match: null },
+    ],
+    hasImage: false,
+    hasAudio: false,
+  }).ok, false);
+});
+
 test(
   "version-two answer kinds reject mismatched content and typing media",
   () => {

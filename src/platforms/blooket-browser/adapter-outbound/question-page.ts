@@ -247,10 +247,16 @@ export function inspectOpenedBlooketQuestion(
       }
       if (answer.includes(imageAnswerMarker)) return undefined;
       if (answer.startsWith(mathAnswerMarker)) {
+        const finalMarker = answer.length - mathAnswerMarker.length;
+        const nextMarker = answer.indexOf(
+          mathAnswerMarker,
+          mathAnswerMarker.length,
+        );
         if (
           qType !== "mc" ||
           !answer.endsWith(mathAnswerMarker) ||
-          answer.length <= mathAnswerMarker.length * 2
+          answer.length <= mathAnswerMarker.length * 2 ||
+          nextMarker !== finalMarker
         )
           return undefined;
         return {
