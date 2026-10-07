@@ -61,6 +61,16 @@ const plan: BlooketWritePlan = {
   }],
 };
 
+const mediaPlan: BlooketWritePlan = {
+  ...plan,
+  planId: "plan:media-test",
+  operations: [{
+    ...plan.operations[0]!,
+    operationId: "plan:media-test:set",
+    coverMediaId: "cover",
+  }],
+};
+
 function checkpoint(index = 0) {
   return {
     schemaVersion: 2 as const,
@@ -98,11 +108,15 @@ function writePort(
   result: BlooketWriteAttemptResult | "throw",
   calls: string[],
   targets: Array<string | null> = [],
+  mediaSnapshots: Array<readonly string[]> = [],
 ): BlooketWriteExecutionPort {
   return {
-    execute: async (operation, target) => {
+    execute: async (operation, target, context) => {
       calls.push("write:" + operation.operationId);
       targets.push(target.remoteSetId);
+      mediaSnapshots.push(
+        context.preparedMedia.map((item) => item.mediaId),
+      );
       if (result === "throw") {
         throw new Error("fixture write failure");
       }
@@ -110,6 +124,75 @@ function writePort(
     },
   };
 }
+
+test(
+  "one-step media writes require admission before the write port",
+  async () => {
+  const browserCalls: string[] = [];
+  const writeCalls: string[] = [];
+  assert.deepEqual(
+    await executeNextBlooketWrite(
+      mediaPlan,
+      {
+        schemaVersion: 2,
+        planId: mediaPlan.planId,
+        nextOperationIndex: 0,
+        remoteSetId: null,
+      },
+      browser(browserCalls),
+      secrets([]),
+      writePort({
+        ok: true,
+        receipt: { kind: "set-created", remoteSetId: "remote-set-1" },
+      }, writeCalls),
+    ),
+    {
+      ok: false,
+      stage: "prepared-media",
+      code: "blooket-media-unavailable",
+      mediaId: "cover",
+    },
+  );
+  assert.deepEqual(writeCalls, []);
+  },
+);
+
+test(
+  "one-step execution passes admitted media to the write context",
+  async () => {
+  const mediaSnapshots: Array<readonly string[]> = [];
+  const result = await executeNextBlooketWrite(
+    mediaPlan,
+    {
+      schemaVersion: 2,
+      planId: mediaPlan.planId,
+      nextOperationIndex: 0,
+      remoteSetId: null,
+    },
+    browser([]),
+    secrets([]),
+    writePort({
+      ok: true,
+      receipt: { kind: "set-created", remoteSetId: "remote-set-1" },
+    }, [], [], mediaSnapshots),
+    {
+      read: async (mediaId) => ({
+        ok: true,
+        value: {
+          mediaId,
+          revision: 2,
+          format: "png",
+          bytes: new Uint8Array([1]),
+        },
+      }),
+    },
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.kind, "advanced");
+  assert.deepEqual(mediaSnapshots, [["cover"]]);
+  },
+);
 
 test("invalid checkpoints fail before all side effects", async () => {
   const browserCalls: string[] = [];
