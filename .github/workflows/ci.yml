@@ -52,39 +52,31 @@ jobs:
         run: npm run package -- darwin-arm64
       - name: Verify ARM64 package
         run: npm run package:verify -- darwin-arm64
+      - name: Assert ARM64 distribution archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .temp/distributions/darwin-arm64.zip
       - name: Compile Safari WebExtension host
         shell: bash
         run: |
           set -euo pipefail
           rm -rf .temp/safari-project
-          xcrun safari-web-extension-packager \
-            ".temp/distributions/darwin-arm64/""Blooket Studio.app/Contents/Resources/extensions/chrome" \
-            --project-location .temp/safari-project \
-            --app-name "Blooket Studio Safari" \
-            --bundle-identifier com.blooketstudio.ci.safari \
-            --swift \
-            --macos-only \
-            --copy-resources \
-            --no-open \
-            --no-prompt
-          project="$(find .temp/safari-project -maxdepth 2 \
-            -name '*.xcodeproj' -print -quit)"
+          extension_root=".temp/distributions/darwin-arm64"
+          app_root="$extension_root/Blooket Studio.app"
+          extension="$app_root/Contents/Resources/extensions/chrome"
+          xcrun safari-web-extension-packager "$extension"             --project-location .temp/safari-project             --app-name "Blooket Studio Safari"             --bundle-identifier com.blooketstudio.ci.safari             --swift             --macos-only             --copy-resources             --no-open             --no-prompt
+          project="$(find .temp/safari-project -maxdepth 2             -name '*.xcodeproj' -print -quit)"
           test -n "$project"
-          scheme="$(xcodebuild -project "$project" -list -json |
-            python3 -c 'import json,sys; d=json.load(sys.stdin); ''print(d["project"]["schemes"][0])')"
+          schemes_json="$(xcodebuild -project "$project" -list -json)"
+          scheme="$(printf '%s' "$schemes_json" |
+            python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["project"]["schemes"][0])')"
           test -n "$scheme"
-          xcodebuild \
-            -project "$project" \
-            -scheme "$scheme" \
-            -configuration Debug \
-            -destination 'platform=macOS,arch=arm64' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+          xcodebuild             -project "$project"             -scheme "$scheme"             -configuration Debug             -destination 'platform=macOS,arch=arm64'             CODE_SIGNING_ALLOWED=NO             build
       - name: Exercise packaged workspace in Safari
         shell: bash
         run: |
           set -euo pipefail
-          test -s .temp/distributions/darwin-arm64.zip
           sudo /usr/bin/safaridriver --enable
           npm run macos:safari-smoke
       - uses: actions/upload-artifact@v7
