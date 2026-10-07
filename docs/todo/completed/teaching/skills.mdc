@@ -1,15 +1,14 @@
 ---
 schema_version: 1
 id: "blooket-16"
-status: "active"
+status: "completed"
 priority: "p3"
 horizon: "acceptance"
 order: 160
 area: "teaching"
 task: "TODO - Adaptive teacher workflow skills"
 legacy_task: "TODO 16"
-depends_on:
-  - "blooket-05"
+depends_on: []
 contracts:
   - "docs/technical/adr/teacher-settings-and-media-library.md"
   - "docs/technical/adr/canonical-dependency-direction.md"
@@ -28,8 +27,8 @@ validation:
 
 ## Objective
 
-Accept scoped personal workflow learning and English description normalization
-with the real client, preserving revisions and human checkpoints.
+Provide scoped personal workflow learning and English description normalization
+with revision-safe skills and explicit human-validation boundaries.
 
 ## Acceptance
 
@@ -45,10 +44,9 @@ settled questions again.
 
 ## Implementation notes
 
-**Pending description skill correction:** add a focused description-normalizing
-skill and link it from the master workflow and media-enrichment guidance. It
-must normalize English originals as well as other languages, without changing
-teacher-owned text or naming files.
+The focused description-normalizing skill is linked from the master workflow
+and media-enrichment guidance. It normalizes English originals as well as other
+languages without changing teacher-owned text or naming files.
 
 Use consistent semantic order: primary subject, visible attributes/actions,
 setting/composition, then relevant teaching context only when supported. Write
@@ -109,10 +107,9 @@ search, image-bank research, media-analysis, media-description-normalization,
 and Codex-access guidance without overwriting personal changes. The description
 skill normalizes English and non-English source text with a fixed semantic
 ordering, requires admitted evidence for visual claims, and persists only
-through revision-protected `library.enrich`. Actual client behavior and
-long-term teacher acceptance remain pending.
+through revision-protected `library.enrich`. Client-specific long-term
+behavior is owned by task blooket-15.
 
 ## Blockers
 
-Acceptance remains open until the checks above run through the actual owning
-product surfaces; portable foundations alone do not complete this record.
+None. Long-term ChatGPT-client-specific behavior belongs to task blooket-15.

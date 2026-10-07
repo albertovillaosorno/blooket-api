@@ -26,6 +26,12 @@ jobs:
       - run: npm run check
       - run: npm run roadmap:check
       - run: npm test
+      - name: Validate Linux development package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run package -- linux-x64
+          npm run package:verify -- linux-x64
 
   macos-arm:
     needs: validate
@@ -63,16 +69,86 @@ jobs:
           set -euo pipefail
           rm -rf .temp/safari-project
           extension_root=".temp/distributions/darwin-arm64"
-          app_root="$extension_root/Blooket Studio.app"
-          extension="$app_root/Contents/Resources/extensions/chrome"
-          xcrun safari-web-extension-packager "$extension"             --project-location .temp/safari-project             --app-name "Blooket Studio Safari"             --bundle-identifier com.blooketstudio.ci.safari             --swift             --macos-only             --copy-resources             --no-open             --no-prompt
-          project="$(find .temp/safari-project -maxdepth 2             -name '*.xcodeproj' -print -quit)"
+          app_root="$extension_root/Blooket API.app"
+          resources="$app_root/Contents/Resources"
+          extension="$resources/extensions/chrome"
+          packager_args=(
+            "$extension"
+            --project-location
+            .temp/safari-project
+            --app-name
+            "Blooket API Safari"
+            --bundle-identifier
+            com.albertovilla.blooket-api.safari
+            --swift
+            --macos-only
+            --copy-resources
+            --no-open
+            --no-prompt
+          )
+          xcrun safari-web-extension-packager "${packager_args[@]}"
+          find_args=(
+            .temp/safari-project
+            -maxdepth
+            2
+            -name
+            '*.xcodeproj'
+            -print
+            -quit
+          )
+          project="$(find "${find_args[@]}")"
           test -n "$project"
           schemes_json="$(xcodebuild -project "$project" -list -json)"
-          scheme="$(printf '%s' "$schemes_json" |
-            python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["project"]["schemes"][0])')"
+          scheme="$(
+            printf '%s' "$schemes_json" |
+              plutil -extract project.schemes.0 raw -o - -
+          )"
           test -n "$scheme"
-          xcodebuild             -project "$project"             -scheme "$scheme"             -configuration Debug             -destination 'platform=macOS,arch=arm64'             CODE_SIGNING_ALLOWED=NO             build
+          derived_data=".temp/safari-derived"
+          rm -rf "$derived_data"
+          build_args=(
+            -project
+            "$project"
+            -scheme
+            "$scheme"
+            -configuration
+            Debug
+            -derivedDataPath
+            "$derived_data"
+            -destination
+            'platform=macOS,arch=arm64'
+            CODE_SIGNING_ALLOWED=NO
+            build
+          )
+          xcodebuild "${build_args[@]}"
+          safari_app="$(
+            find "$derived_data/Build/Products/Debug" -maxdepth 1 \
+              -type d -name '*.app' -print -quit
+          )"
+          test -n "$safari_app"
+          safari_root="$resources/Safari"
+          companion="$safari_root/Blooket API Safari.app"
+          rm -rf "$safari_root"
+          mkdir -p "$safari_root"
+          ditto "$safari_app" "$companion"
+          appex="$(find "$companion" -type d -name '*.appex' \
+            -print -quit)"
+          test -n "$appex"
+          extension_id="$(plutil -extract CFBundleIdentifier raw -o - \
+            "$appex/Contents/Info.plist")"
+          test -n "$extension_id"
+          printf '%s\n' "$extension_id" > "$safari_root/extension-id.txt"
+          helper_source="$resources/app/src/platforms/safari-extension"
+          helper_source="$helper_source/adapter-outbound/open-extension.swift"
+          xcrun swiftc \
+            "$helper_source" \
+            -framework SafariServices \
+            -o "$safari_root/open-extension"
+          chmod 755 "$safari_root/open-extension"
+          rm -f .temp/distributions/darwin-arm64.zip
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$app_root" .temp/distributions/darwin-arm64.zip
+          test -s .temp/distributions/darwin-arm64.zip
       - name: Exercise packaged workspace in Safari
         shell: bash
         run: |

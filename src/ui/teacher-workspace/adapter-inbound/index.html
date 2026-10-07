@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Blooket Studio</title>
+    <title>Blooket API</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
@@ -246,6 +246,15 @@
           <h2 data-i18n="connectionRequests"></h2>
           <p data-i18n="consentHelp"></p>
           <div id="connections"></div>
+        </article>
+        <article class="notice" id="safariExtensionPanel" hidden>
+          <h2 data-i18n="browserExtensions"></h2>
+          <p data-i18n="safariExtensionHelp"></p>
+          <button
+            id="installSafariExtension"
+            type="button"
+            data-i18n="installSafariExtension"
+          ></button>
         </article>
         <article class="notice" id="updatePanel" hidden>
           <h2 data-i18n="updates"></h2>

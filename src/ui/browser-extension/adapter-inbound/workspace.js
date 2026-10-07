@@ -67,7 +67,7 @@
       }
       const bridge = JSON.parse(text).browserBridge;
       if (
-        bridge?.application !== "blooket-studio" ||
+        bridge?.application !== "blooket-api" ||
         bridge.schemaVersion !== 1 ||
         typeof bridge.token !== "string" ||
         !/^[a-zA-Z0-9_-]{43}$/u.test(bridge.token)

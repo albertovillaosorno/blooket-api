@@ -43,8 +43,8 @@ const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const zip = join(repo, ".temp/distributions/darwin-arm64.zip");
 const root = await mkdtemp(join(repo, ".temp/macos-safari-smoke-"));
 const data = join(root, "data");
-const app = join(root, "Blooket Studio.app");
-const launcher = join(app, "Contents/MacOS/Blooket Studio");
+const app = join(root, "Blooket API.app");
+const launcher = join(app, "Contents/MacOS/Blooket API");
 const driverPort = 4444;
 const driverOrigin = "http://127.0.0.1:" + String(driverPort);
 const env = {
@@ -64,6 +64,12 @@ try {
   assert.equal(machine.trim(), "arm64");
 
   await execute("unzip", ["-q", zip, "-d", root]);
+  const safariRoot = join(app, "Contents/Resources/Safari");
+  await Promise.all([
+    execute("test", ["-d", join(safariRoot, "Blooket API Safari.app")]),
+    execute("test", ["-x", join(safariRoot, "open-extension")]),
+    execute("test", ["-s", join(safariRoot, "extension-id.txt")]),
+  ]);
   const { stdout: originText } = await execute(launcher, ["--no-open"], {
     env,
     timeout: 40_000,
@@ -104,14 +110,17 @@ try {
     "settingsVisible: !document.querySelector('#settings').hidden,",
     "diagnostics: document.querySelector('#diagnostics').textContent.trim()",
     ".length,",
+    "safariInstallVisible: document.querySelector(",
+    "'#installSafariExtension').getClientRects().length > 0,",
     "};",
   ].join("\n"));
-  assert.equal(desktop["title"], "Blooket Studio");
+  assert.equal(desktop["title"], "Blooket API");
   assert.equal(desktop["ready"], "complete");
   assert.equal(desktop["untranslated"], 0);
   assert.equal(desktop["libraryVisible"], true);
   assert.equal(desktop["settingsVisible"], false);
   assert.ok(Number(desktop["diagnostics"]) > 0);
+  assert.equal(desktop["safariInstallVisible"], true);
   assert.ok(Number(desktop["width"]) <= Number(desktop["clientWidth"]) + 1);
 
   const interaction = await evaluate(sessionId, [
@@ -149,6 +158,29 @@ try {
   assert.equal(mobile["settingsVisible"], true);
   assert.ok(Number(mobile["buttons"]) >= 3);
   assert.ok(Number(mobile["width"]) <= Number(mobile["clientWidth"]) + 1);
+
+  const bootstrapResponse = await fetch(origin + "/api/bootstrap", {
+    signal: AbortSignal.timeout(5_000),
+  });
+  assert.equal(bootstrapResponse.status, 200);
+  const bootstrap = await bootstrapResponse.json() as {
+    csrf?: unknown;
+    safariExtension?: { available?: unknown };
+  };
+  assert.equal(bootstrap.safariExtension?.available, true);
+  assert.equal(typeof bootstrap.csrf, "string");
+  const safariSetup = await fetch(origin + "/api/safari-extension-open", {
+    method: "POST",
+    headers: {
+      Origin: origin,
+      "Content-Type": "application/json",
+      "X-CSRF-Token": bootstrap.csrf as string,
+    },
+    body: "{}",
+    signal: AbortSignal.timeout(20_000),
+  });
+  assert.equal(safariSetup.status, 200);
+  assert.deepEqual(await safariSetup.json(), { ok: true });
 
   console.log("macOS ARM64 packaged Safari smoke passed.");
 } finally {
@@ -196,7 +228,7 @@ async function waitForWorkspace(id: string): Promise<void> {
     ].join("\n")).catch(() => ({}));
     if (
       state["ready"] === "complete" &&
-      state["title"] === "Blooket Studio" &&
+      state["title"] === "Blooket API" &&
       Number(state["diagnostics"]) > 0
     )
       return;

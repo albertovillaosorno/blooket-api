@@ -13,6 +13,8 @@ concurrency:
 
 jobs:
   ci:
+    permissions:
+      contents: read
     uses: ./.github/workflows/ci.yml
 
   gate:
@@ -48,17 +50,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          pattern: package-darwin-arm64
+          name: package-darwin-arm64
           path: .temp/release-assets
-          merge-multiple: true
-      - name: Publish verified ARM64 archive
+      - name: Publish verified ARM64 app
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          asset=.temp/release-assets/darwin-arm64.zip
-          test -s "$asset"
-          gh release create "$RELEASE_TAG" "$asset" \
+          app=.temp/release-assets/darwin-arm64.zip
+          test -s "$app"
+          gh release create "$RELEASE_TAG" "$app" \
             --verify-tag --title "$RELEASE_TAG" --notes ""

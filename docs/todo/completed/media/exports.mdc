@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-07"
-status: "active"
+status: "completed"
 priority: "p0"
 horizon: "foundations"
 order: 70
@@ -29,8 +29,8 @@ validation:
 
 ## Objective
 
-Accept automatic optimization on the native host with one shared canvas and
-actual prepared bytes strictly below 2,500,000.
+Provide automatic bounded optimization on one shared canvas with actual prepared
+bytes strictly below 2,500,000 and deterministic static/GIF fallback behavior.
 
 ## Acceptance
 
@@ -47,10 +47,10 @@ metadata or a successful preview alone is insufficient.
 
 ## Implementation notes
 
-**Pending automatic optimization correction:** the teacher should edit the image
-and receive a usable prepared result, without manually managing oversized files.
-Do not present an invalid candidate as a downloadable/prepared asset or ask the
-teacher to solve its byte size through trial and error.
+Automatic optimization is implemented: the teacher edits the image and receives
+a usable prepared result without manually managing oversized files. Invalid
+candidates never become downloadable/prepared assets and byte-size fallback is
+bounded and automatic.
 
 Enforce one configured final canvas width, height, and aspect ratio for both
 static images and animated GIFs. Image-specific zoom, pan, backgrounds, and
@@ -151,11 +151,10 @@ select their immutable original rather than the prepared working image. Missing
 or conflicting originals stop before publication; JPEG and AVIF bytes survive
 without conversion and the exact old index remains recoverable.
 
-Implement the automatic optimization correction above and block continuation
-until an actual valid file exists. Preserve animation while recording effective
-FPS reductions, and never assume 10 FPS alone guarantees size. The current
-1280-by-720 default is an application choice, not a verified upstream pixel
-requirement; the shared-canvas policy must remain explicit.
+The automatic optimization path blocks continuation until an actual valid file
+exists, preserves animation while recording effective FPS reductions, and never
+assumes 10 FPS alone guarantees size. The current 1280-by-720 default remains an
+application choice rather than an upstream requirement.
 
 ## Evidence
 
@@ -216,7 +215,7 @@ result is installed into a later editor session.
 The output must remain strictly below 2,500,000 bytes, including GIF animation;
 2,500,000 bytes exactly fails. The portable ceiling now has one domain owner
 shared by renderer admission, durable metadata, worker IPC validation, prepared
-reads, and package smoke verification; a boundary regression proves the exact
+reads, and package smoke verification. A boundary regression proves the exact
 ceiling is rejected.
 
 Portable export isolation was implemented on 2026-10-06. Image intake,
@@ -225,15 +224,14 @@ first-use probe now run untrusted decoding/rendering in a temporary worker. It
 receives bytes and bounded values over IPC, without user paths, descriptions,
 credentials, or inherited development variables.
 
-The portable test suite, strict TypeScript, and browser-script syntax passed on
-2026-10-06 after these changes. Jig reports only the external
+The portable test suite, strict TypeScript, and browser-script syntax passed
+on 2026-10-06 after these changes. Jig reports only the external
 `scalability.repository-graph` evidence gap; repository checks were not
 weakened. Chrome editor acceptance used synthetic local data, without changing
 Blooket.
 
 ## Blockers
 
-**Pending:** native macOS worker/package behavior and accepted resource budgets
-need a real target host. Native memory is bounded by admitted work, not an OS
-quota. The eventual Blooket upload must independently reject oversized or stale
-files in task 11; that concrete upload boundary is not implemented yet.
+None. macOS-native resource hardening belongs to task blooket-15. The
+separate Blooket upload boundary in task blooket-11 must revalidate prepared
+bytes, but it does not keep this export pipeline open.

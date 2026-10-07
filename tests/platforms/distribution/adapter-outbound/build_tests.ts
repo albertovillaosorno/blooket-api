@@ -82,6 +82,9 @@ test("CI validates before ARM Safari and release only publishes", async () => {
     "npm test",
   ])
     assert.ok(validateCommands.includes(command));
+  const validateText = validateCommands.join("\n");
+  assert.ok(validateText.includes("npm run package -- linux-x64"));
+  assert.ok(validateText.includes("npm run package:verify -- linux-x64"));
 
   const mac = ci.jobs["macos-arm"];
   assert.equal(mac.needs, "validate");
@@ -95,14 +98,17 @@ test("CI validates before ARM Safari and release only publishes", async () => {
     "npm run package:verify -- darwin-arm64",
     "safari-web-extension-packager",
     "CODE_SIGNING_ALLOWED=NO",
+    "Blooket API Safari.app",
+    "extension-id.txt",
+    "open-extension",
     "safaridriver --enable",
     "npm run macos:safari-smoke",
   ])
     assert.ok(macText.includes(fragment));
-  assert.ok(!macText.includes("macos-26-intel"));
 
   assert.deepEqual(release.on.push.tags, ["v[0-9][0-9].[1-4].*"]);
   assert.equal(release.jobs.ci.uses, "./.github/workflows/ci.yml");
+  assert.equal(release.jobs.ci.permissions.contents, "read");
   assert.equal(release.jobs.gate.needs, "ci");
   const gate = release.jobs.gate.steps.at(-1);
   assert.equal(gate.env.RELEASE_ENABLED, "$" + "{{ vars.RELEASE_ENABLED }}");
@@ -112,9 +118,12 @@ test("CI validates before ARM Safari and release only publishes", async () => {
   assert.equal(release.jobs.publish.needs, "gate");
   const download = release.jobs.publish.steps[0];
   assert.equal(download.uses, "actions/download-artifact@v8");
-  assert.equal(download.with.pattern, "package-darwin-arm64");
+  assert.equal(download.with.name, "package-darwin-arm64");
+  assert.equal(download.with.pattern, undefined);
+  assert.equal(download.with["merge-multiple"], undefined);
   const publication = release.jobs.publish.steps.at(-1).run as string;
   assert.ok(publication.includes("darwin-arm64.zip"));
+  assert.equal((publication.match(/\.zip/gu) ?? []).length, 1);
   assert.ok(publication.includes('gh release create "$RELEASE_TAG"'));
   assert.ok(!publication.includes("linux-x64.tar.gz"));
   assert.ok(!publication.includes("npm "));

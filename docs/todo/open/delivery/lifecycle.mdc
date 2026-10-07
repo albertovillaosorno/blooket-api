@@ -38,8 +38,8 @@ checks, service ownership, and tunnel lifecycle on the Mac.
 ## Acceptance
 
 Test that first-use runs once, failed attempts remain repairable, logs are
-bounded, and the recipient sees useful translated failures. Existing macOS
-status remains unverified until the actual Mac runs it.
+bounded, and the user sees useful translated failures. Platform-only macOS
+hardening belongs to task blooket-15.
 
 Complete when first-use runs once, manual rerun repairs its status, start/stop
 and opt-in login launch are visible/reversible, and disablement or shutdown

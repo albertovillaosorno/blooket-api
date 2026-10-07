@@ -1,0 +1,9 @@
+identity:
+  id: function:safari-extension
+  name: safari-extension
+  path: src/platforms/safari-extension
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

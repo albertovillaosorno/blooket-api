@@ -127,7 +127,7 @@ export async function startMcpGateway(options: {
           "charset=utf-8><title>Connect Blooket " +
           "Studio</title><body style='font:18px " +
           "system-ui;max-width:600px;margin:80px " +
-          "auto'><h1>Connect Blooket Studio</h1><p>Open the " +
+          "auto'><h1>Connect Blooket API</h1><p>Open the " +
           "local app on your Mac and approve this " +
           "connection:</p><p><strong>" +
           grant.id +

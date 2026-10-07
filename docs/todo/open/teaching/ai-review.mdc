@@ -6,7 +6,7 @@ priority: "p1"
 horizon: "publication"
 order: 120
 area: "teaching"
-task: "TODO - AI intake and quiz review"
+task: "TODO - Autonomous AI quiz publication"
 legacy_task: "TODO 12"
 depends_on:
   - "blooket-05"
@@ -27,25 +27,25 @@ validation:
   - "jig validate --root ."
 ---
 
-# TODO - AI intake and quiz review
+# TODO - Autonomous AI quiz publication
 
 ## Objective
 
-Finish admitted AI image delivery and browser review, publication, progress,
-cancellation, and recovery through the canonical operations.
+Finish admitted AI image delivery, autonomous publication, correction,
+progress, cancellation, and recovery through the canonical operations.
 
 ## Acceptance
 
 Verify actual AI image delivery: ChatGPT attachments do not automatically reach
-an MCP server. Define the admitted upload/intake workflow, bounds, local review,
-and metadata creation. The model enriches detected language, YAML English
-fields, and topics; it never chooses asset paths or overwrites original
-names/descriptions.
+an MCP server. Define the admitted upload/intake workflow, bounds, and metadata
+creation. The model enriches detected language, YAML English fields, and topics;
+it never chooses asset paths or overwrites original names/descriptions.
 
-Complete when the teacher and AI can review a generated quiz with stable-ID
-media, publish it through task 11, change its admitted fields, and see verified
-results. Confirm remote skills and admitted image delivery with the actual
-client rather than assuming files or attachments are available.
+Complete when AI can generate a quiz with stable-ID media, publish it through
+task 11 without an editorial approval gate, verify the remote result, and repair
+or republish admitted fields when verification finds a correctable mismatch.
+The teacher may inspect or edit at any time, but ordinary publication does not
+wait for confirmation.
 
 ## Implementation notes
 
@@ -61,14 +61,20 @@ progress, and recovery through registered CLI commands and MCP tools. Keep local
 JSON as automatic private drafts/execution state rather than requiring manual
 file management or treating it as authority over fresh Blooket state.
 
-Finish quiz review, publication, progress, cancellation, and recovery in the
-browser UI. The current draft view is read-only and explicitly says publication
-is pending. Translate remaining states and actionable errors into English and
-Spanish, preserving quiz and original-media language independently.
+Finish autonomous quiz publication, progress, cancellation, correction, and
+recovery in the browser UI. Manual inspection remains available but is not a
+pre-publication gate. Translate remaining states and actionable errors into
+English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+The browser runtime now has guarded text-only Create Set and Add Question
+mechanics with exact post-submit read-back and persisted journal/budget
+integration. Local drafts remain recovery/authoring state rather than a remote
+Blooket draft authority.
+
 ## Blockers
 
-Acceptance remains open until the checks above run through the actual owning
-product surfaces; portable foundations alone do not complete this record.
+Canonical external publication entrypoints and admitted media upload remain
+functional work. No teacher approval is required before an otherwise admitted
+publication; human intervention is reserved for genuine validation boundaries.

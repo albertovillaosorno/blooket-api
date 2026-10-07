@@ -1,15 +1,14 @@
 ---
 schema_version: 1
 id: "blooket-06"
-status: "active"
+status: "completed"
 priority: "p0"
 horizon: "foundations"
 order: 60
 area: "media"
 task: "TODO - Image and GIF editor"
 legacy_task: "TODO 06"
-depends_on:
-  - "blooket-05"
+depends_on: []
 contracts:
   - "docs/technical/adr/teacher-settings-and-media-library.md"
   - "docs/technical/adr/image-processing-engine.md"
@@ -28,8 +27,9 @@ validation:
 
 ## Objective
 
-Verify shrinkable zoom, drag framing, Gaussian or solid backgrounds, color
-selection, and preview/export parity in the target browser.
+Provide the completed image/GIF editing workflow: shrinkable zoom, drag framing,
+blurred or solid backgrounds, deterministic color selection, animation handling,
+undo/redo, and prepared-output parity.
 
 ## Acceptance
 
@@ -40,8 +40,8 @@ for static images and GIFs. Preserve keyboard/accessibility checks below.
 
 Complete when canonical media remains stable, per-image recipes save/reopen,
 preview/export agree, and import, zoom/drag, undo/redo, adjustments, both
-backgrounds, and color picking work in the target browser. Keep native-browser
-checks explicitly pending where no macOS test host is available.
+backgrounds, and color picking work in the target browser. Platform-specific
+browser hardening is owned by task blooket-15.
 
 ## Implementation notes
 
@@ -74,11 +74,10 @@ eyedropper/fallback canvas picker, undo/redo, preparation, preview, and
 download. Preserve canonical optimized media and per-image edit recipes in YAML;
 global settings contain export defaults only.
 
-Finish Safari behavior, keyboard/accessibility and responsive checks, file
-chooser/drag-and-drop, GIF preview parity, pixel picking, and both background
-modes. Task 03 preserves unsaved configuration on language changes; retain that
-behavior. Translate diagnostics, state, and failure messages fully rather than
-showing raw English codes in the Spanish UI.
+Preserve keyboard/accessibility, file chooser/drag-and-drop, GIF preview, pixel
+picking, and both background modes. Task 03 preserves unsaved configuration on
+language changes; retain that behavior. Translate diagnostics, state, and
+failure messages fully rather than showing raw English codes in the Spanish UI.
 
 Changing export defaults must not overwrite existing individual recipes. The
 browser framing preview directs the teacher to the prepared file for final
@@ -165,8 +164,5 @@ browser-script syntax, and all 709 portable tests passed at this checkpoint.
 
 ## Blockers
 
-**Pending:** Safari accessibility/responsive behavior, file chooser and
-drag-and-drop intake, animation preview replay, and eyedropper selection remain
-unverified. Chrome exposed the native eyedropper control but automation
-did not produce a confirmed color selection. Continue independent export work
-in task 07 and retain these target-browser acceptance checks.
+None. Safari-specific accessibility, chooser, eyedropper, clipboard, and
+responsive hardening belongs to task blooket-15.

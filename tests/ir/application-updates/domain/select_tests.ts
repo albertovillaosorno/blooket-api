@@ -35,8 +35,12 @@ import {
   releaseAssetUrl,
   releasePageUrl,
 } from "../../../../src/ir/application-updates/contract/releases.ts";
-import { selectPublicUpdate } from
-  "../../../../src/ir/application-updates/domain/select.ts";
+import {
+  MAC_APPLICATION_BUNDLE,
+  MAC_UPDATE_ARCHIVE,
+  MAC_UPDATE_TARGET,
+  selectPublicUpdate,
+} from "../../../../src/ir/application-updates/domain/select.ts";
 
 const now = new Date("2026-10-07T00:00:00Z");
 const release = (revision: string, id = 1, names = ["darwin-arm64.zip"]) => {
@@ -60,6 +64,12 @@ const release = (revision: string, id = 1, names = ["darwin-arm64.zip"]) => {
 };
 const choose = (values: unknown, target = "darwin-arm64") =>
   selectPublicUpdate(values, "26.4.0", target, now);
+
+test("Mac update identity is ARM64 Blooket API.app only", () => {
+  assert.equal(MAC_UPDATE_TARGET, "darwin-arm64");
+  assert.equal(MAC_UPDATE_ARCHIVE, "darwin-arm64.zip");
+  assert.equal(MAC_APPLICATION_BUNDLE, "Blooket API.app");
+});
 
 test(
   "empty, same and older catalogs are current, newer versions need trust",

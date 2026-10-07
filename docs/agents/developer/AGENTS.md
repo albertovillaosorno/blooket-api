@@ -81,14 +81,18 @@ Releases use quarterly CalVer tags `vYY.Q.PATCH`, with UTC three-month quarters,
 and product versions `YY.Q.PATCH` (for example `26.4.0`). Tags must match
 `PRODUCT_VERSION` and require the repository variable `RELEASE_ENABLED=true`.
 
-A release tag must pass its gate, then the reusable CI workflow for that exact
-commit, before publication can run. Failed, canceled, or skipped CI blocks the
-release. Release does not rebuild or re-test; it publishes CI artifacts. Release
-notes are handwritten later in the GitHub UI, with no automated changelog or
-generated notes.
+A release tag invokes the reusable CI workflow for that exact commit first.
+Portable validation must pass before the ARM64 macOS/Safari job can run; only
+after the complete CI workflow succeeds may the release gate admit publication.
+Failed, canceled, or skipped CI blocks release.
 
-The Mac product target is ARM64; Linux packaging/tests remain required even
-when its release asset is omitted.
+Release does not rebuild or re-test; it publishes CI artifacts. Release notes
+are handwritten later in the GitHub UI, with no automated changelog or generated
+notes.
+
+The Mac product target is ARM64. Linux packaging/tests remain useful for
+portable validation, but Linux is never a release asset. Release publishes only
+the ARM64 Mac app archive and Safari host archive.
 
 ## Architecture rules
 

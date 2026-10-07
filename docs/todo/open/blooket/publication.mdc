@@ -59,7 +59,7 @@ file format, and actual bytes before every upload. Upload only a prepared
 rendition strictly below 2,500,000 bytes, never a larger original or stale file.
 Reuse the same guard in UI, CLI, HTTP, browser, and MCP execution.
 
-Run an approved small publication through this application's actual MCP/CLI
+Run a small publication through this application's actual MCP/CLI
 runtime, read it back after refresh, and test interruption, recovery, ambiguity,
 account limits, and unsupported types. The existing private UI test is useful
 evidence but does not replace this missing end-to-end flow.
@@ -118,7 +118,7 @@ the attempting journal for reconciliation without replay.
 
 Text-only Add Question browser mechanics now submit once and require exact
 post-submit read-back. Media upload and canonical publication entrypoints remain
-pending, including the approved MCP/CLI create/add-question/read-back path.
+pending, including the MCP/CLI create/add-question/read-back path.
 
 Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
 and does not block this functional record.

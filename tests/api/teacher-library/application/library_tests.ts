@@ -11,7 +11,7 @@
 // - Owns:
 //   - Library lifecycle and recoverable skills and quiz drafts.
 // - Must-Not:
-//   - Let AI overwrite original text, rename assets, or publish drafts.
+//   - Publish quizzes from the library boundary instead of canonical writes.
 // - Allows:
 //   - Inputs: Explicit bounded capability requests.
 //   - Outputs: Validated values or stable failure codes.

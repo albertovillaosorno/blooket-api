@@ -59,10 +59,13 @@ it passes does macos-arm run on macos-26, require ARM64, build the single
 supported Mac package, compile the Safari WebExtension host, and exercise the
 packaged localhost UI through Safari WebDriver.
 
-Keep production Apple trust, Safari distribution edge cases, native Keychain
-and login-item behavior, filesystem normalization, and ChatGPT-specific
-compatibility here. Do not reopen earlier records merely to demand a recipient
-Mac, Safari, or ChatGPT smoke test.
+Keep production Apple trust, signing/notarization, Gatekeeper, installed
+Safari behavior, native Keychain and login-item behavior, filesystem
+normalization, and ChatGPT-specific compatibility here. Also own Safari-only
+editor acceptance such as native chooser/clipboard permission behavior,
+eyedropper interaction, accessibility/responsive behavior, and animated preview
+replay. Do not reopen earlier records merely to demand a recipient Mac, Safari,
+or ChatGPT smoke test.
 
 A CAPTCHA, unfamiliar login, organization choice, consent prompt, browser
 permission, or other genuine human-validation boundary still requires the human
@@ -76,7 +79,10 @@ platform-specific build, Safari conversion, native package behavior, and Safari
 WebDriver smoke coverage; Release owns only release gating and publication.
 
 The supported Mac product architecture is ARM64. Intel/x64 is not a package,
-update target, CI target, or release asset.
+update target, CI target, or release asset. Long-term client behavior for the
+completed personal-skill system, native settings/Keychain behavior, and
+ChatGPT-specific OAuth registration/reauthorization behavior also live only in
+this final record.
 
 ## Evidence
 

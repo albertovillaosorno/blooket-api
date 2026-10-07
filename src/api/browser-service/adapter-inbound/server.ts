@@ -92,6 +92,10 @@ import {
   createBlooketBrowserBridgeBroker,
   type BlooketBrowserBridgeBroker,
 } from "../../../platforms/blooket-browser/adapter-outbound/broker.ts";
+import {
+  openPackagedSafariExtension,
+  safariExtensionAvailable,
+} from "../../../platforms/safari-extension/adapter-outbound/install.ts";
 
 import {
   migrateLegacyLibrary,
@@ -134,10 +138,21 @@ export async function startBrowserService(
     stop?: () => Promise<void>;
     browserBridge?: BlooketBrowserBridgeBroker;
     updates?: ApplicationUpdateChecker;
+    safariExtension?: {
+      available: () => Promise<boolean>;
+      open: () => Promise<
+        | { readonly ok: true }
+        | { readonly ok: false; readonly code: string }
+      >;
+    };
   } = {},
 ) {
   const root = options.root ?? userDataRoot();
   const secrets = options.secrets ?? createHostSecretStore();
+  const safariExtension = options.safariExtension ?? {
+    available: safariExtensionAvailable,
+    open: openPackagedSafariExtension,
+  };
   const preferences = await loadPreferences(root);
   let selectedPort = options.port;
   if (selectedPort === undefined) {
@@ -264,10 +279,13 @@ export async function startBrowserService(
             gatewayPort: 2608,
           },
           browserBridge: {
-            application: "blooket-studio",
+            application: "blooket-api",
             schemaVersion: 1,
             token: browserBridge.pairingToken(),
             ...browserBridge.status(),
+          },
+          safariExtension: {
+            available: await safariExtension.available(),
           },
         });
         return;
@@ -410,6 +428,18 @@ export async function startBrowserService(
         )
           throw new Error("invalid-update-check-request");
         json(response, 200, await updates.check());
+        return;
+      }
+      if (url.pathname === "/api/safari-extension-open") {
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          Object.keys(body).length !== 0
+        )
+          throw new Error("invalid-safari-extension-request");
+        const result = await safariExtension.open();
+        json(response, result.ok ? 200 : 409, result);
         return;
       }
       if (url.pathname === "/api/browser-pairing-reset") {
