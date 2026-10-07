@@ -113,9 +113,10 @@ test(
             result: {
               ok: true,
               value: {
-                schemaVersion: 2,
+                schemaVersion: 3,
                 number: 1,
                 question: "Type sun.",
+                equation: null,
                 qType: "typing",
                 random: true,
                 timeLimit: 15,
@@ -391,9 +392,10 @@ test(
     });
     assert.equal(questions.ok, true);
     assert.deepEqual(questions.value, [{
-      schemaVersion: 2,
+      schemaVersion: 3,
       number: 1,
       question: "Type sun.",
+      equation: null,
       qType: "typing",
       random: true,
       timeLimit: 15,

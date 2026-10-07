@@ -125,11 +125,12 @@ function fakeChrome(options: {
               result: {
                 ok: true,
                 value: {
-                  schemaVersion: 2,
+                  schemaVersion: 3,
                   number: 1,
                   question: options.mismatchReadBack
                     ? "Different question"
                     : "Type sun.",
+                  equation: null,
                   qType: "typing",
                   random: true,
                   timeLimit: 15,
