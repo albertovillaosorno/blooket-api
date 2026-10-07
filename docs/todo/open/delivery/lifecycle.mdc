@@ -160,6 +160,12 @@ Missing or failed secret-store reads produce bounded codes; secret values never
 enter diagnostic state or logs. Portable regressions cover fixed/automatic port
 behavior, owned-port reruns, prerequisite ordering, and secret containment.
 
+Online lifecycle regressions also pin disablement after a live connection, a
+missing tunnel token before gateway creation, the gateway-port upper bound, and
+cleanup of the active gateway/tunnel pair. Existing connector tests retain the
+useful missing-executable status, exclude the token from argv, and kill a child
+that resists graceful shutdown.
+
 ## Blockers
 
 Acceptance remains open until the checks above run through the actual owning

@@ -250,3 +250,97 @@ test("tunnel stop failure still closes the authenticated gateway", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test(
+  "missing tunnel token and gateway bounds stop before disablement cleanup",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "online-prerequisites-"));
+    let tokenConfigured = false;
+    let tunnelStarts = 0;
+    let tunnelStops = 0;
+    let gateway: Awaited<ReturnType<typeof startMcpGateway>> | undefined;
+    const controller = createOnlineConnection(
+      root,
+      {
+        read: async (name) =>
+          name === "mcp.owner-verifier"
+            ? { ok: true, kind: "found", secret: "fixture-owner" }
+            : tokenConfigured
+              ? { ok: true, kind: "found", secret: "fixture-token" }
+              : { ok: true, kind: "missing" },
+        write: async () => ({ ok: true }),
+        delete: async () => ({ ok: true }),
+      },
+      {
+        startGateway: async (options) => {
+          gateway = await startMcpGateway({ ...options, port: 0 });
+          return gateway;
+        },
+        startTunnel: (_token, update) => {
+          tunnelStarts++;
+          update("connected");
+          return {
+            stop: async () => {
+              tunnelStops++;
+            },
+          };
+        },
+      },
+    );
+    try {
+      const preferences = await loadPreferences(root);
+      await savePreferences(root, {
+        ...preferences,
+        online: {
+          ...preferences.online,
+          enabled: true,
+          publicUrl: "https://teacher.example/mcp",
+        },
+      });
+
+      await controller.reload(35300);
+      assert.equal(
+        (controller.status() as { state: string }).state,
+        "tunnel-token-missing",
+      );
+      assert.equal(gateway, undefined);
+      assert.equal(tunnelStarts, 0);
+
+      tokenConfigured = true;
+      await controller.reload(65535);
+      assert.equal(
+        (controller.status() as { state: string }).state,
+        "gateway-port-unavailable",
+      );
+      assert.equal(gateway, undefined);
+      assert.equal(tunnelStarts, 0);
+
+      await controller.reload(35300);
+      assert.equal(
+        (controller.status() as { state: string }).state,
+        "connected",
+      );
+      assert.equal(tunnelStarts, 1);
+      assert.ok(gateway?.server.listening);
+
+      await savePreferences(root, {
+        ...preferences,
+        online: {
+          ...preferences.online,
+          enabled: false,
+          publicUrl: "",
+        },
+      });
+      await controller.reload(35300);
+      assert.equal(
+        (controller.status() as { state: string }).state,
+        "disabled",
+      );
+      assert.equal(tunnelStops, 1);
+      assert.equal(gateway.server.listening, false);
+    } finally {
+      await controller.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
