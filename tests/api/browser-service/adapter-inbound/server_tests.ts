@@ -229,6 +229,11 @@ test(
       ).json()) as { id: string; edit: { zoom: number } };
       assert.ok(imported.id);
       assert.equal(imported.edit.zoom, 0.7);
+      const samples = (await (
+        await post("/api/media-color-samples", { id: imported.id })
+      ).json()) as { rgba: number[] };
+      assert.equal(samples.rgba.length, 8 * 8 * 4);
+      assert.ok(samples.rgba.every((value) => value >= 0 && value <= 255));
       const media = (await (
         await fetch(service.origin + "/api/media")
       ).json()) as { id: string; normalizationStatus: string }[];

@@ -158,6 +158,42 @@ export type CompactImageResult =
         | "native-media-failed";
     };
 
+export async function sampleImageColorsIsolated(
+  bytes: Uint8Array,
+  options?: NativeMediaOptions,
+): Promise<Uint8Array> {
+  admitSource(bytes);
+  const reply = object(
+    await runNativeJob(
+      {
+        version: 1,
+        kind: "sample-colors",
+        bytes: new Uint8Array(bytes),
+      },
+      options,
+    ),
+  );
+  if (reply["ok"] === false) {
+    exact(reply, ["ok", "code"]);
+    if (typeof reply["code"] === "string" && SOURCE_CODES.has(reply["code"]))
+      throw new Error(reply["code"]);
+    throw new Error("native-media-invalid-result");
+  }
+  exact(reply, ["ok", "value"]);
+  if (reply["ok"] !== true) throw new Error("native-media-invalid-result");
+  const value = object(reply["value"]);
+  exact(value, ["rgba"]);
+  const rgba = value["rgba"];
+  if (
+    !(rgba instanceof Uint8Array) ||
+    rgba.byteLength < 256 ||
+    rgba.byteLength > 1_280 ||
+    rgba.byteLength % 256 !== 0
+  )
+    throw new Error("native-media-invalid-result");
+  return rgba;
+}
+
 export async function compactImageIsolated(
   bytes: Uint8Array,
   options?: NativeMediaOptions,

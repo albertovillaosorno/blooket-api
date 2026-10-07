@@ -49,6 +49,7 @@ import {
 import {
   compactImageIsolated,
   decodeImageIsolated,
+  sampleImageColorsIsolated,
   renderImageIsolated,
 } from "../../../platforms/native-media/adapter-outbound/process.ts";
 import {
@@ -271,6 +272,42 @@ export async function executeLibraryCommand(
     ]);
   }
 }
+export async function sampleLibraryImageColors(
+  root: string,
+  input: unknown,
+): Promise<{ readonly rgba: readonly number[] }> {
+  const request = object(input);
+  const hasId = "id" in request;
+  exact(request, [hasId ? "id" : "base64"]);
+  let bytes: Uint8Array;
+  if (hasId) {
+    if (
+      !text(request["id"], 128) ||
+      !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(request["id"])
+    )
+      throw new Error("invalid-media-id");
+    const library = (await loadPreferences(root)).mediaRoot;
+    const record = (await listLibrary(library)).find(
+      (item) => item.id === request["id"],
+    );
+    if (!record) throw new Error("media-not-found");
+    const path = await safeLibraryPath(library, record.asset);
+    bytes = await boundedBytes(path, 25_000_000);
+    if (bytes.length < 1) throw new Error("invalid-or-oversized-library-file");
+  } else {
+    if (!text(request["base64"], 35_000_000))
+      throw new Error("invalid-source-bytes");
+    bytes = Buffer.from(request["base64"] as string, "base64");
+    if (
+      bytes.length < 1 ||
+      bytes.length > 25_000_000 ||
+      Buffer.from(bytes).toString("base64") !== request["base64"]
+    )
+      throw new Error("invalid-source-bytes");
+  }
+  return { rgba: [...(await sampleImageColorsIsolated(bytes))] };
+}
+
 export async function importLibraryImage(
   root: string,
   input: unknown,

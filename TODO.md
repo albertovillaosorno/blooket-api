@@ -373,12 +373,18 @@ ties use the lower palette key, and extreme luminance is brought into a bounded
 the recipe still has its initial white color. It never replaces a persisted
 non-default color, manual color, or eyedropper choice.
 
-Animated multi-frame representative sampling remains pending; GIFs therefore do
-not receive the static-frame automatic suggestion yet.
+Animated representative sampling was implemented on 2026-10-06. The isolated
+native worker first validates the whole source, selects at most five frames
+spread deterministically across the animation, and reduces each selected frame
+to 8-by-8 RGBA before returning samples. The browser computes one dominant
+bounded-luminance color across those samples, so the solid background does not
+change as the GIF advances.
 
-Use bounded representative sampling for animated inputs, without flashing the
-background color from frame to frame. Preview and preparation must use the
-same selected color, framing, blur, and adjustment recipe.
+Pending GIF analysis is tied to the active editor identity. A late result cannot
+replace a manual color, an eyedropper choice, or a different image. New GIF
+intake reuses its in-flight base64 read for import and retains the one computed
+suggestion after canonicalization while that editor remains open. Preview and
+preparation use the same selected color, framing, blur, and adjustment recipe.
 
 Acceptance includes a reduced foreground surrounded by both background types,
 plus/minus and slider zoom in both directions, drag pan, automatic solid-color
