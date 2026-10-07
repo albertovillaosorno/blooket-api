@@ -477,8 +477,10 @@ The local browser bridge has a versioned request/response contract, bounded
 in-memory broker, bearer-authenticated loopback routes, and API port adapters.
 The concrete Chrome worker and page extractor now support session observation,
 nonempty My Sets summaries, and the observed private set-detail controls.
-Local Configuration supplies a temporary pairing code with explicit revocation;
-reset invalidates the old code and settles pending jobs without replay.
+
+The extension discovers the workspace automatically through its isolated local
+page relay. It never asks the teacher for an address, pairing code, Blooket
+credentials, or a Connect action. The popup shows state and page shortcuts.
 
 Authorized Chrome DOM inspection on 2026-10-06 confirmed My Sets article/h3/Edit
 link structure and the detail controls: input#title[name="title"],
@@ -496,26 +498,54 @@ popup senders, exact loopback configuration, bounded replies, navigation,
 unsupported commands, and signed-out page stops. Artifact tests verify emitted
 JavaScript imports and the narrow permission set, with no server/secret modules.
 
-Still pending: actual installation/pairing and live application reads; canonical
-CLI/MCP service composition; observed empty-account and pagination contracts;
+Still pending: canonical CLI/MCP service composition; observed empty-account
+and pagination contracts;
 public set details; capabilities and complete question/media facts; login and
 organization-selection states; Safari worker lifecycle. These prevent completion
 of task 08 and publication tasks 09-12. Portable doubles are not browser
 acceptance, and no live question read-back is claimed.
 
-Validation for this increment: 572 portable tests, strict TypeScript, both
-browser-script syntax checks, and compiled-extension assembly pass. Chrome
-displayed the new local connection controls and revocation acknowledgement in
-a disposable workspace, with EN/ES presentation checked. Browser inspection
-redacts password-field values; backend tests verify actual token replacement.
+Initial validation: 572 portable tests, strict TypeScript, browser-script
+syntax, and compiled-extension assembly passed. Manual pairing controls were
+removed at the human's request; that workflow is superseded by automatic local
+workspace discovery, not a product requirement.
 
 Jig reports only the existing external `JIG-RULE-GAP-001`. Package-release
 freshness evidence was re-fetched from its configured registry providers.
 
 **Installation blocker:** the browser-control URL policy rejects
 `chrome://extensions/` and forbids bypassing it through another control surface.
-The human must load the reviewed unpacked extension manually before live
-pairing/read acceptance. This does not require changing the real `.env`.
+The human loaded the development extension manually. Future reloads during
+development also need that browser action. The real `.env` is unchanged.
+
+The human loaded the extension and reported Chrome registration status 3:
+"Top-level await is disallowed in service workers." The worker startup was
+corrected to register its listener synchronously, restore session storage
+asynchronously, and queue popup actions behind restoration. The artifact test
+now requires a synchronous emitted ESM dependency graph, which rejects this
+class of startup failure.
+
+The human then confirmed the popup and Disconnected state, establishing worker
+message handling. After the automatic-discovery
+update, the human confirmed Ready without entering any configuration.
+
+A real extension read through the application adapters returned two IR-validated
+set
+summaries and found the existing synthetic fixture. Its set-detail read also
+passed the IR decoder and confirmed private visibility and the synthetic title,
+without logging private lesson names or account values. No Blooket data was
+changed.
+
+Final portable checks pass 574 tests, strict TypeScript, and all three browser
+script syntax checks. Emitted-worker tests require a synchronous module graph;
+workspace relay tests reject unrelated origins, applications, malformed tokens,
+and oversized responses. The final native Linux archive must be rebuilt for
+this committed revision rather than reusing an older artifact.
+
+Fresh native Linux archive checks passed before automatic discovery changed.
+Rebuild and verify the final archive for the committed revision; do not treat
+the
+older archive as acceptance of the new worker.
 
 Complete when fresh validated remote state can be read reliably, capability
 changes are detected, and a missing/challenged session returns the appropriate

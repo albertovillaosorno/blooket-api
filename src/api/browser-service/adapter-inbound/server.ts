@@ -232,6 +232,7 @@ export async function startBrowserService(
             gatewayPort: 2608,
           },
           browserBridge: {
+            application: "blooket-studio",
             schemaVersion: 1,
             token: browserBridge.pairingToken(),
             ...browserBridge.status(),

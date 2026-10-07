@@ -68,7 +68,7 @@ export async function buildBrowserExtension(
     );
     const presentation = "src/ui/browser-extension/adapter-inbound";
     await mkdir(join(destination, presentation), { recursive: true });
-    for (const name of ["popup.html", "popup.css", "popup.js"])
+    for (const name of ["popup.html", "popup.css", "popup.js", "workspace.js"])
       await cp(
         join(repo, presentation, name),
         join(destination, presentation, name),

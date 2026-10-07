@@ -9,11 +9,11 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Explicit local extension connection and serial browser read delivery.
+//   - Automatic local workspace discovery and serial browser read delivery.
 // - Must-Not:
 //   - Persist credentials, submit quiz edits, or execute arbitrary commands.
 // - Allows:
-//   - Inputs: Explicit local pairing plus exact versioned read requests.
+//   - Inputs: Trusted local workspace transport and exact read requests.
 //   - Outputs: Admitted browser replies and connection status without tokens.
 //   - Side effects: One owned tab, temporary pairing, and local polling.
 // - Split-When:
@@ -25,7 +25,7 @@
 // - Description:
 //   - Validates incoming jobs and refuses unsupported read or write operations.
 // - Usage:
-//   - Compile as the extension worker; pair explicitly through its popup.
+//   - Compile as the extension worker; discover the running local workspace.
 // - Defaults:
 //   - Restart invalidates service tokens; disconnect stops the owned relay.
 //
@@ -55,22 +55,27 @@ declare const chrome: {
       addListener(
         listener: (
           message: unknown,
-          sender: { url?: string },
+          sender: { url?: string; tab?: { id?: number } },
           reply: (value: unknown) => void,
         ) => boolean,
       ): void;
     };
   };
   tabs: {
+    query(options: { url: string[] }): Promise<BrowserTab[]>;
     create(options: { url: string; active: boolean }): Promise<BrowserTab>;
     get(id: number): Promise<BrowserTab>;
-    update(id: number, options: { url: string }): Promise<BrowserTab>;
+    update(
+      id: number,
+      options: { url?: string; active?: boolean },
+    ): Promise<BrowserTab>;
   };
   scripting: {
     executeScript(options: {
       target: { tabId: number };
-      func: (...args: never[]) => unknown;
+      func?: (...args: never[]) => unknown;
       args?: unknown[];
+      files?: string[];
     }): Promise<{ result?: unknown }[]>;
   };
   storage: {
@@ -84,7 +89,7 @@ declare const chrome: {
 
 let connection: Connection | undefined;
 let generation = 0;
-let status = "disconnected";
+let status = "waiting-for-workspace";
 let pendingUiAction = Promise.resolve();
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -212,7 +217,13 @@ async function relay(current: Connection, activeGeneration: number) {
   while (connection === current && generation === activeGeneration) {
     try {
       // A browser API call also keeps an explicitly connected worker alive.
-      await chrome.tabs.get(current.tabId);
+      try {
+        await chrome.tabs.get(current.tabId);
+      } catch {
+        await disconnect();
+        status = "waiting-for-workspace";
+        return;
+      }
       const next = await bridgeFetch(current, "/api/browser-bridge/next");
       if (!next || typeof next !== "object" || !("job" in next))
         throw new Error("invalid-bridge-poll");
@@ -251,16 +262,10 @@ async function disconnect() {
   status = "disconnected";
   await chrome.storage.session?.remove("connection");
 }
-async function handle(message: unknown) {
-  if (!message || typeof message !== "object" || !("kind" in message))
-    return { ok: false, status: "invalid-request" };
-  if (message.kind === "status") return { ok: true, status };
-  if (message.kind === "disconnect") {
-    await disconnect();
-    return { ok: true, status };
-  }
+async function connectWorkspace(message: unknown) {
   if (
-    message.kind !== "connect" ||
+    !message ||
+    typeof message !== "object" ||
     !("origin" in message) ||
     !("token" in message)
   )
@@ -268,11 +273,14 @@ async function handle(message: unknown) {
   const candidate = configured({
     origin: message.origin,
     token: message.token,
-    tabId: 1,
+    tabId: connection?.tabId ?? 1,
   });
-  if (!candidate) return { ok: false, status: "invalid-configuration" };
-  await disconnect();
-  // Verify the code before creating any browser tab.
+  if (!candidate) return { ok: false, status: "connection-unavailable" };
+  if (
+    connection?.origin === candidate.origin &&
+    connection.token === candidate.token
+  )
+    return { ok: true, status };
   const verified = await bridgeFetch(candidate, "/api/browser-bridge/status");
   if (
     !verified ||
@@ -287,24 +295,94 @@ async function handle(message: unknown) {
     typeof verified.connected !== "boolean"
   )
     return { ok: false, status: "connection-unavailable" };
-  const tab = await chrome.tabs.create({
-    url: "https://dashboard.blooket.com/my-sets",
-    active: true,
-  });
+  let tab: BrowserTab | undefined;
+  if (connection) {
+    try {
+      tab = await chrome.tabs.get(connection.tabId);
+    } catch {
+      /* Closed. */
+    }
+  }
+  if (!tab?.id)
+    tab = await chrome.tabs.create({
+      url: "https://dashboard.blooket.com/my-sets",
+      active: false,
+    });
   if (!tab.id) return { ok: false, status: "browser-unavailable" };
+  await disconnect();
   connection = { ...candidate, tabId: tab.id };
   await chrome.storage.session?.set({ connection });
   status = "connected";
   void relay(connection, generation);
   return { ok: true, status };
 }
+async function discoverWorkspaces() {
+  const tabs = await chrome.tabs.query({
+    url: ["http://127.0.0.1/*", "http://127.0.0.2/*"],
+  });
+  for (const tab of tabs.slice(0, 16)) {
+    if (!tab.id || !tab.url || new URL(tab.url).pathname !== "/") continue;
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["src/ui/browser-extension/adapter-inbound/workspace.js"],
+      });
+    } catch {
+      /* A tab can close during discovery. */
+    }
+  }
+}
+async function handlePopup(message: unknown) {
+  if (!message || typeof message !== "object" || !("kind" in message))
+    return { ok: false, status: "invalid-request" };
+  if (message.kind === "status") {
+    if (!connection) await discoverWorkspaces();
+    return { ok: true, status };
+  }
+  if (message.kind === "open-workspace") {
+    await chrome.tabs.create({
+      url: connection?.origin ?? "http://127.0.0.1:2607",
+      active: true,
+    });
+    return { ok: true, status };
+  }
+  if (message.kind === "open-blooket" && connection) {
+    await chrome.tabs.update(connection.tabId, { active: true });
+    return { ok: true, status };
+  }
+  return { ok: false, status: "invalid-request" };
+}
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (
-    sender.url !==
-    chrome.runtime.getURL("src/ui/browser-extension/adapter-inbound/popup.html")
-  )
-    return false;
-  const result = pendingUiAction.then(() => handle(message));
+  const popup =
+    sender.url ===
+    chrome.runtime.getURL(
+      "src/ui/browser-extension/adapter-inbound/popup.html",
+    );
+  let workspace = false;
+  try {
+    if (
+      sender.url &&
+      sender.tab?.id &&
+      message &&
+      typeof message === "object" &&
+      "kind" in message &&
+      message.kind === "workspace-ready" &&
+      "origin" in message
+    ) {
+      const page = new URL(sender.url);
+      workspace =
+        page.origin === message.origin &&
+        page.pathname === "/" &&
+        page.protocol === "http:" &&
+        ["127.0.0.1", "127.0.0.2"].includes(page.hostname);
+    }
+  } catch {
+    /* Untrusted sender URL. */
+  }
+  if (!popup && !workspace) return false;
+  const result = pendingUiAction.then(() =>
+    workspace ? connectWorkspace(message) : handlePopup(message),
+  );
   pendingUiAction = result.then(
     () => undefined,
     () => undefined,
@@ -318,11 +396,19 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   return true;
 });
 
-// Only session storage is used; a browser restart requires manual pairing.
-const previous = configured(
-  (await chrome.storage.session?.get("connection"))?.["connection"],
-);
-if (previous) {
-  connection = previous;
-  void relay(previous, generation);
+async function restoreConnection() {
+  try {
+    const previous = configured(
+      (await chrome.storage.session?.get("connection"))?.["connection"],
+    );
+    if (previous) {
+      connection = previous;
+      void relay(previous, generation);
+    }
+    await discoverWorkspaces();
+  } catch {
+    status = "connection-unavailable";
+  }
 }
+// Listener registration stays synchronous; actions wait for restoration.
+pendingUiAction = restoreConnection();

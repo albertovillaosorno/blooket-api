@@ -34,6 +34,7 @@ import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { buildBrowserExtension } from
   "../../../../src/platforms/distribution/adapter-outbound/extension.ts";
 
@@ -60,6 +61,33 @@ test(
     const files = await readdir(output, { recursive: true });
     const scripts = files.filter((file) => file.endsWith(".js"));
     assert.ok(scripts.includes(manifest.background.service_worker));
+    const before = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+    let listenerCount = 0;
+    Object.defineProperty(globalThis, "chrome", {
+      configurable: true,
+      value: {
+        tabs: { query: async () => [] },
+        runtime: {
+          onMessage: {
+            addListener: () => {
+              listenerCount++;
+            },
+          },
+        },
+        storage: { session: { get: async () => ({}) } },
+      },
+    });
+    try {
+      // Node rejects asynchronous ESM graphs here, as Chrome workers do.
+      createRequire(import.meta.url)(
+        join(output, manifest.background.service_worker),
+      );
+      assert.equal(listenerCount, 1);
+      await Promise.resolve();
+    } finally {
+      if (before) Object.defineProperty(globalThis, "chrome", before);
+      else Reflect.deleteProperty(globalThis, "chrome");
+    }
     assert.ok(scripts.length > 1);
     assert.equal(
       files.some(

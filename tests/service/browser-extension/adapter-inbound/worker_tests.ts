@@ -43,6 +43,7 @@ test(
   let listener;
   let tabUrl = "https://dashboard.blooket.com/my-sets";
   let creates = 0;
+  let closed = false;
   let validStatus = true;
   const jobs = [];
   const replies = [];
@@ -61,12 +62,14 @@ test(
       },
     },
     tabs: {
+      query: async () => [{ id: 99, url: origin + "/" }],
       create: async ({ url }) => {
         creates++;
         tabUrl = url;
         return { id: 7, url, status: "complete" };
       },
       get: async (id) => {
+        if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
         return { id, url: tabUrl, status: "complete" };
       },
@@ -86,7 +89,14 @@ test(
       },
     },
     scripting: {
-      executeScript: async ({ target, func, args }) => {
+      executeScript: async ({ target, func, args, files }) => {
+        if (files) {
+          assert.equal(target.tabId, 99);
+          assert.deepEqual(files, [
+            "src/ui/browser-extension/adapter-inbound/workspace.js",
+          ]);
+          return [];
+        }
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
         if (func.name === "openBlooketDetailPanel") return [{ result: true }];
@@ -178,28 +188,41 @@ test(
       ),
       false,
     );
-    for (const unsafe of [
-      "https://127.0.0.1:4567",
-      "http://localhost:4567",
-      "http://127.0.0.1:4567/path",
-      "http://evil.invalid:4567",
-    ])
-      assert.equal(
-        (
-          await message({
-            kind: "connect",
-            origin: unsafe,
-            token,
-          })
-        ).status,
-        "invalid-configuration",
-      );
+    assert.equal((await message({ kind: "connect", origin, token })).ok, false);
+    const announce = (value) =>
+      new Promise((resolve) => {
+        assert.equal(
+          listener(
+            { kind: "workspace-ready", ...value },
+            { url: origin + "/", tab: { id: 99 } },
+            resolve,
+          ),
+          true,
+        );
+      });
+    assert.equal(
+      listener(
+        { kind: "workspace-ready", origin, token },
+        { url: "http://127.0.0.1:9999/", tab: { id: 99 } },
+        () => {},
+      ),
+      false,
+    );
+    assert.equal(
+      listener(
+        { kind: "workspace-ready", origin, token },
+        { url: origin + "/", tab: undefined },
+        () => {},
+      ),
+      false,
+    );
     assert.equal(requests.length, 0);
     validStatus = false;
-    assert.equal((await message({ kind: "connect", origin, token })).ok, false);
+    assert.equal((await announce({ origin, token })).ok, false);
     assert.equal(creates, 0);
     validStatus = true;
-    assert.equal((await message({ kind: "connect", origin, token })).ok, true);
+    assert.equal((await announce({ origin, token })).ok, true);
+    assert.equal((await announce({ origin, token })).ok, true);
     assert.equal(creates, 1);
     assert.equal((await expectReply({ kind: "sets.list" })).ok, true);
     assert.equal(
@@ -234,14 +257,10 @@ test(
       (await message({ kind: "status" })).status,
       "blooket-attention-required",
     );
-    assert.equal(
-      (await message({ kind: "disconnect" })).status,
-      "disconnected",
-    );
-    assert.deepEqual(stored, {});
   } finally {
-    if (listener) await message({ kind: "disconnect" });
+    closed = true;
     await pause(1100);
+    assert.deepEqual(stored, {});
     globalThis.fetch = priorFetch;
     if (priorChrome) Object.defineProperty(globalThis, "chrome", priorChrome);
     else Reflect.deleteProperty(globalThis, "chrome");
