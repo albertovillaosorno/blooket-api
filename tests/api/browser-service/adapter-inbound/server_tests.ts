@@ -210,8 +210,6 @@ test(
           filename: "Sample.png",
           name: "Sample",
           description: "Sample image",
-          language: "en",
-          topics: [],
           base64: Buffer.from(source).toString("base64"),
         })
       ).json()) as { id: string };

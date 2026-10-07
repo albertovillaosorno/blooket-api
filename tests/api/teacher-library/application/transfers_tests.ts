@@ -79,8 +79,6 @@ async function setup() {
     filename: "Original.png",
     name: "Original",
     description: "Texto original",
-    language: "es",
-    topics: ["example"],
     base64: Buffer.from(sourceBytes).toString("base64"),
   });
   const bytes = await readFile(join(library, record.asset));

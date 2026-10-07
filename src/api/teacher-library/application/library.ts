@@ -262,8 +262,6 @@ export async function importLibraryImage(
   exact(request, [
     "name",
     "description",
-    "language",
-    "topics",
     "base64",
     ...("filename" in request ? ["filename"] : []),
   ]);
@@ -271,11 +269,9 @@ export async function importLibraryImage(
     ("filename" in request && !text(request["filename"], 240)) ||
     !text(request["name"], 200) ||
     !text(request["description"], 10_000) ||
-    !text(request["language"], 35) ||
     !text(request["base64"], 35_000_000)
   )
     throw new Error("invalid-import");
-  topics(request["topics"]);
   const bytes = Buffer.from(request["base64"], "base64");
   if (
     bytes.length > 25_000_000 ||
@@ -305,9 +301,9 @@ export async function importLibraryImage(
           revision: 1,
           name: request["name"] as string,
           description: request["description"] as string,
-          language: request["language"] as string,
+          language: "",
         },
-        topics: request["topics"] as string[],
+        topics: [],
         generatedEnglish: null,
         edit: {
           ...preferences.defaults,
