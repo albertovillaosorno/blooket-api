@@ -46,6 +46,30 @@ export interface RenditionOptimizationCandidate {
 
 const DETAIL_SCALES = [1, 0.85, 0.7, 0.55, 0.4] as const;
 
+export function decodeRenditionOptimizationCandidate(
+  value: unknown,
+): RenditionOptimizationCandidate {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error("invalid-rendition-optimization-candidate");
+  const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate).sort();
+  if (
+    keys.join(",") !==
+      ["compression", "detailScale", "gifFps", "stage"].sort().join(",") ||
+    !["requested", "detail", "fps", "compression"].includes(
+      String(candidate["stage"]),
+    ) ||
+    !DETAIL_SCALES.some((scale) => scale === candidate["detailScale"]) ||
+    !(
+      candidate["gifFps"] === null ||
+      GIF_FRAME_RATES.some((fps) => fps === candidate["gifFps"])
+    ) ||
+    !["lossless", "compact"].includes(String(candidate["compression"]))
+  )
+    throw new Error("invalid-rendition-optimization-candidate");
+  return candidate as unknown as RenditionOptimizationCandidate;
+}
+
 export function renditionOptimizationCandidates(input: {
   readonly animated: boolean;
   readonly gifFps: number;

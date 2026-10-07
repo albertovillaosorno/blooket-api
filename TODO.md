@@ -463,6 +463,13 @@ when the recipe requested lossless output. Static candidates never invent FPS.
 The policy does not claim byte success; integration must encode each candidate
 in order, preserve final canvas geometry, and persist the effective winner.
 
+Prepared metadata now has a backward-compatible optional effective candidate.
+Existing records without it still load; every newly prepared file records the
+validated baseline candidate today. The decoder rejects effective parameters
+that could not have come from the record's requested recipe. Optimizer
+integration can therefore persist a later candidate without inventing a second
+quality state or rewriting the teacher's recipe.
+
 Normalize static prepared images to JPEG with the chosen background flattened.
 Keep animated media animated and detect actual source frame delays, duration,
 and cadence before choosing an explicit output FPS. Variable-delay sources

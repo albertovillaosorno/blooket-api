@@ -29,6 +29,12 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
+import {
+  decodeRenditionOptimizationCandidate,
+  renditionOptimizationCandidates,
+  type RenditionOptimizationCandidate,
+} from "../../rendition-optimization/domain/candidates.ts";
+
 const PREPARED_FILE = new RegExp(
   "^renditions/[a-zA-Z0-9_-]" + "[a-zA-Z0-9._-]{0,127}/[0-9]+\\.(png|gif)$",
   "u",
@@ -81,6 +87,7 @@ export interface LibraryMetadata {
     readonly file: string;
     readonly bytes: number;
     readonly recipeRevision: number;
+    readonly effective?: RenditionOptimizationCandidate;
   };
 }
 export function normalizationStatus(
@@ -203,7 +210,12 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
   }
   if (m["prepared"] !== null) {
     const prepared = object(m["prepared"]);
-    exact(prepared, ["file", "bytes", "recipeRevision"]);
+    exact(prepared, [
+      "file",
+      "bytes",
+      "recipeRevision",
+      ...("effective" in prepared ? ["effective"] : []),
+    ]);
     if (
       typeof prepared["file"] !== "string" ||
       !PREPARED_FILE.test(prepared["file"]) ||
@@ -211,6 +223,25 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
       !integer(prepared["recipeRevision"], 1, Number(m["revision"]))
     )
       throw new Error("invalid-prepared-media");
+    if ("effective" in prepared) {
+      const effective = decodeRenditionOptimizationCandidate(
+        prepared["effective"],
+      );
+      const allowed = renditionOptimizationCandidates({
+        animated: prepared["file"].endsWith(".gif"),
+        gifFps: Number(object(m["edit"])["gifFps"]),
+        compression: object(m["edit"])["compression"] as
+          | "lossless"
+          | "compact",
+      });
+      if (
+        !allowed.some(
+          (candidate) =>
+            JSON.stringify(candidate) === JSON.stringify(effective),
+        )
+      )
+        throw new Error("invalid-prepared-media");
+    }
   }
   return value as LibraryMetadata;
 }

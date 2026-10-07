@@ -604,6 +604,12 @@ test(
     const library = (await loadPreferences(root)).mediaRoot;
     const record = await prepareLibraryImage(root, imported.id);
     const prepared = record.prepared!;
+    assert.deepEqual(prepared.effective, {
+      stage: "requested",
+      detailScale: 1,
+      gifFps: null,
+      compression: imported.edit.compression,
+    });
     const valid = await readPreparedLibraryImage(library, record.id, 1);
     assert.equal(valid.bytes.length, prepared.bytes);
     await assert.rejects(
