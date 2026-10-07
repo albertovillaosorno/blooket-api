@@ -237,7 +237,10 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
       if (
         !allowed.some(
           (candidate) =>
-            JSON.stringify(candidate) === JSON.stringify(effective),
+            candidate.stage === effective.stage &&
+            candidate.detailScale === effective.detailScale &&
+            candidate.gifFps === effective.gifFps &&
+            candidate.compression === effective.compression,
         )
       )
         throw new Error("invalid-prepared-media");

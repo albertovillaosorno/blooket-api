@@ -32,6 +32,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  decodeLibraryMetadata,
   normalizationStatus,
   type LibraryMetadata,
 } from "../../../../src/media/library-metadata/domain/metadata.ts";
@@ -97,3 +98,40 @@ test(
   );
   },
 );
+
+test("prepared effective metadata is key-order independent", () => {
+  const prepared = {
+    ...base,
+    prepared: {
+      file: "renditions/asset-1/1.png",
+      bytes: 100,
+      recipeRevision: 1,
+      effective: {
+        compression: "compact",
+        gifFps: null,
+        detailScale: 1,
+        stage: "requested",
+      },
+    },
+  };
+  assert.deepEqual(
+    decodeLibraryMetadata(prepared).prepared?.effective,
+    prepared.prepared.effective,
+  );
+  assert.throws(
+    () =>
+      decodeLibraryMetadata({
+        ...prepared,
+        prepared: {
+          ...prepared.prepared,
+          effective: {
+            compression: "compact",
+            gifFps: null,
+            detailScale: 0.4,
+            stage: "fps",
+          },
+        },
+      }),
+    /invalid-prepared-media/u,
+  );
+});
