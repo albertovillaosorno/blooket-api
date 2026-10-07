@@ -87,7 +87,8 @@ export type EnsureBlooketSessionResult =
       readonly code:
         | CredentialFailure["code"]
         | BlooketBrowserFailureCode
-        | "blooket-authentication-not-established";
+        | "blooket-authentication-not-established"
+        | "blooket-authentication-required";
     };
 
 export async function ensureBlooketSession(
@@ -125,6 +126,19 @@ export async function ensureBlooketSession(
     finalDecision ?? {
       ok: false,
       code: "blooket-authentication-not-established",
+    }
+  );
+}
+
+export async function inspectReadyBlooketSession(
+  browser: BlooketBrowserSessionPort,
+): Promise<EnsureBlooketSessionResult> {
+  const observed = await inspectBlooketSession(browser);
+  if (!observed.ok) return observed;
+  return (
+    classifyInspectedSession(observed, true) ?? {
+      ok: false,
+      code: "blooket-authentication-required",
     }
   );
 }

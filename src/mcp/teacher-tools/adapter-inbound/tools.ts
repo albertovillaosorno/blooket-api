@@ -48,6 +48,7 @@ function tool(
   properties: Record<string, unknown>,
   readOnly: boolean,
   required: readonly string[] = Object.keys(properties),
+  openWorld = false,
 ) {
   return {
     name,
@@ -63,11 +64,43 @@ function tool(
       readOnlyHint: readOnly,
       destructiveHint: !readOnly,
       idempotentHint: readOnly,
-      openWorldHint: false,
+      openWorldHint: openWorld,
     },
   };
 }
 const tools = [
+  tool(
+    "blooket_session_inspect",
+    "blooket.session.inspect",
+    "Observe Blooket access in the teacher's local browser. This does not " +
+      "sign in, solve a challenge, read credentials, or publish a quiz.",
+    {},
+    true,
+    [],
+    true,
+  ),
+  tool(
+    "blooket_sets_list",
+    "blooket.sets.list",
+    "Read observed My Sets summaries through the connected local browser. " +
+      "Returns validated remote IDs and titles; completeness and pagination " +
+      "are not yet established. Sign in locally if access is required.",
+    {},
+    true,
+    [],
+    true,
+  ),
+  tool(
+    "blooket_sets_get",
+    "blooket.sets.get",
+    "Read observed set title, description and visibility by remote set ID. " +
+      "Does not return questions, media URLs, cookies, or edit a quiz. " +
+      "Only the observed private-set detail surface is currently supported.",
+    { setId: { type: "string", minLength: 1, maxLength: 512 } },
+    true,
+    ["setId"],
+    true,
+  ),
   tool(
     "instructions_get",
     "profile.get",

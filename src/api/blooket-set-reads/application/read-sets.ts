@@ -46,6 +46,7 @@ import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import {
   ensureBlooketSession,
+  inspectReadyBlooketSession,
   type EnsureBlooketSessionResult,
 } from "../../blooket-session/application/ensure-session.ts";
 import type {
@@ -163,8 +164,9 @@ export async function listBlooketSets(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   reads: BlooketSetReadPort,
+  options: { readonly readOnly?: boolean } = {},
 ): Promise<ListBlooketSetsResult> {
-  const session = await ensureReadySession(browser, secrets);
+  const session = await ensureReadySession(browser, secrets, options.readOnly);
   if (!session.ok || session.kind !== "ready") {
     return session;
   }
@@ -204,6 +206,7 @@ export async function getBlooketSet(
   secrets: HostSecretStore,
   reads: BlooketSetReadPort,
   setId: unknown,
+  options: { readonly readOnly?: boolean } = {},
 ): Promise<GetBlooketSetResult> {
   const decodedId = decodeBlooketSetId(setId);
   if (!decodedId.ok) {
@@ -215,14 +218,12 @@ export async function getBlooketSet(
     };
   }
 
-  const session = await ensureReadySession(browser, secrets);
+  const session = await ensureReadySession(browser, secrets, options.readOnly);
   if (!session.ok || session.kind !== "ready") {
     return session;
   }
 
-  const probed = await safeProbe(
-    () => reads.get(decodedId.value),
-  );
+  const probed = await safeProbe(() => reads.get(decodedId.value));
   if (!probed.ok) {
     return {
       ok: false,
@@ -280,9 +281,7 @@ export async function listBlooketQuestions(
     return session;
   }
 
-  const probed = await safeQuestionProbe(
-    () => reads.list(decodedId.value),
-  );
+  const probed = await safeQuestionProbe(() => reads.list(decodedId.value));
   if (!probed.ok) {
     return {
       ok: false,
@@ -315,18 +314,18 @@ export async function listBlooketQuestions(
 async function ensureReadySession(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
+  readOnly = false,
 ): Promise<
-  | Extract<
-      EnsureBlooketSessionResult,
-      { readonly ok: true }
-    >
+  | Extract<EnsureBlooketSessionResult, { readonly ok: true }>
   | {
       readonly ok: false;
       readonly stage: "session";
       readonly code: SessionFailure["code"];
     }
 > {
-  const session = await ensureBlooketSession(browser, secrets);
+  const session = readOnly
+    ? await inspectReadyBlooketSession(browser)
+    : await ensureBlooketSession(browser, secrets);
   if (!session.ok) {
     return {
       ok: false,

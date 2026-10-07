@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-read-commands
+  name: blooket-read-commands
+  path: src/ir/blooket-read-commands
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

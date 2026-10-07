@@ -34,7 +34,20 @@ import { readFile } from "node:fs/promises";
 
 import { runCli } from "../../command-running/adapter-inbound/run-cli.ts";
 
+import { executeCommand } from
+  "../../../api/command-execution/application/execute-command.ts";
+import { isBlooketReadCommand } from
+  "../../../ir/blooket-read-commands/contract/commands.ts";
+import { executeLocalBlooketRead } from
+  "../../../platforms/service-lifecycle/adapter-outbound/command.ts";
+import { userDataRoot } from
+  "../../../platforms/user-storage/adapter-outbound/root.ts";
+
 const exitCode = await runCli(process.argv.slice(2), {
+  execute: (command) =>
+    isBlooketReadCommand(command.command)
+      ? executeLocalBlooketRead(command, userDataRoot())
+      : executeCommand(command),
   readStdin: async () => {
     const chunks: Buffer[] = [];
     let size = 0;
