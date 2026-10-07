@@ -33,6 +33,7 @@ import { execFile } from "node:child_process";
 import { cp, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { buildExtensionIcons } from "./icons.ts";
 
 const execute = promisify(execFile);
 export async function buildBrowserExtension(
@@ -77,6 +78,7 @@ export async function buildBrowserExtension(
       join(repo, presentation, "manifest.json"),
       join(destination, "manifest.json"),
     );
+    await buildExtensionIcons(repo, destination);
   } catch {
     await rm(destination, { recursive: true, force: true });
     throw new Error("browser-extension-build-failed");

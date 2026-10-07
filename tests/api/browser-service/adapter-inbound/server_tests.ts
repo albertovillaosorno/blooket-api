@@ -44,6 +44,40 @@ import {
   savePreferences,
 } from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 
+test("local icons load and image intake requires origin and CSRF", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clipboard-service-"));
+  const service = await startBrowserService({ root, port: 0 });
+  try {
+    for (const path of ["/icon.svg", "/mcp-icon.png", "/library.js"]) {
+      const response = await fetch(service.origin + path);
+      assert.equal(response.status, 200);
+      assert.ok((await response.arrayBuffer()).byteLength > 100);
+    }
+    const boot = await (await fetch(service.origin + "/api/bootstrap")).json();
+    const rejected = await fetch(service.origin + "/api/image-source", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.test/a" }),
+    });
+    assert.equal(rejected.status, 403);
+    const blocked = await fetch(service.origin + "/api/image-source", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: service.origin,
+        "X-CSRF-Token": boot.csrf,
+      },
+      body: JSON.stringify({ url: "http://127.0.0.1/private" }),
+    });
+    assert.equal(blocked.status, 400);
+    assert.equal((await blocked.json()).code, "image-url-not-public");
+  } finally {
+    service.server.close();
+    service.server.closeAllConnections();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test(
   "fixed collisions stop; automatic ports honor " + "and persist loopback",
   async () => {

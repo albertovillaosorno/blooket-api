@@ -172,6 +172,8 @@ export async function verifyDistribution(
         redirect: "error",
       });
     assert.equal((await request("/")).status, 200);
+    for (const path of ["/icon.svg", "/mcp-icon.png", "/library.js"])
+      assert.equal((await request(path)).status, 200);
     const bootstrap = (await (await request("/api/bootstrap")).json()) as {
       csrf: string;
     };

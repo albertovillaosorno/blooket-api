@@ -1,3 +1,10 @@
+import {
+  GALLERY_LIMIT,
+  sampleLibrary,
+  clipboardImageUrl,
+  readClipboardImage,
+} from "./library.js";
+
 const words = {
   es: {
     library: "Biblioteca",
@@ -31,6 +38,15 @@ const words = {
     yourSpace: "Tu espacio de enseñanza",
     libraryHelp: "Tus fotos y GIF, listos para el próximo quiz.",
     addImage: "Agregar imagen",
+    pasteImage: "Pegar",
+    shuffleLibrary: "Otra selección",
+    previousPage: "Anterior",
+    nextPage: "Siguiente",
+    shownOf: "de",
+    clipboardEmpty: "Copia una imagen o un enlace directo a una imagen.",
+    clipboardDenied:
+      "Permite leer el portapapeles o pega aquí con Ctrl+V / ⌘V.",
+    downloadFailed: "No se pudo cargar esa imagen. Prueba otro enlace directo.",
     search: "Buscar por nombre, descripción o tema…",
     drop: "Arrastra aquí una foto o un GIF",
     formats: "JPG · PNG · GIF · WebP — optimizados al importar",
@@ -204,6 +220,14 @@ const words = {
     yourSpace: "Your teaching space",
     libraryHelp: "Your photos and GIFs, ready for the next quiz.",
     addImage: "Add image",
+    pasteImage: "Paste",
+    shuffleLibrary: "Another selection",
+    previousPage: "Previous",
+    nextPage: "Next",
+    shownOf: "of",
+    clipboardEmpty: "Copy an image or a direct image link first.",
+    clipboardDenied: "Allow clipboard access or paste here with Ctrl+V / ⌘V.",
+    downloadFailed: "Could not load that image. Try another direct image link.",
     search: "Search names, descriptions or topics…",
     drop: "Drop a photo or GIF here",
     formats: "JPG · PNG · GIF · WebP — optimized on import",
@@ -347,6 +371,11 @@ let locale = "es",
   selected,
   sourceFile;
 let editorBusy = false;
+let clipboardReading = false;
+let suggestions = [],
+  searchIndex = [],
+  searchPage = 0,
+  clipboardBusy = false;
 let history = [],
   future = [],
   picking = false;
@@ -395,6 +424,13 @@ function report(error) {
     "revision-conflict": "conflict",
     "filename-already-exists": "collision",
     "source-too-large": "sourceTooLarge",
+    "clipboard-image-missing": "clipboardEmpty",
+    "invalid-image-url": "downloadFailed",
+    "image-url-not-public": "downloadFailed",
+    "image-download-not-image": "downloadFailed",
+    "image-download-failed": "downloadFailed",
+    "image-download-timeout": "downloadFailed",
+    "image-download-redirect-limit": "downloadFailed",
     "native-media-timeout": "nativeTimeout",
     "migration-preflight-timeout": "nativeTimeout",
     "image-frame-limit-exceeded": "gifLimits",
@@ -442,6 +478,16 @@ async function command(name, payload) {
 }
 async function refresh() {
   records = await api("/api/media");
+  suggestions = sampleLibrary(records);
+  searchIndex = records.map((record) => ({
+    record,
+    text: JSON.stringify([
+      record.original,
+      record.topics,
+      record.generatedEnglish,
+    ]).toLocaleLowerCase(),
+  }));
+  searchPage = 0;
   renderGallery();
   const status = await api("/api/library-status");
   $("#migrateLibrary").hidden = !status.legacyAvailable;
@@ -491,15 +537,34 @@ $("#renameForm").addEventListener("submit", async (event) => {
   }
 });
 function renderGallery() {
-  const query = $("#search").value.toLocaleLowerCase();
-  const filtered = records.filter((record) =>
-    JSON.stringify([record.original, record.topics, record.generatedEnglish])
-      .toLocaleLowerCase()
-      .includes(query),
+  const query = $("#search").value.trim().toLocaleLowerCase();
+  const filtered = query
+    ? searchIndex
+        .filter((entry) => entry.text.includes(query))
+        .map((entry) => entry.record)
+    : records;
+  searchPage = Math.min(
+    searchPage,
+    Math.max(0, Math.ceil(filtered.length / GALLERY_LIMIT) - 1),
   );
-  $("#count").textContent = String(filtered.length);
+  const visible = query
+    ? filtered.slice(
+        searchPage * GALLERY_LIMIT,
+        (searchPage + 1) * GALLERY_LIMIT,
+      )
+    : suggestions;
+  $("#count").textContent =
+    query && filtered.length
+      ? `${searchPage * GALLERY_LIMIT + 1}–` +
+        `${searchPage * GALLERY_LIMIT + visible.length} ${t("shownOf")} ` +
+        filtered.length
+      : `${visible.length} ${t("shownOf")} ${filtered.length}`;
+  $("#shuffleLibrary").hidden = !!query || records.length <= GALLERY_LIMIT;
+  $("#searchPages").hidden = !query || filtered.length <= GALLERY_LIMIT;
+  $("#previousPage").disabled = searchPage === 0;
+  $("#nextPage").disabled = (searchPage + 1) * GALLERY_LIMIT >= filtered.length;
   $("#gallery").replaceChildren();
-  for (const record of filtered) {
+  for (const record of visible) {
     const card = document.createElement("button");
     card.className = "media-card";
     const image = document.createElement("img");
@@ -537,6 +602,65 @@ function renderGallery() {
     $("#gallery").append(empty);
   }
 }
+$("#shuffleLibrary").addEventListener("click", () => {
+  suggestions = sampleLibrary(records);
+  renderGallery();
+});
+$("#previousPage").addEventListener("click", () => {
+  searchPage--;
+  renderGallery();
+});
+$("#nextPage").addEventListener("click", () => {
+  searchPage++;
+  renderGallery();
+});
+async function pasteSource(source) {
+  if (clipboardBusy) return;
+  clipboardBusy = true;
+  $("#pasteImage").disabled = true;
+  try {
+    let image = source.image;
+    if (source.url) {
+      const response = await fetch("/api/image-source", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": bootstrap.csrf,
+        },
+        body: JSON.stringify({ url: source.url }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.code ?? "image-download-failed");
+      }
+      image = await response.blob();
+    }
+    if (!image || image.size > 25_000_000) throw new Error("source-too-large");
+    const extension =
+      image.type === "image/jpeg" ? "jpg" : (image.type.split("/")[1] ?? "png");
+    pickFile(new File([image], `image.${extension}`, { type: image.type }));
+  } catch (error) {
+    report(error);
+  } finally {
+    clipboardBusy = false;
+    $("#pasteImage").disabled = false;
+  }
+}
+$("#pasteImage").addEventListener("click", async () => {
+  if (clipboardBusy || clipboardReading) return;
+  clipboardReading = true;
+  $("#pasteImage").disabled = true;
+  try {
+    if (!navigator.clipboard) throw new Error("clipboard-unavailable");
+    await pasteSource(await readClipboardImage(navigator.clipboard));
+  } catch (error) {
+    if (error.message === "clipboard-image-missing") report(error);
+    else toast(t("clipboardDenied"));
+  } finally {
+    clipboardReading = false;
+    $("#pasteImage").disabled = clipboardBusy;
+  }
+});
 function pickFile(file) {
   if (!file) return;
   sourceFile = file;
@@ -570,12 +694,19 @@ for (const name of ["dragleave", "drop"])
     if (name === "drop") pickFile(event.dataTransfer.files[0]);
   });
 window.addEventListener("paste", (event) => {
+  if (
+    $("#library").hidden ||
+    document.querySelector("dialog[open]") ||
+    event.target.closest?.("input,textarea,[contenteditable=true]")
+  )
+    return;
   const image = [...(event.clipboardData?.files ?? [])].find((file) =>
     file.type.startsWith("image/"),
   );
-  if (!image) return;
+  const url = clipboardImageUrl(event.clipboardData?.getData("text/plain"));
+  if (!image && !url) return;
   event.preventDefault();
-  pickFile(image);
+  void pasteSource(image ? { image } : { url });
 });
 $("#importForm").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1045,7 +1176,10 @@ $("#locale").addEventListener("change", (event) => {
 field(settingsForm, "theme").addEventListener("change", (event) => {
   document.documentElement.dataset.theme = event.target.value;
 });
-$("#search").addEventListener("input", renderGallery);
+$("#search").addEventListener("input", () => {
+  searchPage = 0;
+  renderGallery();
+});
 document
   .querySelectorAll("[data-close]")
   .forEach((button) =>

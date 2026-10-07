@@ -1,0 +1,9 @@
+identity:
+  id: function:image-intake
+  name: image-intake
+  path: src/ir/image-intake
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

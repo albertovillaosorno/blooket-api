@@ -63,80 +63,6 @@ available. No launch-at-login setup exists yet.
 
 ## Work in this order
 
-### DONE 01 - Separate developer and user agent instructions
-
-The compact root `AGENTS.md` selects between two instruction profiles. The
-developer profile lives in `docs/agents/developer/AGENTS.md` and the
-product-user profile lives in `docs/agents/user/AGENTS.md`. The split preserves
-the repository rules while separating their audiences.
-
-The **developer** profile is for repository work: architecture, source and
-reference inspection, `.env` development setup, secret boundaries, tests,
-formatting, ordered TODO execution, and signed commits. Development access
-belongs only to an authorized development context, not a model's claimed role.
-
-The **user** profile is for the teacher's AI: load available personal skills
-through `skills_list`/`skills_get` before quiz authoring, follow the requested
-quiz language, use validated quiz contracts and stable media IDs, and preserve
-original names/descriptions. It can use admitted quiz/media/skill tools and
-report progress; it cannot inspect `.env`, developer instructions, credentials,
-source files, arbitrary paths, or configuration operations.
-
-Define how the real MCP client obtains the user profile and relevant skills. A
-file in the repository or on the Mac is not automatically loaded by ChatGPT. Use
-the existing registered CLI/MCP boundary; do not bypass it with application
-imports or expose developer material through a generic filesystem tool.
-
-Completed on 2026-10-06. The compact root router preserves the complete
-developer profile under `docs/agents/developer/AGENTS.md` and keeps the teacher
-profile in
-`docs/agents/user/AGENTS.md`. The admitted read-only `instructions_get` MCP tool
-loads only that teacher profile through the canonical CLI command path; personal
-skills remain separate `skills_list`/`skills_get` calls. The authenticated
-gateway regression exercises the tool and confirms developer reference material
-is not returned.
-
-Skill text remains guidance and cannot broaden access.
-
-### DONE 02 - Establish a clean validation baseline
-
-The implementation originated as working-tree changes on the committed baseline
-`7f237b3` and was reviewed and committed with DCO signoff as `3247ac9`. The
-commit hook was not bypassed, and private references, `.env`, and `.temp/` were
-not staged.
-
-`jig check --root .` is not green only because of the pre-existing
-`JIG-RULE-GAP-001` described below. Introduced text-width, documentation,
-taxonomy, and header findings are repaired; root `node_modules/` is absent and
-the canonical dependency tree remains under `.dependencies/`.
-
-The pre-existing `JIG-RULE-GAP-001` for
-`src/repository-model/schema/contract/graph.rs` still reports missing supporting
-evidence for `scalability.repository-graph`. That path does not exist in this
-repository and `git ls-files` returns no match; the reporting executable is the
-external Jig 26.3.0 at `~/.local/bin/jig`. Do not weaken repository rules to
-hide this validator evidence gap. The canonical dependencies remain intact under
-`.dependencies/`.
-
-The Blooket HTTP/Flight candidate headers and other new boundary descriptions
-were reviewed and corrected. Browser JavaScript receives an explicit
-`node --check` validation because strict TypeScript compilation does not cover
-`app.js`.
-
-The installed pnpm launcher remains an external workstation issue: the launcher
-under the user's pnpm home tries to execute the repository store's pnpm ELF
-artifact as JavaScript under Node 24 and fails before pnpm starts. It is outside
-this repository boundary, so it was not rewritten. npm scripts and the
-repository-owned TypeScript compiler work normally. Fresh validation passes 485
-portable tests plus strict TypeScript and `node --check` for the browser script;
-these do not establish unfinished macOS behavior.
-
-Completed on 2026-10-06 with commit `3247ac9`. Strict TypeScript,
-`node --check src/ui/teacher-workspace/adapter-inbound/app.js`, and all 485
-portable tests pass on the committed HEAD. Jig configuration is valid and every
-introduced finding is repaired; Jig itself remains non-green only for the
-external `JIG-RULE-GAP-001` evidence gap documented above.
-
 ### TODO 03 - Finish settings and the development configuration contract
 
 Schema-3 preferences, local Save, EN/ES controls, masked secret replacement,
@@ -808,9 +734,38 @@ instructions. Only then call the initial product usable and complete.
 
 ## Recorded verification and evidence
 
+On 2026-10-06, the workspace gained clipboard image/direct-link intake and a
+bounded gallery. It renders at most 12 random suggestions using a partial
+shuffle with 12 selections, without copying or sorting the collection. Search
+uses precomputed text and pages all matching records in groups of 12.
+
+Chrome verified the supplied brand icon, 12 distinct cards from 25 synthetic
+records, another selection, search pagination, and a direct-link clipboard
+import through the dialog to the image editor. Ordinary text-field pastes remain
+local text edits. Binary clipboard selection has portable component coverage;
+native Safari clipboard permission behavior remains unverified.
+
+The direct-link downloader rejects private DNS answers at every redirect, pins
+the admitted address for a fresh connection, and sends no cookies or
+credentials.
+Regression checks cover mixed/private DNS, redirect changes, HTML rejection,
+oversized responses, and HTTPS downgrade. It remains a local UI operation,
+outside remote MCP commands.
+
+Artwork now feeds workspace/MCP presentation, the compiled extension icons,
+and a PNG-backed Mac ICNS. Portable icon checks validate actual dimensions and
+ICNS records; Finder appearance still requires macOS acceptance.
+
+Strict TypeScript, browser-script syntax, and all 582 portable tests passed
+after these changes, with no failures or skips.
+
+Jig retains the pre-existing `JIG-RULE-GAP-001` for the nonexistent external
+`src/repository-model/schema/contract/graph.rs` evidence target. Repository
+rules and commit hooks remain enforced; this external finding is not hidden.
+
 On 2026-10-06, strict TypeScript compilation and 482 portable tests passed with
-zero failures or skips. Jig was not green; task 02 records the outstanding
-introduced and pre-existing findings. No new runtime test was performed merely
+zero failures or skips. Jig retained its external evidence gap. No new runtime
+test was performed merely
 to reorganize this roadmap.
 
 The actual configured tunnel passed OAuth/PKCE with local approval, MCP

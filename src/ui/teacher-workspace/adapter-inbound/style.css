@@ -32,6 +32,9 @@ header {
   background: var(--surface);
 }
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 22px;
   font-weight: 750;
   text-decoration: none;
@@ -39,7 +42,7 @@ header {
   letter-spacing: -0.8px;
   white-space: nowrap;
 }
-.brand span {
+.brand span span {
   color: var(--accent);
   font-weight: 450;
 }
@@ -88,6 +91,25 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+}
+.heading-actions,
+.gallery-pages {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mcp-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mcp-heading img {
+  border-radius: 6px;
+}
+.gallery-pages {
+  justify-content: flex-end;
+  margin-bottom: 18px;
 }
 button,
 .button {
