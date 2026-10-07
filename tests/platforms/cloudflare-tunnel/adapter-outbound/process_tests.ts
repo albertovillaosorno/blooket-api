@@ -62,6 +62,72 @@ test("missing connector retains its useful failure after close", async () => {
   }
 });
 
+
+test("connection timeout survives child close without becoming offline",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "connector-timeout-"));
+  const fixture = join(root, "connector.cjs");
+  const states: string[] = [];
+  await writeFile(
+    fixture,
+    "#!/usr/bin/env node\nsetInterval(()=>{},1000);\n",
+    { mode: 0o755 },
+  );
+  let observed!: () => void;
+  const timedOut = new Promise<void>((resolve) => {
+    observed = resolve;
+  });
+  const tunnel = startCloudflareTunnel(
+    "synthetic-token",
+    (state) => {
+      states.push(state);
+      if (state === "connection-timeout") observed();
+    },
+    fixture,
+    25,
+  );
+  try {
+    await timedOut;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(states.at(-1), "connection-timeout");
+  } finally {
+    await tunnel.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("connector early exit becomes offline without inventing a timeout",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "connector-early-exit-"));
+  const fixture = join(root, "connector.cjs");
+  const states: string[] = [];
+  await writeFile(
+    fixture,
+    "#!/usr/bin/env node\nprocess.exit(0);\n",
+    { mode: 0o755 },
+  );
+  let observed!: () => void;
+  const offline = new Promise<void>((resolve) => {
+    observed = resolve;
+  });
+  const tunnel = startCloudflareTunnel(
+    "synthetic-token",
+    (state) => {
+      states.push(state);
+      if (state === "offline") observed();
+    },
+    fixture,
+    1000,
+  );
+  try {
+    await offline;
+    assert.deepEqual(states, ["starting", "offline"]);
+  } finally {
+    await tunnel.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("connector stop waits for a resistant child & excludes token argv",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "connector-stop-"));

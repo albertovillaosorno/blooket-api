@@ -44,6 +44,7 @@ export function startCloudflareTunnel(
   token: string,
   update: (state: string) => void,
   executable = connectorExecutable(),
+  connectionTimeoutMs = 30_000,
 ) {
   let child: ChildProcess | undefined;
   let stopped = false;
@@ -56,7 +57,7 @@ export function startCloudflareTunnel(
       update(failure);
       child?.kill("SIGTERM");
     }
-  }, 30_000);
+  }, connectionTimeoutMs);
   timer.unref();
   child = spawn(executable, ["tunnel", "--no-autoupdate", "run"], {
     env: {
