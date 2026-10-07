@@ -399,7 +399,7 @@ Architecture decisions cover [browser hosting and online MCP][browser-mcp],
 [settings and the media library][library], and
 [atomic persistence][persistence].
 
-## I love you
+## love u
 
 > Avergonzado, sintiendo sobre sí la mirada reprobatoria de sus hermanos, sacó
 > algunas naranjas de su bolsa y comenzó a tirarlas al aire, haciendo
@@ -431,7 +431,7 @@ record in [docs/todo/open](docs/todo/open/). Criteria, blockers, and evidence
 belong in those records; completion moves them to `docs/todo/completed/` and
 removes the index entry. See [the record workflow](docs/todo/README.md).
 
-[Automatic updates](docs/todo/open/delivery/17-updates.mdc) are planned, not
+[Automatic updates](docs/todo/open/delivery/updates.mdc) are planned, not
 implemented. They will use final public GitHub Releases without a teacher GitHub
 account, with independent opt-in update and launch-at-login preferences, trusted
 artifacts, safe restart, and retained data. Both preferences default off; native
