@@ -87,7 +87,14 @@ export type EditorRenditionResult =
 export type OptimizedEditorRenditionResult =
   | {
       readonly ok: true;
-      readonly value: ImageRendition & {
+      readonly value: {
+        readonly bytes: Uint8Array;
+        readonly format: "jpeg" | "gif";
+        readonly mediaType: "image/jpeg" | "image/gif";
+        readonly width: number;
+        readonly height: number;
+        readonly frameCount: number;
+        readonly animated: boolean;
         readonly effective: RenditionOptimizationCandidate;
       };
     }
@@ -140,6 +147,7 @@ async function renderDecodedImageRendition(
   canvas: RenditionCanvas,
   limits: RenditionLimits,
   options: EditorRenditionOptions,
+  enforceByteLimit = true,
 ): Promise<EditorRenditionResult> {
   const timeline = decoded.animated
     ? resampleGifTimeline(decoded.frameDelaysMs, options.gifFps ?? 10)
@@ -180,7 +188,10 @@ async function renderDecodedImageRendition(
         )
       : await renderFrame(source, state, canvas, limits, options);
 
-    if (rendered.byteLength > Math.min(limits.maxOutputBytes, 2_499_999)) {
+    if (
+      enforceByteLimit &&
+      rendered.byteLength > Math.min(limits.maxOutputBytes, 2_499_999)
+    ) {
       return { ok: false, code: "rendition-byte-limit-exceeded" };
     }
 
@@ -253,9 +264,35 @@ export async function renderOptimizedImageRendition(
         gifFps: effective.gifFps ?? options.gifFps,
         compression: effective.compression,
       },
+      false,
     );
-    if (rendered.ok)
-      return { ok: true, value: { ...rendered.value, effective } };
+    if (rendered.ok) {
+      const bytes = decoded.value.animated
+        ? rendered.value.bytes
+        : await encodePreparedJpeg(
+            rendered.value.bytes,
+            effective.compression,
+            options.background?.color ?? "#ffffff",
+            limits.maxOutputPixels,
+          );
+      if (bytes.byteLength > Math.min(limits.maxOutputBytes, 2_499_999)) {
+        lastLimitFailure = {
+          ok: false,
+          code: "rendition-byte-limit-exceeded",
+        };
+        continue;
+      }
+      return {
+        ok: true,
+        value: {
+          ...rendered.value,
+          bytes,
+          format: decoded.value.animated ? "gif" : "jpeg",
+          mediaType: decoded.value.animated ? "image/gif" : "image/jpeg",
+          effective,
+        },
+      };
+    }
     if (
       rendered.code !== "rendition-byte-limit-exceeded" &&
       rendered.code !== "rendition-pixel-limit-exceeded"
@@ -264,6 +301,25 @@ export async function renderOptimizedImageRendition(
     lastLimitFailure = rendered;
   }
   return lastLimitFailure;
+}
+
+async function encodePreparedJpeg(
+  source: Uint8Array,
+  compression: "lossless" | "compact",
+  background: string,
+  maxOutputPixels: number,
+): Promise<Uint8Array> {
+  const sharp = await loadSharp();
+  return await sharp(source, {
+    failOn: "warning",
+    limitInputPixels: maxOutputPixels,
+  })
+    .flatten({ background })
+    .jpeg({
+      quality: compression === "compact" ? 80 : 92,
+      mozjpeg: true,
+    })
+    .toBuffer();
 }
 
 async function renderFrame(

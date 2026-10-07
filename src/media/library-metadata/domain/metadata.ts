@@ -36,7 +36,7 @@ import {
 } from "../../rendition-optimization/domain/candidates.ts";
 
 const PREPARED_FILE = new RegExp(
-  "^renditions/[a-zA-Z0-9_-]" + "[a-zA-Z0-9._-]{0,127}/[0-9]+\\.(png|gif)$",
+  "^renditions/[a-zA-Z0-9_-]" + "[a-zA-Z0-9._-]{0,127}/[0-9]+\\.(png|jpg|gif)$",
   "u",
 );
 

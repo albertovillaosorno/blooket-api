@@ -244,14 +244,12 @@ test(
         await post("/api/prepare", { id: imported.id })
       ).json()) as { prepared: { file: string; bytes: number } };
       assert.ok(prepared.prepared.bytes < 2_500_000);
-      assert.equal(
-        (
-          await fetch(
-            service.origin + "/media/" + imported.id + "?variant=prepared",
-          )
-        ).status,
-        200,
+      assert.match(prepared.prepared.file, /[.]jpg$/u);
+      const preparedResponse = await fetch(
+        service.origin + "/media/" + imported.id + "?variant=prepared",
       );
+      assert.equal(preparedResponse.status, 200);
+      assert.equal(preparedResponse.headers.get("content-type"), "image/jpeg");
       assert.equal(
         (
           await fetch(

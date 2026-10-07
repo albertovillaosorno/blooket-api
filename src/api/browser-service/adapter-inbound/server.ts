@@ -306,7 +306,9 @@ export async function startBrowserService(
           response.writeHead(200, {
             "Content-Type": image.file.endsWith(".gif")
               ? "image/gif"
-              : "image/png",
+              : image.file.endsWith(".jpg")
+                ? "image/jpeg"
+                : "image/png",
           });
           response.end(image.bytes);
           return;

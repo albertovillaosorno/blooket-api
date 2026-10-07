@@ -334,7 +334,7 @@ export async function renderEditorIsolated(
       canvas,
       limits.maxOutputPixels,
       limits.maxOutputBytes,
-    );
+    ) as EditorRenditionResult;
   } catch (error) {
     const code = error instanceof Error ? error.message : "native-media-failed";
     return {
@@ -409,7 +409,10 @@ function decodeRenderedReply(
     output.length >= 2_500_000 ||
     output.length > maxOutputBytes ||
     !format ||
-    !["png", "gif"].includes(format.format) ||
+    !(expectedRecipe === undefined
+      ? ["png", "gif"]
+      : ["jpeg", "gif"]
+    ).includes(format.format) ||
     value["format"] !== format.format ||
     value["mediaType"] !== format.mediaType ||
     value["width"] !== canvas.width ||
@@ -418,9 +421,9 @@ function decodeRenderedReply(
     canvas.width * canvas.height * Number(value["frameCount"]) >
       maxOutputPixels ||
     typeof value["animated"] !== "boolean" ||
-    (format.format === "png"
-      ? value["animated"] !== false || value["frameCount"] !== 1
-      : value["animated"] !== true)
+    (format.format === "gif"
+      ? value["animated"] !== true
+      : value["animated"] !== false || value["frameCount"] !== 1)
   )
     throw new Error("native-media-invalid-result");
   return reply as unknown as EditorRenditionResult;
