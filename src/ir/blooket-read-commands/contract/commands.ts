@@ -42,12 +42,14 @@ export const BLOOKET_READ_COMMANDS = [
   "blooket.session.inspect",
   "blooket.sets.list",
   "blooket.sets.get",
+  "blooket.questions.list",
 ] as const;
 export type BlooketReadCommandName = (typeof BLOOKET_READ_COMMANDS)[number];
 export type BlooketReadPayload =
   | { readonly kind: "session" }
   | { readonly kind: "list" }
-  | { readonly kind: "get"; readonly setId: string };
+  | { readonly kind: "get"; readonly setId: string }
+  | { readonly kind: "questions"; readonly setId: string };
 
 export function isBlooketReadCommand(
   name: string,
@@ -70,10 +72,12 @@ export function decodeBlooketReadCommand(
         },
       ],
     };
-  const keys = new Set(name === "blooket.sets.get" ? ["setId"] : []);
+  const needsSetId =
+    name === "blooket.sets.get" || name === "blooket.questions.list";
+  const keys = new Set(needsSetId ? ["setId"] : []);
   const issues = [...unknownFieldIssues(value, keys, "$.payload")];
   if (issues.length) return { ok: false, issues };
-  if (name === "blooket.sets.get") {
+  if (needsSetId) {
     const id = decodeBlooketSetId(value["setId"], "$.payload.setId");
     if (!id.ok) return id;
     if (id.value.length > 512 || /[\x00-\x1f\x7f]/u.test(id.value))
@@ -87,7 +91,13 @@ export function decodeBlooketReadCommand(
           },
         ],
       };
-    return { ok: true, value: { kind: "get", setId: id.value } };
+    return {
+      ok: true,
+      value: {
+        kind: name === "blooket.sets.get" ? "get" : "questions",
+        setId: id.value,
+      },
+    };
   }
   return {
     ok: true,

@@ -102,6 +102,17 @@ const tools = [
     true,
   ),
   tool(
+    "blooket_questions_list",
+    "blooket.questions.list",
+    "Read validated text-question state for one remote set through the " +
+      "connected local browser. Question and audio/image presence are read " +
+      "only; answer-image questions remain unsupported and fail closed.",
+    { setId: { type: "string", minLength: 1, maxLength: 512 } },
+    true,
+    ["setId"],
+    true,
+  ),
+  tool(
     "instructions_get",
     "profile.get",
     "Read the teacher-facing agent profile. Call this before quiz " +

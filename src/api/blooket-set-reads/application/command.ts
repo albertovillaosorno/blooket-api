@@ -44,13 +44,19 @@ import type { BlooketBrowserSessionPort } from
 import { inspectBlooketSession } from
   "../../blooket-session/application/inspect-session.ts";
 import type { BlooketSetReadPort } from "../contract/set-reads.ts";
-import { listBlooketSets, getBlooketSet } from "./read-sets.ts";
+import type { BlooketQuestionReadPort } from "../contract/question-reads.ts";
+import {
+  listBlooketQuestions,
+  listBlooketSets,
+  getBlooketSet,
+} from "./read-sets.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 
 export interface BlooketReadDependencies {
   readonly session: BlooketBrowserSessionPort;
   readonly sets: BlooketSetReadPort;
+  readonly questions: BlooketQuestionReadPort;
   readonly secrets: HostSecretStore;
 }
 
@@ -64,16 +70,23 @@ export async function executeBlooketReadCommand(
   if (!decoded.ok) return commandFailure(command.operationId, decoded.issues);
   if (!dependencies)
     return fail(command.operationId, "blooket-browser-unavailable");
-  const { session, sets, secrets } = dependencies;
+  const { session, sets, questions, secrets } = dependencies;
   const payload = decoded.value;
   const result =
     payload.kind === "session"
       ? await inspectBlooketSession(session)
       : payload.kind === "list"
         ? await listBlooketSets(session, secrets, sets, { readOnly: true })
-        : await getBlooketSet(session, secrets, sets, payload.setId, {
-            readOnly: true,
-          });
+        : payload.kind === "questions"
+          ? await listBlooketQuestions(
+              session,
+              secrets,
+              questions,
+              payload.setId,
+            )
+          : await getBlooketSet(session, secrets, sets, payload.setId, {
+              readOnly: true,
+            });
   if (!result.ok) return fail(command.operationId, result.code);
   return commandSuccess(command.operationId, result);
 }

@@ -116,11 +116,14 @@ test("read arguments preserve opaque IDs and reject extra authority", () => {
     ["session", "inspect", "--json"],
     ["sets", "list"],
     ["sets", "get", "opaque ID", "--json"],
+    ["questions", "list", "opaque ID", "--json"],
   ])
     assert.equal(parseCliArguments(args).ok, true);
   for (const args of [
     ["sets", "get"],
     ["sets", "get", "a", "b"],
+    ["questions", "list"],
+    ["questions", "list", "a", "b"],
     ["sets", "list", "--token", "secret"],
     ["session", "inspect", "--json", "--json"],
   ])

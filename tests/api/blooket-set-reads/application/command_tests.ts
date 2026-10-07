@@ -49,6 +49,27 @@ function dependencies(state: ObservedBlooketNavigationStateKind) {
       authenticate: secret,
     },
     secrets: { read: secret, write: secret, delete: secret },
+    questions: {
+      list: async () => {
+        reads++;
+        return {
+          ok: true,
+          value: [{
+            schemaVersion: 1,
+            number: 1,
+            question: "Type sun.",
+            qType: "typing",
+            random: true,
+            timeLimit: 15,
+            answers: ["sun"],
+            correctAnswers: ["sun"],
+            answerTypes: ["exactly"],
+            hasImage: false,
+            hasAudio: false,
+          }],
+        };
+      },
+    },
     sets: {
       list: async () => {
         reads++;
@@ -107,7 +128,17 @@ test("canonical reads reuse a ready session without secret access",
     ).ok,
     true,
   );
-  assert.equal(fixture.reads(), 2);
+  assert.equal(
+    (
+      await executeCommand(
+        envelope("blooket.questions.list", { setId: "fixture" }),
+        undefined,
+        fixture.ports,
+      )
+    ).ok,
+    true,
+  );
+  assert.equal(fixture.reads(), 3);
 });
 
 test("closed and challenged sessions stop before reads or secrets",

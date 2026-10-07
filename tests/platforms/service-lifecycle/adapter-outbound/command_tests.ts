@@ -82,7 +82,21 @@ test("local reads and MCP traverse the real CLI and service bridge",
               description: "Synthetic fixture",
               visibility: "private",
             }
-          : [{ schemaVersion: 1, id: "fixture", title: "Synthetic quiz" }];
+          : job.command.kind === "questions.list"
+            ? [{
+                schemaVersion: 1,
+                number: 1,
+                question: "Type sun.",
+                qType: "typing",
+                random: true,
+                timeLimit: 15,
+                answers: ["sun"],
+                correctAnswers: ["sun"],
+                answerTypes: ["exactly"],
+                hasImage: false,
+                hasAudio: false,
+              }]
+            : [{ schemaVersion: 1, id: "fixture", title: "Synthetic quiz" }];
     assert.ok(
       bridge.complete(bridge.pairingToken(), {
         schemaVersion: 1,
@@ -123,10 +137,16 @@ test("local reads and MCP traverse the real CLI and service bridge",
       root,
     );
     assert.equal(detail.isError, false);
+    const questions = await callTeacherTool(
+      "blooket_questions_list",
+      { setId: "fixture" },
+      root,
+    );
+    assert.equal(questions.isError, false);
     assert.equal(
       listTeacherTools().filter((tool) => tool.name.startsWith("blooket_"))
         .length,
-      3,
+      4,
     );
     assert.equal(JSON.stringify(mcp).includes(bridge.pairingToken()), false);
   } finally {
