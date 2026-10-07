@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "minimum_chrome_version": "110",
-  "name": "Blooket Studio",
+  "name": "Blooket API",
   "version": "26.4.0.0",
   "description": "Connect Blooket to your local teaching workspace.",
   "icons": {
@@ -32,7 +32,7 @@
       "16": "icons/16.png",
       "32": "icons/32.png"
     },
-    "default_title": "Blooket Studio",
+    "default_title": "Blooket API",
     "default_popup": "src/ui/browser-extension/adapter-inbound/popup.html"
   },
   "content_security_policy": {

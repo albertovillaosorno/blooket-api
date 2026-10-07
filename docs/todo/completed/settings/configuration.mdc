@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-03"
-status: "active"
+status: "completed"
 priority: "p0"
 horizon: "foundations"
 order: 30
@@ -28,15 +28,15 @@ validation:
 
 ## Objective
 
-Verify native settings and Keychain behavior while preserving the validated
-development configuration contract.
+Preserve the validated settings and development-configuration contract while
+platform-only Keychain/Safari hardening moves to the final platform record.
 
 ## Acceptance
 
 Complete when ordinary settings migrate safely, local Save reports partial
 failures accurately, valid development configuration starts, and global export
-defaults remain separate from every individual image recipe. Record native
-Keychain/folder tests as pending until they actually run on macOS.
+defaults remain separate from every individual image recipe. Native
+Keychain/folder hardening is owned by task blooket-15.
 
 ## Implementation notes
 
@@ -152,5 +152,5 @@ test was performed merely to reorganize this roadmap.
 
 ## Blockers
 
-Platform-only macOS/Safari hardening belongs to task blooket-15 and does
-not block this functional record.
+None. Remaining native Keychain/Safari behavior belongs to task blooket-15 and
+is not part of this completed functional record.

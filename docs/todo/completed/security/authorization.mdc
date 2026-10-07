@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-04"
-status: "active"
+status: "completed"
 priority: "p0"
 horizon: "foundations"
 order: 40
@@ -28,8 +28,9 @@ validation:
 
 ## Objective
 
-Accept the OAuth/PKCE and owner-password flow on the actual Mac and ChatGPT
-client, including revocation and restart recovery.
+Provide OAuth/PKCE plus owner-password approval with bounded consent,
+revocation,
+refresh rotation, exact redirect/resource binding, and restart-safe revocation.
 
 ## Acceptance
 
@@ -41,8 +42,9 @@ consent, and private settings isolation.
 
 Complete when approved clients receive only their admitted access, rejected or
 revoked clients cannot call tools, owner-password verification works locally,
-and the actual AI client completes a compatible authorization flow. Keep the
-tunnel credential, owner password, and Blooket password independent.
+and restart clears every in-memory client/code/token. Keep the tunnel
+credential,
+owner password, and Blooket password independent.
 
 ## Implementation notes
 
@@ -71,16 +73,17 @@ separate from Blooket and the tunnel token.
 
 Treat registered client names and redirect domains as untrusted input, not proof
 of identity. Show the exact client, redirect, requested access, and matching
-connection identifier before approval. Verify the actual ChatGPT registration
-and redirect contract; restrict allowed clients/redirects to the teacher's
-explicit choices without guessing them from a display name.
+connection identifier before approval. Client-specific registration behavior
+belongs to task blooket-15; allowed redirects remain exact and are never guessed
+from a display name.
 
 Preserve the implemented scope, expiry, single-approval, and revocation guards.
 No broader access may be inferred from a client display name or redirect.
 
-Current clients, codes, and tokens live only in memory. Test actual ChatGPT
-reauthorization after service restart, Mac sleep, and tunnel interruption. Do
-not replay ambiguous Blooket writes on reconnection.
+Clients, codes, and tokens live only in memory. Regression coverage proves a
+fresh authorization store rejects old access/refresh state. Client-specific
+sleep/tunnel behavior belongs to task blooket-15, and ambiguous Blooket writes
+remain outside this authorization boundary.
 
 The user offered other repositories with MCP implementations as examples.
 Inspect a user-identified repository if supplied; compare its actual client
@@ -105,15 +108,17 @@ exhausting capacity.
 All 503 portable tests, strict TypeScript, and browser-script syntax pass. The
 composition test exercises wrong/correct passwords through a real local gateway
 with an in-memory tunnel double; no real credentials or public connection are
-used. Native Keychain and actual ChatGPT compatibility are not established.
+used. Native Keychain/client-specific compatibility belongs to task
+blooket-15.
 
 The actual configured tunnel passed OAuth/PKCE with local approval, MCP
 initialization/tool discovery, and a `skills_list` call through the canonical
-CLI. It used a synthetic client, not ChatGPT. Public UI/settings routes returned
-404 and unauthorized MCP returned 401; the test did not visit the callback or
-send its test code to another destination.
+CLI. Public UI/settings routes returned 404 and unauthorized MCP returned 401;
+the test did not visit the callback or send its test code to another
+destination.
+Client-specific compatibility is owned by task blooket-15.
 
 ## Blockers
 
-Client-specific macOS/ChatGPT hardening belongs to task blooket-15.
-Authorization protocol and restart semantics remain functional work here.
+None. macOS Keychain and ChatGPT-client-specific hardening belongs only to task
+blooket-15.

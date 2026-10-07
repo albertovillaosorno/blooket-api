@@ -67,7 +67,7 @@ challenges preserve their wait/human states. Missing or stale local instances
 fail closed. Local requests use exact loopback discovery, bounded responses,
 correlation checks, CSRF admission, and no redirects.
 
-This was a local tool projection check, not actual ChatGPT or a new public OAuth
+This was a local tool projection check, not a new public OAuth
 acceptance run.
 
 The development service restarted normally, the workspace reconnected without

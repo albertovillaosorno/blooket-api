@@ -40,7 +40,10 @@ import {
   type UpdateAsset,
 } from "../contract/releases.ts";
 
-export type MacUpdateTarget = "darwin-arm64";
+export const MAC_UPDATE_TARGET = "darwin-arm64" as const;
+export const MAC_UPDATE_ARCHIVE = "darwin-arm64.zip" as const;
+export const MAC_APPLICATION_BUNDLE = "Blooket API.app" as const;
+export type MacUpdateTarget = typeof MAC_UPDATE_TARGET;
 export type UpdateSelection =
   | { readonly status: "current"; readonly skippedTags: number }
   | {
@@ -72,7 +75,7 @@ export function selectPublicUpdate(
 ): UpdateSelection {
   const current = decodeProductVersion(currentVersion);
   if (!Number.isFinite(now.getTime())) throw new Error("invalid-update-clock");
-  if (target !== "darwin-arm64")
+  if (target !== MAC_UPDATE_TARGET)
     return { status: "unsupported-platform" };
   if (!Array.isArray(entries) || entries.length > MAX_RELEASES)
     return { status: "untrusted-metadata", reason: "malformed" };
@@ -120,7 +123,7 @@ export function selectPublicUpdate(
   if (!newest) return { status: "current", skippedTags };
   const version = newest.tag.slice(1);
   const matching = newest.assets.filter(
-    (asset) => asset.name === `${target}.zip`,
+    (asset) => asset.name === MAC_UPDATE_ARCHIVE,
   );
   if (matching.length !== 1)
     return {

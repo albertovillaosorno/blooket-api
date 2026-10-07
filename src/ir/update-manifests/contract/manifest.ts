@@ -47,7 +47,7 @@ import {
 import type { MacUpdateTarget } from
   "../../application-updates/domain/select.ts";
 
-export const UPDATE_BUNDLE_ID = "com.albertovilla.blooket-studio";
+export const UPDATE_BUNDLE_ID = "com.albertovilla.blooket-api";
 export interface ManifestAsset {
   readonly target: MacUpdateTarget;
   readonly name: string;

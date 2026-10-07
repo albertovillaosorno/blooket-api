@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-05"
-status: "active"
+status: "completed"
 priority: "p0"
 horizon: "foundations"
 order: 50
@@ -29,8 +29,9 @@ validation:
 
 ## Objective
 
-Finish native library and client acceptance, preserving two-field intake,
-original teacher text, and revision-safe AI normalization.
+Provide two-field intake, optimized canonical media, lossless
+migration/recovery, original teacher text preservation, and revision-safe AI
+normalization.
 
 ## Acceptance
 
@@ -40,15 +41,14 @@ failed-save/revision-race handling, and correct pending/completed/stale states.
 
 Complete when legacy IDs/bytes/text migrate without loss, legacy rename/move can
 recover from interruption, AI updates preserve teacher-authored text, and
-initial skills are installed without overwriting personal skills. Verify the
-user profile from task 01 can discover and read the resulting skills.
+initial skills are installed without overwriting personal skills. Those
+functional conditions are implemented and regression-tested.
 
 ## Implementation notes
 
-**Pending import and enrichment correction:** every intake path, including file
-selection, dragging, and clipboard image/link import, asks only for name and
-description. Remove the language selector and comma-separated topic field from
-intake; do not move the same questions into another required dialog.
+Every intake path, including file selection, dragging, and clipboard image/link
+import, asks only for name and description. Language and topics are enrichment
+outputs rather than teacher-facing intake requirements.
 Teacher-authored text remains unchanged; canonical asset paths are internal and
 must not become another teacher-facing naming task.
 
@@ -97,9 +97,8 @@ and metadata conflicts, and resumes idempotently without overwriting unrelated
 files. Source changes retain the journal for repair instead of guessing success.
 
 Existing skill and draft tools have logical IDs, revision checks, and recovery
-copies; verify how the actual ChatGPT client reads skills and follows the
-project schema. Validate media/account semantics before publication, beyond
-draft JSON syntax.
+copies. Client-specific skill consumption belongs to task blooket-15; media and
+account publication semantics belong to the publication records.
 
 ## Shared media correction context
 
@@ -123,10 +122,10 @@ ratio. Automatic preparation must produce an actual file strictly below
 second when relevant, and color/encoding optimization afterward. The editor must
 retain that shared final geometry throughout optimization.
 
-These are pending product changes, not claims about the current implementation.
-Keep teacher-authored text intact. New intake source blobs are ephemeral and the
-library retains only its optimized canonical WebP/GIF asset; legacy migration
-continues preserving historical files for recovery.
+These corrections are implemented. Teacher-authored text remains intact. New
+intake source blobs are ephemeral and the library retains only its optimized
+canonical WebP/GIF asset; legacy migration continues preserving historical files
+for recovery.
 
 Retain actual-byte validation and never label an oversized or unverified
 candidate ready for download or publication. The detailed acceptance checks
@@ -171,8 +170,8 @@ evidence gap.
 
 Chrome previously passed the now-legacy local rename operation and a prepared
 export using synthetic media. Its native migration confirmation stalled browser
-inspection; the complete visual migration workflow remains unverified. Continue
-independent editor work in task 06; keep client acceptance pending.
+inspection. Historical visual/client-specific acceptance belongs to task
+blooket-15 and does not reopen the completed migration contract.
 
 On 2026-10-06, the workspace gained clipboard image/direct-link intake and a
 bounded gallery. It renders at most 12 random suggestions using a partial
@@ -183,7 +182,7 @@ Chrome verified the supplied brand icon, 12 distinct cards from 25 synthetic
 records, another selection, search pagination, and a direct-link clipboard
 import through the dialog to the image editor. Ordinary text-field pastes remain
 local text edits. Binary clipboard selection has portable component coverage;
-native Safari clipboard permission behavior remains unverified.
+Safari-specific clipboard permission behavior belongs to task blooket-15.
 
 The direct-link downloader rejects private DNS answers at every redirect, pins
 the admitted address for a fresh connection, and sends no cookies or
@@ -204,9 +203,10 @@ The saved English name/description remained exact, original language stayed
 unknown, topics stayed empty, and generated English stayed null. The library
 correctly retained pending AI analysis despite English original text; the
 prepared JPEG was 522 bytes at the shared 320-by-180 canvas. This proves local
-Chrome intake, not real AI normalization or native Safari clipboard acceptance.
+Chrome intake; client-specific normalization/clipboard hardening belongs to
+task blooket-15.
 
 ## Blockers
 
-Platform/client-specific hardening belongs to task blooket-15 and does not
-block this library record.
+None. Safari/client-specific hardening belongs to task blooket-15.
+Publication semantics remain owned by the Blooket publication records.

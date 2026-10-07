@@ -8,6 +8,15 @@ import {
 
 const words = {
   es: {
+    browserExtensions: "Extensiones del navegador",
+    safariExtensionHelp:
+      "Safari viene incluida con Blooket API. Abre la instalación y " +
+      "actívala en Safari cuando el sistema te lo pida.",
+    installSafariExtension: "Instalar en Safari",
+    safariExtensionOpened:
+      "Se abrió la instalación de Safari. Completa la activación en Safari.",
+    safariExtensionUnavailable:
+      "La extensión de Safari no está incluida en este paquete.",
     updates: "Actualizaciones",
     currentVersion: "Versión instalada",
     checkUpdates: "Buscar actualizaciones",
@@ -179,8 +188,8 @@ const words = {
     prepare: "Guardar y preparar",
     download: "Descargar archivo preparado",
     quizzesHelp:
-      "La IA puede guardar borradores aquí. Revisa el " +
-      "contenido antes de publicarlo.",
+      "La IA publica automáticamente y verifica el resultado. " +
+      "Puedes revisar o editar cuando quieras.",
     connection: "Conexión con Blooket",
     publicationPending:
       "La publicación aún requiere validar el adaptador " +
@@ -209,7 +218,7 @@ const words = {
       "Algunos secretos pueden haberse guardado; vuelve a " +
       "intentar.",
     diagnosticsDone: "Diagnóstico completado",
-    noDrafts: "Los borradores de la IA aparecerán aquí.",
+    noDrafts: "El trabajo de IA en curso aparecerá aquí.",
     sourceLanguage: "Original",
     english: "Inglés generado",
     stale: "Normalización pendiente de actualizar",
@@ -218,6 +227,15 @@ const words = {
     normalizationStale: "Análisis AI desactualizado",
   },
   en: {
+    browserExtensions: "Browser extensions",
+    safariExtensionHelp:
+      "Safari is included with Blooket API. Open setup, then enable it " +
+      "in Safari when macOS asks.",
+    installSafariExtension: "Install in Safari",
+    safariExtensionOpened:
+      "Safari setup opened. Finish enabling the extension in Safari.",
+    safariExtensionUnavailable:
+      "The Safari extension is not included in this package.",
     updates: "Updates",
     currentVersion: "Installed version",
     checkUpdates: "Check for updates",
@@ -385,7 +403,9 @@ const words = {
     redo: "Redo",
     prepare: "Save and prepare",
     download: "Download prepared file",
-    quizzesHelp: "AI drafts appear here. Review the content before publishing.",
+    quizzesHelp:
+      "AI publishes automatically and verifies the result. " +
+      "You can review or edit whenever you want.",
     connection: "Blooket connection",
     publicationPending:
       "Publishing still requires a verified Blooket " +
@@ -413,7 +433,7 @@ const words = {
       "Settings were not fully saved. Some secrets may " +
       "have been saved; please retry.",
     diagnosticsDone: "Diagnostics completed",
-    noDrafts: "Your AI drafts will appear here.",
+    noDrafts: "AI work in progress will appear here.",
     sourceLanguage: "Original",
     english: "Generated English",
     stale: "English normalization needs updating",
@@ -550,6 +570,8 @@ function report(error) {
     "filename-format-mismatch": "invalidFilename",
     "library-recovery-required": "recoveryRequired",
     "folder-picker-macos-only": "folderMac",
+    "safari-extension-unavailable": "safariExtensionUnavailable",
+    "safari-extension-open-failed": "operationFailed",
   };
   toast(t(messages[error.message] ?? "operationFailed"));
 }
@@ -1436,6 +1458,8 @@ function renderUpdates() {
 }
 function renderSettingsState() {
   renderUpdates();
+  $("#safariExtensionPanel").hidden =
+    bootstrap.safariExtension?.available !== true;
   $("#passwordState").textContent = t(
     bootstrap.secrets.passwordConfigured ? "configured" : "missing",
   );
@@ -1530,6 +1554,18 @@ $("#folder").addEventListener("click", async () => {
     ).path;
   } catch (error) {
     report(error);
+  }
+});
+$("#installSafariExtension").addEventListener("click", async () => {
+  const button = $("#installSafariExtension");
+  button.disabled = true;
+  try {
+    await api("/api/safari-extension-open", {});
+    toast(t("safariExtensionOpened"));
+  } catch (error) {
+    report(error);
+  } finally {
+    button.disabled = false;
   }
 });
 $("#checkUpdates").addEventListener("click", async () => {

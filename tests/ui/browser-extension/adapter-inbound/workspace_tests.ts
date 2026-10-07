@@ -67,7 +67,7 @@ async function fixture(body, page = "http://127.0.0.1:4567/") {
 test("automatic workspace relay forwards only its private capability",
   async () => {
   const result = await fixture({
-    browserBridge: { application: "blooket-studio", schemaVersion: 1, token },
+    browserBridge: { application: "blooket-api", schemaVersion: 1, token },
     preferences: { email: "synthetic-private@example.invalid" },
     csrf: "synthetic-local-csrf",
   });
@@ -92,8 +92,8 @@ test("automatic workspace relay ignores unrelated origins and bootstraps",
   }
   for (const body of [
     {}, {browserBridge: {application:"another-app",schemaVersion:1,token}},
-    {browserBridge: {application:"blooket-studio",schemaVersion:2,token}},
-    {browserBridge: {application:"blooket-studio",schemaVersion:1,token:"bad"}},
+    {browserBridge: {application:"blooket-api",schemaVersion:2,token}},
+    {browserBridge: {application:"blooket-api",schemaVersion:1,token:"bad"}},
     "{invalid", "x".repeat(1_000_001),
   ]) assert.equal((await fixture(body)).messages.length, 0);
 });

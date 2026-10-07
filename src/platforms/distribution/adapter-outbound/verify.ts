@@ -64,11 +64,11 @@ export async function verifyDistribution(
   const root = await mkdtemp(join(repo, ".temp/package verification "));
   const mac = target.startsWith("darwin-");
   const resources = mac
-    ? join(root, "Blooket Studio.app/Contents/Resources")
+    ? join(root, "Blooket API.app/Contents/Resources")
     : root;
   const launcher = mac
-    ? join(root, "Blooket Studio.app/Contents/MacOS/Blooket Studio")
-    : join(root, "blooket-studio");
+    ? join(root, "Blooket API.app/Contents/MacOS/Blooket API")
+    : join(root, "blooket-api");
   const data = join(root, "test data");
   const env = {
     PATH: process.env["PATH"],
@@ -121,7 +121,7 @@ export async function verifyDistribution(
     assert.equal(packageMetadata.version, PRODUCT_VERSION);
     if (mac) {
       const info = await readFile(join(root,
-        "Blooket Studio.app/Contents/Info.plist"), "utf8");
+        "Blooket API.app/Contents/Info.plist"), "utf8");
       assert.ok(info.includes(
         `<key>CFBundleShortVersionString</key>` +
         `<string>${PRODUCT_VERSION}</string>`,
@@ -147,22 +147,29 @@ export async function verifyDistribution(
     assert.doesNotMatch(worker, /from\s+["'][^"']+\.ts["']/u);
     assert.doesNotMatch(worker, /from\s+["']node:/u);
     if (mac && release) {
-      const plugins = join(root, "Blooket Studio.app/Contents/PlugIns");
+      const safariRoot = join(
+        root,
+        "Blooket API.app/Contents/Resources/Safari",
+      );
+      const companion = join(safariRoot, "Blooket API Safari.app");
+      const plugins = join(companion, "Contents/PlugIns");
       const extensions = (await readdir(plugins)).filter((name) =>
         name.endsWith(".appex"),
       );
       assert.equal(extensions.length, 1, "Safari extension must be packaged");
+      await access(join(safariRoot, "open-extension"));
+      await access(join(safariRoot, "extension-id.txt"));
       await execute("codesign", [
         "--verify",
         "--deep",
         "--strict",
-        join(root, "Blooket Studio.app"),
+        join(root, "Blooket API.app"),
       ]);
       await execute("spctl", [
         "--assess",
         "--type",
         "execute",
-        join(root, "Blooket Studio.app"),
+        join(root, "Blooket API.app"),
       ]);
     }
     // Setup uses ordinary preferences only; all exercised code is packaged.

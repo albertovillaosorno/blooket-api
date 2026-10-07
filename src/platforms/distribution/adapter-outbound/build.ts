@@ -201,7 +201,7 @@ export async function buildDistribution(target: DistributionTarget) {
   }
   await mkdir(cache, { recursive: true });
   const mac = target.startsWith("darwin-");
-  const bundle = mac ? join(output, "Blooket Studio.app/Contents") : output;
+  const bundle = mac ? join(output, "Blooket API.app/Contents") : output;
   const resource = mac ? join(bundle, "Resources") : output;
   const app = join(resource, "app");
   const runtime = join(resource, "runtime");
@@ -221,7 +221,7 @@ export async function buildDistribution(target: DistributionTarget) {
     await writeFile(
       join(app, "package.json"),
       JSON.stringify({
-        name: "blooket-studio-runtime",
+        name: "blooket-api-runtime",
         version: PRODUCT_VERSION,
         private: true,
         type: "module",
@@ -335,8 +335,8 @@ export async function buildDistribution(target: DistributionTarget) {
       ) + "\n",
     );
     if (mac) {
-      await buildMacIcon(repo, join(resource, "Blooket Studio.icns"));
-      const executable = join(bundle, "MacOS/Blooket Studio");
+      await buildMacIcon(repo, join(resource, "Blooket API.icns"));
+      const executable = join(bundle, "MacOS/Blooket API");
       await mkdir(dirname(executable), { recursive: true });
       await writeFile(
         executable,
@@ -351,10 +351,10 @@ export async function buildDistribution(target: DistributionTarget) {
         join(bundle, "Info.plist"),
         `<?xml version="1.0"?>
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>com.albertovilla.blooket-studio</string>
-<key>CFBundleName</key><string>Blooket Studio</string>
-<key>CFBundleExecutable</key><string>Blooket Studio</string>
-<key>CFBundleIconFile</key><string>Blooket Studio.icns</string>
+<key>CFBundleIdentifier</key><string>com.albertovilla.blooket-api</string>
+<key>CFBundleName</key><string>Blooket API</string>
+<key>CFBundleExecutable</key><string>Blooket API</string>
+<key>CFBundleIconFile</key><string>Blooket API.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>${PRODUCT_VERSION}</string>
 <key>CFBundleVersion</key><string>${appleBuildVersion(PRODUCT_VERSION)}</string>
@@ -368,7 +368,7 @@ export async function buildDistribution(target: DistributionTarget) {
         [
           "-qr",
           join(repo, ".temp/distributions", target + ".zip"),
-          "Blooket Studio.app",
+          "Blooket API.app",
         ],
         output,
       );
@@ -437,7 +437,7 @@ try {
     "--experimental-sea-config",
     config,
   ]);
-  const executable = join(output, "blooket-studio");
+  const executable = join(output, "blooket-api");
   await cp(join(output, "runtime/node"), executable);
   await run(
     "npx",

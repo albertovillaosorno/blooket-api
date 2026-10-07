@@ -245,6 +245,40 @@ test(
   );
 });
 
+
+test("restart clears clients codes access and refresh tokens", () => {
+  const publicUrl = "https://teacher.example/mcp";
+  const auth = createTeacherAuthorization(publicUrl);
+  const setup = fixture(auth, "teacher offline_access");
+  auth.approve(setup.grant.id);
+  const issued = auth.exchange(setup.exchange());
+
+  assert.equal(
+    auth.authenticate("Bearer " + issued.access_token),
+    true,
+  );
+
+  const restarted = createTeacherAuthorization(publicUrl);
+  assert.equal(
+    restarted.authenticate("Bearer " + issued.access_token),
+    false,
+  );
+  assert.throws(
+    () =>
+      restarted.exchange(
+        new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: setup.client.client_id,
+          resource: restarted.resource,
+          refresh_token: issued.refresh_token!,
+        }),
+      ),
+    /invalid-grant/u,
+  );
+  assert.deepEqual(restarted.pending(), []);
+  assert.deepEqual(restarted.connections(), []);
+});
+
 test(
   "unused registrations expire rather than " +
     "permanently exhausting capacity",

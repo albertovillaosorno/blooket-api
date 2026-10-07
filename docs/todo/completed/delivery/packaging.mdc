@@ -1,0 +1,95 @@
+---
+schema_version: 1
+id: "blooket-14"
+status: "completed"
+priority: "p2"
+horizon: "delivery"
+order: 140
+area: "delivery"
+task: "TODO - Native ARM64 package and release mechanics"
+legacy_task: "TODO 14"
+depends_on: []
+contracts:
+  - "docs/technical/adr/product-update-lifecycle.md"
+  - "docs/technical/adr/macos-browser-ui-and-online-mcp.md"
+scope:
+  - "src/platforms/distribution/"
+  - ".github/workflows/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Native ARM64 package and release mechanics
+
+## Objective
+
+Provide one ARM64 Mac application archive, one Safari-extension archive, Linux
+development-package validation, and a release workflow that only publishes
+already-validated Mac artifacts.
+
+## Acceptance
+
+The supported Mac product target is ARM64 only. General CI validates TypeScript,
+roadmap integrity, the portable suite, and the Linux x64 development package.
+Only after that job passes does the macOS ARM job build and verify the ARM64
+app,
+convert the shared WebExtension with Apple's Safari packager, compile the Xcode
+project without signing, embed that containing app inside Blooket API.app,
+recreate the final Mac archive, and exercise the packaged workspace through
+Safari WebDriver.
+
+A quarterly release tag invokes the reusable CI workflow. Release does not
+compile, test, package, or reverify. After CI succeeds it checks the explicit
+release flag and quarterly CalVer tag, downloads the exact CI artifact by name,
+requires darwin-arm64.zip and publishes only that asset with empty notes for
+later manual editing. Its Blooket API.app already contains the Safari companion.
+
+Linux remains a development/validation target and is never a release asset.
+There is no macOS x64 target in package assembly, updater selection, CI, or
+Release.
+
+## Implementation notes
+
+The distribution assembler pins Node 24.21.0 and the admitted cloudflared
+archive, embeds the runtime, workspace, canonical CLI, browser extension, native
+dependencies, metadata, and icons, and creates the ARM64 app archive. The Linux
+x64 package remains available for local and CI portability checks.
+
+The reusable CI workflow is deliberately opt-in for a ci-* tag and also
+available through workflow_call. Its macos-arm job depends on general
+validation, requires an ARM64 runner, asserts the app archive before Safari
+work, converts the already-built WebExtension, builds the generated Xcode
+project, embeds Blooket API Safari.app plus the activation helper inside the
+main application, reruns the Mac archive, executes Safari WebDriver smoke
+coverage, then uploads that one ZIP under the exact package-darwin-arm64 name.
+
+The Release workflow is triggered only by quarterly vYY.Q.PATCH tags. The
+release tag therefore runs the complete reusable CI chain first; a standalone
+ci-* tag runs CI only. Publication has repository write permission only in its
+final job and never downloads or publishes Linux artifacts.
+
+## Evidence
+
+Portable distribution coverage verifies target admission, archive content,
+version metadata, extension compilation, icons, release-tag rules, workflow
+ordering, exact action major versions, Linux exclusion from Release, and the
+single ARM64 release archive with its embedded Safari companion.
+
+The Linux development archive has repeatedly passed assembly and extracted
+package verification. The current workflow structure test proves general
+validation precedes macos-arm, Release calls the reusable CI workflow, and the
+publish job contains no npm/package command.
+
+Current GitHub Actions and Node documentation support the pinned action majors,
+pnpm cache use through setup-node, the ARM64 macOS runner, and direct execution
+of erasable TypeScript under Node 24. Platform-specific Apple trust and native
+acceptance are intentionally owned by task blooket-15.
+
+## Blockers
+
+None. Signing, notarization, Gatekeeper, installed Safari behavior, native
+Keychain/login-item behavior, and other platform-specific acceptance belong only
+to task blooket-15.

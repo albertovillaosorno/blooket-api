@@ -109,8 +109,9 @@ changing dependency layout or validators.
    recipes; each image keeps its own settings.
 4. Prepare and review/download the rendition. Oversized output or a stale
    recipe cannot be offered as a valid prepared download.
-5. Use skills and draft tools to prepare material. The current draft view is
-   read-only; publication is still being connected to safe execution.
+5. Use skills and draft tools as recoverable working state. Publication is
+   designed to proceed automatically through canonical execution; review and
+   correction remain available but are not an approval gate.
 
 The 1280-by-720 default canvas is an application choice, not a verified Blooket
 requirement. GIF FPS controls timing, not a guaranteed file size.
@@ -280,17 +281,18 @@ committed `PRODUCT_VERSION`; package metadata is a checked projection.
 
 A release tag starts a strictly ordered pipeline:
 
-1. the tag must pass quarterly CalVer validation and the repository variable
-   `RELEASE_ENABLED` must equal `true`;
-2. the same reusable CI workflow must pass for that exact tagged commit;
-3. release-mode macOS verification additionally requires the Safari extension,
-   valid code signing, and Gatekeeper assessment;
-4. only then may the release job download the CI artifacts and publish them.
+1. reusable CI validates the exact tagged commit on Linux;
+2. only after that passes, the ARM64 macOS job builds/verifies the Mac app,
+   compiles the Safari WebExtension host, exercises Safari WebDriver, and
+   embeds the Safari companion inside the Mac app and rezips the final archive;
+3. only after the complete CI workflow passes, the release gate requires valid
+   quarterly CalVer and repository variable RELEASE_ENABLED=true;
+4. publish downloads those CI artifacts and creates the GitHub Release.
 
 Release itself does not compile, run tests, build packages, or rerun package
-verification. It publishes the macOS ARM64 ZIP files already produced
-by CI. Linux x64 is always built and tested; include its tarball only when
-`RELEASE_INCLUDE_LINUX=true`.
+verification. It publishes exactly darwin-arm64.zip; the Safari containing app
+and extension live inside Blooket API.app in that archive. Linux x64 remains
+useful for portable development/validation and is never a release asset.
 
 There is no automated changelog and no repository release-notes file is
 required. The workflow creates the release with empty notes; write the human
@@ -339,7 +341,7 @@ The extension requests scripting/storage and access only to the Blooket
 dashboard and the two admitted IPv4 loopback addresses. No cookie permission
 or general web access is requested.
 
-Open Blooket Studio normally. Its local workspace announces the connection
+Open Blooket API normally. Its local workspace announces the connection
 inside the extension's isolated page context; the extension discovers already
 open workspace tabs when it starts. It connects automatically and opens its own
 Blooket tab without changing the teacher's existing tabs.
@@ -377,17 +379,18 @@ The normal launcher opens it. If the service runs without a browser page, the
 popup's **Open workspace** shortcut uses the default local port 2607.
 
 The portable tests exercise the compiled worker and synthetic browser APIs.
-They do not establish an installed Chrome extension, Safari worker lifecycle,
-or live publication. Safari conversion/signing remains task 14 and still blocks
-release-mode verification.
+The ARM64 CI stage separately converts/compiles the Safari host and exercises
+the packaged workspace through Safari WebDriver. Remaining Apple trust and
+platform-specific hardening belongs to the final platform record.
 
-Extract the Linux archive and run `./blooket-studio` to open the workspace.
+Extract the Linux archive and run `./blooket-api` to open the workspace.
 `--no-open` starts without opening a browser, `--status` reports the service,
 and `--stop` stops that instance. Reopening reuses the running service.
 Replacing the extracted package retains user data; deleting the package does
 not remove settings, media, or host-store secrets.
 
-macOS installation acceptance remains
+macOS platform-only installation/trust hardening remains in the final platform
+record rather than blocking completed packaging work.
 pending; do not present an unsigned archive as a ready-to-install release.
 
 ## Develop and verify

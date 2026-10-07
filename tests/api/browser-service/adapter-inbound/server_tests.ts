@@ -170,7 +170,7 @@ test(
     const service = await startBrowserService({ root, port: 0 });
     try {
       const html = await (await fetch(service.origin)).text();
-      assert.match(html, /Blooket Studio/u);
+      assert.match(html, /Blooket API/u);
       assert.doesNotMatch(html, /id="importDialog"/u);
       assert.equal((html.match(/id="canvas"/gu) ?? []).length, 1);
       assert.match(
@@ -608,6 +608,64 @@ test(
       headers: { Authorization: "Bearer " + boot.browserBridge.token },
     });
     assert.equal(revoked.status, 401);
+  } finally {
+    await new Promise<void>((resolve) => {
+      service.server.close(() => resolve());
+      service.server.closeAllConnections();
+    });
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test("Safari extension setup is same-origin and package-owned", async () => {
+  const root = await mkdtemp(join(tmpdir(), "safari-extension-service-"));
+  let opened = 0;
+  const service = await startBrowserService({
+    root,
+    port: 0,
+    safariExtension: {
+      available: async () => true,
+      open: async () => {
+        opened++;
+        return { ok: true };
+      },
+    },
+  });
+  try {
+    const boot = (await (
+      await fetch(service.origin + "/api/bootstrap")
+    ).json()) as {
+      csrf: string;
+      safariExtension: { available: boolean };
+    };
+    assert.deepEqual(boot.safariExtension, { available: true });
+    const denied = await fetch(
+      service.origin + "/api/safari-extension-open",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(denied.status, 403);
+    assert.equal(opened, 0);
+
+    const response = await fetch(
+      service.origin + "/api/safari-extension-open",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": boot.csrf,
+          Origin: service.origin,
+        },
+        body: "{}",
+      },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(opened, 1);
   } finally {
     await new Promise<void>((resolve) => {
       service.server.close(() => resolve());

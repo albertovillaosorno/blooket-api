@@ -4,8 +4,8 @@
 
 Accepted product direction; partially implemented as of 2026-10-06. The local
 browser UI/API, development tunnel, OAuth/PKCE MCP gateway, and lightweight
-diagnostics exist. Packaging, actual ChatGPT acceptance, macOS verification, and
-complete Blooket publication remain pending; see `TODO.md`.
+diagnostics exist. Complete Blooket publication remains pending; macOS,
+Safari, and ChatGPT-specific hardening is centralized in task blooket-15.
 
 This decision replaces the initial native-desktop-first presentation plan, Linux
 product test baseline, and deferred remote-relay scope. Existing portable
@@ -20,7 +20,9 @@ implementations and useful tests remain; no domain rewrite is implied.
 The user restored Safari packaging via GitHub Actions macOS runners on
 2026-10-06. Chrome is tested directly on Linux and macOS; Safari conversion and
 native acceptance use macOS. Releases use vYY.Q.PATCH quarterly CalVer tags.
-Mac ARM64 and Intel are default release assets, with optional Linux delivery.
+
+The product Mac target is ARM64. Release publishes the ARM64 app archive and
+Safari host archive only; Linux remains a development/validation package.
 
 The initial recipient is one teacher with a Mac who wants to create quizzes
 quickly with ChatGPT. A browser interface keeps review and editing in the same
@@ -28,9 +30,9 @@ daily workflow. Online AI access is essential to that workflow, not an optional
 enterprise feature. The user provisions the Cloudflare domain, tunnel, and MCP
 client connection.
 
-The Mac's CPU and OS have not been confirmed. Appearance and Touch ID are not
-sufficient to choose an architecture or claim a minimum macOS version. There is
-no current macOS test host and no requirement to set up a virtual machine.
+The product architecture is ARM64. Runtime OS support remains validated by
+package/runtime policy and platform hardening rather than appearance heuristics.
+No virtual-machine project is required for ordinary development.
 
 ## Decision
 
@@ -62,7 +64,9 @@ settings, secret management, and arbitrary filesystem routes private.
 ChatGPT supports remote MCP over streaming HTTP or SSE and documents OAuth
 authentication. Its authorization flow is distinct from the tunnel credential;
 do not assume arbitrary Cloudflare service-token headers are accepted. Confirm
-access using the recipient's actual account and configuration.
+protocol behavior through the documented MCP/OAuth contract. Client-specific
+compatibility belongs to task blooket-15 rather than blocking core authorization
+work.
 
 The Mac must be awake with the service and tunnel running. Disconnects preserve
 execution state and do not automatically replay an ambiguous mutation.
@@ -87,24 +91,20 @@ explicit recoverable state rather than claiming successful setup.
 
 ### Packaging and first-use verification
 
-The delivery scope changed on 2026-10-06: prepare separate ARM64 and x86-64
-macOS applications and a Linux x64 package for developer testing. The Mac app
-opens the local workspace on launch; settings expose extension setup and
-visible service controls. Confirm macOS 13.5 or later before installation.
-Linux acceptance cannot establish Keychain, Safari, or macOS signing behavior.
+The delivery scope is one ARM64 macOS application plus a Linux x64 package
+for developer testing. The Mac app opens the local workspace on launch;
+settings expose extension setup and visible service controls. Linux validation
+does not establish Keychain, Safari, or macOS signing behavior.
 
 Include the runtime, native Sharp/libvips dependencies, UI assets, CLI, and the
 selected cloudflared delivery mechanism. Do not require Metal acceleration or a
 Windows build. A Linux x64 test package is now required.
 
-Development can proceed without a VM or macOS host. Portable tests on Fedora
-remain useful and do not establish macOS integration correctness. An Intel VM
-would not validate ARM64 behavior; OpenCore is a bootloader, not a CPU emulator.
+Development can proceed without a VM. Portable tests on Fedora remain useful;
+platform-specific behavior is covered by the opt-in ARM64 macOS CI stage and
+final platform-hardening record.
 
-Apple's documented macOS ARM virtualization uses an Apple-silicon Mac. None of
-these environments is a prerequisite for this prototype.
-
-Run one bounded first-use diagnostic on the recipient's Mac. Check runtime
+Run one bounded first-use diagnostic on the installed Mac. Check runtime
 OS/architecture, settings decoding, disposable application-data storage, local
 port availability, a tiny native image decode, Keychain client availability, and
 configured service/tunnel prerequisites. Distinguish missing configuration from
@@ -120,9 +120,9 @@ Keep logs bounded and sanitized, with useful OS/runtime versions and failure
 codes but no private quizzes, tokens, passwords, cookies, or raw secret command
 output. Let independent features remain usable.
 
-Until a check or user workflow has actually run on macOS, label that behavior
-unverified. A first-use diagnostic is evidence of its narrow checks, not proof
-of full quiz publication or recovery behavior.
+A first-use diagnostic is evidence of its narrow checks, not proof of full
+quiz publication or recovery behavior. Broader macOS/Safari acceptance belongs
+to task blooket-15 and must not reopen functional records.
 
 ### Blooket API evidence
 
@@ -191,7 +191,7 @@ and actual-client verification in `TODO.md`.
 - One browser UI serves the initial Mac workflow and shares extension behavior.
 - Online AI access is a first-release requirement with user-provisioned hosting.
 - Existing IR, CLI execution, persistence, and recovery semantics are retained.
-- macOS integration remains honestly unverified until the recipient runs it.
+- macOS/Safari-specific hardening is centralized in task blooket-15.
 - First-use diagnostics provide repair evidence without requiring a VM project.
 
 ## Rejected Alternatives
@@ -215,10 +215,10 @@ the actual online AI account can execute an authenticated MCP read. Quiz
 publication additionally needs an approved end-to-end create/read-back and
 interruption/recovery exercise through the same canonical executor.
 
-Linux x64 package and Chrome checks are development delivery gates. Native Mac
-acceptance remains separate. VM provisioning is not a release gate. Existing
-portable test failures must still be reported; changing
-product scope is not permission to delete or weaken working coverage.
+Linux x64 package and Chrome checks remain development validation. ARM64 Mac
+and Safari behavior is exercised by the native CI stage. VM provisioning is not
+a release gate. Existing portable test failures must still be reported; product
+scope is not permission to delete or weaken working coverage.
 
 ### Sources
 
