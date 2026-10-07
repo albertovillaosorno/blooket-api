@@ -259,6 +259,19 @@ test("question panels expose normalized read facts without saving", () => {
     }
     hidden.value = JSON.stringify({
       number: 1,
+      question: "Ambiguous math answer",
+      qType: "mc",
+      random: false,
+      timeLimit: 20,
+      answers: ["`*`x`*`y`*`", "plain"],
+      correctAnswers: ["`*`x`*`y`*`"],
+      answerTypes: [],
+      image: "",
+      audio: "",
+    });
+    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    hidden.value = JSON.stringify({
+      number: 1,
       question: "Solve this`*`x^2`*`",
       qType: "mc",
       random: false,

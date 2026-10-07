@@ -421,10 +421,16 @@ function normalizeLegacyAnswer(
     return undefined;
   }
   if (answer.startsWith(LEGACY_MATH_ANSWER_MARKER)) {
+    const finalMarker = answer.length - LEGACY_MATH_ANSWER_MARKER.length;
+    const nextMarker = answer.indexOf(
+      LEGACY_MATH_ANSWER_MARKER,
+      LEGACY_MATH_ANSWER_MARKER.length,
+    );
     if (
       qType !== "mc"
       || !answer.endsWith(LEGACY_MATH_ANSWER_MARKER)
       || answer.length <= LEGACY_MATH_ANSWER_MARKER.length * 2
+      || nextMarker !== finalMarker
     ) {
       issues.push({
         path,
@@ -508,6 +514,9 @@ function decodeAnswer(
     (kind === "image" && content !== null)
     || ((kind === "text" || kind === "math")
       && (typeof content !== "string" || content.length === 0))
+    || (kind === "math"
+      && typeof content === "string"
+      && content.includes(LEGACY_MATH_ANSWER_MARKER))
   ) {
     issues.push({
       path: path + ".content",
@@ -551,6 +560,9 @@ function decodeAnswer(
     || (match !== null && match !== "exactly" && match !== "contains")
     || (kind === "image" && content !== null)
     || ((kind === "text" || kind === "math") && typeof content !== "string")
+    || (kind === "math"
+      && typeof content === "string"
+      && content.includes(LEGACY_MATH_ANSWER_MARKER))
   ) {
     return undefined;
   }

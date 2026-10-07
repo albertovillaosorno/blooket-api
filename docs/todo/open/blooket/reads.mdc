@@ -285,6 +285,9 @@ baseline and cannot confirm a text-only write when an equation remains remote.
 The provider-specific lowering and final Add Question page boundary also reject
 math/image marker sequences in fields that are supposed to remain plain text,
 so local text cannot silently acquire provider media semantics during a write.
+Recovered answer equations are likewise accepted only with the exact
+writer-generated pair of math delimiters; repeated/internal delimiters fail
+closed before normalized v3 data crosses the browser boundary.
 
 Image and audio remain presence-only facts. Retaining their provider strings,
 hashing them as substitute identities, or treating presence as content equality
