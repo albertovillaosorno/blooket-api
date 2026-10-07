@@ -37,7 +37,6 @@ validation:
   - npm test
   - jig validate --root .
   - npm run package:verify -- darwin-arm64 --release
-  - npm run package:verify -- darwin-arm64 --release
 ---
 
 # TODO - Safe automatic application updates
