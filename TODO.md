@@ -510,6 +510,10 @@ revision or asset identity rejects the stale result before any rendition write.
 The local HTTP route propagates client disconnects through AbortSignal to the
 native worker, and cancelled preparation publishes no prepared metadata.
 
+A concurrency regression starts a large preparation, commits a newer recipe
+while native rendering is active, and requires the older work to fail with a
+revision conflict while the newer revision remains unprepared.
+
 The editor now retains the last rendered prepared preview while recipe changes
 are pending or a replacement is being optimized. That stale preview is display
 only: its download action is disabled until actual encoding and byte checks
