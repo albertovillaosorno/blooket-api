@@ -31,7 +31,10 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renditionOptimizationCandidates } from
+import {
+  decodeRenditionOptimizationCandidate,
+  renditionOptimizationCandidates,
+} from
   "../../../../src/media/rendition-optimization/domain/candidates.ts";
 
 test("GIF candidates reduce detail before FPS and compression", () => {
@@ -121,4 +124,36 @@ test("invalid requested FPS fails closed", () => {
     }),
     [],
   );
+});
+
+test("persisted effective candidates decode exactly", () => {
+  assert.deepEqual(
+    decodeRenditionOptimizationCandidate({
+      stage: "detail",
+      detailScale: 0.7,
+      gifFps: 10,
+      compression: "compact",
+    }),
+    {
+      stage: "detail",
+      detailScale: 0.7,
+      gifFps: 10,
+      compression: "compact",
+    },
+  );
+  for (const value of [
+    { stage: "detail", detailScale: 0.6, gifFps: 10, compression: "compact" },
+    { stage: "fps", detailScale: 0.4, gifFps: 30, compression: "compact" },
+    {
+      stage: "fps",
+      detailScale: 0.4,
+      gifFps: 10,
+      compression: "compact",
+      extra: true,
+    },
+  ])
+    assert.throws(
+      () => decodeRenditionOptimizationCandidate(value),
+      /invalid-rendition-optimization-candidate/u,
+    );
 });
