@@ -89,17 +89,28 @@ function fixture(options: {
             }
             if (operation.kind === "sets.list") {
               if (options.malformedList)
-                return [{ result: { ok: true, value: [{ id: 7 }] } }];
+                return [{
+                  result: {
+                    ok: true,
+                    value: {
+                      items: [{ id: 7 }],
+                      completeness: "unknown",
+                    },
+                  },
+                }];
               return [{
                 result: {
                   ok: true,
-                  value: options.empty
-                    ? []
-                    : [{
-                        schemaVersion: 1,
-                        id: "set-fixture",
-                        title: "Synthetic fixture",
-                      }],
+                  value: {
+                    items: options.empty
+                      ? []
+                      : [{
+                          schemaVersion: 1,
+                          id: "set-fixture",
+                          title: "Synthetic fixture",
+                        }],
+                    completeness: options.empty ? "complete" : "unknown",
+                  },
                 },
               }];
             }

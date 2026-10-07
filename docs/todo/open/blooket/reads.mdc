@@ -156,6 +156,15 @@ empty-library state as "You'll need a question set to host!" plus the visible
 markers; zero cards alone, folder-empty text, and search-empty text still fail
 closed so loading cannot masquerade as an empty account.
 
+The canonical `sets.list` URL strips search/folder query state before
+reading.
+Because the page boundary can emit an empty array only for that exact recovered
+empty-account state, the browser bridge marks only `[]` as `complete`. Non-empty
+card lists remain `unknown`: curated module 52644 consumes `sets`, `allSets`,
+and
+`numSets`, but the server origin of those props is not present in the curated
+client chunks, so visible card count is not promoted to full-account truth.
+
 Inspecting the existing synthetic typing question confirmed its visible text,
 answer, match mode, and seconds, but did not establish every required question
 field. No edits or Save actions were submitted during this inspection.

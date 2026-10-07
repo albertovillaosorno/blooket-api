@@ -63,7 +63,13 @@ test("bridge adapters map session and opaque read calls exactly", async () => {
   const adapters = createBlooketBrowserBridgeAdapters(transport([
     { ok: true, value: "my-sets" },
     { ok: true, value: null },
-    { ok: true, value: [{ remote: "set" }] },
+    {
+      ok: true,
+      value: {
+        items: [{ remote: "set" }],
+        completeness: "unknown",
+      },
+    },
     { ok: true, value: { remote: "detail" } },
     { ok: true, value: [{ remote: "question" }] },
   ], commands));
@@ -101,6 +107,40 @@ test("bridge adapters map session and opaque read calls exactly", async () => {
     { kind: "sets.get", setId: "opaque/set id?" },
     { kind: "questions.list", setId: "opaque/set id?" },
   ]);
+});
+
+test("explicit empty-account set lists are complete", async () => {
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const adapters = createBlooketBrowserBridgeAdapters(transport([
+    {
+      ok: true,
+      value: { items: [], completeness: "complete" },
+    },
+  ], commands));
+
+  assert.deepEqual(await adapters.sets.list(), {
+    ok: true,
+    value: [],
+    completeness: "complete",
+  });
+  assert.deepEqual(commands, [{ kind: "sets.list" }]);
+});
+
+test("set-list completeness evidence fails closed when malformed", async () => {
+  for (const value of [
+    [],
+    { items: [], completeness: "unknown", extra: true },
+    { items: [{ remote: "set" }], completeness: "complete" },
+    { items: [], completeness: "partial" },
+  ]) {
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      { ok: true, value },
+    ], []));
+    assert.deepEqual(await adapters.sets.list(), {
+      ok: false,
+      code: "blooket-browser-failed",
+    });
+  }
 });
 
 test("bridge write adapter admits only text Create Set", async () => {
