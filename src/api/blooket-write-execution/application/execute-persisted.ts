@@ -145,12 +145,16 @@ export type ExecutePersistedBlooketWriteResult =
   | {
       readonly ok: false;
       readonly stage: "mutation-pacing";
-      readonly code: "mutation-pacing-cancelled";
+      readonly code:
+        | "mutation-pacing-cancelled"
+        | "mutation-pacing-failed";
     }
   | {
       readonly ok: false;
       readonly stage: "mutation-budget";
-      readonly code: MutationBudgetFileFailure["code"];
+      readonly code:
+        | MutationBudgetFileFailure["code"]
+        | "mutation-budget-admission-failed";
     }
   | {
       readonly ok: false;
@@ -418,9 +422,18 @@ async function executePersistedBlooketWriteLocked(
     return baseline.result;
   }
 
-  const pacing = options.pacer === undefined
-    ? undefined
-    : await options.pacer.acquire(options.signal);
+  let pacing: Awaited<ReturnType<BlooketMutationPacer["acquire"]>> | undefined;
+  try {
+    pacing = options.pacer === undefined
+      ? undefined
+      : await options.pacer.acquire(options.signal);
+  } catch {
+    return {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-failed",
+    };
+  }
   if (pacing !== undefined && !pacing.ok) {
     return {
       ok: false,
@@ -439,12 +452,22 @@ async function executePersistedBlooketWriteLocked(
   }
 
   if (options.budget !== undefined) {
-    const reserved = await reserveMutationBudgetStart(
-      options.budget.path,
-      plan.planId,
-      options.budget.policy,
-      options.budget.now?.() ?? Date.now(),
-    );
+    let reserved: Awaited<ReturnType<typeof reserveMutationBudgetStart>>;
+    try {
+      reserved = await reserveMutationBudgetStart(
+        options.budget.path,
+        plan.planId,
+        options.budget.policy,
+        options.budget.now?.() ?? Date.now(),
+      );
+    } catch {
+      lease?.release();
+      return {
+        ok: false,
+        stage: "mutation-budget",
+        code: "mutation-budget-admission-failed",
+      };
+    }
     if (!reserved.ok) {
       lease?.release();
       return {
