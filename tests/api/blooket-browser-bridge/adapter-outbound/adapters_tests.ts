@@ -170,6 +170,106 @@ test("bridge write adapter admits only text Create Set", async () => {
   assert.equal(commands.length, 2);
 });
 
+test("bridge write adapter admits text-only Add Question", async () => {
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const adapters = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: { ok: true } },
+    {
+      ok: true,
+      value: {
+        ok: false,
+        kind: "navigation",
+        state: "security-challenge",
+      },
+    },
+  ], commands));
+  const submission = {
+    schemaVersion: 1 as const,
+    kind: "add-question" as const,
+    remoteSetId: "set-fixture",
+    number: 1,
+    question: "Type sun.",
+    answers: [{
+      kind: "text" as const,
+      text: "sun",
+      correct: true,
+    }],
+    image: null,
+    audio: "" as const,
+    qType: "typing" as const,
+    random: true,
+    answerTypes: ["exactly" as const],
+    timeLimit: 15,
+  };
+  assert.deepEqual(await adapters.writes.addQuestion(submission, []), {
+    ok: true,
+  });
+  assert.deepEqual(await adapters.writes.addQuestion(submission, []), {
+    ok: false,
+    kind: "navigation",
+    state: "security-challenge",
+  });
+  assert.deepEqual(commands, [
+    {
+      kind: "questions.create",
+      setId: "set-fixture",
+      number: 1,
+      question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing",
+      random: true,
+      answerTypes: ["exactly"],
+      timeLimit: 15,
+    },
+    {
+      kind: "questions.create",
+      setId: "set-fixture",
+      number: 1,
+      question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing",
+      random: true,
+      answerTypes: ["exactly"],
+      timeLimit: 15,
+    },
+  ]);
+
+  assert.deepEqual(
+    await adapters.writes.addQuestion({
+      ...submission,
+      image: { mediaId: "question-image" },
+    }, [{
+      mediaId: "question-image",
+      revision: 1,
+      format: "png",
+      bytes: new Uint8Array([1]),
+    }]),
+    {
+      ok: false,
+      kind: "browser",
+      code: "blooket-browser-failed",
+    },
+  );
+  assert.deepEqual(
+    await adapters.writes.addQuestion({
+      ...submission,
+      qType: "mc",
+      answers: [{
+        kind: "image",
+        image: { mediaId: "answer-image" },
+        correct: true,
+      }],
+      answerTypes: null,
+    }, []),
+    {
+      ok: false,
+      kind: "browser",
+      code: "blooket-browser-failed",
+    },
+  );
+  assert.equal(commands.length, 2);
+});
+
 test("bridge write adapter rejects malformed surface values", async () => {
   for (const value of [
     { ok: true },

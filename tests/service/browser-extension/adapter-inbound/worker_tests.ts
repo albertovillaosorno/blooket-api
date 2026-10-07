@@ -46,6 +46,7 @@ test(
   let closed = false;
   let validStatus = true;
   let questionPanelCloses = true;
+  let addQuestionPanelReady = false;
   const jobs = [];
   const replies = [];
   const scripts = [];
@@ -128,6 +129,40 @@ test(
           return [{ result: questionPanelCloses }];
         if (func.name === "isBlooketQuestionPanelClosed")
           return [{ result: questionPanelCloses }];
+        if (func.name === "openBlooketAddQuestionPanel") {
+          assert.equal(args[0], "set-fixture");
+          addQuestionPanelReady = true;
+          return [{ result: true }];
+        }
+        if (func.name === "isBlooketAddQuestionPanelReady")
+          return [{ result: addQuestionPanelReady }];
+        if (func.name === "prepareBlooketAddQuestionForm") {
+          assert.deepEqual(args[0], {
+            setId: "set-fixture",
+            number: 1,
+            question: "Type sun.",
+            answers: [{ text: "sun", correct: true }],
+            qType: "typing",
+            random: true,
+            answerTypes: ["exactly"],
+            timeLimit: 15,
+          });
+          return [{ result: { ok: true } }];
+        }
+        if (func.name === "submitBlooketAddQuestionForm") {
+          assert.deepEqual(args[0], {
+            setId: "set-fixture",
+            number: 1,
+            question: "Type sun.",
+            answers: [{ text: "sun", correct: true }],
+            qType: "typing",
+            random: true,
+            answerTypes: ["exactly"],
+            timeLimit: 15,
+          });
+          addQuestionPanelReady = false;
+          return [{ result: { ok: true } }];
+        }
         if (func.name === "prepareBlooketCreateSetForm") {
           assert.deepEqual(args[0], {
             title: "Synthetic created set",
@@ -343,6 +378,25 @@ test(
     );
     assert.ok(scripts.includes("prepareBlooketCreateSetForm"));
     assert.ok(scripts.includes("observeBlooketCreateSetSuccess"));
+
+    const added = await expectReply({
+      kind: "questions.create",
+      setId: "set-fixture",
+      number: 1,
+      question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing",
+      random: true,
+      answerTypes: ["exactly"],
+      timeLimit: 15,
+    });
+    assert.deepEqual(added.value, { ok: true });
+    assert.equal(
+      scripts.filter((name) => name === "submitBlooketAddQuestionForm").length,
+      1,
+    );
+    assert.ok(scripts.includes("prepareBlooketAddQuestionForm"));
+    assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
 
     questionPanelCloses = false;
     assert.equal(

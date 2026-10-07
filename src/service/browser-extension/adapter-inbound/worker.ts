@@ -43,6 +43,7 @@ import {
   openBlooketQuestionPanel,
 } from
   "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
+import { createExtensionAddQuestionHost } from "./add-question-host.ts";
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -364,6 +365,25 @@ async function relay(current: Connection, activeGeneration: number) {
                   : { ok: true, value: submitted };
               }
             }
+          } else if (job.command.kind === "questions.create") {
+            const host = createExtensionAddQuestionHost(
+              chrome,
+              current.tabId,
+              pause,
+            );
+            result = {
+              ok: true,
+              value: await host.addQuestion({
+                setId: job.command.setId,
+                number: job.command.number,
+                question: job.command.question,
+                answers: job.command.answers,
+                qType: job.command.qType,
+                random: job.command.random,
+                answerTypes: job.command.answerTypes,
+                timeLimit: job.command.timeLimit,
+              }),
+            };
           }
         } catch {
           status = "blooket-attention-required";
