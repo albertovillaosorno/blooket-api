@@ -85,6 +85,15 @@ export function inspectBlooketPage(
       )
         return { ok: true, value: "my-sets" };
       if (
+        url.pathname === "/create" &&
+        document.querySelector("form#question-set-form")?.tagName === "FORM" &&
+        Array.from(
+          document.querySelectorAll("form#question-set-form button"),
+        ).filter((button) => button.textContent?.trim() === "Create Set")
+          .length === 1
+      )
+        return { ok: true, value: "create" };
+      if (
         url.pathname === "/edit" &&
         main.querySelector("h1") &&
         Array.from(main.querySelectorAll("button")).some(

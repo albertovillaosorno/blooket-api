@@ -48,7 +48,11 @@ export interface BlooketCreateSetBrowserHost {
     | { readonly ok: true }
     | BlooketBrowserWriteSurfaceFailure
   >;
-  submitCreateSet(): Promise<
+  submitCreateSet(expected: {
+    readonly title: string;
+    readonly description: string;
+    readonly private: boolean;
+  }): Promise<
     | { readonly ok: true }
     | BlooketBrowserWriteSurfaceFailure
   >;
@@ -68,13 +72,14 @@ export function createBlooketBrowserWriteSurface(
       try {
         const opened = await host.openCreateSet();
         if (!opened.ok) return opened;
-        const prepared = await host.prepareCreateSet({
+        const expected = {
           title: submission.title,
           description: submission.description,
           private: submission.private,
-        });
+        };
+        const prepared = await host.prepareCreateSet(expected);
         if (!prepared.ok) return prepared;
-        const submitted = await host.submitCreateSet();
+        const submitted = await host.submitCreateSet(expected);
         if (!submitted.ok) return submitted;
         return await host.observeCreateSet();
       } catch {

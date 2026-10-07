@@ -35,6 +35,7 @@ import test from "node:test";
 import {
   observeBlooketCreateSetSuccess,
   prepareBlooketCreateSetForm,
+  submitBlooketCreateSetForm,
 } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/blooket-browser/adapter-outbound/create-set-page.ts";
@@ -247,6 +248,50 @@ test("wrong routes ambiguous controls and visibility fail closed", () => {
       }).ok,
       false,
     );
+  });
+});
+
+test("submit revalidates prepared state before one exact click", () => {
+  const page = fixture(true);
+  const submit = page.form.selectors["button"]?.[0];
+  assert.ok(submit);
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    const expected = {
+      title: "Synthetic set",
+      description: "Synthetic description",
+      private: true,
+    };
+    assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
+    assert.deepEqual(submitBlooketCreateSetForm(expected), { ok: true });
+    assert.equal(submit.clicked, 1);
+
+    page.title.value = "Changed after preparation";
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submit.clicked, 1);
+  });
+});
+
+test("submit refuses stale privacy and ambiguous submit controls", () => {
+  const page = fixture(true);
+  const submit = page.form.selectors["button"]?.[0];
+  assert.ok(submit);
+  const expected = {
+    title: "Synthetic set",
+    description: "",
+    private: true,
+  };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
+    page.privacy.attributes["aria-checked"] = "true";
+    page.privacy.labels = [node("LABEL", "Public (Playable by everyone)")];
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submit.clicked, 0);
+
+    page.privacy.attributes["aria-checked"] = "false";
+    page.privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+    page.form.selectors["button"]?.push(node("BUTTON", "Create Set"));
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submit.clicked, 0);
   });
 });
 
