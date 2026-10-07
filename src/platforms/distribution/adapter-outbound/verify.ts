@@ -42,6 +42,8 @@ import {
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { preparedMediaBytesAdmitted } from
+  "../../../media/rendition-optimization/domain/limits.ts";
 import { defaultTeacherPreferences } from
   "../../../settings/teacher-preferences/domain/preferences.ts";
 import { decodeServiceRuntime } from
@@ -213,9 +215,12 @@ export async function verifyDistribution(
       },
     });
     assert.equal(typeof imported["id"], "string");
-    const prepared = await post("/api/prepare", { id: imported["id"] });
+    const prepared = await post("/api/prepare", {
+      id: imported["id"],
+      revision: imported["revision"],
+    });
     const rendition = prepared["prepared"] as { bytes: number };
-    assert.ok(rendition.bytes > 0 && rendition.bytes < 2_500_000);
+    assert.ok(preparedMediaBytesAdmitted(rendition.bytes));
     const download = await request(
       "/media/" +
         String(imported["id"]) +

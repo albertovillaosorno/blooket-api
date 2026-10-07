@@ -70,6 +70,8 @@ import { tryAcquireFileLock } from
   "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import { decodeProjectDocument } from
   "../../../projects/project-documents/domain/project.ts";
+import { MAX_PREPARED_MEDIA_BYTES } from
+  "../../../media/rendition-optimization/domain/limits.ts";
 import type { ExportDefaults } from
   "../../../settings/teacher-preferences/domain/preferences.ts";
 import {
@@ -517,26 +519,62 @@ export async function editLibraryImage(
     return next;
   });
 }
+async function withPreparationLibraryLock<T>(
+  library: string,
+  signal: AbortSignal | undefined,
+  work: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (signal?.aborted) throw new Error("native-media-cancelled");
+    try {
+      return await withLibraryLock(library, work);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.message !== "library-busy" ||
+        attempt === 199
+      )
+        throw error;
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("library-busy");
+}
+
 export async function prepareLibraryImage(
   root: string,
   id: string,
+  expectedRevision: number,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<LibraryMetadata> {
+  if (
+    !Number.isSafeInteger(expectedRevision) ||
+    expectedRevision < 1
+  )
+    throw new Error("invalid-prepare-revision");
   const preferences = await loadPreferences(root);
   const library = preferences.mediaRoot;
-  const snapshot = await withLibraryLock(library, async () => {
-    const record = (await listLibrary(library)).find((item) => item.id === id);
-    if (!record) throw new Error("media-not-found");
-    if (!hasConfiguredCanvas(record, preferences.defaults))
-      throw new Error("canvas-settings-conflict");
-    const originalPath = await safeLibraryPath(library, record.asset);
-    if ((await lstat(originalPath)).size > 25_000_000)
-      throw new Error("source-too-large");
-    return {
-      record,
-      bytes: await boundedBytes(originalPath, 25_000_000),
-    };
-  });
+  const snapshot = await withPreparationLibraryLock(
+    library,
+    options.signal,
+    async () => {
+      const record = (await listLibrary(library)).find(
+        (item) => item.id === id,
+      );
+      if (!record) throw new Error("media-not-found");
+      if (record.revision !== expectedRevision)
+        throw new Error("prepared-revision-conflict");
+      if (!hasConfiguredCanvas(record, preferences.defaults))
+        throw new Error("canvas-settings-conflict");
+      const originalPath = await safeLibraryPath(library, record.asset);
+      if ((await lstat(originalPath)).size > 25_000_000)
+        throw new Error("source-too-large");
+      return {
+        record,
+        bytes: await boundedBytes(originalPath, 25_000_000),
+      };
+    },
+  );
   const rendered = await renderImageIsolated(
     snapshot.bytes,
     snapshot.record.edit,
@@ -551,37 +589,43 @@ export async function prepareLibraryImage(
     snapshot.record.revision +
     "." +
     extension;
-  return await withLibraryLock(library, async () => {
-    const currentPreferences = await loadPreferences(root);
-    if (
-      currentPreferences.mediaRoot !== library ||
-      currentPreferences.defaults.width !== preferences.defaults.width ||
-      currentPreferences.defaults.height !== preferences.defaults.height
-    )
-      throw new Error("prepared-settings-conflict");
-    const current = (await listLibrary(library)).find((item) => item.id === id);
-    if (!current) throw new Error("media-not-found");
-    if (
-      current.revision !== snapshot.record.revision ||
-      current.asset !== snapshot.record.asset
-    )
-      throw new Error("prepared-revision-conflict");
-    await writeAtomicFile(
-      await safeLibraryPath(library, file, true),
-      rendered.value.bytes,
-    );
-    const next = {
-      ...current,
-      prepared: {
-        file,
-        bytes: rendered.value.bytes.length,
-        recipeRevision: current.revision,
-        effective: rendered.value.effective,
-      },
-    };
-    await saveMetadata(library, next);
-    return next;
-  });
+  return await withPreparationLibraryLock(
+    library,
+    options.signal,
+    async () => {
+      const currentPreferences = await loadPreferences(root);
+      if (
+        currentPreferences.mediaRoot !== library ||
+        currentPreferences.defaults.width !== preferences.defaults.width ||
+        currentPreferences.defaults.height !== preferences.defaults.height
+      )
+        throw new Error("prepared-settings-conflict");
+      const current = (await listLibrary(library)).find(
+        (item) => item.id === id,
+      );
+      if (!current) throw new Error("media-not-found");
+      if (
+        current.revision !== snapshot.record.revision ||
+        current.asset !== snapshot.record.asset
+      )
+        throw new Error("prepared-revision-conflict");
+      await writeAtomicFile(
+        await safeLibraryPath(library, file, true),
+        rendered.value.bytes,
+      );
+      const next = {
+        ...current,
+        prepared: {
+          file,
+          bytes: rendered.value.bytes.length,
+          recipeRevision: current.revision,
+          effective: rendered.value.effective,
+        },
+      };
+      await saveMetadata(library, next);
+      return next;
+    },
+  );
 }
 export function safeCode(error: unknown): string {
   return error instanceof Error && /^[a-z][a-z0-9-]{1,60}$/u.test(error.message)
@@ -620,7 +664,7 @@ export async function readPreparedLibraryImage(
       throw new Error("prepared-media-invalid");
     const bytes = await boundedBytes(
       await safeLibraryPath(library, prepared.file),
-      2_499_999,
+      MAX_PREPARED_MEDIA_BYTES,
     );
     if (bytes.length !== prepared.bytes)
       throw new Error("prepared-media-invalid");

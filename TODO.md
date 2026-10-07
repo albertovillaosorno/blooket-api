@@ -515,12 +515,15 @@ preparation remains blocked until the recipe changes. A transient probe failure
 does not strand the editor: compact remains available and the authoritative
 prepare path still performs the complete byte validation before publication.
 
-Preparation concurrency was hardened on 2026-10-06. The application captures
-the exact record and bounded source bytes under the library lock, releases the
-lock for native optimization, then reacquires it before publication. A changed
-revision or asset identity rejects the stale result before any rendition write.
-The local HTTP route propagates client disconnects through AbortSignal to the
-native worker, and cancelled preparation publishes no prepared metadata.
+Preparation concurrency was hardened on 2026-10-06. Every prepare request is
+bound to the caller's exact expected revision. The application briefly retries
+library-lock contention, captures that revision and bounded source bytes, then
+releases the lock for native optimization before reacquiring it for publication.
+
+A changed revision or asset identity rejects the stale result before any
+rendition write. The local HTTP route propagates client disconnects through
+AbortSignal to the native worker, and cancelled preparation publishes no
+prepared metadata.
 
 A concurrency regression starts a large preparation, commits a newer recipe
 while native rendering is active, and requires the older work to fail with a
@@ -562,10 +565,15 @@ fetch, the loopback route propagates that abort to the worker, and no stale
 result is installed into a later editor session.
 
 The output must remain strictly below 2,500,000 bytes, including GIF animation;
-2,500,000 bytes exactly fails. If an input is malformed, exceeds admitted
-resources, or cannot be represented under the invariant canvas and bounded
-quality policy, explain that processing could not finish and retain editable
-source state. Do not relax the ceiling or fabricate a valid output.
+2,500,000 bytes exactly fails. The portable ceiling now has one domain owner
+shared by renderer admission, durable metadata, worker IPC validation, prepared
+reads, and package smoke verification; a boundary regression proves the exact
+ceiling is rejected.
+
+If an input is malformed, exceeds admitted resources, or cannot be represented
+under the invariant canvas and bounded quality policy, explain that processing
+could not finish and retain editable source state. Do not relax the ceiling or
+fabricate a valid output.
 
 Acceptance covers static and animated oversize inputs, detected variable GIF
 timing, the ordered optimization stages, JPEG normalization, the same final

@@ -1309,7 +1309,7 @@ editForm.addEventListener("submit", async (event) => {
     preparationController = controller;
     selected = await api(
       "/api/prepare",
-      { id: selected.id },
+      { id: selected.id, revision: selected.revision },
       controller.signal,
     );
     if (session !== editorSession || !$("#editor").open) return;

@@ -530,19 +530,29 @@ export async function startBrowserService(
         if (
           typeof body !== "object" ||
           body === null ||
-          Object.keys(body).join() !== "id" ||
+          Object.keys(body).sort().join() !== "id,revision" ||
           !("id" in body) ||
-          typeof body.id !== "string"
+          typeof body.id !== "string" ||
+          !("revision" in body) ||
+          typeof body.revision !== "number" ||
+          !Number.isSafeInteger(body.revision) ||
+          body.revision < 1
         )
           throw new Error("invalid-prepare-request");
+        const revision = (
+          body as unknown as { readonly revision: number }
+        ).revision;
         const controller = new AbortController();
         const cancel = () => controller.abort();
         request.once("aborted", cancel);
         response.once("close", cancel);
         try {
-          const prepared = await prepareLibraryImage(root, body.id, {
-            signal: controller.signal,
-          });
+          const prepared = await prepareLibraryImage(
+            root,
+            body.id,
+            revision,
+            { signal: controller.signal },
+          );
           if (!response.destroyed) json(response, 200, prepared);
         } finally {
           request.removeListener("aborted", cancel);

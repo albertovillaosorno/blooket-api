@@ -54,6 +54,8 @@ import {
   renditionOptimizationCandidates,
   type RenditionOptimizationCandidate,
 } from "../../rendition-optimization/domain/candidates.ts";
+import { MAX_PREPARED_MEDIA_BYTES } from
+  "../../rendition-optimization/domain/limits.ts";
 
 type DecodeFailureCode = Extract<
   ImageDecodeResult,
@@ -190,7 +192,8 @@ async function renderDecodedImageRendition(
 
     if (
       enforceByteLimit &&
-      rendered.byteLength > Math.min(limits.maxOutputBytes, 2_499_999)
+      rendered.byteLength >
+        Math.min(limits.maxOutputBytes, MAX_PREPARED_MEDIA_BYTES)
     ) {
       return { ok: false, code: "rendition-byte-limit-exceeded" };
     }
@@ -275,7 +278,10 @@ export async function renderOptimizedImageRendition(
             options.background?.color ?? "#ffffff",
             limits.maxOutputPixels,
           );
-      if (bytes.byteLength > Math.min(limits.maxOutputBytes, 2_499_999)) {
+      if (
+        bytes.byteLength >
+        Math.min(limits.maxOutputBytes, MAX_PREPARED_MEDIA_BYTES)
+      ) {
         lastLimitFailure = {
           ok: false,
           code: "rendition-byte-limit-exceeded",

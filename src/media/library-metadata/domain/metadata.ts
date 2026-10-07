@@ -34,6 +34,8 @@ import {
   renditionOptimizationCandidates,
   type RenditionOptimizationCandidate,
 } from "../../rendition-optimization/domain/candidates.ts";
+import { MAX_PREPARED_MEDIA_BYTES } from
+  "../../rendition-optimization/domain/limits.ts";
 
 const PREPARED_FILE = new RegExp(
   "^renditions/[a-zA-Z0-9_-]" + "[a-zA-Z0-9._-]{0,127}/[0-9]+\\.(png|jpg|gif)$",
@@ -219,7 +221,7 @@ export function decodeLibraryMetadata(value: unknown): LibraryMetadata {
     if (
       typeof prepared["file"] !== "string" ||
       !PREPARED_FILE.test(prepared["file"]) ||
-      !integer(prepared["bytes"], 1, 2_499_999) ||
+      !integer(prepared["bytes"], 1, MAX_PREPARED_MEDIA_BYTES) ||
       !integer(prepared["recipeRevision"], 1, Number(m["revision"]))
     )
       throw new Error("invalid-prepared-media");
