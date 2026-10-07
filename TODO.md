@@ -496,8 +496,12 @@ delay vector rather than a fabricated detected FPS. The resampler consumes that
 vector and emits the explicitly requested output FPS, initially 10, with bounded
 automatic reductions only when required. Variable-delay inputs therefore retain
 their measured timing evidence while prepared metadata describes only the actual
-uniform output FPS. Existing tests cover variable delays, duration tolerance,
-loop preservation, and every admitted output frame rate.
+uniform output FPS.
+
+Existing tests cover variable delays, duration tolerance, loop preservation, and
+every admitted output frame rate. Timeline expansion is also part of automatic
+FPS fallback: a 60-second GIF requested at 50 FPS now falls to 10 FPS when that
+is the first rate at or below the 600-frame budget.
 
 Dynamic quality admission was implemented on 2026-10-06 using actual encoded
 bytes. A non-writing local probe runs the same isolated bounded candidate search
