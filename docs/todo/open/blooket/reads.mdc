@@ -223,6 +223,20 @@ mean login succeeded: `ensureBlooketSession` performs the required fresh
 observation and only then reports ready, wait, human-action, or authentication
 failure. No challenge or organization choice is automated.
 
+Recovered dashboard module 88289 bounds the organization prompt without making
+it automatable. Search results become a selected organization only after a human
+chooses one; the form then submits hidden `schoolId` with `action=school`. The
+same form separately exposes `action=renounce` as the explicit "I'm not part of
+a school or district" choice.
+
+On server-action success the client closes the modal and calls
+`router.refresh()`;
+on error it keeps the flow in error handling. The recovered client does not
+reveal the server-side account mutation or prove the navigation state after the
+refresh. Because the two actions express different account assertions, the
+worker continues to classify the prompt as `organization-prompt` and never
+selects, renounces, or submits it automatically.
+
 Recovered capability UI establishes the account-specific observation path. Edit
 module 12048 reads `session.hasPlus` and passes it into the question editor.
 Module 89770 always renders the answer-image control and the question Audio
