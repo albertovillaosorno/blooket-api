@@ -90,7 +90,10 @@ function fakeChrome(options: {
     },
     scripting: {
       executeScript: async ({ func, args }) => {
-        calls.push(func.name);
+        const call = func.name === "runBlooketAddQuestionPageAction"
+          ? func.name + ":" + String(args?.[0])
+          : func.name;
+        calls.push(call);
         switch (func.name) {
           case "inspectBlooketPage":
             return [{
@@ -99,17 +102,19 @@ function fakeChrome(options: {
                 value: options.navigationState ?? "edit",
               },
             }];
-          case "openBlooketAddQuestionPanel":
-            modalOpen = args?.[0] === "set-fixture";
-            return [{ result: modalOpen }];
-          case "isBlooketAddQuestionPanelReady":
-            return [{ result: modalOpen }];
-          case "prepareBlooketAddQuestionForm":
-            return [{ result: { ok: true } }];
-          case "submitBlooketAddQuestionForm":
-            modalOpen = false;
-            questionAdded = true;
-            return [{ result: { ok: true } }];
+          case "runBlooketAddQuestionPageAction":
+            if (args?.[0] === "open") {
+              modalOpen = args?.[1] === "set-fixture";
+              return [{ result: modalOpen }];
+            }
+            if (args?.[0] === "is-ready") return [{ result: modalOpen }];
+            if (args?.[0] === "prepare") return [{ result: { ok: true } }];
+            if (args?.[0] === "submit") {
+              modalOpen = false;
+              questionAdded = true;
+              return [{ result: { ok: true } }];
+            }
+            throw new Error("unexpected-add-question-action");
           case "listBlooketQuestionNumbers":
             return [{
               result: {
@@ -168,8 +173,9 @@ test("host confirms Add Question only after exact read-back", async () => {
   );
   assert.deepEqual(await host.addQuestion(input), { ok: true });
   assert.equal(
-    fake.calls.filter((name) => name === "submitBlooketAddQuestionForm")
-      .length,
+    fake.calls.filter(
+      (name) => name === "runBlooketAddQuestionPageAction:submit",
+    ).length,
     1,
   );
   assert.ok(fake.calls.includes("inspectOpenedBlooketQuestion"));
@@ -189,11 +195,11 @@ test("navigation challenge stops before opening Add Question", async () => {
     state: "security-challenge",
   });
   assert.equal(
-    fake.calls.includes("openBlooketAddQuestionPanel"),
+    fake.calls.includes("runBlooketAddQuestionPageAction:open"),
     false,
   );
   assert.equal(
-    fake.calls.includes("submitBlooketAddQuestionForm"),
+    fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
     false,
   );
 });
@@ -211,8 +217,9 @@ test("post-submit mismatch fails without a second submit", async () => {
     code: "blooket-browser-failed",
   });
   assert.equal(
-    fake.calls.filter((name) => name === "submitBlooketAddQuestionForm")
-      .length,
+    fake.calls.filter(
+      (name) => name === "runBlooketAddQuestionPageAction:submit",
+    ).length,
     1,
   );
 });

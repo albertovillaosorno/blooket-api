@@ -319,6 +319,17 @@ baseline and cannot confirm a text-only write when an equation remains remote.
 The provider-specific lowering and final Add Question page boundary also reject
 math/image marker sequences in fields that are supposed to remain plain text,
 so local text cannot silently acquire provider media semantics during a write.
+
+Chrome scripting serializes an injected `func` without its module lexical
+scope. Live login acceptance exposed that direct unit tests had hidden this
+distinction: the previous login helpers and Add Question helpers referenced
+module-local functions that were unavailable after injection.
+
+Both flows now inject one self-contained action runner, while wrapper APIs
+retain
+their existing call shape. Regression tests reconstruct each runner from
+`Function(toString())` before exercising it, so future browser-script closures
+fail in portable tests instead of only in a live extension.
 Recovered answer equations are likewise accepted only with the exact
 writer-generated pair of math delimiters; repeated/internal delimiters fail
 closed before normalized v3 data crosses the browser boundary.

@@ -36,6 +36,7 @@ import {
   isBlooketAddQuestionPanelReady,
   openBlooketAddQuestionPanel,
   prepareBlooketAddQuestionForm,
+  runBlooketAddQuestionPageAction,
   submitBlooketAddQuestionForm,
   type BlooketTextQuestionPageInput,
 } from
@@ -189,6 +190,24 @@ const typing: BlooketTextQuestionPageInput = {
   answerTypes: ["exactly"],
   timeLimit: 15,
 };
+
+test("serialized Add Question runner preserves browser semantics", () => {
+  const page = fixture();
+  const serialized = Function(
+    "return (" + runBlooketAddQuestionPageAction.toString() + ")",
+  )() as typeof runBlooketAddQuestionPageAction;
+  withPage(
+    page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture",
+    () => {
+      assert.equal(serialized("open", "set-fixture"), true);
+      assert.equal(serialized("is-ready", "set-fixture"), true);
+      assert.deepEqual(serialized("prepare", typing), { ok: true });
+      assert.deepEqual(serialized("submit", typing), { ok: true });
+      assert.equal(page.submit.clicked, 1);
+    },
+  );
+});
 
 test("Add Question opens and serializes exact typing state", () => {
   const page = fixture();
