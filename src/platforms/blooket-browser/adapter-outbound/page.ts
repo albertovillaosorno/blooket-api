@@ -199,7 +199,13 @@ export function inspectBlooketPage(
         // Zero cards alone can be loading, search, or folder state.
         if (!emptyAccount || !createSet) return failed();
       }
-      return { ok: true, value: result };
+      return {
+        ok: true,
+        value: {
+          items: result,
+          completeness: result.length === 0 ? "complete" : "unknown",
+        },
+      };
     }
     if (
       operation.kind !== "sets.get" ||

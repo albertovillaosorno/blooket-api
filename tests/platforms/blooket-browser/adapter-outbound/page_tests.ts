@@ -133,10 +133,18 @@ test(
     const result = inspectBlooketPage({ kind: "sets.list" });
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.deepEqual(result.value, [
-      { schemaVersion: 1, id: "opaque/set? id", title: "Synthetic fixture" },
-    ]);
-    assert.equal(decodeBlooketSetList(result.value).ok, true);
+    assert.deepEqual(result.value, {
+      items: [
+        { schemaVersion: 1, id: "opaque/set? id", title: "Synthetic fixture" },
+      ],
+      completeness: "unknown",
+    });
+    assert.equal(
+      decodeBlooketSetList(
+        (result.value as { readonly items: unknown }).items,
+      ).ok,
+      true,
+    );
     main.selectors["article"] = [card(), card()];
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     main.selectors["article"] = [];
@@ -146,8 +154,18 @@ test(
     ];
     main.selectors["button"] = [node("BUTTON", "Create a Set")];
     const empty = inspectBlooketPage({ kind: "sets.list" });
-    assert.deepEqual(empty, { ok: true, value: [] });
-    assert.equal(decodeBlooketSetList(empty.ok ? empty.value : null).ok, true);
+    assert.deepEqual(empty, {
+      ok: true,
+      value: { items: [], completeness: "complete" },
+    });
+    assert.equal(
+      decodeBlooketSetList(
+        empty.ok
+          ? (empty.value as { readonly items: unknown }).items
+          : null,
+      ).ok,
+      true,
+    );
     main.selectors["h2"] = [node("H2", "Open a folder to view your sets!")];
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     main.selectors["h2"] = [node("H2", "No sets found.")];

@@ -258,13 +258,16 @@ test(
                         ? "edit"
                         : "my-sets"
                   : operation.kind === "sets.list"
-                    ? [
-                        {
-                          schemaVersion: 1,
-                          id: "set-fixture",
-                          title: "Synthetic",
-                        },
-                      ]
+                    ? {
+                        items: [
+                          {
+                            schemaVersion: 1,
+                            id: "set-fixture",
+                            title: "Synthetic",
+                          },
+                        ],
+                        completeness: "unknown",
+                      }
                     : {
                         schemaVersion: 1,
                         id: operation.setId,

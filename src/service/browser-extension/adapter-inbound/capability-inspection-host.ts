@@ -329,12 +329,22 @@ function firstSetId(value: unknown): string | null | undefined {
     !("ok" in value) ||
     value.ok !== true ||
     !("value" in value) ||
-    !Array.isArray(value.value) ||
-    value.value.length > 200
+    !value.value ||
+    typeof value.value !== "object" ||
+    Array.isArray(value.value) ||
+    Object.keys(value.value).sort().join() !== "completeness,items" ||
+    !("items" in value.value) ||
+    !Array.isArray(value.value.items) ||
+    value.value.items.length > 200 ||
+    !("completeness" in value.value) ||
+    (value.value.completeness !== "complete" &&
+      value.value.completeness !== "unknown") ||
+    (value.value.completeness === "complete" &&
+      value.value.items.length !== 0)
   )
     return undefined;
   let first: string | null = null;
-  for (const item of value.value) {
+  for (const item of value.value.items) {
     if (!item || typeof item !== "object" || Array.isArray(item))
       return undefined;
     const record = item as Record<string, unknown>;

@@ -105,9 +105,26 @@ export function createBlooketBrowserBridgeAdapters(
     sets: {
       list: async () => {
         const result = await safeRequest(transport, { kind: "sets.list" });
-        return result.ok
-          ? { ...result, completeness: "unknown" as const }
-          : result;
+        if (!result.ok) return result;
+        if (
+          !result.value ||
+          typeof result.value !== "object" ||
+          Array.isArray(result.value) ||
+          Object.keys(result.value).sort().join() !== "completeness,items" ||
+          !("items" in result.value) ||
+          !Array.isArray(result.value.items) ||
+          !("completeness" in result.value) ||
+          (result.value.completeness !== "complete" &&
+            result.value.completeness !== "unknown") ||
+          (result.value.completeness === "complete" &&
+            result.value.items.length !== 0)
+        )
+          return browserFailure();
+        return {
+          ok: true,
+          value: result.value.items,
+          completeness: result.value.completeness,
+        };
       },
       get: async (setId) =>
         await safeRequest(transport, { kind: "sets.get", setId }),
