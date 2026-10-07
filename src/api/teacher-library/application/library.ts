@@ -46,8 +46,6 @@ import {
   normalizationStatus,
   type LibraryMetadata,
 } from "../../../media/library-metadata/domain/metadata.ts";
-import { renditionOptimizationCandidates } from
-  "../../../media/rendition-optimization/domain/candidates.ts";
 import {
   compactImageIsolated,
   decodeImageIsolated,
@@ -437,11 +435,7 @@ export async function prepareLibraryImage(
         file,
         bytes: rendered.value.bytes.length,
         recipeRevision: record.revision,
-        effective: renditionOptimizationCandidates({
-          animated: rendered.value.animated,
-          gifFps: record.edit.gifFps,
-          compression: record.edit.compression,
-        })[0]!,
+        effective: rendered.value.effective,
       },
     };
     await saveMetadata(library, next);

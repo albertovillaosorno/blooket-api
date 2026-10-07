@@ -463,12 +463,26 @@ when the recipe requested lossless output. Static candidates never invent FPS.
 The policy does not claim byte success; integration must encode each candidate
 in order, preserve final canvas geometry, and persist the effective winner.
 
-Prepared metadata now has a backward-compatible optional effective candidate.
-Existing records without it still load; every newly prepared file records the
-validated baseline candidate today. The decoder rejects effective parameters
-that could not have come from the record's requested recipe. Optimizer
-integration can therefore persist a later candidate without inventing a second
-quality state or rewriting the teacher's recipe.
+Prepared metadata has a backward-compatible optional effective candidate.
+Existing records without it still load. The decoder rejects effective parameters
+that could not have come from the record's requested recipe.
+
+Portable automatic candidate execution was integrated on 2026-10-06. The
+isolated preparation worker decodes the source once, then tries the bounded
+policy in order and advances only for actual byte/pixel limit failures. Working
+detail is reduced before framing while the final configured canvas dimensions
+stay unchanged. GIF FPS reductions happen only after all detail candidates, and
+compact compression remains last.
+
+The first actually valid encoded file returns its exact effective candidate.
+Preparation persists that worker-selected value without rewriting the teacher's
+requested recipe.
+
+Tests use encoded bytes rather than estimates: one static fixture stops at 55%
+working detail before compression, another reaches compact only after 40%
+lossless is still too large, and a GIF forced over its output-pixel budget at
+20 FPS falls to 10 FPS while preserving final canvas dimensions and loop/timing
+semantics.
 
 Normalize static prepared images to JPEG with the chosen background flattened.
 Keep animated media animated and detect actual source frame delays, duration,

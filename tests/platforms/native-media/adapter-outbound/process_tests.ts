@@ -156,6 +156,12 @@ test("isolated GIF rendering preserves loops and explicit 20 FPS", async () => {
   assert.ok(result.ok);
   if (!result.ok) return;
   assert.ok(result.value.bytes.length < 2_500_000);
+  assert.deepEqual(result.value.effective, {
+    stage: "requested",
+    detailScale: 1,
+    gifFps: 20,
+    compression: "compact",
+  });
   const sharp = await loadSharp();
   const output = await sharp(result.value.bytes, { animated: true }).metadata();
   assert.equal(output.pages, 4);
