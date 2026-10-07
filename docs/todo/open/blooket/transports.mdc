@@ -102,6 +102,22 @@ before mutation. Unsupported HTTP operations also select browser before
 mutation, while any already-ambiguous primary mutation requires reconciliation
 and cannot fall back or retry.
 
+The browser fallback now has a concrete text-only Create Set path. Its page
+helper recognizes only the observed create form, uses native control setters,
+revalidates the exact values immediately before one submit click, and accepts
+only the observed same-origin /edit?id=... success navigation.
+
+The Chrome host preserves session/challenge states and bounds navigation
+polling. Its internal sets.create bridge command accepts only bounded
+title/description/privacy fields; media, arbitrary fields, malformed surface
+results, and Add Question remain fail-closed.
+
+The local browser-service composition routes this bridge surface through the
+canonical browser write execution adapter, so an observed remote set ID is
+decoded again before it can become a durable receipt. No external publication
+command is registered yet, and no live application-driven Create Set acceptance
+has been claimed from these synthetic transport tests.
+
 A private one-question quiz was created through the authorized Blooket UI and
 changed from multiple choice to typing with a 15-second limit. Its final type
 and time persisted after reload. Request fields were observed; the action
