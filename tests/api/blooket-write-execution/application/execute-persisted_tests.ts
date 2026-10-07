@@ -299,6 +299,97 @@ test("abort after pacing grant still stops before journal", async () => {
   });
 });
 
+test("pacing exceptions fail stably before budget journal or mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const writeCalls: string[] = [];
+    const pacer: BlooketMutationPacer = {
+      acquire: async () => {
+        throw new Error("synthetic-pacing-failure");
+      },
+    };
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      {
+        pacer,
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 60_000,
+        },
+      },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-failed",
+    });
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
+test("budget clock exceptions fail stably before journal or mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const events: string[] = [];
+    const writeCalls: string[] = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      {
+        pacer: immediatePacer(events),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => {
+            throw new Error("synthetic-clock-failure");
+          },
+        },
+      },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "mutation-budget",
+      code: "mutation-budget-admission-failed",
+    });
+    assert.deepEqual(events, ["acquire", "release"]);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
 test("pacing cancellation stops before journal and mutation", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
