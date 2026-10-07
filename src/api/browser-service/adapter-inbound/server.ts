@@ -29,8 +29,7 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
-import { createBlooketBrowserBridgeAdapters } from
-  "../../blooket-browser-bridge/adapter-outbound/adapters.ts";
+import { createBlooketRuntimePorts } from "./blooket-runtime.ts";
 import {
   createApplicationUpdateChecker,
   type ApplicationUpdateChecker,
@@ -156,7 +155,7 @@ export async function startBrowserService(
     options.browserBridge ?? createBlooketBrowserBridgeBroker();
   const updates = options.updates ?? createApplicationUpdateChecker();
   const blooket = {
-    ...createBlooketBrowserBridgeAdapters(browserBridge),
+    ...createBlooketRuntimePorts(browserBridge, root),
     secrets,
   };
   let origin = "";
