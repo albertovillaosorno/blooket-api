@@ -82,6 +82,7 @@ const SOURCE_CODES = new Set([
 const RENDER_CODES = new Set([
   "invalid-editor-rendition",
   "editor-animation-unsupported",
+  "rendition-timeline-limit-exceeded",
   "rendition-pixel-limit-exceeded",
   "rendition-byte-limit-exceeded",
   "rendition-failed",

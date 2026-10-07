@@ -49,7 +49,10 @@ import {
 import { loadSharp } from
   "../../sharp-runtime/adapter-outbound/sharp-runtime.ts";
 
-import { resampleGifTimeline } from "../../gif-timeline/domain/timeline.ts";
+import {
+  GIF_FRAME_RATES,
+  resampleGifTimeline,
+} from "../../gif-timeline/domain/timeline.ts";
 import {
   renditionOptimizationCandidates,
   type RenditionOptimizationCandidate,
@@ -80,6 +83,7 @@ export type EditorRenditionResult =
       readonly code:
         | "invalid-editor-rendition"
         | "editor-animation-unsupported"
+        | "rendition-timeline-limit-exceeded"
         | "rendition-pixel-limit-exceeded"
         | "rendition-byte-limit-exceeded"
         | "rendition-failed";
@@ -113,6 +117,8 @@ export async function renderEditedImageRendition(
     !validCanvasAndLimits(canvas, limits) ||
     !validEditorState(state) ||
     !validBlurSigma(options.blurSigma) ||
+    (options.gifFps !== undefined &&
+      !GIF_FRAME_RATES.some((fps) => fps === options.gifFps)) ||
     (options.detailScale !== undefined &&
       ![1, 0.85, 0.7, 0.55, 0.4].includes(options.detailScale)) ||
     (options.background !== undefined &&
@@ -155,7 +161,7 @@ async function renderDecodedImageRendition(
     ? resampleGifTimeline(decoded.frameDelaysMs, options.gifFps ?? 10)
     : { pages: [0], delayMs: 100 };
   if (timeline === undefined)
-    return { ok: false, code: "invalid-editor-rendition" };
+    return { ok: false, code: "rendition-timeline-limit-exceeded" };
   if (
     exceedsPixelLimit(
       canvas.width,
@@ -301,7 +307,8 @@ export async function renderOptimizedImageRendition(
     }
     if (
       rendered.code !== "rendition-byte-limit-exceeded" &&
-      rendered.code !== "rendition-pixel-limit-exceeded"
+      rendered.code !== "rendition-pixel-limit-exceeded" &&
+      rendered.code !== "rendition-timeline-limit-exceeded"
     )
       return rendered;
     lastLimitFailure = rendered;

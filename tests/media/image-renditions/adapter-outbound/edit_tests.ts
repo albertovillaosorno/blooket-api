@@ -477,6 +477,51 @@ test(
   },
 );
 
+test(
+  "GIF optimization lowers FPS when requested timing exceeds 600 frames",
+  async () => {
+  const sharp = await loadSharp();
+  const long = await sharp(GIF_2_FRAME_2X2, { animated: true })
+    .gif({
+      loop: 2,
+      delay: [30_000, 30_000],
+      reuse: true,
+      effort: 1,
+      colours: 16,
+      dither: 0,
+      keepDuplicateFrames: true,
+    })
+    .toBuffer();
+  const optimized = await renderOptimizedImageRendition(
+    long,
+    state(),
+    { width: 2, height: 2 },
+    {
+      maxInputPixels: 1_000_000,
+      maxOutputPixels: 10_000,
+      maxOutputBytes: 1_000_000,
+    },
+    {
+      blurSigma: 20,
+      gifFps: 50,
+      compression: "compact",
+      background: { mode: "solid", color: "#ffffff" },
+    },
+  );
+  assert.ok(optimized.ok);
+  if (!optimized.ok) return;
+  assert.deepEqual(optimized.value.effective, {
+    stage: "fps",
+    detailScale: 0.4,
+    gifFps: 10,
+    compression: "compact",
+  });
+  assert.equal(optimized.value.frameCount, 600);
+  assert.equal(optimized.value.width, 2);
+  assert.equal(optimized.value.height, 2);
+  },
+);
+
 test("GIF optimization lowers FPS only after detail candidates", async () => {
   const optimized = await renderOptimizedImageRendition(
     GIF_2_FRAME_2X2,
@@ -648,6 +693,25 @@ test("editor output pixel and byte limits fail closed", async () => {
     ),
     { ok: false, code: "rendition-byte-limit-exceeded" },
   );
+});
+
+test("unadmitted GIF FPS remains an invalid editor request", async () => {
+  const rendered = await renderEditedImageRendition(
+    GIF_2_FRAME_2X2,
+    state(),
+    { width: 2, height: 2 },
+    LIMITS,
+    {
+      blurSigma: 20,
+      gifFps: 3,
+      compression: "compact",
+      background: { mode: "solid", color: "#ffffff" },
+    },
+  );
+  assert.deepEqual(rendered, {
+    ok: false,
+    code: "invalid-editor-rendition",
+  });
 });
 
 test("invalid editor values fail before native image work", async () => {

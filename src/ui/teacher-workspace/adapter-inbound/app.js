@@ -498,6 +498,7 @@ function report(error) {
     "native-media-timeout": "nativeTimeout",
     "migration-preflight-timeout": "nativeTimeout",
     "image-frame-limit-exceeded": "gifLimits",
+    "rendition-timeline-limit-exceeded": "gifLimits",
     "invalid-editor-rendition": "gifLimits",
     "invalid-or-oversized-library-file": "tooLarge",
     "prepared-revision-conflict": "stalePrepared",
