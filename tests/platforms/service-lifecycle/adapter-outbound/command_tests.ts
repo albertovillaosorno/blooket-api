@@ -74,7 +74,48 @@ test("local reads and MCP traverse the real CLI and service bridge",
     const value =
       job.command.kind === "session.observe"
         ? "my-sets"
-        : job.command.kind === "sets.get"
+        : job.command.kind === "capabilities.inspect"
+          ? {
+              schemaVersion: 3,
+              verifiedOn: "2026-10-07",
+              evidence: [{
+                kind: "browser-observation",
+                reference: "synthetic capability fixture",
+              }],
+              questionTypes: {
+                multipleChoice: {
+                  availability: "supported",
+                  minAnswers: 2,
+                  maxAnswers: 4,
+                  requiresQuestionText: true,
+                  allowsMultipleCorrect: true,
+                },
+                typingAnswer: {
+                  availability: "supported",
+                  matchModes: ["exact", "contains"],
+                },
+              },
+              features: {
+                questionImages: "supported",
+                answerImages: "unsupported",
+                audio: "unsupported",
+              },
+              setMetadata: {
+                titleRequired: true,
+                descriptionRequired: false,
+                titleMaxLength: 75,
+                descriptionMaxLength: 300,
+                coverImageOptional: true,
+                visibility: ["public", "private"],
+              },
+              upload: {
+                maxBytes: 2_500_000,
+                canvasWidth: null,
+                canvasHeight: null,
+                maxPixels: null,
+              },
+            }
+          : job.command.kind === "sets.get"
           ? {
               schemaVersion: 1,
               id: job.command.setId,
@@ -131,6 +172,24 @@ test("local reads and MCP traverse the real CLI and service bridge",
     assert.equal(result.ok, true);
     if (result.ok && result.value.ok && direct.ok)
       assert.deepEqual(result.value.value, direct.value);
+    const capabilities = await callTeacherTool(
+      "blooket_capabilities_inspect",
+      {},
+      root,
+    );
+    assert.equal(capabilities.isError, false);
+    const capabilityResult = decodeResultEnvelope(
+      JSON.parse(capabilities.content[0]!.text),
+    );
+    assert.equal(capabilityResult.ok, true);
+    if (capabilityResult.ok && capabilityResult.value.ok) {
+      const value = capabilityResult.value.value as {
+        readonly kind?: string;
+        readonly value?: { readonly features?: { readonly audio?: string } };
+      };
+      assert.equal(value.kind, "capabilities");
+      assert.equal(value.value?.features?.audio, "unsupported");
+    }
     const detail = await callTeacherTool(
       "blooket_sets_get",
       { setId: "fixture" },
@@ -146,7 +205,7 @@ test("local reads and MCP traverse the real CLI and service bridge",
     assert.equal(
       listTeacherTools().filter((tool) => tool.name.startsWith("blooket_"))
         .length,
-      4,
+      5,
     );
     assert.equal(JSON.stringify(mcp).includes(bridge.pairingToken()), false);
   } finally {

@@ -47,6 +47,7 @@ export interface BlooketReadInvocation {
   readonly kind: "blooket-read";
   readonly command:
     | "blooket.session.inspect"
+    | "blooket.capabilities.inspect"
     | "blooket.sets.list"
     | "blooket.sets.get"
     | "blooket.questions.list";
@@ -90,6 +91,8 @@ export function parseCliArguments(args: readonly string[]): CliParseResult {
 
   if (args[0] === "session" && args[1] === "inspect")
     return parseBlooketRead("blooket.session.inspect", args.slice(2));
+  if (args[0] === "capabilities" && args[1] === "inspect")
+    return parseBlooketRead("blooket.capabilities.inspect", args.slice(2));
   if (args[0] === "sets" && args[1] === "list")
     return parseBlooketRead("blooket.sets.list", args.slice(2));
   if (args[0] === "sets" && args[1] === "get")

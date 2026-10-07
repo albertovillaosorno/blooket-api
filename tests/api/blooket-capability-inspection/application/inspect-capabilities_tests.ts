@@ -32,13 +32,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-// jig-ignore-next-line: TypeScript module specifier is indivisible.
-import { inspectBlooketCapabilities } from "../../../../src/api/blooket-capability-inspection/application/inspect-capabilities.ts";
+import { inspectBlooketCapabilities } from
+// jig-ignore-next-line: Static import path cannot be wrapped safely.
+  "../../../../src/api/blooket-capability-inspection/application/inspect-capabilities.ts";
 import type {
   BlooketCapabilityInspectionPort,
   BlooketCapabilityProbeResult,
-// jig-ignore-next-line: TypeScript module specifier is indivisible.
-} from "../../../../src/api/blooket-capability-inspection/contract/capability-inspection.ts";
+} from
+// jig-ignore-next-line: Static import path cannot be wrapped safely.
+  "../../../../src/api/blooket-capability-inspection/contract/capability-inspection.ts";
 import type {
   BlooketBrowserSessionPort,
   BlooketBrowserObservationResult,
@@ -182,6 +184,30 @@ test("ready reused sessions inspect and decode capabilities", async () => {
   assert.deepEqual(secretReads, []);
   assert.deepEqual(probeCalls, ["inspect"]);
 });
+
+test(
+  "read-only inspection never reads credentials or authenticates",
+  async () => {
+  const browserCalls: string[] = [];
+  const secretReads: string[] = [];
+  const probeCalls: string[] = [];
+  const result = await inspectBlooketCapabilities(
+    browser([{ ok: true, state: "signed-out" }], browserCalls),
+    secretStore(secretReads),
+    capabilityProbe({ ok: true, value: capabilities }, probeCalls),
+    { readOnly: true },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    stage: "session",
+    code: "blooket-authentication-required",
+  });
+  assert.deepEqual(browserCalls, ["observe"]);
+  assert.deepEqual(secretReads, []);
+  assert.deepEqual(probeCalls, []);
+  },
+);
 
 test("signed-out sessions authenticate before capability probing", async () => {
   const browserCalls: string[] = [];

@@ -179,38 +179,50 @@ set-list baseline unless the source declares the collection `complete`.
 Synthetic complete-list tests preserve the exact-difference verifier for a
 future evidence-backed source; unknown live lists remain observational only.
 
-Still pending: server-side set-list completeness; capabilities and complete
-question-level media facts beyond the bounded presence currently observed; login
-and the outcome of organization selection; Safari worker lifecycle. These
-prevent completion of task 08 and publication tasks 09-12. Portable doubles are
-not browser acceptance, and no live question read-back is claimed.
+Still pending: server-side set-list completeness; live browser acceptance of
+capability inspection; complete question-level media facts beyond the bounded
+presence currently observed; login and the outcome of organization selection;
+Safari worker lifecycle. These prevent completion of task 08 and publication
+tasks 09-12. Portable doubles are not browser acceptance, and no live question
+read-back or live capability probe is claimed.
 
-The worker keeps capability inspection and browser authentication fail-closed
-until their required browser semantics are observed and implemented. Question
-listing is a supported observational read: the worker navigates to the exact
-set edit route, bounds the visible Edit-question controls, opens each question,
-decodes the observed serialized question and normalized answer facts, and
-verifies panel cleanup. Answer-image and math encodings now have bounded
-reference-backed normalization, but question image/audio identity and broader
-media behavior remain intentionally unclaimed.
+The worker keeps browser authentication fail-closed until its required browser
+semantics are observed and implemented. Question listing is a supported
+observational read: the worker navigates to the exact set edit route, bounds the
+visible Edit-question controls, opens each question, decodes the observed
+serialized question and normalized answer facts, and verifies panel cleanup.
+Answer-image and math encodings now have bounded reference-backed normalization,
+but question image/audio identity and broader media behavior remain
+intentionally unclaimed.
 
-Recovered capability UI now establishes an account-specific observation path,
-but not yet a safe complete probe. Edit module 12048 reads `session.hasPlus` and
-passes it into the question editor. Module 89770 always renders the accessible
-`Add Image to Answer N` control; opening it selects either the real image picker
-when `hasPlus` is true or an explicit Blooket Plus upsell when false. The same
-module selects either the real question-audio picker or an `Upgrade to Plus`
-modal from that same account flag.
+Recovered capability UI establishes the account-specific observation path. Edit
+module 12048 reads `session.hasPlus` and passes it into the question editor.
+Module 89770 always renders the answer-image control and the question Audio
+control. The same `hasPlus` value selects the real answer-image picker and real
+audio picker for Plus accounts, or the explicit Blooket Plus upsell drawers for
+accounts without that entitlement.
 
-The version-one browser bridge already carries `capabilities.inspect`, while the
-concrete worker deliberately refuses it. A safe implementation still needs a
-fully observed non-mutating lifecycle: select an existing set without assuming
-one exists, open Add Question, classify the nested image/audio modal, close the
-nested and parent forms unambiguously, and restore the prior page. An account
-with no sets must remain inspectable without creating one. Until those cleanup
-and empty-account semantics are implemented and tested, the account-dependent
-feature facts remain `account-dependent` rather than guessed `supported` or
-`unsupported`.
+Module 89770 renders explicit Cancel controls for the Add Question form and its
+nested drawer; module 72398 confirms the parent form modal disables overlay
+closure.
+
+Portable capability inspection is now implemented behind the existing
+`capabilities.inspect` browser bridge command. The worker selects one already
+visible My Sets ID, opens Add Question without submitting it, opens only the
+Audio drawer, resolves the shared `hasPlus` media gate, verifies cancellation of
+the nested drawer and parent form, and restores the exact prior dashboard URL.
+Any ambiguous control, malformed set row, cleanup failure, or restoration
+failure invalidates the whole snapshot. The account-specific observation is
+recorded as capability evidence without retaining a set ID or provider media
+identity.
+
+An account with no sets is handled without creating probe content: static
+verified facts are returned while answer images and audio remain explicitly
+`account-dependent`. The canonical read command, CLI, and MCP tool all use
+read-only session inspection; signed-out or expired sessions return
+`blooket-authentication-required` without reading stored credentials or invoking
+browser authentication. Real Chrome/Safari acceptance of this capability probe
+remains pending, so portable coverage is not promoted to live account evidence.
 
 Initial validation: 572 portable tests, strict TypeScript, browser-script
 syntax, and compiled-extension assembly passed. Manual pairing controls were

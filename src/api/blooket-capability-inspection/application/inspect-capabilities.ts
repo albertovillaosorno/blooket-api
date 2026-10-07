@@ -39,6 +39,7 @@ import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import {
   ensureBlooketSession,
+  inspectReadyBlooketSession,
   type EnsureBlooketSessionResult,
 } from "../../blooket-session/application/ensure-session.ts";
 import type {
@@ -93,8 +94,11 @@ export async function inspectBlooketCapabilities(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   inspection: BlooketCapabilityInspectionPort,
+  options: { readonly readOnly?: boolean } = {},
 ): Promise<InspectBlooketCapabilitiesResult> {
-  const session = await ensureBlooketSession(browser, secrets);
+  const session = options.readOnly
+    ? await inspectReadyBlooketSession(browser)
+    : await ensureBlooketSession(browser, secrets);
   if (!session.ok) {
     return {
       ok: false,
