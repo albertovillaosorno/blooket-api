@@ -199,8 +199,6 @@ export async function verifyDistribution(
       filename: "Fixture.png",
       name: "Package fixture",
       description: "Synthetic image",
-      language: "en",
-      topics: ["test"],
       base64: source,
     });
     assert.equal(typeof imported["id"], "string");
