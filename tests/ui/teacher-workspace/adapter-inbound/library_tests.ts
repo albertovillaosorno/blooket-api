@@ -33,6 +33,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   sampleLibrary,
+  representativeSolidColor,
   clipboardImageUrl,
   readClipboardImage,
 } from "../../../../src/ui/teacher-workspace/adapter-inbound/library.js";
@@ -57,6 +58,38 @@ test(
   assert.deepEqual(
     sampleLibrary(records.slice(0, 3), () => 0),
     records.slice(0, 3),
+  );
+});
+
+test("solid color uses a bounded deterministic dominant palette", () => {
+  const rgba = new Uint8ClampedArray([
+    240, 32, 32, 255,
+    238, 30, 30, 255,
+    20, 100, 220, 255,
+    1, 1, 1, 20,
+  ]);
+  assert.equal(representativeSolidColor(rgba), "#ef1f1f");
+  assert.equal(
+    representativeSolidColor(
+      new Uint8ClampedArray([0, 0, 0, 255]),
+    ),
+    "#303030",
+  );
+  assert.equal(
+    representativeSolidColor(
+      new Uint8ClampedArray([255, 255, 255, 255]),
+    ),
+    "#d0d0d0",
+  );
+  assert.equal(
+    representativeSolidColor(
+      new Uint8ClampedArray([0, 0, 0, 20]),
+    ),
+    null,
+  );
+  assert.equal(
+    representativeSolidColor(new Uint8ClampedArray(260)),
+    null,
   );
 });
 

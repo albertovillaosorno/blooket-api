@@ -359,6 +359,16 @@ test its palette/contrast criteria; do not claim one universally optimal color.
 Keep a visible color picker and eyedropper, and preserve the teacher's manual
 color override in the recipe rather than replacing it on every preview.
 
+Static-image solid backgrounds now use an 8-by-8 preview sample. Opaque pixels
+are grouped into deterministic 4-bit RGB palette bins; the dominant bin wins,
+ties use the lower palette key, and extreme luminance is brought into a bounded
+48-208 range. The suggestion runs once when entering solid mode, only while
+the recipe still has its initial white color. It never replaces a persisted
+non-default color, manual color, or eyedropper choice.
+
+Animated multi-frame representative sampling remains pending; GIFs therefore do
+not receive the static-frame automatic suggestion yet.
+
 Use bounded representative sampling for animated inputs, without flashing the
 background color from frame to frame. Preview and preparation must use the
 same selected color, framing, blur, and adjustment recipe.
