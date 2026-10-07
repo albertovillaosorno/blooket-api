@@ -62,7 +62,7 @@ async function work(input: unknown) {
       ? ["maxInputPixels"]
       : kind === "editor"
         ? ["state", "canvas", "limits", "options"]
-        : kind === "compact"
+        : kind === "compact" || kind === "sample-colors"
           ? []
           : ["recipe"]),
   ]);
@@ -77,6 +77,7 @@ async function work(input: unknown) {
       && kind !== "render"
       && kind !== "editor"
       && kind !== "compact"
+      && kind !== "sample-colors"
     )
   )
     throw new Error("invalid-native-job");
@@ -93,6 +94,35 @@ async function work(input: unknown) {
     )
       throw new Error("invalid-native-job");
     return await decodeSourceImage(bytes, limit);
+  }
+  if (kind === "sample-colors") {
+    const decoded = await decodeSourceImage(bytes, 80_000_000);
+    if (!decoded.ok) throw new Error(decoded.code);
+    const count = Math.min(5, decoded.value.frameCount);
+    const pages = Array.from({ length: count }, (_, index) =>
+      Math.min(
+        decoded.value.frameCount - 1,
+        Math.floor(((index + 0.5) * decoded.value.frameCount) / count),
+      ),
+    );
+    const frameBytes = 8 * 8 * 4;
+    const rgba = new Uint8Array(frameBytes * pages.length);
+    for (let index = 0; index < pages.length; index++) {
+      const sample = await sharp(bytes, {
+        failOn: "warning",
+        limitInputPixels: 80_000_000,
+        page: pages[index]!,
+        pages: 1,
+      })
+        .resize({ width: 8, height: 8, fit: "fill" })
+        .ensureAlpha()
+        .raw()
+        .toBuffer();
+      if (sample.byteLength !== frameBytes)
+        throw new Error("invalid-native-samples");
+      rgba.set(sample, index * frameBytes);
+    }
+    return { ok: true as const, value: { rgba } };
   }
   if (kind === "compact") {
     const decoded = await decodeSourceImage(bytes, 80_000_000);

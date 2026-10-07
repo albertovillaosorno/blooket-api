@@ -41,6 +41,7 @@ import {
   decodeImageIsolated,
   renderImageIsolated,
   renderEditorIsolated,
+  sampleImageColorsIsolated,
 } from "../../../../src/platforms/native-media/adapter-outbound/process.ts";
 import { loadSharp } from
   "../../../../src/media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
@@ -107,6 +108,48 @@ test("isolated compaction discards source encoding", async () => {
   assert.equal(output.width, 2);
   assert.equal(output.height, 2);
 });
+
+test(
+  "isolated color sampling caps representative animation frames",
+  async () => {
+    const sharp = await loadSharp();
+    const width = 2;
+    const height = 2;
+    const pages = 7;
+    const raw = new Uint8Array(width * height * 4 * pages);
+    for (let page = 0; page < pages; page++) {
+      for (let pixel = 0; pixel < width * height; pixel++) {
+        const offset = (page * width * height + pixel) * 4;
+        raw[offset] = page * 30;
+        raw[offset + 1] = 255 - page * 20;
+        raw[offset + 2] = 50;
+        raw[offset + 3] = 255;
+      }
+    }
+    const gif = await sharp(raw, {
+      raw: { width, height: height * pages, channels: 4, pageHeight: height },
+    })
+      .gif({
+        delay: Array(pages).fill(50),
+        loop: 0,
+        keepDuplicateFrames: true,
+      })
+      .toBuffer();
+    const sampled = await sampleImageColorsIsolated(gif);
+    assert.equal(sampled.byteLength, 5 * 8 * 8 * 4);
+  },
+);
+
+test(
+  "isolated color sampling returns stable bounded GIF frame samples",
+  async () => {
+    const sampled = await sampleImageColorsIsolated(GIF);
+    assert.equal(sampled.byteLength, 2 * 8 * 8 * 4);
+    const first = [...sampled.slice(0, 4)];
+    const second = [...sampled.slice(8 * 8 * 4, 8 * 8 * 4 + 4)];
+    assert.notDeepEqual(first, second);
+  },
+);
 
 test("isolated GIF rendering preserves loops and explicit 20 FPS", async () => {
   const result = await renderImageIsolated(GIF, recipe);

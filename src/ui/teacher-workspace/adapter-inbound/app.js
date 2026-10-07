@@ -371,7 +371,10 @@ let locale = "es",
   records = [],
   selected,
   sourceFile,
-  sourcePreviewUrl;
+  sourcePreviewUrl,
+  sourceBase64,
+  sourceBase64Promise,
+  animatedColorSuggestion;
 let editorBusy = false;
 let clipboardReading = false;
 let suggestions = [],
@@ -644,10 +647,54 @@ $("#pasteImage").addEventListener("click", async () => {
     $("#pasteImage").disabled = clipboardBusy;
   }
 });
-function clearSourceDraft() {
+function clearSourceDraft(preserveColor = false) {
   sourceFile = undefined;
+  sourceBase64 = undefined;
+  sourceBase64Promise = undefined;
+  if (!preserveColor) animatedColorSuggestion = undefined;
   if (sourcePreviewUrl) URL.revokeObjectURL(sourcePreviewUrl);
   sourcePreviewUrl = undefined;
+}
+async function fileBase64(file) {
+  if (file === sourceFile && sourceBase64) return sourceBase64;
+  if (file === sourceFile && sourceBase64Promise)
+    return await sourceBase64Promise;
+  const pending = new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  if (file === sourceFile) sourceBase64Promise = pending;
+  try {
+    const value = await pending;
+    if (file === sourceFile) sourceBase64 = value;
+    return value;
+  } finally {
+    if (file === sourceFile && sourceBase64Promise === pending)
+      sourceBase64Promise = undefined;
+  }
+}
+async function loadAnimatedColorSuggestion(target, id) {
+  try {
+    const file = sourceFile;
+    const payload = id
+      ? { id }
+      : file
+        ? { base64: await fileBase64(file) }
+        : undefined;
+    if (!payload) return;
+    const sampled = await api("/api/media-color-samples", payload);
+    const color = representativeSolidColor(
+      new Uint8ClampedArray(sampled.rgba),
+    );
+    if (!color || selected !== target || !$("#editor").open) return;
+    animatedColorSuggestion = color;
+    if (selected.edit.background.mode === "solid") {
+      suggestSolidColor();
+      preview();
+    }
+  } catch {}
 }
 function pickFile(file) {
   if (!file) return;
@@ -745,6 +792,10 @@ function openEditor(record, sourceUrl) {
   syncRecipe();
   showPrepared();
   $("#editor").showModal();
+  if (record.asset.endsWith(".gif") && !solidColorSuggested) {
+    const target = selected;
+    void loadAnimatedColorSuggestion(target, record.id || undefined);
+  }
 }
 function syncRecipe() {
   for (const name of [
@@ -804,23 +855,20 @@ function preview() {
     `saturate(${recipe.saturation}) ` + `contrast(${recipe.contrast})`;
 }
 function suggestSolidColor() {
-  if (
-    !selected ||
-    selected.asset.endsWith(".gif") ||
-    solidColorSuggested ||
-    solidColorTouched
-  )
-    return;
-  const image = $("#foreground");
-  if (!image.complete || !image.naturalWidth || !image.naturalHeight) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 8;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) return;
-  context.drawImage(image, 0, 0, 8, 8);
-  const color = representativeSolidColor(
-    context.getImageData(0, 0, 8, 8).data,
-  );
+  if (!selected || solidColorSuggested || solidColorTouched) return;
+  let color = animatedColorSuggestion;
+  if (!selected.asset.endsWith(".gif")) {
+    const image = $("#foreground");
+    if (!image.complete || !image.naturalWidth || !image.naturalHeight) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 8;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return;
+    context.drawImage(image, 0, 0, 8, 8);
+    color = representativeSolidColor(
+      context.getImageData(0, 0, 8, 8).data,
+    );
+  }
   if (!color) return;
   selected.edit.background.color = color;
   solidColorSuggested = true;
@@ -1051,12 +1099,7 @@ editForm.addEventListener("submit", async (event) => {
     if (sourceFile) {
       if (sourceFile.size > 25_000_000) throw new Error("source-too-large");
       const file = sourceFile;
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const base64 = await fileBase64(file);
       selected = await api("/api/import", {
         ...original,
         base64,
@@ -1065,7 +1108,7 @@ editForm.addEventListener("submit", async (event) => {
       const canonicalUrl = "/media/" + selected.id;
       $("#foreground").src = $("#background").src = canonicalUrl;
       $("#editorTitle").textContent = selected.original.name;
-      clearSourceDraft();
+      clearSourceDraft(true);
     } else {
       selected = await api("/api/edit", {
         id: selected.id,

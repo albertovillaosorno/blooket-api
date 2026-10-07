@@ -40,6 +40,7 @@ import {
   prepareLibraryImage,
   executeLibraryCommand,
   readPreparedLibraryImage,
+  sampleLibraryImageColors,
 } from "../../../../src/api/teacher-library/application/library.ts";
 import { loadPreferences } from
   "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
@@ -99,6 +100,25 @@ test(
       assert.equal(record.original.language, "");
       assert.deepEqual(record.topics, []);
       assert.deepEqual(record.edit, input.edit);
+      const pendingSamples = await sampleLibraryImageColors(root, {
+        base64: input.base64,
+      });
+      assert.equal(pendingSamples.rgba.length, 8 * 8 * 4);
+      const storedSamples = await sampleLibraryImageColors(root, {
+        id: record.id,
+      });
+      assert.equal(storedSamples.rgba.length, 8 * 8 * 4);
+      await assert.rejects(
+        sampleLibraryImageColors(root, {
+          id: record.id,
+          base64: input.base64,
+        }),
+        /unknown-or-missing-field/u,
+      );
+      await assert.rejects(
+        sampleLibraryImageColors(root, { id: "../outside" }),
+        /invalid-media-id/u,
+      );
       const result = await executeLibraryCommand(
         {
           version: 1,

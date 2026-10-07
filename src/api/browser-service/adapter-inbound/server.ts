@@ -62,6 +62,7 @@ import {
   editLibraryImage,
   prepareLibraryImage,
   readPreparedLibraryImage,
+  sampleLibraryImageColors,
   libraryRecordView,
   safeCode,
 } from "../../teacher-library/application/library.ts";
@@ -373,7 +374,9 @@ export async function startBrowserService(
       }
       const body = await readBody(
         request,
-        url.pathname === "/api/import" ? 36_000_000 : 1_000_000,
+        ["/api/import", "/api/media-color-samples"].includes(url.pathname)
+          ? 36_000_000
+          : 1_000_000,
       );
       if (url.pathname === "/api/browser-pairing-reset") {
         if (
@@ -473,6 +476,10 @@ export async function startBrowserService(
       }
       if (url.pathname === "/api/media-rename") {
         json(response, 200, await renameLibraryImage(root, body));
+        return;
+      }
+      if (url.pathname === "/api/media-color-samples") {
+        json(response, 200, await sampleLibraryImageColors(root, body));
         return;
       }
       if (url.pathname === "/api/import") {
