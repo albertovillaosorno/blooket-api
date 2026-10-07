@@ -61,6 +61,12 @@ import type {
 } from "../contract/write-execution.ts";
 import type { BlooketPreparedMedia } from
   "../contract/prepared-media.ts";
+import type { BlooketPreparedMediaReadPort } from
+  "../contract/prepared-media.ts";
+import {
+  admitBlooketPreparedMedia,
+  blooketWriteOperationMediaIds,
+} from "./admit-prepared-media.ts";
 
 type SessionFailure = Extract<
   EnsureBlooketSessionResult,
@@ -118,6 +124,16 @@ export type ExecuteNextBlooketWriteResult =
     }
   | {
       readonly ok: false;
+      readonly stage: "prepared-media";
+      readonly code:
+        | "blooket-media-not-prepared"
+        | "blooket-media-stale"
+        | "blooket-media-invalid"
+        | "blooket-media-unavailable";
+      readonly mediaId: string;
+    }
+  | {
+      readonly ok: false;
       readonly stage: "write";
       readonly code:
         | BlooketBrowserFailureCode
@@ -145,6 +161,7 @@ export async function executeNextBlooketWrite(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
+  media?: BlooketPreparedMediaReadPort,
 ): Promise<ExecuteNextBlooketWriteResult> {
   const prepared = await prepareNextBlooketWrite(
     plan,
@@ -156,11 +173,34 @@ export async function executeNextBlooketWrite(
     return prepared;
   }
 
+  const requiredMediaIds = blooketWriteOperationMediaIds(
+    prepared.operation,
+  );
+  if (requiredMediaIds.length > 0 && media === undefined) {
+    return {
+      ok: false,
+      stage: "prepared-media",
+      code: "blooket-media-unavailable",
+      mediaId: requiredMediaIds[0]!,
+    };
+  }
+  const admittedMedia = media === undefined
+    ? { ok: true as const, media: [] }
+    : await admitBlooketPreparedMedia(prepared.operation, media);
+  if (!admittedMedia.ok) {
+    return {
+      ok: false,
+      stage: "prepared-media",
+      code: admittedMedia.code,
+      mediaId: admittedMedia.mediaId,
+    };
+  }
+
   const attempted = await attemptBlooketWrite(
     writes,
     prepared.operation,
     prepared.checkpoint.remoteSetId,
-    [],
+    admittedMedia.media,
   );
   return completeBlooketWriteAttempt(
     plan,
