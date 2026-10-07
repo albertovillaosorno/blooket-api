@@ -168,6 +168,52 @@ test("busy budget locks fail before state publication", async () => {
     } finally {
       await acquired.lock.release();
     }
+    assert.deepEqual(
+      await reserveMutationBudgetStart(
+        path,
+        "plan:synthetic",
+        POLICY,
+        10_000,
+      ),
+      {
+        ok: true,
+        state: { version: 1, startedAtMs: 10_000, starts: 1 },
+      },
+    );
+  });
+});
+
+test("durable duration exhaustion preserves the prior state", async () => {
+  await temporary(async (directory) => {
+    const path = join(directory, "budget.json");
+    const policy = { maximumStarts: 10, maximumDurationMs: 5_000 };
+    assert.equal(
+      (
+        await reserveMutationBudgetStart(
+          path,
+          "plan:duration",
+          policy,
+          20_000,
+        )
+      ).ok,
+      true,
+    );
+    const before = await readFile(path, "utf8");
+
+    assert.deepEqual(
+      await reserveMutationBudgetStart(
+        path,
+        "plan:duration",
+        policy,
+        25_000,
+      ),
+      {
+        ok: false,
+        kind: "budget",
+        code: "mutation-task-duration-exhausted",
+      },
+    );
+    assert.equal(await readFile(path, "utf8"), before);
   });
 });
 
