@@ -456,6 +456,13 @@ and framing; it must not silently produce different output resolutions for
 different files. Record effective parameters rather than claiming the requested
 quality/FPS was retained after automatic reduction.
 
+A portable candidate-policy foundation was added on 2026-10-06. It emits a
+bounded cumulative sequence: requested settings, working-detail scales of 85%,
+70%, 55%, and 40%, lower admitted GIF FPS values, then compact compression only
+when the recipe requested lossless output. Static candidates never invent FPS.
+The policy does not claim byte success; integration must encode each candidate
+in order, preserve final canvas geometry, and persist the effective winner.
+
 Normalize static prepared images to JPEG with the chosen background flattened.
 Keep animated media animated and detect actual source frame delays, duration,
 and cadence before choosing an explicit output FPS. Variable-delay sources
