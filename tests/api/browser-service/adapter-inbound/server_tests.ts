@@ -169,10 +169,13 @@ test(
     const root = await mkdtemp(join(tmpdir(), "browser-service-"));
     const service = await startBrowserService({ root, port: 0 });
     try {
-      assert.match(
-        await (await fetch(service.origin)).text(),
-        /Blooket Studio/u,
-      );
+      const html = await (await fetch(service.origin)).text();
+      assert.match(html, /Blooket Studio/u);
+      assert.doesNotMatch(html, /id="importDialog"/u);
+      assert.equal((html.match(/id="canvas"/gu) ?? []).length, 1);
+      const app = await (await fetch(service.origin + "/app.js")).text();
+      assert.match(app, /URL\.createObjectURL\(file\)/u);
+      assert.match(app, /edit: selected\.edit/u);
       const boot = (await (
         await fetch(service.origin + "/api/bootstrap")
       ).json()) as {
@@ -210,9 +213,22 @@ test(
           name: "Sample",
           description: "Sample image",
           base64: Buffer.from(source).toString("base64"),
+          edit: {
+            panX: 0.2,
+            panY: -0.2,
+            zoom: 0.7,
+            contrast: 1,
+            saturation: 1,
+            background: { mode: "solid", color: "#123456" },
+            width: 1280,
+            height: 720,
+            gifFps: 10,
+            compression: "compact",
+          },
         })
-      ).json()) as { id: string };
+      ).json()) as { id: string; edit: { zoom: number } };
       assert.ok(imported.id);
+      assert.equal(imported.edit.zoom, 0.7);
       const media = (await (
         await fetch(service.origin + "/api/media")
       ).json()) as { id: string; normalizationStatus: string }[];

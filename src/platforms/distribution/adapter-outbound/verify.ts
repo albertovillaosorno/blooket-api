@@ -199,6 +199,18 @@ export async function verifyDistribution(
       name: "Package fixture",
       description: "Synthetic image",
       base64: source,
+      edit: {
+        panX: 0,
+        panY: 0,
+        zoom: 1,
+        contrast: 1,
+        saturation: 1,
+        background: { mode: "blur", color: "#ffffff" },
+        width: 1280,
+        height: 720,
+        gifFps: 10,
+        compression: "compact",
+      },
     });
     assert.equal(typeof imported["id"], "string");
     const prepared = await post("/api/prepare", { id: imported["id"] });
