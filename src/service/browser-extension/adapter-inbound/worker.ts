@@ -11,7 +11,8 @@
 // - Owns:
 //   - Automatic local workspace discovery and serial browser read delivery.
 // - Must-Not:
-//   - Persist credentials, submit quiz edits, or execute arbitrary commands.
+//   - Persist credentials, bypass provider stops, or execute arbitrary
+//     commands.
 // - Allows:
 //   - Inputs: Trusted local workspace transport and exact read requests.
 //   - Outputs: Admitted browser replies and connection status without tokens.
@@ -23,7 +24,8 @@
 // - Summary:
 //   - Keeps browser APIs in host composition and delegates page semantics.
 // - Description:
-//   - Validates incoming jobs and refuses unsupported read or write operations.
+//   - Validates jobs and keeps credential submission separate from
+//     confirmation.
 // - Usage:
 //   - Compile as the extension worker; discover the running local workspace.
 // - Defaults:
@@ -47,6 +49,8 @@ import { createExtensionAddQuestionHost } from "./add-question-host.ts";
 import { createExtensionCapabilityInspectionHost } from
   "./capability-inspection-host.ts";
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
+import { createExtensionSessionAuthenticationHost } from
+  "./login-host.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
 
@@ -202,7 +206,14 @@ async function read(
         encodeURIComponent(operation.setId)
       : blooketReadUrl(operation);
   let tab = await chrome.tabs.get(current.tabId);
-  if (!tab.url || new URL(tab.url).origin !== "https://dashboard.blooket.com")
+  if (!tab.url) throw new Error("manual-blooket-sign-in-required");
+  const origin = new URL(tab.url).origin;
+  if (
+    operation.kind === "session.observe"
+      ? origin !== "https://dashboard.blooket.com" &&
+        origin !== "https://id.blooket.com"
+      : origin !== "https://dashboard.blooket.com"
+  )
     throw new Error("manual-blooket-sign-in-required");
   if (target && tab.url !== target)
     await chrome.tabs.update(current.tabId, { url: target });
@@ -339,6 +350,16 @@ async function relay(current: Connection, activeGeneration: number) {
             job.command.kind === "questions.list"
           ) {
             result = await read(current, job.command);
+          } else if (job.command.kind === "session.authenticate") {
+            const host = createExtensionSessionAuthenticationHost(
+              chrome,
+              current.tabId,
+              pause,
+            );
+            result = await host.authenticate({
+              loginIdentifier: job.command.loginIdentifier,
+              password: job.command.password,
+            });
           } else if (job.command.kind === "capabilities.inspect") {
             const host = createExtensionCapabilityInspectionHost(
               chrome,

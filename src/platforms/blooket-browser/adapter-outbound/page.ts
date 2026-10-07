@@ -13,7 +13,7 @@
 // - Must-Not:
 //   - Read hidden framework state, cookies, credentials, or raw page HTML.
 // - Allows:
-//   - Inputs: One admitted read operation on the confirmed dashboard origin.
+//   - Inputs: One admitted read on the dashboard or exact public login page.
 //   - Outputs: Untrusted visible facts or a stable browser failure.
 //   - Side effects: DOM inspection and opening details without saving edits.
 // - Split-When:
@@ -48,16 +48,54 @@ export function inspectBlooketPage(
   });
   try {
     const url = new URL(location.href);
-    if (url.origin !== "https://dashboard.blooket.com") return failed();
-    const main = document.querySelector("main");
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
     const visibleChallenges = Array.from(
       document.querySelectorAll(
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
       ),
-    ).some((frame) => {
-      const bounds = frame.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
-    });
+    ).some(visible);
+    if (
+      operation.kind === "session.observe" &&
+      url.origin === "https://id.blooket.com"
+    ) {
+      if (visibleChallenges)
+        return { ok: true, value: "security-challenge" };
+      if (url.pathname !== "/login")
+        return { ok: true, value: "unexpected-page" };
+      const headings = Array.from(
+        document.querySelectorAll("h1, h2, h3"),
+      ).filter(
+        (heading) =>
+          visible(heading) && heading.textContent?.trim() === "Log in",
+      );
+      const identifiers = Array.from(
+        document.querySelectorAll('input[placeholder="Username or email"]'),
+      ).filter(visible);
+      const passwords = Array.from(
+        document.querySelectorAll(
+          'input[type="password"][placeholder="Password"]',
+        ),
+      ).filter(visible);
+      const submits = Array.from(document.querySelectorAll("button")).filter(
+        (button) =>
+          visible(button) && button.textContent?.trim() === "Let's go!",
+      );
+      return {
+        ok: true,
+        value:
+          headings.length === 1 &&
+          identifiers.length === 1 &&
+          passwords.length === 1 &&
+          submits.length === 1
+            ? "signed-out"
+            : "unexpected-page",
+      };
+    }
+    if (url.origin !== "https://dashboard.blooket.com") return failed();
+    const main = document.querySelector("main");
     const organizationPrompt = Array.from(
       document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',

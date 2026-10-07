@@ -270,6 +270,47 @@ test("create page observation requires the exact observed form", () => {
 });
 
 test(
+  "public login page is the only admitted identity-origin observation",
+  () => {
+  const document = node("DOCUMENT");
+  document.selectors["h1, h2, h3"] = [node("H1", "Log in")];
+  document.selectors['input[placeholder="Username or email"]'] = [
+    node("INPUT"),
+  ];
+  document.selectors[
+    'input[type="password"][placeholder="Password"]'
+  ] = [node("INPUT")];
+  document.selectors["button"] = [node("BUTTON", "Let's go!")];
+  page(document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "signed-out",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+
+  document.selectors[
+    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+  ] = [node("IFRAME")];
+  page(document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "security-challenge",
+    });
+  });
+  document.selectors[
+    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+  ] = [];
+  page(document, "https://id.blooket.com/signup", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
+  });
+  },
+);
+
+test(
   "challenge and unknown origin observations never proceed to set reads",
   () => {
   const { document, main } = base();

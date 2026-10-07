@@ -18,8 +18,11 @@ silently create new fields in the API contract.
 Current public Blooket Help Center material, retrieved on 2026-10-05, identifies
 "My Sets" as the management surface. The current question-set creation guidance
 also establishes title, description, optional cover image, and public/private
-visibility as set metadata. It does not establish a durable machine identifier
-grammar or a complete machine-readable question payload.
+visibility as set metadata. The public identity page observed on 2026-10-07
+exposes `Log in`, `Username or email`, `Password`, and `Let's go!` on the exact
+`https://id.blooket.com/login` route. These observations do not establish a
+durable machine identifier grammar or a complete machine-readable question
+payload.
 
 ## Decision
 
@@ -36,6 +39,9 @@ edit states are reused without credential access. Signed-out or expired states
 trigger security-domain credential retrieval. The application passes those
 credentials directly to the browser-session port, discards them after the call,
 and performs a fresh observation before reporting readiness.
+
+The browser adapter may submit only the exact observed identity login surface;
+submission itself is not evidence that authentication succeeded.
 
 Rate limiting returns a wait state without a guessed delay. Organization
 prompts, security challenges, and unexpected pages require human action.
@@ -67,6 +73,8 @@ establishes their shape.
 - Health/session inspection can never cause credential access or login.
 - Existing ready sessions avoid unnecessary secret-store reads.
 - Credentials remain inside trusted security/application/browser boundaries.
+- Identity-page permission is limited to `https://id.blooket.com/*`, and
+  ordinary set/question reads remain dashboard-only.
 - Browser exceptions become stable secret-free failure codes.
 - Capability and set page data cannot bypass runtime decoding.
 - Invalid set IDs fail before browser, secret-store, or set-read side effects.
@@ -90,7 +98,9 @@ establishes their shape.
 
 Session tests prove confirmed sessions perform zero secret-store reads, login
 reads credentials only when required, challenges stop for a human, and browser
-exceptions never expose fixture credentials.
+exceptions never expose fixture credentials. Extension tests additionally prove
+exact identity-origin admission, challenge refusal, prepared-value revalidation,
+one submit click, and secret-free bridge replies.
 
 Capability-inspection tests prove session gating, strict snapshot decoding, and
 raw invalid-value containment. Set-read tests prove request-first validation,
