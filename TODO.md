@@ -464,13 +464,13 @@ changed.
 Final portable checks pass 574 tests, strict TypeScript, and all three browser
 script syntax checks. Emitted-worker tests require a synchronous module graph;
 workspace relay tests reject unrelated origins, applications, malformed tokens,
-and oversized responses. The final native Linux archive must be rebuilt for
-this committed revision rather than reusing an older artifact.
+and oversized responses. These were portable results; native package evidence
+for subsequent revisions is recorded separately below.
 
 The clean Linux archive for commit `eff0feb` subsequently passed extracted
 package verification, including the updated automatic-discovery worker,
 clipboard helper, icons, launcher, and native media preparation. This proves
-that revision only; subsequent command composition needs a fresh package check.
+that revision only; command composition received its own package check below.
 
 Canonical read composition was implemented on 2026-10-06. The admitted
 `blooket.session.inspect`, `blooket.sets.list`, and `blooket.sets.get` commands
@@ -498,6 +498,13 @@ committed, and no Blooket mutation was performed.
 
 This was a local tool
 projection check, not actual ChatGPT or a new public OAuth acceptance run.
+
+Extracted Linux package verification also passed launch/reuse, native media,
+profile retrieval, and all three packaged read commands. The read check drives
+only its disposable server's authenticated bridge with synthetic session/set
+facts, exercises ordinary CLI syntax, and rejects token leakage. This proves
+native package composition, not a packaged Chrome/Safari installation or live
+Blooket publication.
 
 The development service restarted normally, the workspace reconnected
 without configuration, and the configured tunnel returned to connected.

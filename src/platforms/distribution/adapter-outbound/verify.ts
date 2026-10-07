@@ -176,6 +176,7 @@ export async function verifyDistribution(
       assert.equal((await request(path)).status, 200);
     const bootstrap = (await (await request("/api/bootstrap")).json()) as {
       csrf: string;
+      browserBridge: { token: string };
     };
     const post = async (path: string, value: unknown) => {
       const response = await request(path, {
@@ -259,6 +260,60 @@ export async function verifyDistribution(
     };
     assert.equal(response.ok, true);
     assert.equal(response.operationId, "test:package");
+    // Drive only this disposable package's bridge with synthetic read facts.
+    // This proves CLI/service composition, not native browser acceptance.
+    for (const args of [
+      ["session", "inspect", "--json"],
+      ["sets", "list", "--json"],
+      ["sets", "get", "package-fixture", "--json"],
+    ]) {
+      let finished = false;
+      const read = execute(node, [
+        join(app, "src/cli/executable/adapter-inbound/blooket.ts"), ...args,
+      ], { env, timeout: 30_000, maxBuffer: 1_000_000 }).then(
+        (value) => ({ ok: true as const, value }),
+        () => ({ ok: false as const }),
+      ).finally(() => { finished = true; });
+      while (!finished) {
+        const next = await request("/api/browser-bridge/next", {
+          headers: {
+            Authorization: "Bearer " + bootstrap.browserBridge.token,
+          },
+        });
+        assert.equal(next.status, 200);
+        const { job } = await next.json();
+        if (job) {
+          assert.ok(["session.observe", "sets.list", "sets.get"].includes(
+            job.command.kind,
+          ));
+          const value = job.command.kind === "session.observe" ? "my-sets"
+            : job.command.kind === "sets.list" ? [{ schemaVersion: 1,
+              id: "package-fixture", title: "Synthetic quiz" }]
+            : { schemaVersion: 1, id: "package-fixture",
+              title: "Synthetic quiz", description: "Synthetic package data",
+              visibility: "private" };
+          const completion = await request("/api/browser-bridge/result", {
+            method: "POST",
+            headers: { "Content-Type": "application/json",
+              Authorization: "Bearer " + bootstrap.browserBridge.token },
+            body: JSON.stringify({ schemaVersion: 1, id: job.id,
+              ok: true, value }),
+          });
+          assert.equal(completion.status, 200);
+        }
+        if (!finished)
+          await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      const captured = await read;
+      assert.ok(captured.ok, "Packaged Blooket read command must succeed");
+      const result = JSON.parse(captured.value.stdout);
+      assert.equal(result.ok, true);
+      assert.equal(result.value.ok, true);
+      if (args[0] === "session") assert.equal(result.value.state, "my-sets");
+      else assert.equal(result.value.kind,
+        args[1] === "list" ? "sets" : "set");
+      assert.ok(!captured.value.stdout.includes(bootstrap.browserBridge.token));
+    }
     await launch(["--stop"]);
     for (let attempt = 0; attempt < 50; attempt++) {
       if ((await launch(["--status"])).stdout.trim() === "Service offline.")
