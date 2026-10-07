@@ -194,6 +194,24 @@ verifies panel cleanup. Answer-image and math encodings now have bounded
 reference-backed normalization, but question image/audio identity and broader
 media behavior remain intentionally unclaimed.
 
+Recovered capability UI now establishes an account-specific observation path,
+but not yet a safe complete probe. Edit module 12048 reads `session.hasPlus` and
+passes it into the question editor. Module 89770 always renders the accessible
+`Add Image to Answer N` control; opening it selects either the real image picker
+when `hasPlus` is true or an explicit Blooket Plus upsell when false. The same
+module selects either the real question-audio picker or an `Upgrade to Plus`
+modal from that same account flag.
+
+The version-one browser bridge already carries `capabilities.inspect`, while the
+concrete worker deliberately refuses it. A safe implementation still needs a
+fully observed non-mutating lifecycle: select an existing set without assuming
+one exists, open Add Question, classify the nested image/audio modal, close the
+nested and parent forms unambiguously, and restore the prior page. An account
+with no sets must remain inspectable without creating one. Until those cleanup
+and empty-account semantics are implemented and tested, the account-dependent
+feature facts remain `account-dependent` rather than guessed `supported` or
+`unsupported`.
+
 Initial validation: 572 portable tests, strict TypeScript, browser-script
 syntax, and compiled-extension assembly passed. Manual pairing controls were
 removed at the human's request; that workflow is superseded by automatic local
