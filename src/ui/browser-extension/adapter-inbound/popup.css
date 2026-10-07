@@ -1,0 +1,54 @@
+:root {
+  font:
+    15px system-ui,
+    sans-serif;
+  color-scheme: light dark;
+}
+body {
+  min-width: 320px;
+  max-width: 420px;
+  margin: 20px;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+h1 {
+  font-size: 20px;
+}
+label {
+  display: block;
+  margin: 14px 0;
+}
+label span {
+  display: block;
+  margin-bottom: 5px;
+}
+input,
+button,
+select {
+  font: inherit;
+}
+input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+}
+button {
+  padding: 9px 14px;
+  margin: 6px 0;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: wait;
+}
+p {
+  line-height: 1.45;
+}
+#codeHelp {
+  font-size: 13px;
+}
+#status {
+  min-height: 2em;
+}

@@ -31,11 +31,26 @@
 //
 import { buildDistribution, TARGETS } from "../adapter-outbound/build.ts";
 import { verifyDistribution } from "../adapter-outbound/verify.ts";
+import { buildBrowserExtension } from "../adapter-outbound/extension.ts";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 const args = process.argv.slice(2);
 const verify = args[0] === "--verify";
 const target = args[verify ? 1 : 0];
 const extra = args.slice(verify ? 2 : 1);
-if (
+if (args.length === 1 && args[0] === "--extension") {
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const destination = join(repo, ".temp/distributions/browser-extension");
+  try {
+    await mkdir(join(repo, ".temp/distributions"), { recursive: true });
+    await buildBrowserExtension(repo, destination);
+    process.stdout.write("Extension assembled: " + destination + "\n");
+  } catch {
+    process.stderr.write("Extension assembly failed; check the destination.\n");
+    process.exitCode = 1;
+  }
+} else if (
   !TARGETS.some((value) => value === target) ||
   extra.some((item) => !verify || item !== "--release")
 ) {

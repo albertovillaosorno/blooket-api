@@ -257,6 +257,7 @@ test(
     const boot = (await (
       await fetch(service.origin + "/api/bootstrap")
     ).json()) as {
+      csrf: string;
       browserBridge: {
         schemaVersion: number;
         token: string;
@@ -268,38 +269,34 @@ test(
     assert.ok(boot.browserBridge.token.length >= 32);
 
     const extensionOrigin = "chrome-extension://fixture-extension";
-    const foreign = await fetch(
-      service.origin + "/api/browser-bridge/next",
-      {
-        headers: {
-          Authorization: "Bearer " + boot.browserBridge.token,
-          Origin: "https://evil.example",
-        },
+    const foreign = await fetch(service.origin + "/api/browser-bridge/next", {
+      headers: {
+        Authorization: "Bearer " + boot.browserBridge.token,
+        Origin: "https://evil.example",
       },
-    );
+    });
     assert.equal(foreign.status, 403);
 
-    const wrong = await fetch(
-      service.origin + "/api/browser-bridge/next",
-      {
-        headers: {
-          Authorization: "Bearer wrong-token",
-          Origin: extensionOrigin,
-        },
+    const wrong = await fetch(service.origin + "/api/browser-bridge/next", {
+      headers: {
+        Authorization: "Bearer wrong-token",
+        Origin: extensionOrigin,
       },
-    );
+    });
     assert.equal(wrong.status, 401);
 
     const pending = service.browserBridge.request({ kind: "sets.list" });
-    const response = await fetch(
-      service.origin + "/api/browser-bridge/next",
-      {
-        headers: {
-          Authorization: "Bearer " + boot.browserBridge.token,
-          Origin: extensionOrigin,
-        },
-      },
+    const statusOnly = await fetch(
+      service.origin + "/api/browser-bridge/status",
+      { headers: { Authorization: "Bearer " + boot.browserBridge.token } },
     );
+    assert.equal(statusOnly.status, 200);
+    const response = await fetch(service.origin + "/api/browser-bridge/next", {
+      headers: {
+        Authorization: "Bearer " + boot.browserBridge.token,
+        Origin: extensionOrigin,
+      },
+    });
     assert.equal(response.status, 200);
     assert.equal(
       response.headers.get("access-control-allow-origin"),
@@ -332,6 +329,29 @@ test(
       ok: true,
       value: [{ schemaVersion: 1, id: "set-a", title: "Synthetic" }],
     });
+    const withoutCsrf = await fetch(
+      service.origin + "/api/browser-pairing-reset",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(withoutCsrf.status, 403);
+    const reset = await fetch(service.origin + "/api/browser-pairing-reset", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": boot.csrf,
+        Origin: service.origin,
+      },
+      body: "{}",
+    });
+    assert.equal(reset.status, 200);
+    const revoked = await fetch(service.origin + "/api/browser-bridge/status", {
+      headers: { Authorization: "Bearer " + boot.browserBridge.token },
+    });
+    assert.equal(revoked.status, 401);
   } finally {
     await new Promise<void>((resolve) => {
       service.server.close(() => resolve());

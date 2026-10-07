@@ -1,0 +1,250 @@
+// Copyright:
+//   - Copyright © 2026 Alberto Villa Osorno.
+// SPDX-License-Identifier:
+//   - MIT
+// Confidential:
+//   - false
+// License-File:
+//   - LICENSE-MIT
+//
+// Boundary-Contract:
+// - Owns:
+//   - Synthetic regression coverage for observed Blooket page extraction.
+// - Must-Not:
+//   - Read hidden framework state, cookies, credentials, or raw page HTML.
+// - Allows:
+//   - Inputs: One admitted read operation on the confirmed dashboard origin.
+//   - Outputs: Untrusted visible facts or a stable browser failure.
+//   - Side effects: DOM inspection and opening details without saving edits.
+// - Split-When:
+//   - Question reading gains independently verified control semantics.
+// - Merge-When:
+//   - Visible page reads no longer require a browser-specific boundary.
+// - Summary:
+//   - Extracts set summaries and detail without guessing unavailable fields.
+// - Description:
+//   - Application IR decoders remain the authority for returned values.
+// - Usage:
+//   - Run with synthetic DOM controls and the owning IR decoders.
+// - Defaults:
+//   - Unknown routes, incomplete controls, and ambiguous values fail closed.
+//
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  inspectBlooketPage,
+  blooketReadUrl,
+  openBlooketDetailPanel,
+} from "../../../../src/platforms/blooket-browser/adapter-outbound/page.ts";
+import {
+  decodeBlooketSetList,
+  decodeBlooketSetDetail,
+} from "../../../../src/ir/blooket-set-reads/contract/set-read.ts";
+
+interface FixtureNode {
+  tagName: string;
+  textContent: string;
+  value?: string;
+  labels?: FixtureNode[];
+  selectors: Record<string, FixtureNode[]>;
+  getAttribute(name: string): string | null;
+  querySelector(selector: string): FixtureNode | null;
+  querySelectorAll(selector: string): FixtureNode[];
+  getBoundingClientRect(): { width: number; height: number };
+  click(): void;
+}
+function node(
+  tagName: string,
+  textContent = "",
+  attributes: Record<string, string> = {},
+): FixtureNode {
+  return {
+    tagName,
+    textContent,
+    selectors: {},
+    getAttribute: (name) => attributes[name] ?? null,
+    querySelector(selector) {
+      return this.selectors[selector]?.[0] ?? null;
+    },
+    querySelectorAll(selector) {
+      return this.selectors[selector] ?? [];
+    },
+    getBoundingClientRect: () => ({ width: 20, height: 20 }),
+    click: () => {
+      throw new Error("unexpected-dom-mutation");
+    },
+  };
+}
+function page(document: FixtureNode, href: string, run: () => void): void {
+  const priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: document,
+  });
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: new URL(href),
+  });
+  try {
+    run();
+  } finally {
+    if (priorDocument)
+      Object.defineProperty(globalThis, "document", priorDocument);
+    else Reflect.deleteProperty(globalThis, "document");
+    if (priorLocation)
+      Object.defineProperty(globalThis, "location", priorLocation);
+    else Reflect.deleteProperty(globalThis, "location");
+  }
+}
+function base() {
+  const document = node("DOCUMENT");
+  const main = node("MAIN");
+  document.selectors["main"] = [main];
+  document.selectors['nav a[href="/my-sets"]'] = [node("A", "My Sets")];
+  main.selectors["h1"] = [node("H1", "My Sets")];
+  return { document, main };
+}
+function card(id = "fixture-set") {
+  const article = node("ARTICLE");
+  article.selectors["h3"] = [node("H3", "Synthetic fixture")];
+  article.selectors["a[href]"] = [
+    node("A", " Edit ", {
+      href: "/edit?id=" + encodeURIComponent(id),
+    }),
+    node("A", "View Set", { href: "/set/" + id }),
+  ];
+  return article;
+}
+
+test(
+  "visible set summaries preserve opaque IDs and pass the IR decoder",
+  () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card("opaque/set? id")];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "my-sets",
+    });
+    const result = inspectBlooketPage({ kind: "sets.list" });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.value, [
+      { schemaVersion: 1, id: "opaque/set? id", title: "Synthetic fixture" },
+    ]);
+    assert.equal(decodeBlooketSetList(result.value).ok, true);
+    main.selectors["article"] = [card(), card()];
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    main.selectors["article"] = [];
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+});
+
+test(
+  "malformed or foreign set links fail instead of returning partial lists",
+  () => {
+  const { document, main } = base();
+  for (const href of [
+    "https://example.invalid/edit?id=fixture",
+    "/delete?id=fixture",
+    "/edit",
+    "/edit?id=",
+  ]) {
+    const article = card();
+    article.selectors["a[href]"] = [node("A", "Edit", { href })];
+    main.selectors["article"] = [article];
+    page(document, "https://dashboard.blooket.com/my-sets", () =>
+      assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false),
+    );
+  }
+  main.selectors["article"] = Array.from({ length: 201 }, (_, i) =>
+    card("id" + i),
+  );
+  page(document, "https://dashboard.blooket.com/my-sets", () =>
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false),
+  );
+});
+
+test(
+  "detail requires the observed private label and exact requested set",
+  () => {
+  const { document } = base();
+  const title = node("INPUT");
+  title.value = "Synthetic fixture";
+  const description = node("TEXTAREA");
+  description.value = "Original text";
+  const attributes = {
+    type: "checkbox",
+    role: "switch",
+    "aria-checked": "false",
+  };
+  const privacy = node("INPUT", "", attributes);
+  privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+  document.selectors['input#title[name="title"]'] = [title];
+  document.selectors['textarea#desc[name="desc"]'] = [description];
+  document.selectors['input#private[name="private"]'] = [privacy];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    const result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(decodeBlooketSetDetail(result.value).ok, true);
+    assert.equal(
+      inspectBlooketPage({ kind: "sets.get", setId: "other" }).ok,
+      false,
+    );
+    attributes["aria-checked"] = "true";
+    assert.equal(
+      inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
+      false,
+    );
+    attributes["aria-checked"] = "false";
+    privacy.labels = [node("LABEL", "Unknown visibility")];
+    assert.equal(
+      inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
+      false,
+    );
+  });
+});
+
+test(
+  "challenge and unknown origin observations never proceed to set reads",
+  () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  document.selectors['iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'] = [
+    node("IFRAME"),
+  ];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "security-challenge",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+  page(document, "https://example.invalid/my-sets", () =>
+    assert.equal(inspectBlooketPage({ kind: "session.observe" }).ok, false),
+  );
+});
+
+test("read routes encode IDs and panel opening never submits a form", () => {
+  assert.equal(
+    blooketReadUrl({ kind: "sets.get", setId: "x&redirect=http://bad" }),
+    "https://dashboard.blooket.com/edit?id=x%26redirect%3Dhttp%3A%2F%2Fbad",
+  );
+  assert.throws(() => blooketReadUrl({ kind: "sets.get", setId: "\0" }));
+  const document = node("DOCUMENT");
+  const button = node("BUTTON", "Edit Info");
+  let clicks = 0;
+  button.click = () => {
+    clicks++;
+  };
+  document.selectors["main button"] = [button];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(openBlooketDetailPanel(), true);
+    assert.equal(clicks, 1);
+  });
+  page(document, "https://example.invalid/edit?id=fixture", () => {
+    assert.equal(openBlooketDetailPanel(), false);
+    assert.equal(clicks, 1);
+  });
+});

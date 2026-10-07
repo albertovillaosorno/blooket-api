@@ -28,6 +28,18 @@ const words = {
     gateway: "Puerto del gateway MCP",
     quizzes: "Quizzes",
     settings: "Configuración",
+    browserConnection: "Conexión con Blooket",
+    browserConnectionHelp:
+      "Usa esta dirección y este código en la extensión Blooket Studio. " +
+      "El código cambia al reiniciar el servicio; " +
+      "no lo compartas con una IA. " +
+      "La extensión lee en una pestaña separada. Aún no publica quizzes.",
+    browserAddress: "Dirección del espacio local",
+    browserCode: "Código temporal de conexión",
+    copyBrowserCode: "Copiar código",
+    resetBrowserCode: "Revocar conexión y cambiar código",
+    browserCodeCopied: "Código copiado. Pégalo solo en Blooket Studio.",
+    browserCodeReset: "Conexión revocada. Conecta de nuevo la extensión.",
     yourSpace: "Tu espacio de enseñanza",
     libraryHelp: "Tus fotos y GIF, listos para el próximo quiz.",
     addImage: "Agregar imagen",
@@ -201,6 +213,17 @@ const words = {
     gateway: "MCP gateway port",
     quizzes: "Quizzes",
     settings: "Settings",
+    browserConnection: "Blooket connection",
+    browserConnectionHelp:
+      "Use this address and code in the Blooket Studio extension. " +
+      "The code changes on service restart; do not share it with an AI. " +
+      "The extension reads in a separate tab. It cannot publish quizzes yet.",
+    browserAddress: "Local workspace address",
+    browserCode: "Temporary connection code",
+    copyBrowserCode: "Copy code",
+    resetBrowserCode: "Revoke connection and change code",
+    browserCodeCopied: "Code copied. Paste it only in Blooket Studio.",
+    browserCodeReset: "Connection revoked. Connect the extension again.",
     yourSpace: "Your teaching space",
     libraryHelp: "Your photos and GIFs, ready for the next quiz.",
     addImage: "Add image",
@@ -347,6 +370,7 @@ let locale = "es",
   selected,
   sourceFile;
 let editorBusy = false;
+let browserConnectionMessage = "";
 let history = [],
   future = [],
   picking = false;
@@ -375,6 +399,7 @@ function translate() {
     el.setAttribute("aria-label", t(el.dataset.aria));
   });
   $("#preparedPreview").alt = t("preparedLabel");
+  renderBrowserConnectionMessage();
   renderGallery();
 }
 function toast(message) {
@@ -571,7 +596,7 @@ for (const name of ["dragleave", "drop"])
   });
 window.addEventListener("paste", (event) => {
   const image = [...(event.clipboardData?.files ?? [])].find((file) =>
-    file.type.startsWith("image/")
+    file.type.startsWith("image/"),
   );
   if (!image) return;
   event.preventDefault();
@@ -917,6 +942,7 @@ editForm.addEventListener("submit", async (event) => {
   }
 });
 function fillSettings() {
+  fillBrowserConnection();
   const settings = bootstrap.preferences;
   for (const name of ["email", "mediaRoot"])
     field(settingsForm, name).value = settings[name];
@@ -931,6 +957,38 @@ function fillSettings() {
   $("#onlineFields").disabled = !settings.online.enabled;
   renderSettingsState();
 }
+function fillBrowserConnection() {
+  $("#browserAddress").value = location.origin;
+  $("#browserCode").value = bootstrap.browserBridge?.token ?? "";
+}
+function renderBrowserConnectionMessage() {
+  $("#browserConnectionState").textContent = browserConnectionMessage
+    ? t(browserConnectionMessage) : "";
+}
+$("#copyBrowserCode").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("#browserCode").value);
+    browserConnectionMessage = "browserCodeCopied";
+    renderBrowserConnectionMessage();
+  } catch (error) {
+    report(error);
+  }
+});
+$("#resetBrowserCode").addEventListener("click", async () => {
+  const button = $("#resetBrowserCode");
+  button.disabled = true;
+  try {
+    await api("/api/browser-pairing-reset", {});
+    bootstrap = await api("/api/bootstrap");
+    fillBrowserConnection();
+    browserConnectionMessage = "browserCodeReset";
+    renderBrowserConnectionMessage();
+  } catch (error) {
+    report(error);
+  } finally {
+    button.disabled = false;
+  }
+});
 function renderSettingsState() {
   $("#passwordState").textContent = t(
     bootstrap.secrets.passwordConfigured ? "configured" : "missing",

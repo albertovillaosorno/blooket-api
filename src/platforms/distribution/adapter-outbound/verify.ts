@@ -111,6 +111,18 @@ export async function verifyDistribution(
     const names = await readdir(app);
     assert.ok(!names.includes(".env") && !names.includes("reference"));
     await assert.rejects(access(join(app, "docs/agents/developer")));
+    const browser = join(resources, "extensions/chrome");
+    const browserManifest = JSON.parse(await readFile(
+      join(browser, "manifest.json"), "utf8",
+    ));
+    assert.equal(browserManifest.manifest_version, 3);
+    assert.deepEqual(browserManifest.permissions, ["storage", "scripting"]);
+    assert.equal(browserManifest.background.service_worker,
+      "src/service/browser-extension/adapter-inbound/worker.js");
+    const worker = await readFile(join(browser,
+      "src/service/browser-extension/adapter-inbound/worker.js"), "utf8");
+    assert.doesNotMatch(worker, /from\s+["'][^"']+\.ts["']/u);
+    assert.doesNotMatch(worker, /from\s+["']node:/u);
     if (mac && release) {
       const plugins = join(root, "Blooket Studio.app/Contents/PlugIns");
       const extensions = (await readdir(plugins)).filter((name) =>

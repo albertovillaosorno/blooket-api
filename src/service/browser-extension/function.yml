@@ -1,0 +1,9 @@
+identity:
+  id: function:browser-extension
+  name: browser-extension
+  path: src/service/browser-extension
+classification:
+  repository: blooket-api
+  domain: service
+architecture:
+  kind: adapter-inbound

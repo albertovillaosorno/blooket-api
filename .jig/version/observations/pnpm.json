@@ -2,7 +2,7 @@
   "authority": "pnpm",
   "integrity_kind": "provider-response-sha256",
   "integrity_sha256": "16434dca90b1cea1cec734e042bcb2d17340a3f934b577789eb4b45b3e3b8a65",
-  "observed_on": "2026-10-05",
+  "observed_on": "2026-10-07",
   "provider": "npm-registry",
   "schema_version": 1,
   "source": "https://registry.npmjs.org/pnpm/latest",

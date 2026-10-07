@@ -43,6 +43,7 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, dirname } from "node:path";
+import { buildBrowserExtension } from "./extension.ts";
 
 export const TARGETS = ["linux-x64", "darwin-arm64", "darwin-x64"] as const;
 export type DistributionTarget = (typeof TARGETS)[number];
@@ -204,6 +205,8 @@ export async function buildDistribution(target: DistributionTarget) {
   const runtime = join(resource, "runtime");
   await mkdir(runtime, { recursive: true });
   try {
+    await mkdir(join(resource, "extensions"), { recursive: true });
+    await buildBrowserExtension(repo, join(resource, "extensions/chrome"));
     for (const file of [
       "src",
       "docs/agents/user",

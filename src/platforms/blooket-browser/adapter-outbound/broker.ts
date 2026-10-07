@@ -30,11 +30,7 @@
 // - Defaults:
 //   - Eight pending jobs and a ten-second response deadline.
 //
-import {
-  randomBytes,
-  randomUUID,
-  timingSafeEqual,
-} from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
   BLOOKET_BROWSER_BRIDGE_VERSION,
@@ -56,6 +52,7 @@ interface PendingJob {
 export interface BlooketBrowserBridgeBroker
   extends BlooketBrowserBridgeTransport {
   pairingToken(): string;
+  resetPairing(): void;
   authenticated(token: string): boolean;
   next(token: string): BlooketBrowserBridgeRequest | null;
   complete(token: string, value: unknown): boolean;
@@ -82,7 +79,7 @@ export function createBlooketBrowserBridgeBroker(
   if (!Number.isSafeInteger(maxPending) || maxPending < 1) {
     throw new Error("invalid-browser-bridge-capacity");
   }
-  const token = options.token ?? randomBytes(32).toString("base64url");
+  let token = options.token ?? randomBytes(32).toString("base64url");
   if (Buffer.byteLength(token, "utf8") < 32) {
     throw new Error("invalid-browser-bridge-token");
   }
@@ -94,7 +91,9 @@ export function createBlooketBrowserBridgeBroker(
   function authenticated(candidate: string): boolean {
     const left = Buffer.from(token, "utf8");
     const right = Buffer.from(candidate, "utf8");
-    return left.length === right.length && timingSafeEqual(left, right);
+    return (
+      !closed && left.length === right.length && timingSafeEqual(left, right)
+    );
   }
 
   function settle(
@@ -111,6 +110,14 @@ export function createBlooketBrowserBridgeBroker(
   return {
     pairingToken: () => token,
     authenticated,
+    resetPairing: () => {
+      if (closed) return;
+      token = randomBytes(32).toString("base64url");
+      lastPollAt = 0;
+      for (const id of [...pending.keys()]) {
+        settle(id, { ok: false, code: "blooket-browser-unavailable" });
+      }
+    },
 
     request: async (command) => {
       if (closed || pending.size >= maxPending) {
@@ -158,19 +165,16 @@ export function createBlooketBrowserBridgeBroker(
     complete: (candidate, value) => {
       if (closed || !authenticated(candidate)) return false;
       if (
-        typeof value !== "object"
-        || value === null
-        || !("id" in value)
-        || typeof value.id !== "string"
+        typeof value !== "object" ||
+        value === null ||
+        !("id" in value) ||
+        typeof value.id !== "string"
       ) {
         return false;
       }
       const job = pending.get(value.id);
       if (!job || !job.dispatched) return false;
-      const decoded = decodeBlooketBrowserBridgeResponse(
-        value,
-        job.request.id,
-      );
+      const decoded = decodeBlooketBrowserBridgeResponse(value, job.request.id);
       if (!decoded.ok) {
         settle(job.request.id, {
           ok: false,
@@ -200,7 +204,7 @@ export function createBlooketBrowserBridgeBroker(
 
     status: () => ({
       pending: pending.size,
-      connected: lastPollAt > 0 && now() - lastPollAt <= timeoutMs,
+      connected: !closed && lastPollAt > 0 && now() - lastPollAt <= timeoutMs,
     }),
   };
 }

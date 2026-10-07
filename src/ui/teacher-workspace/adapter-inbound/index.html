@@ -213,6 +213,21 @@
           </div>
         </form>
         <article class="notice">
+          <h2 data-i18n="browserConnection"></h2>
+          <p data-i18n="browserConnectionHelp"></p>
+          <label
+            ><span data-i18n="browserAddress"></span>
+            <input id="browserAddress" readonly autocomplete="off"
+          /></label>
+          <label
+            ><span data-i18n="browserCode"></span>
+            <input id="browserCode" readonly type="password" autocomplete="off"
+          /></label>
+          <button id="copyBrowserCode" data-i18n="copyBrowserCode"></button>
+          <button id="resetBrowserCode" data-i18n="resetBrowserCode"></button>
+          <p id="browserConnectionState" role="status"></p>
+        </article>
+        <article class="notice">
           <h2 data-i18n="connectionRequests"></h2>
           <p data-i18n="consentHelp"></p>
           <div id="connections"></div>

@@ -349,6 +349,14 @@ export async function startBrowserService(
         request,
         url.pathname === "/api/import" ? 36_000_000 : 1_000_000,
       );
+      if (url.pathname === "/api/browser-pairing-reset") {
+        if (!body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).length !== 0)
+          throw new Error("invalid-browser-pairing-request");
+        browserBridge.resetPairing();
+        json(response, 200, { ok: true });
+        return;
+      }
       if (url.pathname === "/api/settings") {
         const saved = await saveConfiguration(root, body, secrets);
         if (saved.ok || saved.secretsSaved.includes("ownerPassword"))
@@ -578,6 +586,10 @@ async function handleBrowserBridgeRequest(
     request.url ?? "/",
     "http://loopback.invalid",
   ).pathname;
+  if (path === "/api/browser-bridge/status" && request.method === "GET") {
+    json(response, 200, { ok: true, ...bridge.status() });
+    return;
+  }
   if (path === "/api/browser-bridge/next" && request.method === "GET") {
     json(response, 200, { ok: true, job: bridge.next(token) });
     return;
