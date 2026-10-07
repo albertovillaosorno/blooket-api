@@ -32,8 +32,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { renderEditedImageRendition } from
-  "../../../../src/media/image-renditions/adapter-outbound/edit.ts";
+import {
+  renderEditedImageRendition,
+  renderOptimizedImageRendition,
+} from "../../../../src/media/image-renditions/adapter-outbound/edit.ts";
 import { loadSharp } from
   "../../../../src/media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
 import { type MediaEditorState } from
@@ -95,6 +97,51 @@ function state(
 async function rawPixels(bytes: Uint8Array): Promise<Uint8Array> {
   const sharp = await loadSharp();
   return await sharp(bytes).raw().toBuffer();
+}
+
+async function detailedFixture(): Promise<Uint8Array> {
+  const sharp = await loadSharp();
+  const width = 96;
+  const height = 96;
+  const raw = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4;
+      raw[offset] = (x * 37 + y * 17) % 256;
+      raw[offset + 1] = (x * 13 + y * 53) % 256;
+      raw[offset + 2] = (x * 71 + y * 29) % 256;
+      raw[offset + 3] = 255;
+    }
+  return await sharp(raw, {
+    raw: { width, height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+}
+
+async function candidateBytes(
+  source: Uint8Array,
+  detailScale: number,
+  compression: "lossless" | "compact",
+): Promise<number> {
+  const rendered = await renderEditedImageRendition(
+    source,
+    state(),
+    { width: 96, height: 96 },
+    {
+      maxInputPixels: 1_000_000,
+      maxOutputPixels: 1_000_000,
+      maxOutputBytes: 1_000_000,
+    },
+    {
+      blurSigma: 20,
+      detailScale,
+      compression,
+      background: { mode: "solid", color: "#ffffff" },
+    },
+  );
+  assert.ok(rendered.ok);
+  return rendered.ok ? rendered.value.bytes.length : 0;
 }
 
 test("neutral editor rendering preserves equal-canvas pixels", async () => {
@@ -301,6 +348,115 @@ test("one-pixel blur regions remain valid bounded operations", async () => {
   );
 
   assert.equal(rendered.ok, true);
+});
+
+test("optimization lowers working detail before compression", async () => {
+  const source = await detailedFixture();
+  const size70 = await candidateBytes(source, 0.7, "lossless");
+  const size55 = await candidateBytes(source, 0.55, "lossless");
+  assert.ok(size70 > size55);
+  const optimized = await renderOptimizedImageRendition(
+    source,
+    state(),
+    { width: 96, height: 96 },
+    {
+      maxInputPixels: 1_000_000,
+      maxOutputPixels: 1_000_000,
+      maxOutputBytes: size55,
+    },
+    {
+      blurSigma: 20,
+      gifFps: 10,
+      compression: "lossless",
+      background: { mode: "solid", color: "#ffffff" },
+    },
+  );
+  assert.ok(optimized.ok);
+  if (!optimized.ok) return;
+  assert.deepEqual(optimized.value.effective, {
+    stage: "detail",
+    detailScale: 0.55,
+    gifFps: null,
+    compression: "lossless",
+  });
+  assert.equal(optimized.value.width, 96);
+  assert.equal(optimized.value.height, 96);
+  assert.ok(optimized.value.bytes.length <= size55);
+});
+
+test(
+  "optimization uses compact only after lossless detail is exhausted",
+  async () => {
+    const source = await detailedFixture();
+    const lossless40 = await candidateBytes(source, 0.4, "lossless");
+    const compact40 = await candidateBytes(source, 0.4, "compact");
+    assert.ok(lossless40 > compact40 + 1);
+    const limit = lossless40 - 1;
+    assert.ok(compact40 <= limit);
+    const optimized = await renderOptimizedImageRendition(
+      source,
+      state(),
+      { width: 96, height: 96 },
+      {
+        maxInputPixels: 1_000_000,
+        maxOutputPixels: 1_000_000,
+        maxOutputBytes: limit,
+      },
+      {
+        blurSigma: 20,
+        gifFps: 10,
+        compression: "lossless",
+        background: { mode: "solid", color: "#ffffff" },
+      },
+    );
+    assert.ok(optimized.ok);
+    if (!optimized.ok) return;
+    assert.deepEqual(optimized.value.effective, {
+      stage: "compression",
+      detailScale: 0.4,
+      gifFps: null,
+      compression: "compact",
+    });
+    assert.equal(optimized.value.width, 96);
+    assert.equal(optimized.value.height, 96);
+    assert.ok(optimized.value.bytes.length <= limit);
+  },
+);
+
+test("GIF optimization lowers FPS only after detail candidates", async () => {
+  const optimized = await renderOptimizedImageRendition(
+    GIF_2_FRAME_2X2,
+    state(),
+    { width: 16, height: 16 },
+    {
+      maxInputPixels: 10_000,
+      maxOutputPixels: 16 * 16 * 2,
+      maxOutputBytes: 1_000_000,
+    },
+    {
+      blurSigma: 20,
+      gifFps: 20,
+      compression: "compact",
+      background: { mode: "solid", color: "#ffffff" },
+    },
+  );
+  assert.ok(optimized.ok);
+  if (!optimized.ok) return;
+  assert.deepEqual(optimized.value.effective, {
+    stage: "fps",
+    detailScale: 0.4,
+    gifFps: 10,
+    compression: "compact",
+  });
+  assert.equal(optimized.value.width, 16);
+  assert.equal(optimized.value.height, 16);
+  assert.equal(optimized.value.frameCount, 2);
+  const sharp = await loadSharp();
+  const metadata = await sharp(optimized.value.bytes, {
+    animated: true,
+  }).metadata();
+  assert.deepEqual(metadata.delay, [100, 100]);
+  assert.equal(metadata.loop, 2);
 });
 
 test(

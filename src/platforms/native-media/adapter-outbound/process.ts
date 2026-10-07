@@ -43,8 +43,14 @@ import type { ImageDecodeResult } from
   "../../../media/image-decoding/adapter-outbound/sharp-image.ts";
 import type {
   EditorRenditionResult,
+  OptimizedEditorRenditionResult,
   EditorRenditionOptions,
 } from "../../../media/image-renditions/adapter-outbound/edit.ts";
+
+import {
+  decodeRenditionOptimizationCandidate,
+  renditionOptimizationCandidates,
+} from "../../../media/rendition-optimization/domain/candidates.ts";
 
 import type { MediaEditorState } from
   "../../../media/editor-state/domain/editor-state.ts";
@@ -247,7 +253,7 @@ export async function renderImageIsolated(
   bytes: Uint8Array,
   recipe: EditRecipe,
   options?: NativeMediaOptions,
-): Promise<EditorRenditionResult> {
+): Promise<OptimizedEditorRenditionResult> {
   admitSource(bytes);
   decodeEditRecipe(recipe);
   const reply = object(
@@ -261,7 +267,17 @@ export async function renderImageIsolated(
       options,
     ),
   );
-  return decodeRenderedReply(reply, recipe, 80_000_000, 2_499_999);
+  try {
+    return decodeRenderedReply(
+      reply,
+      recipe,
+      80_000_000,
+      2_499_999,
+      recipe,
+    ) as OptimizedEditorRenditionResult;
+  } catch {
+    throw new Error("native-media-invalid-result");
+  }
 }
 const NATIVE_FAILURES = [
   "native-media-timeout",
@@ -333,7 +349,8 @@ function decodeRenderedReply(
   canvas: RenditionCanvas,
   maxOutputPixels: number,
   maxOutputBytes: number,
-): EditorRenditionResult {
+  expectedRecipe?: EditRecipe,
+): EditorRenditionResult | OptimizedEditorRenditionResult {
   if (reply["ok"] === false) {
     exact(reply, [
       "ok",
@@ -360,10 +377,31 @@ function decodeRenderedReply(
     "height",
     "frameCount",
     "animated",
+    ...(expectedRecipe === undefined ? [] : ["effective"]),
   ]);
+  const effective =
+    expectedRecipe === undefined
+      ? undefined
+      : decodeRenditionOptimizationCandidate(value["effective"]);
   const output = value["bytes"];
   const format =
     output instanceof Uint8Array ? detectImageFormat(output) : null;
+  if (
+    expectedRecipe !== undefined &&
+    effective !== undefined &&
+    !renditionOptimizationCandidates({
+      animated: value["animated"] === true,
+      gifFps: expectedRecipe.gifFps,
+      compression: expectedRecipe.compression,
+    }).some(
+      (candidate) =>
+        candidate.stage === effective.stage &&
+        candidate.detailScale === effective.detailScale &&
+        candidate.gifFps === effective.gifFps &&
+        candidate.compression === effective.compression,
+    )
+  )
+    throw new Error("native-media-invalid-result");
   if (
     reply["ok"] !== true ||
     !(output instanceof Uint8Array) ||

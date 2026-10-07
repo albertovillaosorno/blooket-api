@@ -50,6 +50,10 @@ import { loadSharp } from
   "../../sharp-runtime/adapter-outbound/sharp-runtime.ts";
 
 import { resampleGifTimeline } from "../../gif-timeline/domain/timeline.ts";
+import {
+  renditionOptimizationCandidates,
+  type RenditionOptimizationCandidate,
+} from "../../rendition-optimization/domain/candidates.ts";
 
 type DecodeFailureCode = Extract<
   ImageDecodeResult,
@@ -64,6 +68,7 @@ export interface EditorRenditionOptions {
     readonly color: string;
   };
   readonly compression?: "lossless" | "compact";
+  readonly detailScale?: number;
 }
 
 export type EditorRenditionResult =
@@ -79,6 +84,15 @@ export type EditorRenditionResult =
       readonly sourceCode?: DecodeFailureCode;
     };
 
+export type OptimizedEditorRenditionResult =
+  | {
+      readonly ok: true;
+      readonly value: ImageRendition & {
+        readonly effective: RenditionOptimizationCandidate;
+      };
+    }
+  | Exclude<EditorRenditionResult, { readonly ok: true }>;
+
 export async function renderEditedImageRendition(
   source: Uint8Array,
   state: MediaEditorState,
@@ -90,6 +104,8 @@ export async function renderEditedImageRendition(
     !validCanvasAndLimits(canvas, limits) ||
     !validEditorState(state) ||
     !validBlurSigma(options.blurSigma) ||
+    (options.detailScale !== undefined &&
+      ![1, 0.85, 0.7, 0.55, 0.4].includes(options.detailScale)) ||
     (options.background !== undefined &&
       (!/^(#[0-9a-f]{6})$/iu.test(options.background.color) ||
         !["blur", "solid"].includes(options.background.mode)))
@@ -105,8 +121,28 @@ export async function renderEditedImageRendition(
       sourceCode: decoded.code,
     };
   }
-  const timeline = decoded.value.animated
-    ? resampleGifTimeline(decoded.value.frameDelaysMs, options.gifFps ?? 10)
+  return await renderDecodedImageRendition(
+    source,
+    decoded.value,
+    state,
+    canvas,
+    limits,
+    options,
+  );
+}
+
+type DecodedImage = Extract<ImageDecodeResult, { readonly ok: true }>["value"];
+
+async function renderDecodedImageRendition(
+  source: Uint8Array,
+  decoded: DecodedImage,
+  state: MediaEditorState,
+  canvas: RenditionCanvas,
+  limits: RenditionLimits,
+  options: EditorRenditionOptions,
+): Promise<EditorRenditionResult> {
+  const timeline = decoded.animated
+    ? resampleGifTimeline(decoded.frameDelaysMs, options.gifFps ?? 10)
     : { pages: [0], delayMs: 100 };
   if (timeline === undefined)
     return { ok: false, code: "invalid-editor-rendition" };
@@ -120,12 +156,12 @@ export async function renderEditedImageRendition(
   ) {
     return { ok: false, code: "rendition-pixel-limit-exceeded" };
   }
-  if (decoded.value.animated && decoded.value.format.format !== "gif") {
+  if (decoded.animated && decoded.format.format !== "gif") {
     return { ok: false, code: "editor-animation-unsupported" };
   }
 
   try {
-    const animated = decoded.value.animated;
+    const animated = decoded.animated;
     const rendered = animated
       ? await renderAnimatedGif(
           source,
@@ -135,11 +171,11 @@ export async function renderEditedImageRendition(
           options,
           timeline,
           {
-            frameCount: decoded.value.frameCount,
-            frameDelaysMs: decoded.value.frameDelaysMs,
-            ...(decoded.value.loopCount === undefined
+            frameCount: decoded.frameCount,
+            frameDelaysMs: decoded.frameDelaysMs,
+            ...(decoded.loopCount === undefined
               ? {}
-              : { loopCount: decoded.value.loopCount }),
+              : { loopCount: decoded.loopCount }),
           },
         )
       : await renderFrame(source, state, canvas, limits, options);
@@ -165,6 +201,71 @@ export async function renderEditedImageRendition(
   }
 }
 
+export async function renderOptimizedImageRendition(
+  source: Uint8Array,
+  state: MediaEditorState,
+  canvas: RenditionCanvas,
+  limits: RenditionLimits,
+  options: EditorRenditionOptions & {
+    readonly gifFps: number;
+    readonly compression: "lossless" | "compact";
+  },
+): Promise<OptimizedEditorRenditionResult> {
+  if (
+    !validCanvasAndLimits(canvas, limits) ||
+    !validEditorState(state) ||
+    !validBlurSigma(options.blurSigma) ||
+    (options.background !== undefined &&
+      (!/^(#[0-9a-f]{6})$/iu.test(options.background.color) ||
+        !["blur", "solid"].includes(options.background.mode)))
+  )
+    return { ok: false, code: "invalid-editor-rendition" };
+  const decoded = await decodeSourceImage(source, limits.maxInputPixels);
+  if (!decoded.ok) {
+    return {
+      ok: false,
+      code: "rendition-failed",
+      sourceCode: decoded.code,
+    };
+  }
+  const candidates = renditionOptimizationCandidates({
+    animated: decoded.value.animated,
+    gifFps: options.gifFps,
+    compression: options.compression,
+  });
+  if (candidates.length === 0)
+    return { ok: false, code: "invalid-editor-rendition" };
+
+  let lastLimitFailure: Extract<EditorRenditionResult, { ok: false }> = {
+    ok: false,
+    code: "rendition-byte-limit-exceeded",
+  };
+  for (const effective of candidates) {
+    const rendered = await renderDecodedImageRendition(
+      source,
+      decoded.value,
+      state,
+      canvas,
+      limits,
+      {
+        ...options,
+        detailScale: effective.detailScale,
+        gifFps: effective.gifFps ?? options.gifFps,
+        compression: effective.compression,
+      },
+    );
+    if (rendered.ok)
+      return { ok: true, value: { ...rendered.value, effective } };
+    if (
+      rendered.code !== "rendition-byte-limit-exceeded" &&
+      rendered.code !== "rendition-pixel-limit-exceeded"
+    )
+      return rendered;
+    lastLimitFailure = rendered;
+  }
+  return lastLimitFailure;
+}
+
 async function renderFrame(
   source: Uint8Array,
   state: MediaEditorState,
@@ -186,11 +287,30 @@ async function renderFrame(
   if (!adjustedDecoded.ok || adjustedDecoded.value.animated) {
     throw new Error("Expected one decoded editor frame.");
   }
+  const detailScale = options.detailScale ?? 1;
+  const working =
+    detailScale === 1
+      ? adjusted
+      : await reduceWorkingDetail(
+          adjusted,
+          adjustedDecoded.value.frameWidth,
+          adjustedDecoded.value.frameHeight,
+          detailScale,
+          limits.maxInputPixels,
+        );
+  const workingWidth = Math.max(
+    1,
+    Math.round(adjustedDecoded.value.frameWidth * detailScale),
+  );
+  const workingHeight = Math.max(
+    1,
+    Math.round(adjustedDecoded.value.frameHeight * detailScale),
+  );
 
   const sample = resolveForegroundRasterSample(
     {
-      width: adjustedDecoded.value.frameWidth,
-      height: adjustedDecoded.value.frameHeight,
+      width: workingWidth,
+      height: workingHeight,
     },
     canvas,
     state.transform,
@@ -200,7 +320,7 @@ async function renderFrame(
   }
 
   const base = await renderStaticBase(
-    adjusted,
+    working,
     canvas,
     limits,
     sample.value,
@@ -340,6 +460,27 @@ async function adjustSource(
   })
     .linear([contrast, contrast, contrast, 1], [offset, offset, offset, 0])
     .modulate({ saturation: state.transform.saturation })
+    .png()
+    .toBuffer();
+}
+
+async function reduceWorkingDetail(
+  source: Uint8Array,
+  width: number,
+  height: number,
+  scale: number,
+  maxInputPixels: number,
+): Promise<Uint8Array> {
+  const sharp = await loadSharp();
+  return await sharp(source, {
+    failOn: "warning",
+    limitInputPixels: maxInputPixels,
+  })
+    .resize({
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale)),
+      fit: "fill",
+    })
     .png()
     .toBuffer();
 }

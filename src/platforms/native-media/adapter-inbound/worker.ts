@@ -32,8 +32,10 @@
 //
 import { decodeSourceImage } from
   "../../../media/image-decoding/adapter-outbound/sharp-image.ts";
-import { renderEditedImageRendition } from
-  "../../../media/image-renditions/adapter-outbound/edit.ts";
+import {
+  renderEditedImageRendition,
+  renderOptimizedImageRendition,
+} from "../../../media/image-renditions/adapter-outbound/edit.ts";
 import {
   decodeEditRecipe,
   object,
@@ -195,7 +197,7 @@ async function work(input: unknown) {
     const options = object(request["options"]);
     exact(options, [
       "blurSigma",
-      ...["gifFps", "background", "compression"].filter(
+      ...["gifFps", "background", "compression", "detailScale"].filter(
         (key) => key in options,
       ),
     ]);
@@ -208,7 +210,7 @@ async function work(input: unknown) {
     );
   }
   const recipe = decodeEditRecipe(request["recipe"]);
-  return await renderEditedImageRendition(
+  return await renderOptimizedImageRendition(
     bytes,
     {
       name: "",
