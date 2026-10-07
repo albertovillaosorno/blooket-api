@@ -247,6 +247,17 @@ Acceptance includes the two-field form on all intake paths, unchanged original
 English and non-English text, generated topics, actual English normalization,
 failed-save/revision-race handling, and correct pending/completed/stale states.
 
+Two-field intake was implemented on 2026-10-06. File selection, drag/drop, and
+clipboard admission all converge on the same import dialog; that dialog now asks
+only for the teacher's name and description. The import application contract
+accepts no language or topics, records original language as unknown (empty
+string), and starts topics empty instead of inferring either value from the UI
+locale.
+
+AI-owned language identification, topic generation, normalized English output,
+and revision-safe normalization completion remain pending. This implementation
+does not claim those enrichment checks are complete.
+
 Mirrored `metadata/<full-original-filename>.yaml` and immutable user-named
 `photos/` assets are implemented with bounded YAML parsing, atomic saves,
 revision protection, stable IDs, and separate generated English metadata.

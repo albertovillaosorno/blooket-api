@@ -667,8 +667,6 @@ function pickFile(file) {
   const form = $("#importForm");
   field(form, "name").value = file.name.replace(/\.[^.]+$/, "");
   field(form, "description").value = "";
-  field(form, "topics").value = "";
-  field(form, "language").value = locale;
   $("#importDialog").showModal();
 }
 $("#file").addEventListener("change", (event) => {
@@ -724,11 +722,6 @@ $("#importForm").addEventListener("submit", async (event) => {
     const record = await api("/api/import", {
       name: field(form, "name").value,
       description: field(form, "description").value,
-      language: field(form, "language").value,
-      topics: field(form, "topics")
-        .value.split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
       base64,
     });
     $("#importDialog").close();

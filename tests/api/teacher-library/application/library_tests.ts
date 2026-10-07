@@ -65,8 +65,6 @@ async function setup() {
     filename: "Mi foto.png",
     name: "Mi foto",
     description: "Un ejemplo",
-    language: "es",
-    topics: ["example"],
     base64: Buffer.from(bytes).toString("base64"),
   };
   return { root, bytes, input };
@@ -87,6 +85,8 @@ test(
         metadataPath(record.asset),
         "metadata/" + record.asset.slice("photos/".length) + ".yaml",
       );
+      assert.equal(record.original.language, "");
+      assert.deepEqual(record.topics, []);
       const result = await executeLibraryCommand(
         {
           version: 1,
