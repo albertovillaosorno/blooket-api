@@ -42,8 +42,10 @@ import {
   readPreparedLibraryImage,
   sampleLibraryImageColors,
 } from "../../../../src/api/teacher-library/application/library.ts";
-import { loadPreferences } from
-  "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
+import {
+  loadPreferences,
+  savePreferences,
+} from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 import {
   listLibrary,
   metadataPath,
@@ -156,8 +158,6 @@ test(
         },
         edit: {
           ...record.edit,
-          width: 160,
-          height: 90,
           zoom: 1.5,
           background: { mode: "solid", color: "#ffffff" },
         },
@@ -594,9 +594,103 @@ test(
   },
 );
 
+test("configured canvas invalidates historical prepared media", async () => {
+  const { root, input } = await setup();
+  try {
+    const imported = await importLibraryImage(root, input);
+    const prepared = await prepareLibraryImage(root, imported.id);
+    const preferences = await loadPreferences(root);
+    const library = preferences.mediaRoot;
+    await savePreferences(root, {
+      ...preferences,
+      defaults: {
+        ...preferences.defaults,
+        width: 640,
+        height: 360,
+      },
+    });
+    const currentDefaults = (await loadPreferences(root)).defaults;
+
+    const read = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:configured-canvas",
+        command: "library.get",
+        payload: { id: imported.id },
+      },
+      root,
+    );
+    assert.equal(read.ok, true);
+    if (!read.ok) throw new Error("expected-library-read");
+    const view = read.value as {
+      revision: number;
+      edit: typeof input.edit;
+      prepared: unknown;
+      original: { name: string; description: string };
+    };
+    assert.equal(view.edit.width, 640);
+    assert.equal(view.edit.height, 360);
+    assert.equal(view.prepared, null);
+
+    await assert.rejects(
+      prepareLibraryImage(root, imported.id),
+      /canvas-settings-conflict/u,
+    );
+    await assert.rejects(
+      readPreparedLibraryImage(
+        library,
+        imported.id,
+        prepared.revision,
+        currentDefaults,
+      ),
+      /prepared-settings-conflict/u,
+    );
+    await assert.rejects(
+      importLibraryImage(root, input),
+      /canvas-settings-conflict/u,
+    );
+
+    const edited = await editLibraryImage(root, {
+      id: imported.id,
+      revision: view.revision,
+      edit: view.edit,
+      original: {
+        name: view.original.name,
+        description: view.original.description,
+      },
+    });
+    assert.equal(edited.revision, imported.revision + 1);
+    assert.equal(edited.edit.width, 640);
+    assert.equal(edited.edit.height, 360);
+    assert.equal(edited.prepared, null);
+
+    const migrated = await prepareLibraryImage(root, imported.id);
+    const current = await readPreparedLibraryImage(
+      library,
+      imported.id,
+      migrated.revision,
+      currentDefaults,
+    );
+    const metadata = await (await loadSharp())(current.bytes).metadata();
+    assert.equal(metadata.width, 640);
+    assert.equal(metadata.height, 360);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("a concurrent edit prevents stale preparation publication", async () => {
   const { root, input } = await setup();
   try {
+    const preferences = await loadPreferences(root);
+    await savePreferences(root, {
+      ...preferences,
+      defaults: {
+        ...preferences.defaults,
+        width: 1920,
+        height: 1920,
+      },
+    });
     const imported = await importLibraryImage(root, {
       ...input,
       edit: { ...input.edit, width: 1920, height: 1920 },

@@ -283,18 +283,20 @@ export async function startBrowserService(
         return;
       }
       if (url.pathname === "/api/media") {
+        const preferences = await loadPreferences(root);
         json(
           response,
           200,
-          (await listLibrary(
-            (await loadPreferences(root)).mediaRoot,
-          )).map(libraryRecordView),
+          (await listLibrary(preferences.mediaRoot)).map((record) =>
+            libraryRecordView(record, preferences.defaults),
+          ),
         );
         return;
       }
       if (url.pathname.startsWith("/media/")) {
         const id = url.pathname.slice(7);
-        const library = (await loadPreferences(root)).mediaRoot;
+        const preferences = await loadPreferences(root);
+        const library = preferences.mediaRoot;
         if (url.searchParams.get("variant") === "prepared") {
           const revision = url.searchParams.get("revision");
           if (revision !== null && !/^[1-9][0-9]{0,15}$/u.test(revision))
@@ -303,6 +305,7 @@ export async function startBrowserService(
             library,
             id,
             revision === null ? undefined : Number(revision),
+            preferences.defaults,
           );
           response.writeHead(200, {
             "Content-Type": image.file.endsWith(".gif")
