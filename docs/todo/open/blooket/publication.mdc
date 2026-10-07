@@ -90,7 +90,8 @@ opens.
 
 A concrete text-only Create Set browser surface now exists behind the local
 browser bridge. It navigates the dedicated Blooket tab to the observed create
-form, fills only the verified title/description/privacy controls, revalidates the
+form and fills only the verified title/description/privacy controls. It
+revalidates the
 exact prepared state before one submit click, and confirms success only after
 the provider reaches an exact /edit?id=... redirect. Challenge, organization,
 rate-limit, expired-session, signed-out, timeout, malformed DOM, and malformed
