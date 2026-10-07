@@ -39,16 +39,27 @@ import {
 } from "../../../platforms/service-lifecycle/adapter-outbound/runtime.ts";
 import { openLocalWorkspace } from
   "../../../platforms/browser-opening/adapter-outbound/open.ts";
+import { runFirstUseDiagnostics } from
+  "../../../api/teacher-configuration/application/configuration.ts";
 
 const args = process.argv.slice(2);
-if (args.some((arg) => !["--no-open", "--stop", "--status"].includes(arg))) {
+const options = ["--no-open", "--stop", "--status", "--diagnostics"];
+if (
+  args.some((arg) => !options.includes(arg))
+  || (args.includes("--diagnostics") && args.length !== 1)
+) {
   process.stderr.write("Unsupported launcher option.\n");
   process.exitCode = 1;
 } else {
   try {
     const root = userDataRoot();
-    let runtime = await existingService(root);
-    if (args.includes("--stop")) {
+    let runtime = args.includes("--diagnostics")
+      ? undefined : await existingService(root);
+    if (args.includes("--diagnostics")) {
+      const diagnostic = await runFirstUseDiagnostics(root, true);
+      process.stdout.write(JSON.stringify(diagnostic) + "\n");
+      if (diagnostic.outcome === "failed") process.exitCode = 1;
+    } else if (args.includes("--stop")) {
       if (runtime) {
         const boot = await fetch(runtime.origin + "/api/bootstrap");
         const data = (await boot.json()) as { csrf?: unknown };

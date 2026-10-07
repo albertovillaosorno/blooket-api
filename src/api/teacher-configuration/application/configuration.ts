@@ -30,7 +30,8 @@
 //   - Unsupported or invalid requests fail closed.
 //
 import { join } from "node:path";
-import { mkdir, access, readFile, rm } from "node:fs/promises";
+import { mkdir, access, open, rm } from "node:fs/promises";
+import { constants } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -65,6 +66,13 @@ import {
   createOwnerPasswordVerifier,
   OWNER_VERIFIER_SECRET,
 } from "../../../security/owner-password/domain/verifier.ts";
+import {
+  decodeFirstUseDiagnostic,
+  DIAGNOSTIC_MAX_BYTES,
+  DIAGNOSTIC_LOG,
+  type DiagnosticCheck,
+  type FirstUseDiagnostic,
+} from "../../../ir/first-use-diagnostics/contract/state.ts";
 
 export async function configurationStatus(
   root: string,
@@ -229,12 +237,27 @@ export async function chooseMediaFolder(): Promise<string> {
   );
   return result.stdout.trim();
 }
-export async function runFirstUseDiagnostics(root: string, rerun = false) {
+export async function runFirstUseDiagnostics(
+  root: string,
+  rerun = false,
+): Promise<FirstUseDiagnostic> {
+  const acquired = await tryAcquireFileLock(join(root, ".diagnostics.lock"));
+  if (!acquired.ok) throw new Error("diagnostics-" + acquired.reason);
+  try {
+    return await inspectFirstUseDiagnostics(root, rerun);
+  } finally {
+    await acquired.lock.release();
+  }
+}
+async function inspectFirstUseDiagnostics(root: string, rerun: boolean) {
   const statePath = join(root, "diagnostics.json");
   if (!rerun) {
     try {
-      const state: unknown = JSON.parse(await readFile(statePath, "utf8"));
-      return state;
+      const state = decodeFirstUseDiagnostic(
+        JSON.parse(await boundedDiagnostic(statePath)),
+      );
+      if (!state.ok) throw new Error("diagnostics-unreadable");
+      return state.value;
     } catch (error) {
       if (
         !(error instanceof Error && "code" in error && error.code === "ENOENT")
@@ -242,11 +265,7 @@ export async function runFirstUseDiagnostics(root: string, rerun = false) {
         throw new Error("diagnostics-unreadable");
     }
   }
-  const checks: {
-    name: string;
-    status: "passed" | "failed" | "unconfigured" | "unverified";
-    code: string;
-  }[] = [];
+  const checks: DiagnosticCheck[] = [];
   checks.push({
     name: "runtime",
     status:
@@ -321,7 +340,7 @@ export async function runFirstUseDiagnostics(root: string, rerun = false) {
       code: "secret-client-unavailable",
     });
   }
-  const state = {
+  const decoded = decodeFirstUseDiagnostic({
     schemaVersion: 1,
     checkVersion: 1,
     at: new Date().toISOString(),
@@ -329,8 +348,10 @@ export async function runFirstUseDiagnostics(root: string, rerun = false) {
       ? "failed"
       : "passed",
     checks,
-    log: "logs/first-use.json",
-  };
+    log: DIAGNOSTIC_LOG,
+  });
+  if (!decoded.ok) throw new Error("diagnostics-invalid-result");
+  const state = decoded.value;
   await mkdir(join(root, "logs"), { recursive: true, mode: 0o700 });
   await writeAtomicFile(
     join(root, state.log),
@@ -338,4 +359,27 @@ export async function runFirstUseDiagnostics(root: string, rerun = false) {
   );
   await writeAtomicFile(statePath, JSON.stringify(state, null, 2) + "\n");
   return state;
+}
+
+async function boundedDiagnostic(path: string): Promise<string> {
+  const handle = await open(
+    path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > DIAGNOSTIC_MAX_BYTES)
+      throw new Error("diagnostics-unreadable");
+    const bytes = Buffer.alloc(DIAGNOSTIC_MAX_BYTES + 1);
+    let length = 0;
+    while (length < bytes.length) {
+      const result = await handle.read(bytes, length, bytes.length - length);
+      if (result.bytesRead === 0) break;
+      length += result.bytesRead;
+    }
+    if (length > DIAGNOSTIC_MAX_BYTES)
+      throw new Error("diagnostics-unreadable");
+    return bytes.subarray(0, length).toString("utf8");
+  } finally {
+    await handle.close();
+  }
 }
