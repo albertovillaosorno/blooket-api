@@ -501,9 +501,13 @@ loop preservation, and every admitted output frame rate.
 
 Dynamic quality admission was implemented on 2026-10-06 using actual encoded
 bytes. A non-writing local probe runs the same isolated bounded candidate search
-with the higher-quality tier requested. The editor debounces recipe changes,
-cancels obsolete probes, and enables higher quality only after that exact source
-and recipe produce a valid high-quality candidate.
+with the higher-quality tier requested. Pending intake is first canonicalized
+through the same isolated compaction used by import, so pre-import and persisted
+admission inspect the same service-owned source bytes.
+
+The editor debounces recipe changes, cancels obsolete probes, and enables higher
+quality only after that exact canonical source and recipe produce a valid
+high-quality candidate.
 
 While admission is pending, preparation waits. If the real search proves only
 compact succeeds, the control moves to compact; if no candidate succeeds,

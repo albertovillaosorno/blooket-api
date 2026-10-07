@@ -600,11 +600,16 @@ test(
   async () => {
     const { root, input } = await setup();
     try {
+      const inline = await inspectPreparationAdmission(root, {
+        base64: input.base64,
+        edit: input.edit,
+      });
       const imported = await importLibraryImage(root, input);
       const admission = await inspectPreparationAdmission(root, {
         id: imported.id,
         edit: imported.edit,
       });
+      assert.deepEqual(inline, admission);
       assert.equal(admission.feasible, true);
       assert.equal(admission.highQuality, true);
       assert.equal(admission.code, null);
@@ -614,13 +619,6 @@ test(
         (record) => record.id === imported.id,
       );
       assert.equal(current?.prepared, null);
-
-      const inline = await inspectPreparationAdmission(root, {
-        base64: input.base64,
-        edit: imported.edit,
-      });
-      assert.equal(inline.feasible, true);
-      assert.equal(inline.effective?.compression, "lossless");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
