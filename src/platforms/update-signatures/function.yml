@@ -1,0 +1,9 @@
+identity:
+  id: function:update-signatures
+  name: update-signatures
+  path: src/platforms/update-signatures
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

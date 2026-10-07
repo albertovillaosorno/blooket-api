@@ -19,9 +19,11 @@ contracts:
   - docs/technical/adr/atomic-local-persistence.md
 scope:
   - src/ir/application-updates/
+  - src/ir/update-manifests/
   - src/api/application-updates/
   - src/api/browser-service/
   - src/platforms/github-updates/
+  - src/platforms/update-signatures/
   - src/settings/teacher-preferences/
   - src/api/teacher-configuration/
   - src/service/
@@ -225,7 +227,43 @@ Do not mark this record completed based on the manual checker.
 
 Validation on 2026-10-07 passed strict TypeScript, roadmap integrity, and the
 full portable suite (671 tests at that snapshot). Jig reported only the known
-external `JIG-RULE-GAP-001`; no local validation finding remains.
+external `JIG-RULE-GAP-001`; no local validation finding remained. Linux
+package assembly and extracted verification passed on fixed commit `7472a8d`
+in an isolated checkout; moving shared HEAD during a prior run caused its
+revision check to fail and was not treated as package acceptance.
+
+### Manifest verification foundation
+
+Schema-one manifests now admit only this repository, canonical version/tag,
+source commit, owned bundle identity, macOS minimum at least 13.5, and exactly
+both Mac ZIP assets with byte sizes, canonical URLs, and SHA-256. Unknown
+fields, conflicting versions, missing/duplicate targets, foreign assets, and
+invalid hashes are rejected before signature verification.
+
+The envelope admits Ed25519 only. Its key ID is the SHA-256 of an already
+admitted local public key's SPKI DER; remote metadata cannot supply a key.
+Signing bytes use `blooket-api:update-manifest:v1` followed by a newline and
+canonical manifest JSON with fixed field/target order. Canonical base64url
+signatures bind all fields and both archive hashes to the publisher key.
+
+The portable verifier requires the signed version, tag, architecture, URL,
+name, and byte size to match the selected public release. Byte verification
+then checks actual length and SHA-256. Successful signature verification still
+returns `requiresAppleVerification: true`; hashes and Ed25519 do not prove
+Gatekeeper/notarization, bundle identity, minimum OS, or safe replacement.
+
+Nine deterministic tests exercise canonicalization, exact contracts, signed
+field/context tampering, wrong/retired keys, local overlapping key rotation,
+release mismatches, changed bytes, and interrupted bytes. Ephemeral fixture
+keys are not production trust roots and no signing secret was configured.
+Strict TypeScript and the full portable suite passed (690 tests at that
+snapshot); Jig retains the known external evidence gap.
+
+These helpers are not connected to downloading or installation. CI still must
+publish the signed envelope after archive signing/notarization and validation,
+and the installed application must pin its real publisher keys with a governed
+rotation policy. No production manifest, trust root, native installer, or
+published-artifact acceptance is claimed.
 
 ## Blockers
 

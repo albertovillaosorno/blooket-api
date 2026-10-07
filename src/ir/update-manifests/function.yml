@@ -1,0 +1,9 @@
+identity:
+  id: function:update-manifests
+  name: update-manifests
+  path: src/ir/update-manifests
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

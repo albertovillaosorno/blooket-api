@@ -52,6 +52,19 @@ public releases only are admitted, with bounded requests, explicit offline and
 error states, architecture-specific assets, verified publisher authenticity, and
 preserved Apple signing/Gatekeeper/notarization requirements.
 
+Schema-one update manifests own the exact repository/version/tag/source commit,
+Mac bundle identity, minimum OS, and both Mac archive names/URLs/sizes/hashes.
+The portable signature format is Ed25519 with canonical manifest JSON, prefixed
+by `blooket-api:update-manifest:v1` and a newline. An envelope names an admitted
+key by its SPKI DER SHA-256 fingerprint; it cannot introduce a trust root.
+
+`src/ir/update-manifests/` owns decoding/canonicalization and
+`src/platforms/update-signatures/` owns cryptographic verification. Production
+publisher-key provisioning/rotation and CI manifest publication remain pending.
+Verified metadata must match the selected release; actual archive bytes must
+match its signed size/hash. Apple trust and transactional installation remain
+independent mandatory checks, with no download/install authority exposed here.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
