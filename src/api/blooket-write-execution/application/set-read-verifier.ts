@@ -330,7 +330,34 @@ function setBaselineFor(
 function questionBaselineFor(
   questions: readonly BlooketQuestionRead[],
 ): BlooketWriteVerificationBaseline {
-  const items = questions.map((question) => JSON.stringify([
+  const items = questions.map(questionBaselineItem);
+  return baselineFor("question-list", items);
+}
+
+function questionBaselineItem(question: BlooketQuestionRead): string {
+  if (question.answers.every((answer) => answer.kind === "text")) {
+    const answers = question.answers.map((answer) => answer.content);
+    const correctAnswers = question.answers
+      .filter((answer) => answer.correct)
+      .map((answer) => answer.content);
+    const answerTypes = question.qType === "typing"
+      ? question.answers.map((answer) => answer.match)
+      : null;
+    return JSON.stringify([
+      question.number,
+      question.question,
+      question.qType,
+      question.random,
+      question.timeLimit,
+      answers,
+      correctAnswers,
+      answerTypes,
+      question.hasImage,
+      question.hasAudio,
+    ]);
+  }
+  return JSON.stringify([
+    "v2",
     question.number,
     question.question,
     question.qType,
@@ -339,8 +366,7 @@ function questionBaselineFor(
     question.answers,
     question.hasImage,
     question.hasAudio,
-  ]));
-  return baselineFor("question-list", items);
+  ]);
 }
 
 function baselineFor(

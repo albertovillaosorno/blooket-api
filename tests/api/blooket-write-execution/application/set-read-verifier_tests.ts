@@ -31,6 +31,7 @@
 //   - Question media remains inconclusive without stable media identity.
 //
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { blooketSetReadWriteVerifier } from
@@ -42,6 +43,9 @@ import type { BlooketQuestionReadPort } from
   "../../../../src/api/blooket-set-reads/contract/question-reads.ts";
 import type { BlooketWriteOperation } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
+import { frameBlooketWriteVerificationCollection } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/projects/blooket-write-plans/domain/verification-baseline.ts";
 
 const operation: BlooketWriteOperation = {
   operationId: "plan:test:set",
@@ -355,6 +359,40 @@ function questionReads(
     }),
   };
 }
+
+test("normalized text reads preserve the legacy question baseline digest",
+  async () => {
+  const verifier = blooketSetReadWriteVerifier(
+    {
+      list: async () => { throw new Error("set list must not be used"); },
+      get: async () => { throw new Error("set detail must not be used"); },
+    },
+    questionReads([[remoteTyping()]]),
+  );
+  const captured = await verifier.captureBaseline(
+    typingOperation(),
+    { remoteSetId: "remote-set-1" },
+  );
+  assert.equal(captured.ok, true);
+  if (!captured.ok || captured.baseline === null) return;
+  const legacyItem = JSON.stringify([
+    1,
+    "Type sun.",
+    "typing",
+    true,
+    10,
+    ["sun"],
+    ["sun"],
+    ["exactly"],
+    false,
+    false,
+  ]);
+  const expected = createHash("sha256")
+    .update(frameBlooketWriteVerificationCollection([legacyItem]), "utf8")
+    .digest("hex");
+  assert.equal(captured.baseline.sha256, expected);
+  },
+);
 
 test("exact text question addition is confirmed from differential reads",
   async () => {
