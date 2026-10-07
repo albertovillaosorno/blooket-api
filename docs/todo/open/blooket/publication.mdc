@@ -116,11 +116,9 @@ the attempting journal for reconciliation without replay.
 
 ## Blockers
 
-Add Question browser mechanics and media upload remain deliberately unsupported,
-so a full quiz cannot yet be published through the application. Canonical
-publication entrypoints and the approved MCP/CLI end-to-end
-create/add-question/read-back run also remain pending. Native Safari acceptance
-is still required before claiming cross-browser publication.
+Text-only Add Question browser mechanics now submit once and require exact
+post-submit read-back. Media upload and canonical publication entrypoints remain
+pending, including the approved MCP/CLI create/add-question/read-back path.
 
-Acceptance remains open until the checks above run through the actual owning
-product surfaces; portable foundations alone do not complete this record.
+Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
+and does not block this functional record.
