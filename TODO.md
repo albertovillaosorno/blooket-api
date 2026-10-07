@@ -491,11 +491,13 @@ renderer remains PNG/GIF internally, so JPEG is restricted to the prepared
 artifact boundary. The compatible lossless recipe value now means the
 higher-quality JPEG tier for static files rather than a lossless output format.
 
-Keep animated media animated and detect actual source frame delays, duration,
-and cadence before choosing an explicit output FPS. Variable-delay sources
-must not be described as having one uniform detected FPS when they do not.
-Use the configured default, initially 10 FPS, and bounded automatic reductions
-when required; preserve duration/loop behavior within the documented tolerance.
+Animated timing already crosses the decode boundary as the exact per-frame
+delay vector rather than a fabricated detected FPS. The resampler consumes that
+vector and emits the explicitly requested output FPS, initially 10, with bounded
+automatic reductions only when required. Variable-delay inputs therefore retain
+their measured timing evidence while prepared metadata describes only the actual
+uniform output FPS. Existing tests cover variable delays, duration tolerance,
+loop preservation, and every admitted output frame rate.
 
 Dynamic quality admission was implemented on 2026-10-06 using actual encoded
 bytes. A non-writing local probe runs the same isolated bounded candidate search
@@ -563,7 +565,7 @@ source state. Do not relax the ceiling or fabricate a valid output.
 
 Acceptance covers static and animated oversize inputs, detected variable GIF
 timing, the ordered optimization stages, JPEG normalization, the same final
-resolution/aspect ratio for all outputs, dynamically admitted slider values,
+resolution/aspect ratio for all outputs, dynamically admitted quality options,
 rapid edit cancellation, and actual-byte revalidation before every downstream
 use. This supersedes manual trial-and-error oversize handling below.
 
@@ -596,7 +598,7 @@ select their immutable original rather than the prepared working image.
 Missing or conflicting originals stop before publication; JPEG and AVIF bytes
 survive without conversion and the exact old index remains recoverable.
 
-All 533 portable tests, strict TypeScript, and browser-script syntax passed on
+The portable test suite, strict TypeScript, and browser-script syntax passed on
 2026-10-06 after these changes. Jig reports only the external
 `scalability.repository-graph` evidence gap; repository checks were not
 weakened.

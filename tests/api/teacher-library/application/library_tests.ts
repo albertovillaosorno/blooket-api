@@ -627,6 +627,31 @@ test(
   },
 );
 
+test("cancelled admission publishes no media or prepared state", async () => {
+  const { root, input } = await setup();
+  try {
+    const imported = await importLibraryImage(root, input);
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      inspectPreparationAdmission(
+        root,
+        { id: imported.id, edit: imported.edit },
+        { signal: controller.signal },
+      ),
+      /native-media-cancelled/u,
+    );
+    const library = (await loadPreferences(root)).mediaRoot;
+    const records = await listLibrary(library);
+    assert.equal(records.length, 1);
+    assert.equal(records[0]!.id, imported.id);
+    assert.equal(records[0]!.revision, imported.revision);
+    assert.equal(records[0]!.prepared, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("configured canvas invalidates historical prepared media", async () => {
   const { root, input } = await setup();
   try {
