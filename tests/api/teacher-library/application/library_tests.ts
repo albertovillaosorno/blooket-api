@@ -31,7 +31,14 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, rm, writeFile, symlink } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -538,6 +545,143 @@ test(
     }
   },
 );
+
+test("visual-only edits preserve current AI normalization", async () => {
+  const { root, input } = await setup();
+  try {
+    const record = await importLibraryImage(root, input);
+    const enriched = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:visual-enrichment",
+        command: "library.enrich",
+        payload: {
+          id: record.id,
+          revision: record.revision,
+          name: "Normalized photo",
+          description: "A normalized English description.",
+          language: "es",
+          topics: ["example", "photo"],
+        },
+      },
+      root,
+    );
+    assert.equal(enriched.ok, true);
+    if (!enriched.ok) throw new Error("expected-enrichment-success");
+    const value = enriched.value as {
+      revision: number;
+      original: { name: string; description: string; revision: number };
+      edit: typeof input.edit;
+      generatedEnglish: {
+        sourceRevision: number;
+        description: string;
+      } | null;
+      topics: readonly string[];
+    };
+
+    const edited = await editLibraryImage(root, {
+      id: record.id,
+      revision: value.revision,
+      original: {
+        name: value.original.name,
+        description: value.original.description,
+      },
+      edit: {
+        ...value.edit,
+        zoom: 1.25,
+        contrast: 1.1,
+      },
+    });
+    assert.equal(edited.original.revision, value.original.revision);
+    assert.equal(
+      edited.generatedEnglish?.sourceRevision,
+      edited.original.revision,
+    );
+    assert.equal(
+      edited.generatedEnglish?.description,
+      "A normalized English description.",
+    );
+    assert.deepEqual(edited.topics, ["example", "photo"]);
+
+    const read = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:visual-enrichment-read",
+        command: "library.get",
+        payload: { id: record.id },
+      },
+      root,
+    );
+    assert.equal(read.ok, true);
+    if (!read.ok) throw new Error("expected-library-read");
+    assert.equal(
+      (read.value as { normalizationStatus: string }).normalizationStatus,
+      "completed",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("failed enrichment persistence cannot publish completed metadata", async () => {
+  const { root, input } = await setup();
+  try {
+    const record = await importLibraryImage(root, input);
+    const library = (await loadPreferences(root)).mediaRoot;
+    const path = join(library, metadataPath(record.asset));
+    const before = await readFile(path);
+    const metadataDirectory = join(library, "metadata");
+    await chmod(metadataDirectory, 0o500);
+
+    const result = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:failed-enrichment-save",
+        command: "library.enrich",
+        payload: {
+          id: record.id,
+          revision: record.revision,
+          name: "Normalized photo",
+          description: "A normalized English description.",
+          language: "es",
+          topics: ["example"],
+        },
+      },
+      root,
+    );
+    await chmod(metadataDirectory, 0o700);
+    assert.equal(result.ok, false);
+    if (result.ok) throw new Error("expected-enrichment-save-failure");
+    assert.equal(result.issues[0]?.code, "operation-failed");
+    assert.deepEqual(await readFile(path), before);
+
+    const current = (await listLibrary(library))[0]!;
+    assert.equal(current.revision, record.revision);
+    assert.equal(current.original.revision, record.original.revision);
+    assert.equal(current.original.language, "");
+    assert.deepEqual(current.topics, []);
+    assert.equal(current.generatedEnglish, null);
+
+    const read = await executeLibraryCommand(
+      {
+        version: 1,
+        operationId: "test:failed-enrichment-read",
+        command: "library.get",
+        payload: { id: record.id },
+      },
+      root,
+    );
+    assert.equal(read.ok, true);
+    if (!read.ok) throw new Error("expected-library-read");
+    assert.equal(
+      (read.value as { normalizationStatus: string }).normalizationStatus,
+      "pending",
+    );
+  } finally {
+    await chmod(join(root, "media", "metadata"), 0o700).catch(() => {});
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test(
   "aliases, duplicate keys and symbolic " +
