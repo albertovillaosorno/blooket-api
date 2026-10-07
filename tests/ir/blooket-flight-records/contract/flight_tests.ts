@@ -34,6 +34,7 @@ import test from "node:test";
 import {
   decodeFlightActionRedirect,
   decodeFlightActionRevalidated,
+  decodeFlightActionResponseMetadata,
   decodeFlightRows,
   flightActionState,
   flightErrorRecords,
@@ -150,6 +151,50 @@ test("action revalidation metadata preserves exact zero-or-one wire flags",
       () => decodeFlightActionRevalidated(value),
       /invalid-flight-revalidated/u,
     );
+});
+
+test("action response metadata keeps exact RSC content-type semantics", () => {
+  assert.deepEqual(
+    decodeFlightActionResponseMetadata({
+      contentType: "text/x-component",
+      redirect: "/edit?id=fixture",
+      revalidated: '[["/sets"],1,0]',
+    }),
+    {
+      hasFlightBody: true,
+      redirect: { pathname: "/edit", search: "?id=fixture", hash: "" },
+      revalidated: { paths: ["/sets"], tag: 1, cookie: 0 },
+    },
+  );
+  assert.deepEqual(
+    decodeFlightActionResponseMetadata({
+      contentType: null,
+      redirect: null,
+      revalidated: null,
+    }),
+    {
+      hasFlightBody: false,
+      redirect: null,
+      revalidated: { paths: [], tag: 0, cookie: 0 },
+    },
+  );
+  assert.equal(
+    decodeFlightActionResponseMetadata({
+      contentType: "text/x-component; charset=utf-8",
+      redirect: null,
+      revalidated: null,
+    }).hasFlightBody,
+    false,
+  );
+  assert.throws(
+    () =>
+      decodeFlightActionResponseMetadata({
+        contentType: "text/x-component\r\nset-cookie: nope",
+        redirect: null,
+        revalidated: null,
+      }),
+    /invalid-flight-content-type/u,
+  );
 });
 
 test("action redirects are same-origin HTTPS metadata, not Flight rows", () => {
