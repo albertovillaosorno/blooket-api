@@ -426,6 +426,49 @@ test(
 );
 
 test(
+  "normalized answer-image reads preserve kind without provider identity",
+  async () => {
+  const result = await listBlooketQuestions(
+    browser([{ ok: true, state: "edit" }], []),
+    secretStore([]),
+    {
+      list: async () => ({
+        ok: true,
+        value: [{
+          schemaVersion: 2,
+          number: 1,
+          question: "Pick the image.",
+          qType: "mc",
+          random: false,
+          timeLimit: 20,
+          answers: [
+            { kind: "image", content: null, correct: true, match: null },
+            {
+              kind: "text",
+              content: "Moon",
+              correct: false,
+              match: null,
+            },
+          ],
+          hasImage: false,
+          hasAudio: false,
+        }],
+      }),
+    },
+    "set-a",
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok && result.kind === "questions") {
+    assert.deepEqual(result.value[0]?.answers, [
+      { kind: "image", content: null, correct: true, match: null },
+      { kind: "text", content: "Moon", correct: false, match: null },
+    ]);
+  }
+  },
+);
+
+test(
   "invalid question set IDs fail before browser and secret access",
   async () => {
   const browserCalls: string[] = [];

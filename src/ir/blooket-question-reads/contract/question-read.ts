@@ -9,7 +9,7 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Minimal versioned runtime contracts for observed Blooket questions.
+//   - Versioned runtime contracts for observed Blooket questions.
 // - Must-Not:
 //   - Guess remote question IDs, media URLs, mastery fields, or account limits.
 // - Allows:
@@ -23,7 +23,7 @@
 // - Summary:
 //   - Validates only fields established by authenticated edit-page evidence.
 // - Description:
-//   - Media are represented by presence only; provider strings stay untrusted.
+//   - Provider media URLs are reduced to answer kind and presence facts.
 // - Usage:
 //   - Decode browser observations before conflict or write verification.
 // - Defaults:
@@ -39,7 +39,20 @@ import {
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 
-export const BLOOKET_QUESTION_READ_VERSION = 1 as const;
+export const BLOOKET_QUESTION_READ_VERSION = 2 as const;
+const LEGACY_BLOOKET_QUESTION_READ_VERSION = 1 as const;
+const LEGACY_IMAGE_ANSWER_MARKER = "`~`";
+const LEGACY_MATH_ANSWER_MARKER = "`*`";
+
+export type BlooketAnswerReadKind = "text" | "math" | "image";
+export type BlooketAnswerMatch = "exactly" | "contains";
+
+export interface BlooketAnswerRead {
+  readonly kind: BlooketAnswerReadKind;
+  readonly content: string | null;
+  readonly correct: boolean;
+  readonly match: BlooketAnswerMatch | null;
+}
 
 export interface BlooketQuestionRead {
   readonly schemaVersion: typeof BLOOKET_QUESTION_READ_VERSION;
@@ -48,9 +61,7 @@ export interface BlooketQuestionRead {
   readonly qType: "mc" | "typing";
   readonly random: boolean;
   readonly timeLimit: number;
-  readonly answers: readonly string[];
-  readonly correctAnswers: readonly string[];
-  readonly answerTypes: readonly ("exactly" | "contains")[] | null;
+  readonly answers: readonly BlooketAnswerRead[];
   readonly hasImage: boolean;
   readonly hasAudio: boolean;
 }
@@ -63,10 +74,19 @@ const QUESTION_KEYS = new Set([
   "random",
   "timeLimit",
   "answers",
-  "correctAnswers",
-  "answerTypes",
   "hasImage",
   "hasAudio",
+]);
+const LEGACY_QUESTION_KEYS = new Set([
+  ...QUESTION_KEYS,
+  "correctAnswers",
+  "answerTypes",
+]);
+const ANSWER_KEYS = new Set([
+  "kind",
+  "content",
+  "correct",
+  "match",
 ]);
 
 export function decodeBlooketQuestionRead(
@@ -77,16 +97,26 @@ export function decodeBlooketQuestionRead(
     return failure(path, "expected-object", "Expected a Blooket question.");
   }
 
-  const issues: ValidationIssue[] = [
-    ...unknownFieldIssues(value, QUESTION_KEYS, path),
-  ];
-  if (value["schemaVersion"] !== BLOOKET_QUESTION_READ_VERSION) {
+  const issues: ValidationIssue[] = [];
+  const version = value["schemaVersion"];
+  if (
+    version !== LEGACY_BLOOKET_QUESTION_READ_VERSION
+    && version !== BLOOKET_QUESTION_READ_VERSION
+  ) {
     issues.push({
       path: path + ".schemaVersion",
       code: "unsupported-version",
-      message: "Expected Blooket question read version 1.",
+      message: "Expected Blooket question read version 1 or 2.",
     });
   }
+  issues.push(...unknownFieldIssues(
+    value,
+    version === LEGACY_BLOOKET_QUESTION_READ_VERSION
+      ? LEGACY_QUESTION_KEYS
+      : QUESTION_KEYS,
+    path,
+  ));
+
   const number = positiveInteger(value["number"], path + ".number", issues);
   const question = requiredString(
     value["question"],
@@ -107,17 +137,9 @@ export function decodeBlooketQuestionRead(
     path + ".timeLimit",
     issues,
   );
-  const answers = stringArray(value["answers"], path + ".answers", issues);
-  const correctAnswers = stringArray(
-    value["correctAnswers"],
-    path + ".correctAnswers",
-    issues,
-  );
-  const answerTypes = decodeAnswerTypes(
-    value["answerTypes"],
-    path + ".answerTypes",
-    issues,
-  );
+  const answers = version === LEGACY_BLOOKET_QUESTION_READ_VERSION
+    ? decodeLegacyAnswers(value, path, qType, issues)
+    : decodeAnswers(value["answers"], path + ".answers", qType, issues);
   const hasImage = booleanValue(
     value["hasImage"],
     path + ".hasImage",
@@ -129,40 +151,6 @@ export function decodeBlooketQuestionRead(
     issues,
   );
 
-  if (answers !== undefined && correctAnswers !== undefined) {
-    const available = new Set(answers);
-    const seen = new Set<string>();
-    for (const [index, answer] of correctAnswers.entries()) {
-      if (!available.has(answer)) {
-        issues.push({
-          path: path + ".correctAnswers[" + String(index) + "]",
-          code: "unknown-correct-answer",
-          message: "Correct answer must exist in answers.",
-        });
-      }
-      if (seen.has(answer)) {
-        issues.push({
-          path: path + ".correctAnswers[" + String(index) + "]",
-          code: "duplicate-correct-answer",
-          message: "Correct answers must be unique.",
-        });
-      }
-      seen.add(answer);
-    }
-  }
-  if (
-    answers !== undefined
-    && answerTypes !== undefined
-    && answerTypes !== null
-    && answerTypes.length !== answers.length
-  ) {
-    issues.push({
-      path: path + ".answerTypes",
-      code: "answer-type-count-mismatch",
-      message: "Answer types must align with the answer array.",
-    });
-  }
-
   if (issues.length > 0) return { ok: false, issues };
   if (
     number === undefined
@@ -171,8 +159,6 @@ export function decodeBlooketQuestionRead(
     || random === undefined
     || timeLimit === undefined
     || answers === undefined
-    || correctAnswers === undefined
-    || answerTypes === undefined
     || hasImage === undefined
     || hasAudio === undefined
   ) {
@@ -189,8 +175,6 @@ export function decodeBlooketQuestionRead(
       random,
       timeLimit,
       answers,
-      correctAnswers,
-      answerTypes,
       hasImage,
       hasAudio,
     },
@@ -227,6 +211,259 @@ export function decodeBlooketQuestionReadList(
   return issues.length > 0
     ? { ok: false, issues }
     : { ok: true, value: questions };
+}
+
+function decodeLegacyAnswers(
+  value: Record<string, unknown>,
+  path: string,
+  qType: unknown,
+  issues: ValidationIssue[],
+): readonly BlooketAnswerRead[] | undefined {
+  const answers = stringArray(value["answers"], path + ".answers", issues);
+  const correctAnswers = stringArray(
+    value["correctAnswers"],
+    path + ".correctAnswers",
+    issues,
+  );
+  const answerTypes = decodeLegacyAnswerTypes(
+    value["answerTypes"],
+    path + ".answerTypes",
+    issues,
+  );
+  if (answers === undefined || correctAnswers === undefined) return undefined;
+
+  const available = new Set(answers);
+  const seen = new Set<string>();
+  for (const [index, answer] of correctAnswers.entries()) {
+    if (!available.has(answer)) {
+      issues.push({
+        path: path + ".correctAnswers[" + String(index) + "]",
+        code: "unknown-correct-answer",
+        message: "Correct answer must exist in answers.",
+      });
+    }
+    if (seen.has(answer)) {
+      issues.push({
+        path: path + ".correctAnswers[" + String(index) + "]",
+        code: "duplicate-correct-answer",
+        message: "Correct answers must be unique.",
+      });
+    }
+    seen.add(answer);
+  }
+  if (
+    answerTypes !== undefined
+    && answerTypes !== null
+    && answerTypes.length !== answers.length
+  ) {
+    issues.push({
+      path: path + ".answerTypes",
+      code: "answer-type-count-mismatch",
+      message: "Answer types must align with the answer array.",
+    });
+  }
+  if (qType === "typing" && answerTypes === null) {
+    issues.push({
+      path: path + ".answerTypes",
+      code: "typing-answer-types-required",
+      message: "Typing answers require explicit match modes.",
+    });
+  }
+  if (answerTypes === undefined) return undefined;
+
+  const normalized: BlooketAnswerRead[] = [];
+  for (const [index, answer] of answers.entries()) {
+    const decoded = normalizeLegacyAnswer(
+      answer,
+      path + ".answers[" + String(index) + "]",
+      qType,
+      correctAnswers.includes(answer),
+      qType === "typing" ? answerTypes?.[index] ?? null : null,
+      issues,
+    );
+    if (decoded !== undefined) normalized.push(decoded);
+  }
+  return normalized;
+}
+
+function normalizeLegacyAnswer(
+  answer: string,
+  path: string,
+  qType: unknown,
+  correct: boolean,
+  match: BlooketAnswerMatch | null,
+  issues: ValidationIssue[],
+): BlooketAnswerRead | undefined {
+  if (answer.startsWith(LEGACY_IMAGE_ANSWER_MARKER)) {
+    if (
+      qType !== "mc"
+      || answer.length <= LEGACY_IMAGE_ANSWER_MARKER.length
+      || answer.indexOf(
+        LEGACY_IMAGE_ANSWER_MARKER,
+        LEGACY_IMAGE_ANSWER_MARKER.length,
+      ) !== -1
+    ) {
+      issues.push({
+        path,
+        code: "invalid-legacy-image-answer",
+        message: "Legacy image answer marker is malformed.",
+      });
+      return undefined;
+    }
+    return { kind: "image", content: null, correct, match: null };
+  }
+  if (answer.includes(LEGACY_IMAGE_ANSWER_MARKER)) {
+    issues.push({
+      path,
+      code: "invalid-legacy-image-answer",
+      message: "Legacy image answer marker is ambiguous.",
+    });
+    return undefined;
+  }
+  if (answer.startsWith(LEGACY_MATH_ANSWER_MARKER)) {
+    if (
+      qType !== "mc"
+      || !answer.endsWith(LEGACY_MATH_ANSWER_MARKER)
+      || answer.length <= LEGACY_MATH_ANSWER_MARKER.length * 2
+    ) {
+      issues.push({
+        path,
+        code: "invalid-legacy-math-answer",
+        message: "Legacy math answer marker is malformed.",
+      });
+      return undefined;
+    }
+    return {
+      kind: "math",
+      content: answer.slice(
+        LEGACY_MATH_ANSWER_MARKER.length,
+        -LEGACY_MATH_ANSWER_MARKER.length,
+      ),
+      correct,
+      match: null,
+    };
+  }
+  return { kind: "text", content: answer, correct, match };
+}
+
+function decodeAnswers(
+  value: unknown,
+  path: string,
+  qType: unknown,
+  issues: ValidationIssue[],
+): readonly BlooketAnswerRead[] | undefined {
+  if (!Array.isArray(value)) {
+    issues.push({
+      path,
+      code: "expected-array",
+      message: "Expected a normalized answer array.",
+    });
+    return undefined;
+  }
+  if (value.length > 100) {
+    issues.push({
+      path,
+      code: "too-many-answers",
+      message: "Expected at most 100 answers.",
+    });
+  }
+  const answers: BlooketAnswerRead[] = [];
+  for (const [index, candidate] of value.entries()) {
+    const decoded = decodeAnswer(
+      candidate,
+      path + "[" + String(index) + "]",
+      qType,
+      issues,
+    );
+    if (decoded !== undefined) answers.push(decoded);
+  }
+  return answers;
+}
+
+function decodeAnswer(
+  value: unknown,
+  path: string,
+  qType: unknown,
+  issues: ValidationIssue[],
+): BlooketAnswerRead | undefined {
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      code: "expected-object",
+      message: "Expected a normalized Blooket answer.",
+    });
+    return undefined;
+  }
+  issues.push(...unknownFieldIssues(value, ANSWER_KEYS, path));
+  const kind = value["kind"];
+  if (kind !== "text" && kind !== "math" && kind !== "image") {
+    issues.push({
+      path: path + ".kind",
+      code: "unsupported-answer-kind",
+      message: 'Expected "text", "math", or "image".',
+    });
+  }
+  const content = value["content"];
+  if (
+    (kind === "image" && content !== null)
+    || ((kind === "text" || kind === "math")
+      && (typeof content !== "string" || content.length === 0))
+  ) {
+    issues.push({
+      path: path + ".content",
+      code: "invalid-answer-content",
+      message: "Answer content does not match its normalized kind.",
+    });
+  }
+  const correct = booleanValue(
+    value["correct"],
+    path + ".correct",
+    issues,
+  );
+  const match = value["match"];
+  if (match !== null && match !== "exactly" && match !== "contains") {
+    issues.push({
+      path: path + ".match",
+      code: "invalid-answer-match",
+      message: 'Expected null, "exactly", or "contains".',
+    });
+  }
+  if (qType === "mc" && match !== null) {
+    issues.push({
+      path: path + ".match",
+      code: "unexpected-answer-match",
+      message: "Multiple-choice answers do not carry typing match modes.",
+    });
+  }
+  if (
+    qType === "typing"
+    && (kind !== "text" || (match !== "exactly" && match !== "contains"))
+  ) {
+    issues.push({
+      path,
+      code: "invalid-typing-answer",
+      message: "Typing answers require text and an explicit match mode.",
+    });
+  }
+  if (
+    (kind !== "text" && kind !== "math" && kind !== "image")
+    || correct === undefined
+    || (match !== null && match !== "exactly" && match !== "contains")
+    || (kind === "image" && content !== null)
+    || ((kind === "text" || kind === "math") && typeof content !== "string")
+  ) {
+    return undefined;
+  }
+  const normalizedContent = kind === "image" ? null : content as string;
+  const normalizedMatch = match === "exactly" || match === "contains"
+    ? match
+    : null;
+  return {
+    kind,
+    content: normalizedContent,
+    correct,
+    match: normalizedMatch,
+  };
 }
 
 function positiveInteger(
@@ -288,11 +525,11 @@ function stringArray(
   return result;
 }
 
-function decodeAnswerTypes(
+function decodeLegacyAnswerTypes(
   value: unknown,
   path: string,
   issues: ValidationIssue[],
-): readonly ("exactly" | "contains")[] | null | undefined {
+): readonly BlooketAnswerMatch[] | null | undefined {
   if (value === null) return null;
   if (!Array.isArray(value)) {
     issues.push({
@@ -302,7 +539,7 @@ function decodeAnswerTypes(
     });
     return undefined;
   }
-  const result: ("exactly" | "contains")[] = [];
+  const result: BlooketAnswerMatch[] = [];
   for (const [index, candidate] of value.entries()) {
     if (candidate !== "exactly" && candidate !== "contains") {
       issues.push({

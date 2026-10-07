@@ -311,22 +311,20 @@ function matchesQuestion(
   )
     return false;
   const value = result.value as Record<string, unknown>;
-  const answers = input.answers.map((answer) => answer.text);
-  const correctAnswers = input.answers
-    .filter((answer) => answer.correct)
-    .map((answer) => answer.text);
+  const answers = input.answers.map((answer, index) => ({
+    kind: "text",
+    content: answer.text,
+    correct: answer.correct,
+    match: input.answerTypes?.[index] ?? null,
+  }));
   return (
-    value["schemaVersion"] === 1 &&
+    value["schemaVersion"] === 2 &&
     value["number"] === input.number &&
     value["question"] === input.question &&
     value["qType"] === input.qType &&
     value["random"] === input.random &&
     value["timeLimit"] === input.timeLimit &&
     JSON.stringify(value["answers"]) === JSON.stringify(answers) &&
-    JSON.stringify(value["correctAnswers"]) ===
-      JSON.stringify(correctAnswers) &&
-    JSON.stringify(value["answerTypes"]) ===
-      JSON.stringify(input.answerTypes) &&
     value["hasImage"] === false &&
     value["hasAudio"] === false
   );

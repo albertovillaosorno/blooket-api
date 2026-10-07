@@ -111,15 +111,18 @@ test(
             result: {
               ok: true,
               value: {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 number: 1,
                 question: "Type sun.",
                 qType: "typing",
                 random: true,
                 timeLimit: 15,
-                answers: ["sun"],
-                correctAnswers: ["sun"],
-                answerTypes: ["exactly"],
+                answers: [{
+                  kind: "text",
+                  content: "sun",
+                  correct: true,
+                  match: "exactly",
+                }],
                 hasImage: false,
                 hasAudio: false,
               },
@@ -336,15 +339,18 @@ test(
     });
     assert.equal(questions.ok, true);
     assert.deepEqual(questions.value, [{
-      schemaVersion: 1,
+      schemaVersion: 2,
       number: 1,
       question: "Type sun.",
       qType: "typing",
       random: true,
       timeLimit: 15,
-      answers: ["sun"],
-      correctAnswers: ["sun"],
-      answerTypes: ["exactly"],
+      answers: [{
+        kind: "text",
+        content: "sun",
+        correct: true,
+        match: "exactly",
+      }],
       hasImage: false,
       hasAudio: false,
     }]);

@@ -9,15 +9,15 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Synthetic regressions for observed Blooket question-modal extraction.
+//   - Synthetic regressions for normalized Blooket question-modal extraction.
 // - Must-Not:
 //   - Submit a form, contact Blooket, or infer hidden provider state.
 // - Allows:
 //   - Inputs: Synthetic controls and serialized question form values.
-//   - Outputs: Assertions about bounded text-only question read behavior.
+//   - Outputs: Assertions about bounded normalized question read behavior.
 //   - Side effects: Temporary document/location globals restored per case.
 // - Split-When:
-//   - Media-answer reads gain a separately representable runtime contract.
+//   - Another provider answer encoding needs independent normalization.
 // - Merge-When:
 //   - Question reads no longer require a browser-specific adapter.
 // - Summary:
@@ -27,7 +27,7 @@
 // - Usage:
 //   - Run through the repository Node test command.
 // - Defaults:
-//   - Loading, ambiguity, malformed JSON, and answer media are rejected.
+//   - Loading, ambiguity, malformed JSON, and malformed media are rejected.
 //
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -109,7 +109,7 @@ function page(document: FixtureNode, href: string, run: () => void): void {
   }
 }
 
-test("question panels expose exact text-only read facts without saving", () => {
+test("question panels expose normalized read facts without saving", () => {
   const document = node("DOCUMENT");
   const group = node("DIV", "", {
     role: "button",
@@ -165,15 +165,26 @@ test("question panels expose exact text-only read facts without saving", () => {
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.deepEqual(result.value, {
-        schemaVersion: 1,
+        schemaVersion: 2,
         number: 1,
         question: "Type sun.",
         qType: "typing",
         random: true,
         timeLimit: 15,
-        answers: ["sun", "the sun"],
-        correctAnswers: ["sun", "the sun"],
-        answerTypes: ["exactly", "contains"],
+        answers: [
+          {
+            kind: "text",
+            content: "sun",
+            correct: true,
+            match: "exactly",
+          },
+          {
+            kind: "text",
+            content: "the sun",
+            correct: true,
+            match: "contains",
+          },
+        ],
         hasImage: true,
         hasAudio: false,
       });
@@ -184,38 +195,79 @@ test("question panels expose exact text-only read facts without saving", () => {
     assert.equal(isBlooketQuestionPanelClosed(), true);
     document.selectors['input#question[name="question"]'] = [hidden];
 
+    const providerUrl = "https://provider.invalid/media";
     hidden.value = JSON.stringify({
       number: 1,
       question: "Image answer",
       qType: "mc",
       random: false,
       timeLimit: 20,
-      answers: ["opaque\u0060~\u0060https://provider.invalid/media"],
-      correctAnswers: [],
-      answerTypes: null,
+      answers: ["`~`" + providerUrl, "plain"],
+      correctAnswers: ["`~`" + providerUrl],
+      answerTypes: [],
       image: "",
       audio: "",
     });
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    const imageAnswer = inspectOpenedBlooketQuestion(1);
+    assert.equal(imageAnswer.ok, true);
+    if (imageAnswer.ok) {
+      assert.deepEqual(imageAnswer.value, {
+        schemaVersion: 2,
+        number: 1,
+        question: "Image answer",
+        qType: "mc",
+        random: false,
+        timeLimit: 20,
+        answers: [
+          { kind: "image", content: null, correct: true, match: null },
+          { kind: "text", content: "plain", correct: false, match: null },
+        ],
+        hasImage: false,
+        hasAudio: false,
+      });
+      assert.equal(
+        JSON.stringify(imageAnswer.value).includes(providerUrl),
+        false,
+      );
+      assert.equal(decodeBlooketQuestionRead(imageAnswer.value).ok, true);
+    }
     hidden.value = JSON.stringify({
       number: 1,
       question: "Math answer",
       qType: "mc",
       random: false,
       timeLimit: 20,
-      answers: ["2`*`x"],
-      correctAnswers: ["2`*`x"],
+      answers: ["`*`x^2`*`"],
+      correctAnswers: ["`*`x^2`*`"],
       answerTypes: [],
       image: "",
       audio: "",
     });
-    const multipleChoice = inspectOpenedBlooketQuestion(1);
-    assert.equal(multipleChoice.ok, true);
-    if (multipleChoice.ok) {
-      const value = multipleChoice.value as { answerTypes?: unknown };
-      assert.equal(value.answerTypes, null);
-      assert.equal(decodeBlooketQuestionRead(value).ok, true);
+    const mathAnswer = inspectOpenedBlooketQuestion(1);
+    assert.equal(mathAnswer.ok, true);
+    if (mathAnswer.ok) {
+      const value = mathAnswer.value as { answers?: unknown };
+      assert.deepEqual(value.answers, [{
+        kind: "math",
+        content: "x^2",
+        correct: true,
+        match: null,
+      }]);
+      assert.equal(decodeBlooketQuestionRead(mathAnswer.value).ok, true);
     }
+    hidden.value = JSON.stringify({
+      number: 1,
+      question: "Malformed image answer",
+      qType: "mc",
+      random: false,
+      timeLimit: 20,
+      answers: ["prefix`~`https://provider.invalid/media"],
+      correctAnswers: [],
+      answerTypes: [],
+      image: "",
+      audio: "",
+    });
+    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
     hidden.value = "{bad";
     assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
   });
