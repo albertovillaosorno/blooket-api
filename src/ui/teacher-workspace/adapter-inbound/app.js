@@ -1,6 +1,7 @@
 import {
   GALLERY_LIMIT,
   sampleLibrary,
+  representativeSolidColor,
   clipboardImageUrl,
   readClipboardImage,
 } from "./library.js";
@@ -378,7 +379,9 @@ let suggestions = [],
   clipboardBusy = false;
 let history = [],
   future = [],
-  picking = false;
+  picking = false,
+  solidColorSuggested = false,
+  solidColorTouched = false;
 const t = (key) => words[locale][key] ?? key;
 const field = (form, name) => form.elements.namedItem(name);
 const settingsForm = $("#settingsForm"),
@@ -721,6 +724,10 @@ function openEditor(record) {
   history = [];
   future = [];
   picking = false;
+  solidColorSuggested =
+    record.edit.background.mode === "solid" ||
+    record.edit.background.color !== "#ffffff";
+  solidColorTouched = false;
   recipeGesture = undefined;
   for (const name of ["name", "description"])
     field(editForm, name).value = record.original[name];
@@ -787,7 +794,36 @@ function preview() {
   image.style.filter =
     `saturate(${recipe.saturation}) ` + `contrast(${recipe.contrast})`;
 }
-$("#foreground").addEventListener("load", preview);
+function suggestSolidColor() {
+  if (
+    !selected ||
+    selected.asset.endsWith(".gif") ||
+    solidColorSuggested ||
+    solidColorTouched
+  )
+    return;
+  const image = $("#foreground");
+  if (!image.complete || !image.naturalWidth || !image.naturalHeight) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 8;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return;
+  context.drawImage(image, 0, 0, 8, 8);
+  const color = representativeSolidColor(
+    context.getImageData(0, 0, 8, 8).data,
+  );
+  if (!color) return;
+  selected.edit.background.color = color;
+  solidColorSuggested = true;
+  field(editForm, "color").value = color;
+}
+$("#foreground").addEventListener("load", () => {
+  preview();
+  if (selected?.edit.background.mode === "solid") {
+    suggestSolidColor();
+    preview();
+  }
+});
 window.addEventListener("resize", preview);
 function remember() {
   history.push(structuredClone(selected.edit));
@@ -811,9 +847,13 @@ editForm.addEventListener("input", (event) => {
     remember();
     recipeGesture = event.target;
   }
-  if (name === "background") selected.edit.background.mode = event.target.value;
-  else if (name === "color")
+  if (name === "background") {
+    selected.edit.background.mode = event.target.value;
+    if (event.target.value === "solid") suggestSolidColor();
+  } else if (name === "color") {
+    solidColorTouched = true;
     selected.edit.background.color = event.target.value;
+  }
   else if (name in selected.edit)
     selected.edit[name] =
       name === "compression" ? event.target.value : Number(event.target.value);
@@ -914,6 +954,7 @@ $("#foreground").addEventListener("pointerdown", (event) => {
     context.drawImage(image, sourceX, sourceY, 1, 1, 0, 0, 1, 1);
     const pixel = context.getImageData(0, 0, 1, 1).data;
     remember();
+    solidColorTouched = true;
     selected.edit.background = {
       mode: "solid",
       color:
@@ -977,6 +1018,7 @@ $("#eyedropper").addEventListener("click", async () => {
       const result = await new window.EyeDropper().open();
       if (editorBusy || selected !== target || !$("#editor").open) return;
       remember();
+      solidColorTouched = true;
       selected.edit.background = { mode: "solid", color: result.sRGBHex };
       syncRecipe();
       invalidate();
