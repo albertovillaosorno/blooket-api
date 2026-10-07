@@ -74,8 +74,8 @@ test(
   assert.equal(selected.verificationRequired, true);
   assert.equal(selected.asset.name, "darwin-arm64.zip");
   assert.equal(
-    choose([release("26.4.1", 1, ["darwin-x64.zip"])], "darwin-x64").status,
-    "available",
+    choose([release("26.4.1", 1, ["linux-x64.zip"])], "linux-x64").status,
+    "unsupported-platform",
   );
 });
 
@@ -120,7 +120,7 @@ test(
 
 test("wrong and duplicate assets never fall back to an older candidate", () => {
   assert.deepEqual(
-    choose([release("26.4.1"), release("26.4.2", 2, ["darwin-x64.zip"])]),
+    choose([release("26.4.1"), release("26.4.2", 2, ["linux-x64.zip"])]),
     {
       status: "incompatible-asset",
       version: "26.4.2",

@@ -252,7 +252,7 @@ CAPTCHAs, organization selection, unfamiliar login challenges, and unknown
 security states stop execution for human action. Normal interaction pacing is
 planned; challenge bypass and anti-bot evasion are outside the design.
 
-macOS is the teacher product target, with ARM64 and Intel packages planned.
+macOS is the teacher product target, with ARM64 packages planned.
 Linux x64 delivery is required for developer testing of the shared service.
 The bundled Node 24 runtime requires macOS 13.5 or later; confirm the OS before
 installation. No VM or Metal requirement is part of the initial plan.
@@ -288,7 +288,7 @@ A release tag starts a strictly ordered pipeline:
 4. only then may the release job download the CI artifacts and publish them.
 
 Release itself does not compile, run tests, build packages, or rerun package
-verification. It publishes the macOS ARM64 and Intel ZIP files already produced
+verification. It publishes the macOS ARM64 ZIP files already produced
 by CI. Linux x64 is always built and tested; include its tarball only when
 `RELEASE_INCLUDE_LINUX=true`.
 
@@ -312,7 +312,7 @@ npm run package -- linux-x64
 npm run package:verify -- linux-x64
 ```
 
-The other targets are `darwin-arm64` and `darwin-x64`. Outputs live under
+The other targets are `darwin-arm64` and `darwin-arm64`. Outputs live under
 `.temp/distributions/`; assembly refuses to overwrite an existing target
 directory.
 

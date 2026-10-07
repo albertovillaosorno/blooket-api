@@ -50,7 +50,7 @@ const workflow = async (name: string) =>
     ),
   );
 
-test("CI is opt-in and release consumes its verified artifacts", async () => {
+test("CI validates before ARM Safari and release only publishes", async () => {
   const ci = await workflow("ci");
   const release = await workflow("release");
   assert.deepEqual(
@@ -64,81 +64,59 @@ test("CI is opt-in and release consumes its verified artifacts", async () => {
   assert.equal(ci.on.push.branches, undefined);
   assert.equal(ci.on.pull_request, undefined);
   assert.equal(ci.on.workflow_dispatch, undefined);
-  assert.equal(ci.on.workflow_call.inputs.release.default, false);
+  assert.equal(ci.on.workflow_call, null);
 
-  assert.deepEqual(
-    ci.jobs.packages.strategy.matrix.include
-      .map((item: { target: string }) => item.target)
-      .sort(),
-    ["darwin-arm64", "darwin-x64", "linux-x64"],
+  assert.equal(ci.jobs.validate["runs-on"], "ubuntu-latest");
+  const setupNode = ci.jobs.validate.steps.find(
+    (step: { uses?: string }) => step.uses === "actions/setup-node@v7",
   );
-  assert.deepEqual(
-    ci.jobs.packages.strategy.matrix.include.map(
-      (item: { runner: string }) => item.runner,
-    ),
-    ["macos-latest", "macos-26-intel", "ubuntu-latest"],
-  );
-
-  const ciCommands = ci.jobs.packages.steps.flatMap((step: { run?: string }) =>
-    step.run ? [step.run] : [],
+  assert.equal(setupNode.with.cache, "pnpm");
+  assert.equal(setupNode.with["cache-dependency-path"], "pnpm-lock.yaml");
+  const validateCommands = ci.jobs.validate.steps.flatMap(
+    (step: { run?: string }) => step.run ? [step.run] : [],
   );
   for (const command of [
     "pnpm install --frozen-lockfile",
     "npm run check",
     "npm run roadmap:check",
     "npm test",
-    'npm run package -- "$PACKAGE_TARGET"',
-  ]) {
-    assert.ok(ciCommands.includes(command));
-  }
-  const packageVerify = ciCommands.find((command: string) =>
-    command.includes("npm run package:verify"),
-  );
-  assert.equal(
-    ciCommands.filter((command: string) => command.includes("package:verify"))
-      .length,
-    1,
-  );
-  assert.ok(
-    packageVerify?.includes('npm run package:verify -- "$PACKAGE_TARGET"'),
-  );
-  assert.ok(
-    packageVerify?.includes(
-      'npm run package:verify -- "$PACKAGE_TARGET" --release',
-    ),
-  );
-  assert.ok(packageVerify?.includes('"$PACKAGE_TARGET" == darwin-*'));
-  assert.ok(packageVerify?.includes('"$RELEASE_MODE" == true'));
+  ])
+    assert.ok(validateCommands.includes(command));
+
+  const mac = ci.jobs["macos-arm"];
+  assert.equal(mac.needs, "validate");
+  assert.equal(mac["runs-on"], "macos-26");
+  const macText = mac.steps
+    .flatMap((step: { run?: string }) => step.run ? [step.run] : [])
+    .join("\n");
+  for (const fragment of [
+    '[[ "$(uname -m)" == arm64 ]]',
+    "npm run package -- darwin-arm64",
+    "npm run package:verify -- darwin-arm64",
+    "safari-web-extension-packager",
+    "CODE_SIGNING_ALLOWED=NO",
+    "safaridriver --enable",
+    "npm run macos:safari-smoke",
+  ])
+    assert.ok(macText.includes(fragment));
+  assert.ok(!macText.includes("macos-26-intel"));
 
   assert.deepEqual(release.on.push.tags, ["v[0-9][0-9].[1-4].*"]);
-  assert.equal(
-    release.jobs.gate.steps.at(-1).env.RELEASE_ENABLED,
-    "${{ vars.RELEASE_ENABLED }}",
-  );
-  const gate = release.jobs.gate.steps.at(-1).run as string;
-  assert.ok(gate.indexOf('[[ "$RELEASE_ENABLED" == true ]]') >= 0);
-  assert.ok(gate.indexOf("release-tag.ts") > gate.indexOf("RELEASE_ENABLED"));
-
   assert.equal(release.jobs.ci.uses, "./.github/workflows/ci.yml");
-  assert.equal(release.jobs.ci.needs, "gate");
-  assert.equal(release.jobs.ci.with.release, true);
-  assert.deepEqual(release.jobs.publish.needs, ["gate", "ci"]);
-  assert.equal(
-    release.jobs.publish.if,
-    "needs.gate.result == 'success' && needs.ci.result == 'success'",
-  );
-  assert.equal(release.jobs.packages, undefined);
+  assert.equal(release.jobs.gate.needs, "ci");
+  const gate = release.jobs.gate.steps.at(-1);
+  assert.equal(gate.env.RELEASE_ENABLED, "$" + "{{ vars.RELEASE_ENABLED }}");
+  assert.ok(gate.run.includes('[[ "$RELEASE_ENABLED" == true ]]'));
+  assert.ok(gate.run.includes("release-tag.ts"));
 
+  assert.equal(release.jobs.publish.needs, "gate");
   const download = release.jobs.publish.steps[0];
   assert.equal(download.uses, "actions/download-artifact@v8");
-  assert.equal(download.with.pattern, "package-*");
+  assert.equal(download.with.pattern, "package-darwin-arm64");
   const publication = release.jobs.publish.steps.at(-1).run as string;
+  assert.ok(publication.includes("darwin-arm64.zip"));
   assert.ok(publication.includes('gh release create "$RELEASE_TAG"'));
-  assert.ok(publication.includes("--verify-tag"));
-  assert.ok(publication.includes('--notes ""'));
-  assert.ok(!publication.includes("--generate-notes"));
-  assert.ok(!publication.includes("--notes-file"));
-  assert.ok(!publication.includes("SHA256SUMS"));
+  assert.ok(!publication.includes("linux-x64.tar.gz"));
   assert.ok(!publication.includes("npm "));
   assert.ok(!publication.includes("package:"));
 

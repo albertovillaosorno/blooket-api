@@ -226,7 +226,7 @@ export async function checkPublicUpdates(options: {
   readonly request?: typeof fetch;
   readonly timeoutMs?: number;
 }): Promise<UpdateCheckResult> {
-  if (options.target !== "darwin-arm64" && options.target !== "darwin-x64")
+  if (options.target !== "darwin-arm64")
     return { status: "unsupported-platform" };
   const timeoutMs = options.timeoutMs ?? UPDATE_CHECK_TIMEOUT_MS;
   if (

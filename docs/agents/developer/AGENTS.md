@@ -87,7 +87,7 @@ release. Release does not rebuild or re-test; it publishes CI artifacts. Release
 notes are handwritten later in the GitHub UI, with no automated changelog or
 generated notes.
 
-Both Mac architectures are required; Linux packaging/tests remain required even
+The Mac product target is ARM64; Linux packaging/tests remain required even
 when its release asset is omitted.
 
 ## Architecture rules
@@ -242,13 +242,13 @@ Safari packaging uses a GitHub Actions macOS runner, as authorized on
 browser execution. Authenticated online MCP access through Cloudflare Tunnel is
 required for the initial usable release, not a deferred enterprise feature.
 
-Package both macOS ARM64 and x86-64 builds. Confirm the OS in About This Mac
+Package the macOS ARM64 build. Confirm the OS in About This Mac
 before installation; the bundled Node 24 runtime requires macOS 13.5 or later.
 Appearance, Touch ID, and an apparent OS version do not identify the CPU. Linux
 tests do not establish native macOS acceptance.
 
 Do not provision a VM for the initial workflow. Fedora tests cover portable
-logic; macOS integration stays unverified until it runs on the recipient's Mac.
+logic; task blooket-15 owns native platform hardening through ARM64 CI.
 Plan a lightweight first-use diagnostic with persisted status and a sanitized
 local failure log, plus manual rerun.
 

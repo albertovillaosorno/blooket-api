@@ -51,7 +51,7 @@ const manifest = () => ({
   sourceCommit: "a".repeat(40),
   bundleId: UPDATE_BUNDLE_ID,
   minimumMacos: "13.5",
-  assets: ["darwin-arm64", "darwin-x64"].map((target) => ({
+  assets: ["darwin-arm64"].map((target) => ({
     target,
     name: target + ".zip",
     size: 1000,
@@ -110,12 +110,11 @@ test(
 });
 
 test(
-  "both exact Mac archives are required with bounded trusted-address hashes",
+  "the exact ARM64 archive is required with bounded trusted-address hashes",
   () => {
   const value = manifest();
   for (const assets of [
     [],
-    [value.assets[0]],
     [value.assets[0], value.assets[0]],
     [...value.assets, value.assets[0]],
   ])
@@ -135,7 +134,7 @@ test(
     assert.equal(
       decodeUpdateManifest({
         ...value,
-        assets: [{ ...value.assets[0], ...change }, value.assets[1]],
+        assets: [{ ...value.assets[0], ...change }],
       }).ok,
       false,
     );

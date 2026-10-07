@@ -4,28 +4,14 @@ on:
   push:
     tags: ["ci-*"]
   workflow_call:
-    inputs:
-      release:
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 jobs:
-  packages:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: darwin-arm64
-            runner: macos-latest
-          - target: darwin-x64
-            runner: macos-26-intel
-          - target: linux-x64
-            runner: ubuntu-latest
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,32 +20,77 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: npm run check
       - run: npm run roadmap:check
       - run: npm test
-      - name: Assemble native package
-        env:
-          PACKAGE_TARGET: ${{ matrix.target }}
-        run: npm run package -- "$PACKAGE_TARGET"
-      - name: Verify extracted package
-        env:
-          PACKAGE_TARGET: ${{ matrix.target }}
-          RELEASE_MODE: ${{ inputs.release }}
+
+  macos-arm:
+    needs: validate
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Require Apple Silicon
         shell: bash
         run: |
-          if [[ "$PACKAGE_TARGET" == darwin-* ]] &&
-             [[ "$RELEASE_MODE" == true ]]; then
-            npm run package:verify -- "$PACKAGE_TARGET" --release
-          else
-            npm run package:verify -- "$PACKAGE_TARGET"
-          fi
+          set -euo pipefail
+          [[ "$(uname -m)" == arm64 ]]
+          [[ "$(node -p process.arch)" == arm64 ]]
+      - name: Build ARM64 package
+        run: npm run package -- darwin-arm64
+      - name: Verify ARM64 package
+        run: npm run package:verify -- darwin-arm64
+      - name: Compile Safari WebExtension host
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .temp/safari-project
+          xcrun safari-web-extension-packager \
+            ".temp/distributions/darwin-arm64/""Blooket Studio.app/Contents/Resources/extensions/chrome" \
+            --project-location .temp/safari-project \
+            --app-name "Blooket Studio Safari" \
+            --bundle-identifier com.blooketstudio.ci.safari \
+            --swift \
+            --macos-only \
+            --copy-resources \
+            --no-open \
+            --no-prompt
+          project="$(find .temp/safari-project -maxdepth 2 \
+            -name '*.xcodeproj' -print -quit)"
+          test -n "$project"
+          scheme="$(xcodebuild -project "$project" -list -json |
+            python3 -c 'import json,sys; d=json.load(sys.stdin); ''print(d["project"]["schemes"][0])')"
+          test -n "$scheme"
+          xcodebuild \
+            -project "$project" \
+            -scheme "$scheme" \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Exercise packaged workspace in Safari
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .temp/distributions/darwin-arm64.zip
+          sudo /usr/bin/safaridriver --enable
+          npm run macos:safari-smoke
       - uses: actions/upload-artifact@v7
         with:
-          name: package-${{ matrix.target }}
-          path: |
-            .temp/distributions/${{ matrix.target }}.zip
-            .temp/distributions/${{ matrix.target }}.tar.gz
+          name: package-darwin-arm64
+          path: .temp/distributions/darwin-arm64.zip
           if-no-files-found: error
           retention-days: 7
           include-hidden-files: true

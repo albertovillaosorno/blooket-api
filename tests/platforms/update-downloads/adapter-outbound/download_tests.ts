@@ -53,7 +53,7 @@ import { RELEASE_REPOSITORY, releaseAssetUrl } from
 import { tryAcquireFileLock } from
   "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 
-function fixture(target: "darwin-arm64" | "darwin-x64" = "darwin-arm64") {
+function fixture(target: "darwin-arm64" = "darwin-arm64") {
   const keys = generateKeyPairSync("ed25519");
   const bytes = Buffer.from("synthetic signed archive payload");
   const decoded = decodeUpdateManifest({
@@ -61,7 +61,7 @@ function fixture(target: "darwin-arm64" | "darwin-x64" = "darwin-arm64") {
     bundleId: UPDATE_BUNDLE_ID,
     version: "26.4.1", tag: "v26.4.1", sourceCommit: "a".repeat(40),
     minimumMacos: "13.5",
-    assets: ["darwin-arm64", "darwin-x64"].map(target => ({
+    assets: ["darwin-arm64"].map(target => ({
       target, name: target + ".zip",
       url: releaseAssetUrl("v26.4.1", target + ".zip"),
       size: bytes.length,
@@ -101,11 +101,10 @@ function stream(...chunks: Uint8Array[]): Response {
   }));
 }
 
-test("signed streaming stages private bytes for both Mac architectures",
-  async () => {
-    for (const target of ["darwin-arm64", "darwin-x64"] as const)
-      await temporary(async directory => {
-        const { bytes, verification } = fixture(target);
+test("signed streaming stages the ARM64 Mac archive", async () => {
+  const target = "darwin-arm64";
+  await temporary(async directory => {
+    const { bytes, verification } = fixture(target);
         const result = await downloadSignedUpdate({
           directory, verification,
           fetch: async (url, init) => {
@@ -126,8 +125,8 @@ test("signed streaming stages private bytes for both Mac architectures",
         assert.deepEqual(await readFile(result.archivePath), bytes);
         assert.equal((await stat(result.archivePath)).mode & 0o777, 0o600);
         assert.equal((await readdir(directory)).length, 1);
-      });
   });
+});
 
 test("unknown publisher prevents disk staging and any network request",
   async () => {

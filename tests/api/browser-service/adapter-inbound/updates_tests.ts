@@ -83,7 +83,7 @@ test(
       null,
       [],
       { url: "https://example.test" },
-      { target: "darwin-x64" },
+      { target: "linux-x64" },
       { currentVersion: "26.4.1" },
     ]) {
       const result = await post(body, headers);

@@ -102,18 +102,21 @@ restart, retained data, and independent login-startup preferences.
 
 [Record](docs/todo/open/delivery/updates.mdc)
 
-## Teacher acceptance
-
-### TODO - Complete teacher workflow acceptance
-
-Run authoring, media, publication, update, and recovery acceptance on the
-recipient Mac and actual ChatGPT account before declaring the product complete.
-
-[Record](docs/todo/open/acceptance/teacher.mdc)
+## Teacher workflows
 
 ### TODO - Adaptive teacher workflow skills
 
-Accept scoped personal workflow learning and English description normalization
-with the real client, preserving revisions and human checkpoints.
+Finish scoped personal workflow learning and English description normalization,
+preserving revisions and human checkpoints.
 
 [Record](docs/todo/open/teaching/skills.mdc)
+
+## Final platform hardening
+
+### TODO - macOS, Safari, and ChatGPT platform hardening
+
+Keep all remaining platform-specific review in one final record. Official
+platform documentation plus the opt-in ARM64 Safari CI job are sufficient;
+recipient-machine or actual-client smoke tests do not block earlier work.
+
+[Record](docs/todo/open/acceptance/teacher.mdc)

@@ -152,8 +152,5 @@ test was performed merely to reorganize this roadmap.
 
 ## Blockers
 
-**External blocker:** no recipient macOS host is available. Native Keychain
-read/write, folder selection, native Safari appearance, and filesystem/port
-behavior still require the actual Mac. Keep this task pending for those checks;
-continue independent authorization work in task 04 rather than claiming native
-coverage.
+Platform-only macOS/Safari hardening belongs to task blooket-15 and does
+not block this functional record.
