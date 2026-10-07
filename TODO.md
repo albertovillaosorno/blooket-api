@@ -530,6 +530,15 @@ GIF FPS when animated, and effective compression tier. Historic prepared records
 without effective metadata still render their ready state without invented
 parameters.
 
+Global canvas enforcement was added on 2026-10-06 without a mass metadata
+rewrite. Import and edit requests must use the configured width and height.
+Library and command views project historical records onto the current configured
+canvas and hide any prepared artifact made for older dimensions.
+
+Direct preparation refuses an unmigrated recipe; saving that projected edit
+advances the normal optimistic revision, after which preparation can publish the
+current canvas. Prepared HTTP reads independently reject old-canvas artifacts.
+
 Editor cancellation is now wired through the full local stack. Each open editor
 gets a monotonic session identity; closing or replacing it invalidates late
 import/edit/prepare responses. Closing during native preparation aborts the

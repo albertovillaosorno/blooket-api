@@ -70,14 +70,36 @@ import { tryAcquireFileLock } from
   "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import { decodeProjectDocument } from
   "../../../projects/project-documents/domain/project.ts";
+import type { ExportDefaults } from
+  "../../../settings/teacher-preferences/domain/preferences.ts";
 import {
   commandSuccess,
   commandFailure,
 } from "../../command-execution/application/result.ts";
 
-export function libraryRecordView(record: LibraryMetadata) {
+function hasConfiguredCanvas(
+  record: LibraryMetadata,
+  defaults: Pick<ExportDefaults, "width" | "height">,
+): boolean {
+  return (
+    record.edit.width === defaults.width &&
+    record.edit.height === defaults.height
+  );
+}
+
+export function libraryRecordView(
+  record: LibraryMetadata,
+  defaults: Pick<ExportDefaults, "width" | "height">,
+) {
+  const currentCanvas = hasConfiguredCanvas(record, defaults);
   return {
     ...record,
+    edit: {
+      ...record.edit,
+      width: defaults.width,
+      height: defaults.height,
+    },
+    prepared: currentCanvas ? record.prepared : null,
     normalizationStatus: normalizationStatus(record),
   };
 }
@@ -129,7 +151,9 @@ export async function executeLibraryCommand(
             throw new Error("use-paginated-library-search");
           return commandSuccess(
             command.operationId,
-            matches.map(libraryRecordView),
+            matches.map((record) =>
+              libraryRecordView(record, preferences.defaults),
+            ),
           );
         }
         const remaining = matches.filter(
@@ -146,7 +170,9 @@ export async function executeLibraryCommand(
         if (remaining.length > 0 && page.length === 0)
           throw new Error("media-metadata-response-too-large");
         return commandSuccess(command.operationId, {
-          records: page.map(libraryRecordView),
+          records: page.map((record) =>
+            libraryRecordView(record, preferences.defaults),
+          ),
           nextCursor: remaining.length > page.length ? page.at(-1)!.id : null,
           total: matches.length,
         });
@@ -156,7 +182,10 @@ export async function executeLibraryCommand(
       if (payload.kind === "get") {
         const record = records.find((item) => item.id === payload.id);
         if (!record) throw new Error("media-not-found");
-        return commandSuccess(command.operationId, libraryRecordView(record));
+        return commandSuccess(
+          command.operationId,
+          libraryRecordView(record, preferences.defaults),
+        );
       }
       return await withLibraryLock(preferences.mediaRoot, async () => {
         const record = (await listLibrary(preferences.mediaRoot)).find(
@@ -184,7 +213,7 @@ export async function executeLibraryCommand(
         await saveMetadata(preferences.mediaRoot, updated);
         return commandSuccess(
           command.operationId,
-          libraryRecordView(updated),
+          libraryRecordView(updated, preferences.defaults),
         );
       });
     }
@@ -315,6 +344,12 @@ export async function importLibraryImage(
   const request = object(input);
   exact(request, ["name", "description", "base64", "edit"]);
   const recipe = decodeEditRecipe(request["edit"]);
+  const preferences = await loadPreferences(root);
+  if (
+    recipe.width !== preferences.defaults.width ||
+    recipe.height !== preferences.defaults.height
+  )
+    throw new Error("canvas-settings-conflict");
   if (
     !text(request["name"], 200) ||
     !text(request["description"], 10_000) ||
@@ -332,7 +367,6 @@ export async function importLibraryImage(
   const compacted = await compactImageIsolated(bytes);
   if (!compacted.ok) throw new Error(compacted.code);
 
-  const preferences = await loadPreferences(root);
   const library = preferences.mediaRoot;
   await initializeLibrary(library);
   return await withLibraryLock(library, async () => {
@@ -372,6 +406,12 @@ export async function editLibraryImage(
   const request = object(input);
   exact(request, ["id", "revision", "edit", "original"]);
   const recipe = decodeEditRecipe(request["edit"]);
+  const preferences = await loadPreferences(root);
+  if (
+    recipe.width !== preferences.defaults.width ||
+    recipe.height !== preferences.defaults.height
+  )
+    throw new Error("canvas-settings-conflict");
   const original = object(request["original"]);
   exact(original, ["name", "description"]);
   if (
@@ -379,7 +419,7 @@ export async function editLibraryImage(
     !text(original["description"], 10_000)
   )
     throw new Error("invalid-original-metadata");
-  const library = (await loadPreferences(root)).mediaRoot;
+  const library = preferences.mediaRoot;
   return await withLibraryLock(library, async () => {
     const record = (await listLibrary(library)).find(
       (item) => item.id === request["id"],
@@ -412,10 +452,13 @@ export async function prepareLibraryImage(
   id: string,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<LibraryMetadata> {
-  const library = (await loadPreferences(root)).mediaRoot;
+  const preferences = await loadPreferences(root);
+  const library = preferences.mediaRoot;
   const snapshot = await withLibraryLock(library, async () => {
     const record = (await listLibrary(library)).find((item) => item.id === id);
     if (!record) throw new Error("media-not-found");
+    if (!hasConfiguredCanvas(record, preferences.defaults))
+      throw new Error("canvas-settings-conflict");
     const originalPath = await safeLibraryPath(library, record.asset);
     if ((await lstat(originalPath)).size > 25_000_000)
       throw new Error("source-too-large");
@@ -439,6 +482,13 @@ export async function prepareLibraryImage(
     "." +
     extension;
   return await withLibraryLock(library, async () => {
+    const currentPreferences = await loadPreferences(root);
+    if (
+      currentPreferences.mediaRoot !== library ||
+      currentPreferences.defaults.width !== preferences.defaults.width ||
+      currentPreferences.defaults.height !== preferences.defaults.height
+    )
+      throw new Error("prepared-settings-conflict");
     const current = (await listLibrary(library)).find((item) => item.id === id);
     if (!current) throw new Error("media-not-found");
     if (
@@ -476,12 +526,18 @@ export async function readPreparedLibraryImage(
   library: string,
   id: string,
   expectedRevision?: number,
+  expectedCanvas?: Pick<ExportDefaults, "width" | "height">,
 ) {
   return await withLibraryLock(library, async () => {
     const record = (await listLibrary(library)).find((item) => item.id === id);
     if (!record) throw new Error("media-not-found");
     const prepared = record.prepared;
     if (prepared === null) throw new Error("media-not-prepared");
+    if (
+      expectedCanvas !== undefined &&
+      !hasConfiguredCanvas(record, expectedCanvas)
+    )
+      throw new Error("prepared-settings-conflict");
     if (
       prepared.recipeRevision !== record.revision ||
       (expectedRevision !== undefined && expectedRevision !== record.revision)

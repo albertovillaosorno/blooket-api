@@ -318,6 +318,118 @@ test(
   },
 );
 
+test("configured canvas is enforced across local media routes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "browser-canvas-"));
+  const service = await startBrowserService({ root, port: 0 });
+  try {
+    const boot = (await (
+      await fetch(service.origin + "/api/bootstrap")
+    ).json()) as { csrf: string };
+    const post = (path: string, body: unknown) =>
+      fetch(service.origin + path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": boot.csrf,
+          Origin: service.origin,
+        },
+        body: JSON.stringify(body),
+      });
+    const sharp = await loadSharp();
+    const source = await sharp(new Uint8Array([80, 40, 120, 255]), {
+      raw: { width: 1, height: 1, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+    const imported = (await (
+      await post("/api/import", {
+        name: "Canvas fixture",
+        description: "",
+        base64: Buffer.from(source).toString("base64"),
+        edit: {
+          panX: 0,
+          panY: 0,
+          zoom: 1,
+          contrast: 1,
+          saturation: 1,
+          background: { mode: "solid", color: "#ffffff" },
+          width: 1280,
+          height: 720,
+          gifFps: 10,
+          compression: "compact",
+        },
+      })
+    ).json()) as { id: string; revision: number };
+    assert.equal(
+      (await post("/api/prepare", { id: imported.id })).status,
+      200,
+    );
+
+    const preferences = await loadPreferences(root);
+    await savePreferences(root, {
+      ...preferences,
+      defaults: {
+        ...preferences.defaults,
+        width: 640,
+        height: 360,
+      },
+    });
+
+    const media = (await (
+      await fetch(service.origin + "/api/media")
+    ).json()) as {
+      id: string;
+      edit: { width: number; height: number };
+      prepared: unknown;
+    }[];
+    assert.equal(media[0]!.id, imported.id);
+    assert.equal(media[0]!.edit.width, 640);
+    assert.equal(media[0]!.edit.height, 360);
+    assert.equal(media[0]!.prepared, null);
+
+    const stalePrepared = await fetch(
+      service.origin + "/media/" + imported.id + "?variant=prepared",
+    );
+    assert.equal(stalePrepared.status, 400);
+    assert.deepEqual(await stalePrepared.json(), {
+      ok: false,
+      code: "prepared-settings-conflict",
+    });
+
+    const stalePrepare = await post("/api/prepare", { id: imported.id });
+    assert.equal(stalePrepare.status, 400);
+    assert.deepEqual(await stalePrepare.json(), {
+      ok: false,
+      code: "canvas-settings-conflict",
+    });
+
+    const command = (await (
+      await post("/api/command", {
+        version: 1,
+        operationId: "test:canvas-view",
+        command: "library.get",
+        payload: { id: imported.id },
+      })
+    ).json()) as {
+      ok: boolean;
+      value: {
+        edit: { width: number; height: number };
+        prepared: unknown;
+      };
+    };
+    assert.equal(command.ok, true);
+    assert.equal(command.value.edit.width, 640);
+    assert.equal(command.value.edit.height, 360);
+    assert.equal(command.value.prepared, null);
+  } finally {
+    await new Promise<void>((resolve) => {
+      service.server.close(() => resolve());
+      service.server.closeAllConnections();
+    });
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test(
   "extension bridge requires its bearer token and correlates one job",
   async () => {
