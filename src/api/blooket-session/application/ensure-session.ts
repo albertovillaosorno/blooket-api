@@ -20,7 +20,7 @@
 // - Split-When:
 //   - Browser login methods require separate orchestration lifecycles.
 // - Merge-When:
-//   - Blooket no longer requires authenticated browser sessions.
+//   - Session reuse and login no longer need independent orchestration.
 // - Summary:
 //   - Reuses confirmed sessions before reading any stored credential.
 // - Description:
