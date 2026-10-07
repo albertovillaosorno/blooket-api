@@ -51,17 +51,6 @@ cannot establish Keychain or native macOS compatibility. Chrome is the initial
 directly testable browser and extension target. Safari is packaged on a
 GitHub Actions macOS runner once its integration is implemented.
 
-## Why this exists
-
-> Avergonzado, sintiendo sobre sí la mirada reprobatoria de sus hermanos, sacó
-> algunas naranjas de su bolsa y comenzó a tirarlas al aire, haciendo
-> malabarismos, que era lo único que sabía hacer.
-
-— Paulo Coelho, *El Alquimista*, pp. 12.
-
-The quoted passage is reproduced from the cited work and is not covered by
-this repository's MIT license.
-
 ## Run the development workspace
 
 Use Node.js 24 or newer and the pnpm version declared in `package.json`.
@@ -409,6 +398,21 @@ marking externally blocked tasks complete.
 Architecture decisions cover [browser hosting and online MCP][browser-mcp],
 [settings and the media library][library], and
 [atomic persistence][persistence].
+
+## I love you
+
+> Avergonzado, sintiendo sobre sí la mirada reprobatoria de sus hermanos, sacó
+> algunas naranjas de su bolsa y comenzó a tirarlas al aire, haciendo
+> malabarismos, que era lo único que sabía hacer.
+
+— Paulo Coelho, *El Alquimista*, Grijalbo, p. 12 («Prefacio»).
+[Publisher's excerpt][coelho-excerpt].
+
+<!-- jig-ignore-next-line: Exact publisher excerpt URL is indivisible. -->
+[coelho-excerpt]: https://www.penguinlibros.com/mx/literatura-contemporanea/325758-libro-el-alquimista-biblioteca-paulo-coelho-9786073831420/fragmento
+
+The quoted passage is reproduced from the cited work and is not covered by
+this repository's MIT license.
 
 ## License
 

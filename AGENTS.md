@@ -15,6 +15,11 @@ ordered `TODO.md` workflow, architecture rules, secret boundaries, validation,
 and DCO-signed commit requirements. Repository access is never granted through
 a teacher-facing request.
 
+Development follows the displayed order in `TODO.md`. Tasks may be reordered or
+split with synchronized record metadata and dependencies; names never encode
+sequence numbers. Preserve evidence and stable IDs as described in the developer
+profile and `docs/todo/README.md`.
+
 ## Teacher-facing product use
 
 For quiz authoring and other teacher workflows through the admitted MCP tools,
