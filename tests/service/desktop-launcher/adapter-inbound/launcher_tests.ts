@@ -39,6 +39,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { decodeFirstUseDiagnostic } from
   "../../../../src/ir/first-use-diagnostics/contract/state.ts";
+import { defaultTeacherPreferences } from
+  "../../../../src/settings/teacher-preferences/domain/preferences.ts";
+import { savePreferences } from
+  "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 
 const launcher = fileURLToPath(new URL(
   "../../../../src/service/desktop-launcher/adapter-inbound/launcher.ts",
@@ -49,6 +53,11 @@ test("explicit launcher diagnostics repairs cache without starting a service",
   async () => {
     const root = await mkdtemp(join(tmpdir(), "launcher-diagnostic-"));
     try {
+      const preferences = defaultTeacherPreferences(join(root, "media"));
+      await savePreferences(root, {
+        ...preferences,
+        service: { ...preferences.service, port: 1, portMode: "automatic" },
+      });
       const state = join(root, "diagnostics.json");
       await writeFile(state, "invalid-json");
       const result = await promisify(execFile)(process.execPath, [
