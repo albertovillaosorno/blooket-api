@@ -161,10 +161,14 @@ worker lifecycle. These prevent completion of task 08 and publication tasks
 09-12. Portable doubles are not browser acceptance, and no live question
 read-back is claimed.
 
-The worker now has an explicit regression for that evidence boundary: capability
-inspection, question listing, and browser authentication remain fail-closed
-without running a page script until their required browser semantics are
-observed and implemented. Supported set/session reads are unaffected.
+The worker keeps capability inspection and browser authentication fail-closed
+until their required browser semantics are observed and implemented. Question
+listing is now a supported observational read: the worker navigates to the exact
+set edit route, bounds the visible Edit-question controls, opens each question,
+decodes the observed serialized text-question fields, and verifies panel
+cleanup.
+Answer-image encodings remain unsupported and fail closed, so this does not
+remove the complete question/media blocker or claim a live question read-back.
 
 Initial validation: 572 portable tests, strict TypeScript, browser-script
 syntax, and compiled-extension assembly passed. Manual pairing controls were
