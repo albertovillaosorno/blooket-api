@@ -48,6 +48,11 @@ export interface FlightActionRevalidated {
   readonly tag: 0 | 1;
   readonly cookie: 0 | 1;
 }
+export interface FlightActionResponseMetadata {
+  readonly hasFlightBody: boolean;
+  readonly redirect: FlightActionRedirect | null;
+  readonly revalidated: FlightActionRevalidated;
+}
 
 const MAX_FLIGHT_BYTES = 5_000_000;
 const MAX_FLIGHT_ROWS = 20_000;
@@ -260,6 +265,31 @@ export function decodeFlightActionRevalidated(
     paths: paths as readonly string[],
     tag,
     cookie,
+  };
+}
+
+export function decodeFlightActionResponseMetadata(input: {
+  readonly contentType: string | null;
+  readonly redirect: string | null;
+  readonly revalidated: string | null;
+  readonly origin?: string;
+}): FlightActionResponseMetadata {
+  if (
+    input.contentType !== null &&
+    (
+      encodedBytes(input.contentType) < 1 ||
+      encodedBytes(input.contentType) > 512 ||
+      /[\r\n]/u.test(input.contentType)
+    )
+  )
+    throw new Error("invalid-flight-content-type");
+  return {
+    hasFlightBody: input.contentType === "text/x-component",
+    redirect: decodeFlightActionRedirect(
+      input.redirect,
+      input.origin ?? "https://dashboard.blooket.com",
+    ),
+    revalidated: decodeFlightActionRevalidated(input.revalidated),
   };
 }
 
