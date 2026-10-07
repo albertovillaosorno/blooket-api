@@ -833,11 +833,14 @@ context. The initial Flight form state is `UNSET` with message and field errors.
 The private creation checkbox is omitted for a private quiz; its UI label is
 inverted relative to the field name, so do not infer visibility from the name.
 
-Record sanitized synthetic payload fixtures for title/description, set ID,
-question JSON, answers/correct answers, `mc`/`typing`, match modes, and seconds.
-Add tests for payload lowering, private/public semantics, update IDs, and media
-unsupported cases. The candidate helper currently supports only text create/add;
-update hashes alone do not implement editing.
+Sanitized synthetic payload fixtures now pin title/description, set ID,
+question JSON, answer order/correctness, `mc`/`typing`, match modes, seconds,
+and the inverted public/private checkbox semantics. Media-backed set/question
+candidates remain unsupported before any HTTP mutation.
+
+The candidate helper still supports only text create/add. Tests pin the observed
+update set/question action hashes as identifiers only; those hashes do not
+implement editing, and no HTTP write is activated by these request fixtures.
 
 The real action response body was not recovered: attempts to retrieve it through
 the browser tool failed. HTTP 200 and UI read-back are not a decoded response
