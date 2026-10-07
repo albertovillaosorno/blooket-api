@@ -83,6 +83,7 @@ export async function executeBlooketReadCommand(
               secrets,
               questions,
               payload.setId,
+              { readOnly: true },
             )
           : await getBlooketSet(session, secrets, sets, payload.setId, {
               readOnly: true,
