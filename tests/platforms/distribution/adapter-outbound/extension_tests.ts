@@ -38,6 +38,9 @@ import { createRequire } from "node:module";
 import { buildBrowserExtension } from
   "../../../../src/platforms/distribution/adapter-outbound/extension.ts";
 
+import { PRODUCT_VERSION, extensionVersion } from
+  "../../../../src/ir/product-version/contract/version.ts";
+
 test(
   "extension compilation emits a closed browser-safe module tree",
   async () => {
@@ -50,6 +53,8 @@ test(
       await readFile(join(output, "manifest.json"), "utf8"),
     );
     assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.version_name, PRODUCT_VERSION);
+    assert.equal(manifest.version, extensionVersion(PRODUCT_VERSION));
     assert.deepEqual(manifest.permissions, ["storage", "scripting"]);
     assert.deepEqual(manifest.host_permissions, [
       "https://dashboard.blooket.com/*",

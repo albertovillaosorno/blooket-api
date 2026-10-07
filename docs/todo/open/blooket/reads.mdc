@@ -1,0 +1,220 @@
+---
+schema_version: 1
+id: "blooket-08"
+status: "active"
+priority: "p1"
+horizon: "publication"
+order: 80
+area: "blooket"
+task: "TODO - Authenticated Blooket reads"
+legacy_task: "TODO 08"
+depends_on: []
+contracts:
+  - "docs/technical/adr/blooket-session-and-read-boundary.md"
+  - "docs/technical/adr/blooket-navigation-state-machine.md"
+scope:
+  - "src/api/blooket-session/"
+  - "src/api/blooket-set-reads/"
+  - "src/api/blooket-capability-inspection/"
+  - "src/service/browser-extension/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Authenticated Blooket reads
+
+## Objective
+
+Finish verified questions, capabilities, pagination, and browser-session stops
+without presenting incomplete reads as publication-ready state.
+
+## Acceptance
+
+Complete when fresh validated remote state can be read reliably, capability
+changes are detected, and a missing/challenged session returns the appropriate
+stop instead of fabricated data or a mutation. These reads establish the
+baselines needed for publication and conflict detection.
+
+## Implementation notes
+
+Implement concrete macOS session, capability, My Sets, and set-detail surfaces
+behind their existing ports. Reuse the teacher's confirmed browser session and
+validate account capabilities, question/media reads, and navigation states
+through the existing IR decoders. Keep unknown limits unknown.
+
+Connect ordinary saved email and the secret-store credential boundary when login
+is needed. Preserve CAPTCHA, organization selection, unfamiliar login, loading,
+expired-session, and human-stop states. Session data and cookies must remain
+inside the browser/security boundary.
+
+The extension discovers the workspace automatically through its isolated local
+page relay. It never asks the teacher for an address, pairing code, Blooket
+credentials, or a Connect action. The popup shows state and page shortcuts.
+
+Jig reports only the existing external `JIG-RULE-GAP-001`. Package-release
+freshness evidence was re-fetched from its configured registry providers.
+
+Payload decoding rejects unknown fields, credentials, paths, wrong types,
+control characters, and oversized IDs before service/browser access.
+
+These reads reuse the existing session without retrieving secrets or submitting
+a login. Signed-out or expired sessions return
+`blooket-authentication-required`; rate limits, organization prompts, and
+challenges preserve their wait/human states. Missing or stale local instances
+fail closed. Local requests use exact loopback discovery, bounded responses,
+correlation checks, CSRF admission, and no redirects.
+
+This was a local tool projection check, not actual ChatGPT or a new public OAuth
+acceptance run.
+
+The development service restarted normally, the workspace reconnected without
+configuration, and the configured tunnel returned to connected. Native Safari,
+complete questions/media, capabilities, server-side set-list completeness, and
+login remain pending. Their absence still blocks publication; do not expose
+unsupported read or write tools as if validated.
+
+## Evidence
+
+Portable question-read foundations were added on 2026-10-06. The version-one
+read contract normalizes question number/text, `mc`/`typing`, randomization,
+seconds, answers/correct answers, typing match modes, and only the presence of
+question image/audio media. It deliberately does not retain provider media URLs
+or invent remote question IDs. Authenticated `listBlooketQuestions` validates
+the opaque set ID before browser or secret access and decodes every adapter
+result before returning it.
+
+The field evidence comes from recovered build
+`86784c3d4c38fcd559c92f38fbadd7a160947de2`: edit module 12048
+(`page-720bc856ab06b26b.js`, factory
+`b0c808b1bcf957f7a974ba0a27269e5c4eca8c3a3be0663f0207fc7ad04f8bb4`) reads
+`set.questions` and each question's number, question, image, audio, `qType`,
+random flag, and `timeLimit`; dependency module 35211
+(`6749-987e303c90e94fbf.js`, factory
+`b21ec449a8a5bbc90abd132bb6b08de90881ab45ba3654182a4d90690e98b90d`) also reads
+answers, correct answers, and answer types. Neither module has a recorded
+factory variant. The previously authorized Chrome observation on the newer build
+confirmed that changing a private test question to typing with a 15-second limit
+persisted after reload; keep the two builds distinct.
+
+Question write recovery now captures a normalized question-list digest and can
+confirm one exact text-only addition only when removing that candidate
+reproduces the pre-write collection. Unchanged state is `not-confirmed`; media
+writes, concurrent edits, malformed reads, and ambiguous additions remain
+`inconclusive`.
+
+The local browser bridge has a versioned request/response contract, bounded
+in-memory broker, bearer-authenticated loopback routes, and API port adapters.
+The concrete Chrome worker and page extractor now support session observation,
+nonempty My Sets summaries, and the observed private set-detail controls.
+
+Authorized Chrome DOM inspection on 2026-10-06 confirmed My Sets article/h3/Edit
+link structure and the detail controls: input#title[name="title"],
+textarea#desc[name="desc"], and input#private[name="private"] with role=switch.
+The observed unchecked switch displays "Private (Only playable by you)".
+
+Recovered edit module 31017 establishes both exact visibility states: private
+renders with the inverted switch unchecked and "Private (Only playable by you)",
+while public renders with the switch checked and "Public (Playable by
+everyone)". The adapter requires the matching visible label and switch state.
+
+Recovered My Sets module 52644 and its captured route HTML establish the true
+empty-library state as "You'll need a question set to host!" plus the visible
+"Create a Set" action. The adapter returns an empty set list only with both
+markers; zero cards alone, folder-empty text, and search-empty text still fail
+closed so loading cannot masquerade as an empty account.
+
+Inspecting the existing synthetic typing question confirmed its visible text,
+answer, match mode, and seconds, but did not establish every required question
+field. No edits or Save actions were submitted during this inspection.
+
+The unpacked extension compiles with the pinned repository compiler and is
+included in native package resources. Synthetic worker tests cover trusted popup
+senders, exact loopback configuration, bounded replies, navigation, unsupported
+commands, and signed-out page stops. Artifact tests verify emitted JavaScript
+imports and the narrow permission set, with no server/secret modules.
+
+Recovered dashboard HTML and module 88289 confirm a visible modal headed "Select
+your organization". Session observation now treats that exact visible dialog as
+organization-prompt, and set reads stop while it is present. The adapter does
+not choose, submit, or infer an organization.
+
+The recovered My Sets client receives one `sets` collection, then filters and
+sorts it locally. No cursor, offset, page, limit, load-more control, or
+pagination UI appears in the captured route/client modules. The removed server
+Flight data means this does not prove the server never truncates, so server-side
+completeness remains an explicit observation gap rather than an invented
+pagination contract.
+
+Still pending: server-side set-list completeness; capabilities and complete
+question/media facts; login and the outcome of organization selection; Safari
+worker lifecycle. These prevent completion of task 08 and publication tasks
+09-12. Portable doubles are not browser acceptance, and no live question
+read-back is claimed.
+
+The worker now has an explicit regression for that evidence boundary: capability
+inspection, question listing, and browser authentication remain fail-closed
+without running a page script until their required browser semantics are
+observed and implemented. Supported set/session reads are unaffected.
+
+Initial validation: 572 portable tests, strict TypeScript, browser-script
+syntax, and compiled-extension assembly passed. Manual pairing controls were
+removed at the human's request; that workflow is superseded by automatic local
+workspace discovery, not a product requirement.
+
+The human loaded the extension and reported Chrome registration status 3:
+"Top-level await is disallowed in service workers." The worker startup was
+corrected to register its listener synchronously, restore session storage
+asynchronously, and queue popup actions behind restoration. The artifact test
+now requires a synchronous emitted ESM dependency graph, which rejects this
+class of startup failure.
+
+The human then confirmed the popup and Disconnected state, establishing worker
+message handling. After the automatic-discovery update, the human confirmed
+Ready without entering any configuration.
+
+A real extension read through the application adapters returned two IR-validated
+set summaries and found the existing synthetic fixture. Its set-detail read also
+passed the IR decoder and confirmed private visibility and the synthetic title,
+without logging private lesson names or account values. No Blooket data was
+changed.
+
+Final portable checks pass 574 tests, strict TypeScript, and all three browser
+script syntax checks. Emitted-worker tests require a synchronous module graph;
+workspace relay tests reject unrelated origins, applications, malformed tokens,
+and oversized responses. These were portable results; native package evidence
+for subsequent revisions is recorded separately below.
+
+The clean Linux archive for commit `eff0feb` subsequently passed extracted
+package verification, including the updated automatic-discovery worker,
+clipboard helper, icons, launcher, and native media preparation. This proves
+that revision only; command composition received its own package check below.
+
+Canonical read composition was implemented on 2026-10-06. The admitted
+`blooket.session.inspect`, `blooket.sets.list`, and `blooket.sets.get` commands
+share the existing validated application ports through the running local
+service. Ordinary CLI syntax and the three matching MCP tools use that path; MCP
+still executes the canonical CLI subprocess, never application internals.
+
+All 589 portable tests and strict TypeScript passed. A synthetic integration
+exercised the actual CLI subprocess, local server, browser broker, and MCP tool
+projection. The authorized installed Chrome extension then confirmed a ready
+session, two IR-validated set summaries, and one private set detail through the
+same CLI/MCP projection. No account content, credentials, or IDs were logged or
+committed, and no Blooket mutation was performed.
+
+Extracted Linux package verification also passed launch/reuse, native media,
+profile retrieval, and all three packaged read commands. The read check drives
+only its disposable server's authenticated bridge with synthetic session/set
+facts, exercises ordinary CLI syntax, and rejects token leakage. This proves
+native package composition, not a packaged Chrome/Safari installation or live
+Blooket publication.
+
+## Blockers
+
+**Installation blocker:** the browser-control URL policy rejects
+`chrome://extensions/` and forbids bypassing it through another control surface.
+The human loaded the development extension manually. Future reloads during
+development also need that browser action. The real `.env` is unchanged.

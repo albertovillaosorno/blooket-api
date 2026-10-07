@@ -36,6 +36,7 @@ jobs:
           node-version: 24.21.0
       - run: pnpm install --frozen-lockfile
       - run: npm run check
+      - run: npm run roadmap:check
       - run: npm test
       - name: Assemble native package
         env:

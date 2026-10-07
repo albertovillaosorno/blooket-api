@@ -1,0 +1,195 @@
+---
+schema_version: 1
+id: blooket-17
+status: active
+priority: p2
+horizon: delivery
+order: 145
+area: delivery
+task: TODO - Safe automatic application updates
+legacy_task: TODO 17
+depends_on:
+  - blooket-03
+  - blooket-11
+  - blooket-13
+  - blooket-14
+contracts:
+  - docs/technical/adr/product-update-lifecycle.md
+  - docs/technical/adr/macos-browser-ui-and-online-mcp.md
+  - docs/technical/adr/atomic-local-persistence.md
+scope:
+  - src/settings/teacher-preferences/
+  - src/api/teacher-configuration/
+  - src/service/
+  - src/platforms/distribution/
+  - src/ui/teacher-workspace/
+  - .github/workflows/
+validation:
+  - npm run check
+  - npm run roadmap:check
+  - npm test
+  - jig validate --root .
+  - npm run package:verify -- darwin-arm64 --release
+  - npm run package:verify -- darwin-x64 --release
+---
+
+# TODO - Safe automatic application updates
+
+## Objective
+
+Offer opt-in public GitHub updates with trusted compatible artifacts, safe
+staging, visible status, and recoverable installation. Keep startup usable
+offline and preserve teacher data and current access boundaries.
+
+## Acceptance
+
+### Independent preferences and ownership
+
+Expose separate EN/ES controls: “Start Blooket Studio at login” / “Iniciar
+Blooket Studio al iniciar sesión” and “Check for and install updates
+automatically” / “Buscar e instalar actualizaciones automáticamente”. Both
+default false; a missing update preference migrates to false.
+
+Task `blooket-13` alone owns native login registration and service lifecycle.
+This record owns update integration and acceptance, reusing that lifecycle
+rather than installing another startup agent. Never silently enable persistence
+or background network activity.
+
+Show current version, last check, and update state, plus “Check for updates” /
+“Buscar actualizaciones”. Manual checks work with automation off; manual
+download/installation requires explicit local action. Disabling automation stops
+future scheduled checks/downloads and cancels uncommitted background work.
+
+Checks and installation remain local product behavior, with no remote MCP shell,
+arbitrary-download, or installation tools and no broadened OAuth permissions.
+
+### Public source and bounded checks
+
+Use this repository's public GitHub Releases REST API without a teacher GitHub
+account or repository credential; never scrape rendered HTML:
+`https://api.github.com/repos/albertovillaosorno/blooket-api/releases`.
+
+Bound metadata to ten seconds, one megabyte, and at most two pages of 50
+releases; admit pagination only for this exact release endpoint. A truncated
+catalog is unavailable, not proof of being current. Preserve normal HTTPS
+validation and bound download size, redirects, and deadlines separately.
+
+When enabled, check at least 30 seconds after usable startup and at most once
+per 24 hours. Coalesce manual/concurrent checks, honor server rate/retry limits,
+and back off at one, six, then 24 hours. Sleep/offline/reconnect cannot cause a
+burst; an ETag may support conditional requests without tracking identifiers.
+
+Network failures never crash the app or block offline startup. Do not transmit
+Blooket/MCP/tunnel credentials, teacher identifiers, lessons, or media metadata
+to GitHub; update checks are not telemetry.
+
+### Results and release selection
+
+Distinguish current/latest, newer compatible version, downloading, ready,
+installation pending safe restart, applied, source unavailable, malformed or
+untrusted metadata, no compatible asset, download failure,
+integrity/authenticity failure, installation failure, and rollback/recovery.
+
+A valid empty catalog or no newer admitted release says “No new version is
+available” / “No hay una nueva versión disponible”. HTTP/DNS errors, timeout,
+invalid JSON/schema, and truncation show a bounded useful failure instead.
+
+Admit only final public releases, excluding drafts and prereleases. Use the same
+canonical `YY.Q.PATCH` parser as the release pipeline: tag `v26.4.0`, product
+`26.4.0`. Order year, quarter, and revision numerically; ignore older and equal
+versions and choose the highest admitted version rather than list order/title.
+
+Reject future UTC calendar quarters and publication times more than five minutes
+ahead of the current clock. Reject malformed objects; skip malformed tags with
+bounded diagnostics, but report untrusted metadata if all candidate tags are
+malformed. A higher patch must remain monotonic within its quarter.
+
+Select exactly one `darwin-arm64.zip` or `darwin-x64.zip` using actual CPU/OS
+capabilities, never appearance. Missing, duplicate, foreign, and incompatible
+assets have explicit outcomes. Linux is a developer package; automatic Linux
+installation needs a separately admitted update contract before support.
+
+### Trust and release pipeline
+
+The current pipeline publishes no update manifest or final archive checksums.
+Dependency hashes in `distribution.json` do not verify a downloaded app archive.
+Add a bounded CI-owned manifest with canonical version/tag, source commit,
+target, minimum OS, asset name, byte size, and SHA-256 after
+signing/notarization. Validate it against tested archives and publish only those
+exact artifacts after the release gate and CI succeed.
+
+Require publisher authenticity through a signed manifest with an admitted key or
+verified CI provenance, with specified trust-key rotation. Preserve Apple
+signing, designated requirement/Team ID, Gatekeeper, and notarization checks.
+Checksums alone do not authenticate the publisher; HTTPS alone does not trust a
+ZIP. Do not weaken signing or bypass legitimate OS authorization.
+
+Validate asset URLs and bounded redirects against the exact repository, tag, and
+expected GitHub release asset authority. Reject foreign URLs, extraction path
+traversal, unsafe symlinks, and mismatched bundle identity/version/target.
+
+### Transaction and recovery
+
+Download automatically only when opted in, or after explicit local action. Stage
+safely and apply at a safe lifecycle boundary; never blindly overwrite a running
+application. Wait for active quiz mutations and block installation on ambiguous
+journals until reconciliation or a human checkpoint; restart must not replay a
+remote write.
+
+Reuse service stop/start ownership and the single-instance lock. Journal phases
+and use atomic replacement or a recoverable staged transaction. Retain or
+recover the old usable app on failure; clean only owned abandoned downloads and
+show sanitized recoverable errors.
+
+Separate the application bundle from user data. Preserve media, metadata,
+preferences, skills, drafts, credential references, and Blooket/tunnel settings.
+Schema migrations are versioned, fail closed, and retain a recoverable original.
+Do not silently reset configuration.
+
+OAuth tokens are currently memory-bound and renewed consent may be necessary
+after restart; show that authorization boundary without claiming token survival
+or resetting saved preferences. Required macOS replacement approval is a real
+human boundary, never a bypass target.
+
+### Acceptance matrix
+
+Use deterministic fixtures/doubles without live GitHub polling for no releases,
+current/newer/older/future versions, numeric ordering, drafts/prereleases,
+malformed tags/metadata/JSON, HTTP/DNS/timeouts, size/pagination limits,
+compatible/incompatible/duplicate/foreign assets, integrity/authenticity
+failure, interrupted downloads/staging/install, recovery/rollback, settings
+off/on, manual checks, backoff/sleep/reconnect, active/ambiguous writes, and
+data retention through failed migrations.
+
+On the real recipient Mac: enable login startup, log out/in or restart, prove
+one service, disable it and prove no next-login startup, remove only owned
+persistence on uninstall, preserve preferences across updates, and recover
+visible registration/start/removal failures. Linux tests are not native proof.
+
+Before completion, exercise an actual published final test/release artifact via
+the production updater on both intended Mac architectures. Verify offline
+startup, Apple trust, rollback/data retention, independent preferences, and
+EN/ES states. Publishing/tagging requires separate human authorization; this
+task authorizes no release.
+
+## Evidence
+
+The launcher already owns service startup and duplicate-instance protection.
+`launchAtLogin` defaults false, but native registration remains unimplemented.
+There is no updater or automatic-update preference yet.
+
+The public [release page][releases] had no releases when inspected without
+authentication on 2026-10-06. An empty catalog is a valid state. Protocol
+references are GitHub's [release API][api] and [asset API][assets].
+
+## Blockers
+
+Tasks 03, 11, 13, and 14 own configuration, write recovery, lifecycle, and
+trusted packaging prerequisites. Actual Macs, signing/notarization, trusted
+manifest metadata, and a separately authorized published artifact remain
+necessary. Neither implementation nor native/production update acceptance is
+claimed here.
+
+[releases]: https://github.com/albertovillaosorno/blooket-api/releases
+[api]: https://docs.github.com/en/rest/releases/releases
+[assets]: https://docs.github.com/en/rest/releases/assets

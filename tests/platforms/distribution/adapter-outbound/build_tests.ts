@@ -54,8 +54,9 @@ test("CI is opt-in and release consumes its verified artifacts", async () => {
   const ci = await workflow("ci");
   const release = await workflow("release");
   assert.deepEqual(
-    (await readdir(new URL("../../../../.github/workflows/", import.meta.url)))
-      .sort(),
+    (
+      await readdir(new URL("../../../../.github/workflows/", import.meta.url))
+    ).sort(),
     ["ci.yml", "release.yml"],
   );
 
@@ -78,12 +79,13 @@ test("CI is opt-in and release consumes its verified artifacts", async () => {
     ["macos-latest", "macos-26-intel", "ubuntu-latest"],
   );
 
-  const ciCommands = ci.jobs.packages.steps.flatMap(
-    (step: { run?: string }) => (step.run ? [step.run] : []),
+  const ciCommands = ci.jobs.packages.steps.flatMap((step: { run?: string }) =>
+    step.run ? [step.run] : [],
   );
   for (const command of [
     "pnpm install --frozen-lockfile",
     "npm run check",
+    "npm run roadmap:check",
     "npm test",
     'npm run package -- "$PACKAGE_TARGET"',
   ]) {
@@ -93,9 +95,8 @@ test("CI is opt-in and release consumes its verified artifacts", async () => {
     command.includes("npm run package:verify"),
   );
   assert.equal(
-    ciCommands.filter((command: string) =>
-      command.includes("package:verify"),
-    ).length,
+    ciCommands.filter((command: string) => command.includes("package:verify"))
+      .length,
     1,
   );
   assert.ok(
@@ -109,7 +110,7 @@ test("CI is opt-in and release consumes its verified artifacts", async () => {
   assert.ok(packageVerify?.includes('"$PACKAGE_TARGET" == darwin-*'));
   assert.ok(packageVerify?.includes('"$RELEASE_MODE" == true'));
 
-  assert.deepEqual(release.on.push.tags, ["v20*.*.*"]);
+  assert.deepEqual(release.on.push.tags, ["v[0-9][0-9].[1-4].*"]);
   assert.equal(
     release.jobs.gate.steps.at(-1).env.RELEASE_ENABLED,
     "${{ vars.RELEASE_ENABLED }}",

@@ -1,0 +1,94 @@
+---
+schema_version: 1
+id: "blooket-13"
+status: "active"
+priority: "p2"
+horizon: "delivery"
+order: 130
+area: "delivery"
+task: "TODO - Diagnostics and launch at login"
+legacy_task: "TODO 13"
+depends_on:
+  - "blooket-03"
+  - "blooket-04"
+contracts:
+  - "docs/technical/adr/macos-browser-ui-and-online-mcp.md"
+  - "docs/technical/adr/host-secret-storage.md"
+scope:
+  - "src/service/"
+  - "src/platforms/service-lifecycle/"
+  - "src/platforms/cloudflare-tunnel/"
+  - "src/settings/local-service/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Diagnostics and launch at login
+
+## Objective
+
+Implement visible, reversible native launch-at-login and accept first-use
+checks, service ownership, and tunnel lifecycle on the Mac.
+
+## Acceptance
+
+Test that first-use runs once, failed attempts remain repairable, logs are
+bounded, and the recipient sees useful translated failures. Existing macOS
+status remains unverified until the actual Mac runs it.
+
+Complete when first-use runs once, manual rerun repairs its status, start/stop
+and opt-in login launch are visible/reversible, and disablement or shutdown
+cleans up the gateway/tunnel. Sleep or reconnection must never replay an
+ambiguous Blooket write.
+
+## Implementation notes
+
+The lightweight first-use check, persisted `diagnostics.json`, sanitized local
+log, and manual rerun exist. It checks runtime, host, settings/storage, a tiny
+native image round-trip, and secret-client presence. Complete settings linkage,
+port and configured tunnel prerequisites, and meaningful Keychain availability
+checks without saving real credentials or mutating Blooket.
+
+Shutdown/reload serialization and terminal stop were implemented and tested in
+task 04. Preserve useful `cloudflared-unavailable`/timeout failure codes instead
+of overwriting them with a generic close/offline state. Test disablement,
+restart, early exit, missing executable/token, sleep/offline behavior, and
+process cleanup.
+
+Add visible stop/start and optional, reversible launch-at-login through ordinary
+macOS facilities.
+
+The packaged Cloudflare connector is resolved beside the runtime; missing-client
+and connection-timeout status survive process close. Shutdown still closes the
+gateway, local server, runtime record, and service lock when a connector stop
+fails. Linux child processes keep only required host-session hints instead of
+inheriting development credentials, including when opening the browser.
+Launch-at-login and the recipient's native-host lifecycle remain pending.
+
+This record alone owns host launch-at-login implementation. Task `blooket-17`
+owns update preference integration and must reuse this lifecycle instead of
+installing another startup agent. The existing `launchAtLogin` setting defaults
+to false and bootstrap still reports it as not implemented.
+
+Native acceptance must enable login startup, perform logout/login or restart,
+observe exactly one owned service, disable it and confirm the next login does
+not start it, and remove only owned persistence on uninstall. Updates preserve
+the preference; registration, launch, and removal failures remain visible and
+recoverable through ordinary supported macOS facilities.
+
+## Evidence
+
+On 2026-10-06, managed startup acquired a shared service lock and published a
+private instance record. The launcher checks the live instance before reuse,
+supports browser opening, status, and CSRF-protected stop, and releases the lock
+on shutdown. Linux archive verification passed launch/reuse, native preparation,
+the actual packaged CLI, foreign-origin rejection, and owned shutdown with
+synthetic data. The real development service and `.env` were not changed.
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

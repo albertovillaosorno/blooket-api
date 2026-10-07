@@ -1,0 +1,72 @@
+---
+schema_version: 1
+id: "blooket-11"
+status: "active"
+priority: "p1"
+horizon: "publication"
+order: 110
+area: "blooket"
+task: "TODO - Journaled quiz publication"
+legacy_task: "TODO 11"
+depends_on:
+  - "blooket-07"
+  - "blooket-09"
+  - "blooket-10"
+contracts:
+  - "docs/technical/adr/blooket-write-plans.md"
+  - "docs/technical/adr/atomic-local-persistence.md"
+  - "docs/technical/adr/canonical-dependency-direction.md"
+scope:
+  - "src/api/blooket-write-execution/"
+  - "src/projects/blooket-write-plans/"
+  - "src/cli/"
+  - "src/mcp/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Journaled quiz publication
+
+## Objective
+
+Connect canonical create/edit execution with fresh remote read-back, strict
+media admission, conflict detection, pacing, and recovery.
+
+## Acceptance
+
+Complete when canonical execution can create and edit an admitted quiz, confirm
+remote IDs/questions/media after reload, detect conflicts, and recover safely
+from interruption. Require the same validation, media ceiling, and pacing for
+MCP, CLI, HTTP, and browser entrypoints.
+
+## Implementation notes
+
+Use the existing validated IR, write-plan lowering, persisted attempt journals,
+checkpoints, receipts, locks, read-back, and reconciliation. Do not add a second
+unprotected publication loop. Extend remote reads to validated question/media
+state and detect concurrent online edits before changing a quiz.
+
+Expose canonical CLI commands and MCP tools for list/read/create/edit, question
+type, per-question seconds, stable-ID media selection, progress, and recovery.
+Fresh verified Blooket state and the teacher's online request drive changes;
+local draft JSON remains private automatic recovery state.
+
+Resolve prepared media by stable ID and validate current recipe revision, actual
+file format, and actual bytes before every upload. Upload only a prepared
+rendition strictly below 2,500,000 bytes, never a larger original or stale file.
+Reuse the same guard in UI, CLI, HTTP, browser, and MCP execution.
+
+Run an approved small publication through this application's actual MCP/CLI
+runtime, read it back after refresh, and test interruption, recovery, ambiguity,
+account limits, and unsupported types. The existing private UI test is useful
+evidence but does not replace this missing end-to-end flow.
+
+## Evidence
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

@@ -41,6 +41,9 @@ import {
   callTeacherTool,
 } from "../../teacher-tools/adapter-inbound/tools.ts";
 
+import { PRODUCT_VERSION } from
+  "../../../cli/json-command-process/adapter-inbound/execute.ts";
+
 export async function startMcpGateway(options: {
   publicUrl: string;
   dataRoot: string;
@@ -230,7 +233,7 @@ export async function startMcpGateway(options: {
                 ? params.protocolVersion
                 : "2025-11-25",
             capabilities: { tools: {} },
-            serverInfo: { name: "blooket-api", version: "0.1.0" },
+            serverInfo: { name: "blooket-api", version: PRODUCT_VERSION },
             instructions:
               "Read personal skills before authoring. Use stable " +
               "media IDs. Original text and filenames belong to " +

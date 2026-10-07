@@ -1,0 +1,107 @@
+---
+schema_version: 1
+id: "blooket-10"
+status: "active"
+priority: "p1"
+horizon: "publication"
+order: 100
+area: "blooket"
+task: "TODO - Mutation pacing and human checkpoints"
+legacy_task: "TODO 10"
+depends_on:
+  - "blooket-08"
+contracts:
+  - "docs/technical/adr/blooket-navigation-state-machine.md"
+  - "docs/technical/adr/blooket-write-plans.md"
+scope:
+  - "src/api/blooket-write-execution/"
+  - "src/projects/blooket-write-plans/"
+  - "src/ir/blooket-navigation/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Mutation pacing and human checkpoints
+
+## Objective
+
+Share bounded account mutation budgets across transports and preserve
+recoverable human-action stops for challenges and unfamiliar access states.
+
+## Acceptance
+
+Test serialization, rolling-window limits, task budgets, cancellation, restart,
+and interruptions using an injected clock. Verify normal browser ordering and
+read-back; pauses alone are not evidence that a mutation succeeded.
+
+Test the stop/notification/resume behavior with synthetic challenge states,
+including challenges reached from localhost that actually belong to Blooket or
+another authentication provider. Revalidate session and remote write state
+afterward, without automatically replaying an ambiguous operation.
+
+Complete when all entrypoints share the mutation budget, waits/cancellation
+preserve checkpoints, and challenge completion resumes only from verified
+session and remote state. Treat the proposed pacing as application defaults, not
+verified provider limits or protection against account restrictions.
+
+## Implementation notes
+
+The user's request concerns Blooket interaction timing, not the MCP's writing
+style. Navigate, fill, and submit in the normal browser sequence; wait for page
+readiness and confirmation between actions instead of issuing a burst of work.
+Apply the same conservative pacing to admitted HTTP actions.
+
+Use one shared per-account mutation queue across MCP, CLI, and local UI, with
+only one write in flight. Proposed application defaults are at least two seconds
+between mutation starts and at most 20 starts in a rolling minute. These are
+application choices, not verified Blooket limits or a guarantee against account
+restrictions; use stricter verified provider limits when known.
+
+Pacing remains intentionally unwired from publication: task 09 still blocks real
+HTTP writes, and the future composition must acquire pacing, durably save the
+incremented task budget, then open the existing attempt journal immediately
+before mutation. Durable budget-file ownership and shared MCP/CLI/UI wiring
+remain pending, so restart acceptance is not yet claimed.
+
+Make pacing, mutations per minute, task mutation budget, and maximum task
+duration configurable within bounded ranges. Persist progress and yield with a
+clear status when a task budget is exhausted; do not silently drop operations.
+Keep pause/cancel responsive and apply provider retry guidance when available.
+
+Count attempts as well as confirmed writes, prevent parallel clients from
+evading the shared limit, and never retry or switch transports after an
+ambiguous mutation without reconciliation. Stop on rate-limit or challenge
+states rather than accelerating, guessing success, or hiding automation.
+
+If a CAPTCHA or security challenge appears during the local browser workflow,
+preserve the checkpoint, return `human-action-required`, and show the actual
+page/origin that needs attention. Let the teacher complete the challenge locally
+and resume only after observing legitimate completion. The user has not observed
+a CAPTCHA; do not invent one or add a localhost CAPTCHA merely for first-use
+diagnostics.
+
+Any assistant attempt to solve a displayed CAPTCHA requires the user's explicit
+confirmation at that moment; a general request to finish the workflow is not
+advance approval. Provide assistance only within that confirmed interaction.
+Never bypass the challenge, use solving services, forge validation, transfer
+challenge/session secrets through MCP, or suppress unfamiliar login stops.
+
+## Evidence
+
+A portable in-process pacing foundation was added on 2026-10-06. It grants one
+exclusive mutation lease at a time, enforces the two-second and 20-per-minute
+defaults with an injected clock, permits only stricter configuration, and
+cancels queued work without consuming a start.
+
+A strict task-budget state now counts attempted mutation starts and has bounded
+maximum-start and maximum-duration policies. Its versioned state round-trips
+through serialization so a future durable owner can resume it without inventing
+progress; clock rollback and malformed state fail closed.
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

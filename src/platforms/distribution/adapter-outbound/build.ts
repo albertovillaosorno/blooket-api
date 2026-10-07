@@ -46,6 +46,11 @@ import { join, dirname } from "node:path";
 import { buildBrowserExtension } from "./extension.ts";
 import { buildMacIcon } from "./icons.ts";
 
+import {
+  PRODUCT_VERSION,
+  appleBuildVersion,
+} from "../../../ir/product-version/contract/version.ts";
+
 export const TARGETS = ["linux-x64", "darwin-arm64", "darwin-x64"] as const;
 export type DistributionTarget = (typeof TARGETS)[number];
 const NODE_VERSION = "24.21.0";
@@ -221,6 +226,7 @@ export async function buildDistribution(target: DistributionTarget) {
       join(app, "package.json"),
       JSON.stringify({
         name: "blooket-studio-runtime",
+        version: PRODUCT_VERSION,
         private: true,
         type: "module",
       }) + "\n",
@@ -320,6 +326,7 @@ export async function buildDistribution(target: DistributionTarget) {
       JSON.stringify(
         {
           version: 1,
+          productVersion: PRODUCT_VERSION,
           target,
           sourceRevision,
           minimumMacOS: mac ? "13.5" : null,
@@ -353,7 +360,8 @@ export async function buildDistribution(target: DistributionTarget) {
 <key>CFBundleExecutable</key><string>Blooket Studio</string>
 <key>CFBundleIconFile</key><string>Blooket Studio.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>${PRODUCT_VERSION}</string>
+<key>CFBundleVersion</key><string>${appleBuildVersion(PRODUCT_VERSION)}</string>
 <key>LSMinimumSystemVersion</key><string>13.5</string>
 <key>LSUIElement</key><true/>
 </dict></plist>

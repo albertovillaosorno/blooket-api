@@ -19,7 +19,7 @@ implementations and useful tests remain; no domain rewrite is implied.
 
 The user restored Safari packaging via GitHub Actions macOS runners on
 2026-10-06. Chrome is tested directly on Linux and macOS; Safari conversion and
-native acceptance use macOS. Releases use vYYYY.Q.PATCH quarterly CalVer tags.
+native acceptance use macOS. Releases use vYY.Q.PATCH quarterly CalVer tags.
 Mac ARM64 and Intel are default release assets, with optional Linux delivery.
 
 The initial recipient is one teacher with a Mac who wants to create quizzes

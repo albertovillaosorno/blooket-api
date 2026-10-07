@@ -1,0 +1,122 @@
+---
+schema_version: 1
+id: "blooket-04"
+status: "active"
+priority: "p0"
+horizon: "foundations"
+order: 40
+area: "security"
+task: "TODO - OAuth and owner approval"
+legacy_task: "TODO 04"
+depends_on:
+  - "blooket-03"
+contracts:
+  - "docs/technical/adr/macos-browser-ui-and-online-mcp.md"
+  - "docs/technical/adr/host-secret-storage.md"
+scope:
+  - "src/mcp/teacher-authorization/"
+  - "src/mcp/streamable-gateway/"
+  - "src/security/owner-password/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - OAuth and owner approval
+
+## Objective
+
+Accept the OAuth/PKCE and owner-password flow on the actual Mac and ChatGPT
+client, including revocation and restart recovery.
+
+## Acceptance
+
+Test PKCE, state round-tripping, resource/audience binding, exact redirects,
+code reuse, expiry, access revocation, refresh rotation, hostile registration,
+wrong passwords, and bounded attempts. A password alone does not prevent a
+phishing page from asking for it. Retain HTTPS, exact origin checks, local
+consent, and private settings isolation.
+
+Complete when approved clients receive only their admitted access, rejected or
+revoked clients cannot call tools, owner-password verification works locally,
+and the actual AI client completes a compatible authorization flow. Keep the
+tunnel credential, owner password, and Blooket password independent.
+
+## Implementation notes
+
+The local UI shows the exact connection ID, client registration ID, untrusted
+name, redirect URL, and requested scope. It supports rejection and individual
+revocation of access and refresh tokens. Password attempts share a five-per-
+minute budget and one in-flight verification; polling preserves typed input.
+Owner replacement reloads/revokes existing access even after a partial settings
+save.
+
+OAuth does not replace the local password check.
+
+Shutdown is serialized with reload and prevents later restart through a racing
+request.
+
+The user prefers an additional password because a client could present a
+misleading name or domain. Preserve OAuth/PKCE for client compatibility and
+require the configured owner password as an additional approval check in the
+local UI. Do not replace OAuth with a password in URLs, tool arguments, or an
+assumed custom header that ChatGPT may not support.
+
+Keep development owner overrides behind the explicit entrypoint. Preserve the
+masked local replacement workflow and Keychain verifier boundary; never return
+the password or verifier through UI/API/CLI/MCP results. Keep this credential
+separate from Blooket and the tunnel token.
+
+Treat registered client names and redirect domains as untrusted input, not proof
+of identity. Show the exact client, redirect, requested access, and matching
+connection identifier before approval. Verify the actual ChatGPT registration
+and redirect contract; restrict allowed clients/redirects to the teacher's
+explicit choices without guessing them from a display name.
+
+Preserve the implemented scope, expiry, single-approval, and revocation guards.
+No broader access may be inferred from a client display name or redirect.
+
+Current clients, codes, and tokens live only in memory. Test actual ChatGPT
+reauthorization after service restart, Mac sleep, and tunnel interruption. Do
+not replay ambiguous Blooket writes on reconnection.
+
+The user offered other repositories with MCP implementations as examples.
+Inspect a user-identified repository if supplied; compare its actual client
+compatibility and credential boundaries rather than copying an auth mechanism
+blindly. No example repository has been selected or inspected yet.
+
+## Evidence
+
+Portable authorization implementation was completed on 2026-10-06. Online
+startup requires a configured owner verifier; local approval checks the owner
+password before issuing a code. Development retains the verifier only in memory.
+Production configuration writes a fixed-parameter salted scrypt verifier through
+the host store and exposes only configured/missing status.
+
+Token issuance now preserves approved scope and creates refresh tokens only for
+requested `offline_access`. Single-use codes, expiry, duplicate parameter
+rejection, exact resource/redirect binding, refresh rotation, and individual
+revocation have regression coverage. Repeated approval cannot replace a code.
+Unused client registrations expire after 15 minutes instead of permanently
+exhausting capacity.
+
+All 503 portable tests, strict TypeScript, and browser-script syntax pass. The
+composition test exercises wrong/correct passwords through a real local gateway
+with an in-memory tunnel double; no real credentials or public connection are
+used. Native Keychain and actual ChatGPT compatibility are not established.
+
+The actual configured tunnel passed OAuth/PKCE with local approval, MCP
+initialization/tool discovery, and a `skills_list` call through the canonical
+CLI. It used a synthetic client, not ChatGPT. Public UI/settings routes returned
+404 and unauthorized MCP returned 401; the test did not visit the callback or
+send its test code to another destination.
+
+## Blockers
+
+**External blocker:** acceptance still needs the recipient's Mac and actual
+ChatGPT client. The chosen restart policy is to clear all in-memory clients,
+codes, and tokens and require new registration/consent. Verify that client can
+reauthorize after restart, sleep, and tunnel interruption before completing this
+task. Continue independent library work in task 05 meanwhile.

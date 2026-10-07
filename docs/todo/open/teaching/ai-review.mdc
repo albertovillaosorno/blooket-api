@@ -1,0 +1,74 @@
+---
+schema_version: 1
+id: "blooket-12"
+status: "active"
+priority: "p1"
+horizon: "publication"
+order: 120
+area: "teaching"
+task: "TODO - AI intake and quiz review"
+legacy_task: "TODO 12"
+depends_on:
+  - "blooket-05"
+  - "blooket-06"
+  - "blooket-11"
+contracts:
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+  - "docs/technical/adr/canonical-dependency-direction.md"
+scope:
+  - "src/ui/teacher-workspace/"
+  - "src/api/teacher-library/"
+  - "src/mcp/teacher-tools/"
+  - "docs/agents/user/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - AI intake and quiz review
+
+## Objective
+
+Finish admitted AI image delivery and browser review, publication, progress,
+cancellation, and recovery through the canonical operations.
+
+## Acceptance
+
+Verify actual AI image delivery: ChatGPT attachments do not automatically reach
+an MCP server. Define the admitted upload/intake workflow, bounds, local review,
+and metadata creation. The model enriches detected language, YAML English
+fields, and topics; it never chooses asset paths or overwrites original
+names/descriptions.
+
+Complete when the teacher and AI can review a generated quiz with stable-ID
+media, publish it through task 11, change its admitted fields, and see verified
+results. Confirm remote skills and admitted image delivery with the actual
+client rather than assuming files or attachments are available.
+
+## Implementation notes
+
+Apply the two-field intake and normalization requirements from tasks 05-07 to
+AI-assisted review. The AI supplies detected language, topics, and structured
+normalized English metadata through admitted enrichment operations, preserving
+the teacher's original name and description. Canonical asset paths remain
+service-owned. Import, English source text, or an unsaved generated response is
+not completed normalization.
+
+Expose validated quiz list/read/create/edit, question type/seconds/media,
+progress, and recovery through registered CLI commands and MCP tools. Keep local
+JSON as automatic private drafts/execution state rather than requiring manual
+file management or treating it as authority over fresh Blooket state.
+
+Finish quiz review, publication, progress, cancellation, and recovery in the
+browser UI. The current draft view is read-only and explicitly says publication
+is pending. Translate remaining states and actionable errors into English and
+Spanish, preserving quiz and original-media language independently.
+
+## Evidence
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

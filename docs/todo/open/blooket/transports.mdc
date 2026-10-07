@@ -1,0 +1,106 @@
+---
+schema_version: 1
+id: "blooket-09"
+status: "active"
+priority: "p1"
+horizon: "publication"
+order: 90
+area: "blooket"
+task: "TODO - Verified HTTP writes and browser fallback"
+legacy_task: "TODO 09"
+depends_on:
+  - "blooket-08"
+contracts:
+  - "docs/technical/adr/blooket-write-plans.md"
+  - "docs/technical/adr/blooket-session-and-read-boundary.md"
+scope:
+  - "src/api/blooket-http-actions/"
+  - "src/ir/blooket-flight-records/"
+  - "src/api/blooket-write-execution/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Verified HTTP writes and browser fallback
+
+## Objective
+
+Validate actual action payloads and responses, select supported transports
+before mutation, and reconcile ambiguous outcomes without replay.
+
+## Acceptance
+
+Complete when every admitted transport has tested payload and response
+contracts, unsupported cases select fallback before mutation, and ambiguous
+writes enter reconciliation. Action hashes and HTTP 200 alone do not establish a
+stable server API or confirmed write.
+
+## Implementation notes
+
+The candidate helper still supports only text create/add. Tests pin the observed
+update set/question action hashes as identifiers only; those hashes do not
+implement editing, and no HTTP write is activated by these request fixtures.
+
+Implement concrete write surfaces using the session/read adapters from task 08.
+Confirm authentication, current build, account capabilities, and the exact
+payload before a mutation; preserve every human-stop state.
+
+Prefer HTTP only for an admitted, currently verified operation. Use the browser
+fallback for unsupported operations before sending a mutation. A timeout or
+ambiguous primary result must enter journal reconciliation, never an immediate
+fallback or retry that can duplicate a quiz/question.
+
+## Evidence
+
+The current observed Blooket build is
+`4e10e84779aaa361fd4310c02366e37ebee7b60d`. Keep this evidence distinct from
+older captures in `reference/curated/`. Use the recovered references according
+to `AGENTS.md`; never import their code into production.
+
+Observed actions include create set, add question, and update question. Create
+posts multipart fields to `/create`; add/update post to `/edit` with the set
+context. The initial Flight form state is `UNSET` with message and field errors.
+The private creation checkbox is omitted for a private quiz; its UI label is
+inverted relative to the field name, so do not infer visibility from the name.
+
+Sanitized synthetic payload fixtures now pin title/description, set ID, question
+JSON, answer order/correctness, `mc`/`typing`, match modes, seconds, and the
+inverted public/private checkbox semantics. Media-backed set/question candidates
+remain unsupported before any HTTP mutation.
+
+The real action response body was not recovered: attempts to retrieve it through
+the browser tool failed. HTTP 200 and UI read-back are not a decoded response
+contract. Capture and validate actual response shapes before activating HTTP
+writes, and never treat `SUCCESS` inferred from client code as observed
+evidence.
+
+Bounded Flight candidate decoding was hardened on 2026-10-06 against the
+recovered production runtime. IDs, JSON rows, UTF-8 byte-length `T` rows,
+duplicate IDs, row/graph limits, direct `$<hex>` references, shared references,
+cycles, and unsupported reference/tag kinds are now explicit and fail closed.
+
+Action-state status is type-checked without coercion, field errors are bounded,
+and malformed JSON is rejected rather than replaced with null. `E` records
+expose only their bounded digest. The same-build Next action reducer establishes
+that redirects arrive through `x-action-redirect`, so redirect metadata is
+decoded separately and restricted to same-origin HTTPS instead of being invented
+as a Flight row. Synthetic tests cover all of these cases.
+
+A private one-question quiz was created through the authorized Blooket UI and
+changed from multiple choice to typing with a 15-second limit. Its final type
+and time persisted after reload. Request fields were observed; the action
+response body and application-driven publication were not verified.
+
+The private test quiz remains in the account; do not delete it automatically or
+commit its ID/account content. Temporary captures and logs may be cleaned
+between sessions. The durable conclusions are recorded here; do not assume an
+ignored fixture still exists. The configuration regression log is currently
+under `.temp/readme-ui-check/full-tests.log`.
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

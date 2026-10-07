@@ -29,11 +29,16 @@
 // - Defaults:
 //   - Failed checks block release and cleanup only the owned fixture.
 //
-import { decodeReleaseTag, initialReleaseTag } from "../domain/release-tag.ts";
+import {
+  assertProductReleaseTag,
+  initialReleaseTag,
+} from "../domain/release-tag.ts";
 try {
   const tag = process.argv[2] ?? initialReleaseTag(new Date());
-  process.stdout.write(decodeReleaseTag(tag).tag + "\n");
+  process.stdout.write(assertProductReleaseTag(tag) + "\n");
 } catch {
-  process.stderr.write("Expected vYYYY.Q.PATCH; Q is a three-month quarter.\n");
+  process.stderr.write(
+    "Expected vYY.Q.PATCH matching PRODUCT_VERSION; UTC quarters 1–4.\n",
+  );
   process.exitCode = 1;
 }

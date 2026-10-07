@@ -1,0 +1,239 @@
+---
+schema_version: 1
+id: "blooket-07"
+status: "active"
+priority: "p0"
+horizon: "foundations"
+order: 70
+area: "media"
+task: "TODO - Bounded media exports"
+legacy_task: "TODO 07"
+depends_on:
+  - "blooket-06"
+contracts:
+  - "docs/technical/adr/image-processing-engine.md"
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+scope:
+  - "src/media/image-renditions/"
+  - "src/media/gif-timeline/"
+  - "src/platforms/native-media/"
+  - "src/api/teacher-library/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Bounded media exports
+
+## Objective
+
+Accept automatic optimization on the native host with one shared canvas and
+actual prepared bytes strictly below 2,500,000.
+
+## Acceptance
+
+Acceptance covers static and animated oversize inputs, detected variable GIF
+timing, the ordered optimization stages, JPEG normalization, the same final
+resolution/aspect ratio for all outputs, dynamically admitted quality options,
+rapid edit cancellation, and actual-byte revalidation before every downstream
+use. This supersedes manual trial-and-error oversize handling below.
+
+Complete when explicit FPS, duration/loop/resource bounds, and failure recovery
+are tested, and an output of 2,500,000 bytes or more cannot advance to upload.
+Recheck actual bytes and recipe freshness at the eventual upload boundary;
+metadata or a successful preview alone is insufficient.
+
+## Implementation notes
+
+**Pending automatic optimization correction:** the teacher should edit the image
+and receive a usable prepared result, without manually managing oversized files.
+Do not present an invalid candidate as a downloadable/prepared asset or ask the
+teacher to solve its byte size through trial and error.
+
+Enforce one configured final canvas width, height, and aspect ratio for both
+static images and animated GIFs. Image-specific zoom, pan, backgrounds, and
+adjustments remain individual recipes. Define a revision-safe transition for
+existing differently sized recipes and invalidate affected prepared results;
+never alter original media to migrate the shared canvas policy.
+
+Optimization follows the requested order: lower working/source raster detail
+first, then GIF FPS if necessary, then palette/color and encoder compression.
+Working-detail reduction must preserve the configured final canvas dimensions
+and framing; it must not silently produce different output resolutions for
+different files. Record effective parameters rather than claiming the requested
+quality/FPS was retained after automatic reduction.
+
+Prepared metadata has a backward-compatible optional effective candidate.
+Existing records without it still load. The decoder rejects effective parameters
+that could not have come from the record's requested recipe.
+
+The first actually valid encoded file returns its exact effective candidate.
+Preparation persists that worker-selected value without rewriting the teacher's
+requested recipe.
+
+Tests use encoded bytes rather than estimates: one static fixture stops at 55%
+working detail before compression, another reaches compact only after 40%
+lossless is still too large, and a GIF forced over its output-pixel budget at 20
+FPS falls to 10 FPS while preserving final canvas dimensions and loop/timing
+semantics.
+
+Animated timing already crosses the decode boundary as the exact per-frame delay
+vector rather than a fabricated detected FPS. The resampler consumes that vector
+and emits the explicitly requested output FPS, initially 10, with bounded
+automatic reductions only when required. Variable-delay inputs therefore retain
+their measured timing evidence while prepared metadata describes only the actual
+uniform output FPS.
+
+The editor debounces recipe changes, cancels obsolete probes, and enables higher
+quality only after that exact canonical source and recipe produce a valid
+high-quality candidate.
+
+While admission is pending, preparation waits. If the real search proves only
+compact succeeds, the control moves to compact; if no candidate succeeds,
+preparation remains blocked until the recipe changes. A transient probe failure
+does not strand the editor: compact remains available and the authoritative
+prepare path still performs the complete byte validation before publication.
+
+Preparation concurrency was hardened on 2026-10-06. Every prepare request is
+bound to the caller's exact expected revision. The application briefly retries
+library-lock contention, captures that revision and bounded source bytes, then
+releases the lock for native optimization before reacquiring it for publication.
+
+A changed revision or asset identity rejects the stale result before any
+rendition write. The local HTTP route propagates client disconnects through
+AbortSignal to the native worker, and cancelled preparation publishes no
+prepared metadata.
+
+A concurrency regression starts a large preparation, commits a newer recipe
+while native rendering is active, and requires the older work to fail with a
+revision conflict while the newer revision remains unprepared.
+
+The ordinary manual size-warning state was removed. The editor reports pending,
+processing, and ready states; exhausting all bounded candidates reports that a
+valid file could not be prepared while retaining editable source state. It no
+longer tells the teacher to tune dimensions or FPS by trial and error.
+
+Direct preparation refuses an unmigrated recipe; saving that projected edit
+advances the normal optimistic revision, after which preparation can publish the
+current canvas. Prepared HTTP reads independently reject old-canvas artifacts.
+
+The editor exposes configured width and height as read-only context rather than
+per-image controls. Settings identifies them as the one library-wide canvas, so
+teachers cannot create a request the persistent API is guaranteed to reject.
+
+If an input is malformed, exceeds admitted resources, or cannot be represented
+under the invariant canvas and bounded quality policy, explain that processing
+could not finish and retain editable source state. Do not relax the ceiling or
+fabricate a valid output.
+
+Prepared GIF FPS is explicit, defaults to 10, and currently admits 1, 2, 5, 10,
+20, 25, and 50 FPS. The implemented renderer resamples source timing and keeps
+loop behavior, with duration/frame/pixel limits. Every output must remain
+strictly below 2,500,000 bytes; an equal-sized file is rejected.
+
+Each job has a 20-second deadline, a minimal environment, a 256-MB JavaScript
+heap, disabled Sharp cache, and one native processing thread. Heap size is not a
+native-memory sandbox; source/output pixel and frame bounds remain explicit.
+Timeout, cancellation, malformed replies, and crashes wait for child cleanup
+before releasing the caller. Independent service requests remain usable.
+
+Tests cover variable-delay fixed-FPS output, preserved loop state, all admitted
+FPS values, duration within one frame interval, frame expansion limits,
+601-frame rejection before full decode, killed/stalled workers, cancellation,
+secret exclusion, malformed replies, and a successful job after timeout. Legacy
+redaction still renders correctly through the worker boundary.
+
+Migration preflight has a 120-second aggregate deadline and shares the legacy
+writer lock, including interrupted transfer replay. Canonical old vault records
+select their immutable original rather than the prepared working image. Missing
+or conflicting originals stop before publication; JPEG and AVIF bytes survive
+without conversion and the exact old index remains recoverable.
+
+Implement the automatic optimization correction above and block continuation
+until an actual valid file exists. Preserve animation while recording effective
+FPS reductions, and never assume 10 FPS alone guarantees size. The current
+1280-by-720 default is an application choice, not a verified upstream pixel
+requirement; the shared-canvas policy must remain explicit.
+
+## Evidence
+
+A portable candidate-policy foundation was added on 2026-10-06. It emits a
+bounded cumulative sequence: requested settings, working-detail scales of 85%,
+70%, 55%, and 40%, lower admitted GIF FPS values, then compact compression only
+when the recipe requested lossless output. Static candidates never invent FPS.
+The policy does not claim byte success; integration must encode each candidate
+in order, preserve final canvas geometry, and persist the effective winner.
+
+Portable automatic candidate execution was integrated on 2026-10-06. The
+isolated preparation worker decodes the source once, then tries the bounded
+policy in order and advances only for actual byte/pixel limit failures. Working
+detail is reduced before framing while the final configured canvas dimensions
+stay unchanged. GIF FPS reductions happen only after all detail candidates, and
+compact compression remains last.
+
+Static preparation normalization was implemented on 2026-10-06. New static
+prepared files are JPEG with the chosen background flattened before final byte
+admission; historic prepared PNG files remain readable. The ordinary editor
+renderer remains PNG/GIF internally, so JPEG is restricted to the prepared
+artifact boundary. The compatible lossless recipe value now means the
+higher-quality JPEG tier for static files rather than a lossless output format.
+
+Existing tests cover variable delays, duration tolerance, loop preservation, and
+every admitted output frame rate. Timeline expansion is also part of automatic
+FPS fallback: a 60-second GIF requested at 50 FPS now falls to 10 FPS when that
+is the first rate at or below the 600-frame budget.
+
+Dynamic quality admission was implemented on 2026-10-06 using actual encoded
+bytes. A non-writing local probe runs the same isolated bounded candidate search
+with the higher-quality tier requested. Pending intake is first canonicalized
+through the same isolated compaction used by import, so pre-import and persisted
+admission inspect the same service-owned source bytes.
+
+The editor now retains the last rendered prepared preview while recipe changes
+are pending or a replacement is being optimized. That stale preview is display
+only: its download action is disabled until actual encoding and byte checks
+produce a current-revision prepared file. New media with no prior prepared file
+shows no synthetic preview.
+
+Ready state now exposes the persisted effective detail percentage, effective GIF
+FPS when animated, and effective compression tier. Historic prepared records
+without effective metadata still render their ready state without invented
+parameters.
+
+Global canvas enforcement was added on 2026-10-06 without a mass metadata
+rewrite. Import and edit requests must use the configured width and height.
+Library and command views project historical records onto the current configured
+canvas and hide any prepared artifact made for older dimensions.
+
+Editor cancellation is now wired through the full local stack. Each open editor
+gets a monotonic session identity; closing or replacing it invalidates late
+import/edit/prepare responses. Closing during native preparation aborts the
+fetch, the loopback route propagates that abort to the worker, and no stale
+result is installed into a later editor session.
+
+The output must remain strictly below 2,500,000 bytes, including GIF animation;
+2,500,000 bytes exactly fails. The portable ceiling now has one domain owner
+shared by renderer admission, durable metadata, worker IPC validation, prepared
+reads, and package smoke verification; a boundary regression proves the exact
+ceiling is rejected.
+
+Portable export isolation was implemented on 2026-10-06. Image intake,
+preparation, legacy editor commands, prepared-download checks, and the native
+first-use probe now run untrusted decoding/rendering in a temporary worker. It
+receives bytes and bounded values over IPC, without user paths, descriptions,
+credentials, or inherited development variables.
+
+The portable test suite, strict TypeScript, and browser-script syntax passed on
+2026-10-06 after these changes. Jig reports only the external
+`scalability.repository-graph` evidence gap; repository checks were not
+weakened. Chrome editor acceptance used synthetic local data, without changing
+Blooket.
+
+## Blockers
+
+**Pending:** native macOS worker/package behavior and accepted resource budgets
+need a real target host. Native memory is bounded by admitted work, not an OS
+quota. The eventual Blooket upload must independently reject oversized or stale
+files in task 11; that concrete upload boundary is not implemented yet.

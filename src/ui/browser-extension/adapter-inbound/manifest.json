@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "110",
   "name": "Blooket Studio",
-  "version": "0.1.0",
+  "version": "26.4.0.0",
   "description": "Connect Blooket to your local teaching workspace.",
   "icons": {
     "16": "icons/16.png",
@@ -37,5 +37,6 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
-  }
+  },
+  "version_name": "26.4.0"
 }
