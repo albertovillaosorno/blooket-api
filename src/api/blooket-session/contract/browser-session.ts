@@ -19,7 +19,7 @@
 // - Split-When:
 //   - Observation and authentication need independent adapter contracts.
 // - Merge-When:
-//   - Blooket browser sessions are no longer used.
+//   - Observation and authentication no longer need separate browser shapes.
 // - Summary:
 //   - Keeps browser mechanics behind a secret-aware application boundary.
 // - Description:
