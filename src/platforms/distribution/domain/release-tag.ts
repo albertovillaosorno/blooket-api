@@ -29,6 +29,11 @@
 // - Defaults:
 //   - Failed checks block release and cleanup only the owned fixture.
 //
+import {
+  decodeProductVersion,
+  PRODUCT_VERSION,
+} from "../../../ir/product-version/contract/version.ts";
+
 export interface QuarterlyRelease {
   readonly year: number;
   readonly quarter: 1 | 2 | 3 | 4;
@@ -36,19 +41,21 @@ export interface QuarterlyRelease {
   readonly tag: string;
 }
 export function decodeReleaseTag(tag: string): QuarterlyRelease {
-  const match = /^v(20[0-9]{2})\.([1-4])\.(0|[1-9][0-9]{0,4})$/u.exec(tag);
-  if (!match) throw new Error("invalid-quarterly-release-tag");
-  return {
-    year: Number(match[1]),
-    quarter: Number(match[2]) as 1 | 2 | 3 | 4,
-    revision: Number(match[3]),
-    tag,
-  };
+  if (!tag.startsWith("v")) throw new Error("invalid-quarterly-release-tag");
+  const { year, quarter, revision } = decodeProductVersion(tag.slice(1));
+  return { year, quarter, revision, tag };
+}
+export function assertProductReleaseTag(tag: string): string {
+  decodeReleaseTag(tag);
+  if (tag !== `v${PRODUCT_VERSION}`)
+    throw new Error("release-tag-product-version-mismatch");
+  return tag;
 }
 export function initialReleaseTag(date: Date): string {
   if (!Number.isFinite(date.getTime())) throw new Error("invalid-release-date");
   const year = date.getUTCFullYear();
+  if (year < 2000 || year > 2099) throw new Error("unsupported-release-year");
   const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
-  const tag = `v${year}.${quarter}.0`;
+  const tag = `v${String(year - 2000).padStart(2, "0")}.${quarter}.0`;
   return decodeReleaseTag(tag).tag;
 }

@@ -1,0 +1,9 @@
+identity:
+  id: function:product-version
+  name: product-version
+  path: src/ir/product-version
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

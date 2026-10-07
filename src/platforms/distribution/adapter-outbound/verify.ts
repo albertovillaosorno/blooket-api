@@ -50,6 +50,9 @@ import { decodeServiceRuntime } from
   "../../service-lifecycle/adapter-outbound/runtime.ts";
 import { TARGETS, type DistributionTarget } from "./build.ts";
 
+import { PRODUCT_VERSION, extensionVersion, appleBuildVersion } from
+  "../../../ir/product-version/contract/version.ts";
+
 const execute = promisify(execFile);
 export async function verifyDistribution(
   target: DistributionTarget,
@@ -100,16 +103,32 @@ export async function verifyDistribution(
       await readFile(join(resources, "distribution.json"), "utf8"),
     ) as {
       target: unknown;
+      productVersion: unknown;
       sourceDirty: unknown;
       sourceRevision: unknown;
     };
     assert.equal(manifest.target, target);
+    assert.equal(manifest.productVersion, PRODUCT_VERSION);
     if (release) assert.equal(manifest.sourceDirty, false);
     const { stdout: revision } = await execute("git", ["rev-parse", "HEAD"], {
       cwd: repo,
     });
     assert.equal(manifest.sourceRevision, revision.trim());
     const app = join(resources, "app");
+    const packageMetadata = JSON.parse(await readFile(
+      join(app, "package.json"), "utf8",
+    ));
+    assert.equal(packageMetadata.version, PRODUCT_VERSION);
+    if (mac) {
+      const info = await readFile(join(root,
+        "Blooket Studio.app/Contents/Info.plist"), "utf8");
+      assert.ok(info.includes(
+        `<key>CFBundleShortVersionString</key>` +
+        `<string>${PRODUCT_VERSION}</string>`,
+      ));
+      assert.ok(info.includes(`<key>CFBundleVersion</key>` +
+        `<string>${appleBuildVersion(PRODUCT_VERSION)}</string>`));
+    }
     const names = await readdir(app);
     assert.ok(!names.includes(".env") && !names.includes("reference"));
     await assert.rejects(access(join(app, "docs/agents/developer")));
@@ -118,6 +137,8 @@ export async function verifyDistribution(
       join(browser, "manifest.json"), "utf8",
     ));
     assert.equal(browserManifest.manifest_version, 3);
+    assert.equal(browserManifest.version_name, PRODUCT_VERSION);
+    assert.equal(browserManifest.version, extensionVersion(PRODUCT_VERSION));
     assert.deepEqual(browserManifest.permissions, ["storage", "scripting"]);
     assert.equal(browserManifest.background.service_worker,
       "src/service/browser-extension/adapter-inbound/worker.js");

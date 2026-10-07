@@ -93,3 +93,7 @@ export async function executeJsonCommand(
     );
   });
 }
+
+// Server identity follows the CLI contract without importing internals in MCP.
+export { PRODUCT_VERSION } from
+  "../../../ir/product-version/contract/version.ts";

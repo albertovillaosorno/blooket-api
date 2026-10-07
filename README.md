@@ -51,6 +51,17 @@ cannot establish Keychain or native macOS compatibility. Chrome is the initial
 directly testable browser and extension target. Safari is packaged on a
 GitHub Actions macOS runner once its integration is implemented.
 
+## Why this exists
+
+> Avergonzado, sintiendo sobre sí la mirada reprobatoria de sus hermanos, sacó
+> algunas naranjas de su bolsa y comenzó a tirarlas al aire, haciendo
+> malabarismos, que era lo único que sabía hacer.
+
+— Paulo Coelho, *El Alquimista*, pp. 12.
+
+The quoted passage is reproduced from the cited work and is not covered by
+this repository's MIT license.
+
 ## Run the development workspace
 
 Use Node.js 24 or newer and the pnpm version declared in `package.json`.
@@ -256,9 +267,15 @@ and the full test suite, assembles its native archive, executes the extracted
 package smoke test, and uploads that verified archive as a workflow artifact.
 A CI tag never creates a GitHub Release.
 
-CalVer release tags use three-month quarters: `vYYYY.Q.PATCH`, with `Q` from 1
-through 4. For example, `v2026.4.0` is the first release in
-October–December 2026. A release tag starts a strictly ordered pipeline:
+Product versions use `YY.Q.PATCH`; Git tags retain the `v` prefix. Tags use UTC
+three-month quarters: `vYY.Q.PATCH`, with Q from 1 through 4. For example,
+`v26.4.0` is October–December 2026, with product version `26.4.0`.
+
+Q1 is Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, and Q4 Oct–Dec. YY means 2000–2099;
+PATCH is 0–99999 without leading zeros. The gate requires the tag to match the
+committed `PRODUCT_VERSION`; package metadata is a checked projection.
+
+A release tag starts a strictly ordered pipeline:
 
 1. the tag must pass quarterly CalVer validation and the repository variable
    `RELEASE_ENABLED` must equal `true`;
@@ -279,7 +296,7 @@ GitHub's generated-notes feature.
 
 Normal branch pushes do not run GitHub Actions. Use local validation while
 developing and reserve a `ci-*` tag for deliberate native-runner validation.
-A `vYYYY.Q.PATCH` release tag invokes CI itself, so do not add a second CI tag
+A `vYY.Q.PATCH` release tag invokes CI itself, so do not add a second CI tag
 for the same release commit.
 
 Jig is a local repository validator and is not part of GitHub Actions. Apple
@@ -402,3 +419,22 @@ third-party trademarks, assets, and dependency notices.
 [browser-mcp]: docs/technical/adr/macos-browser-ui-and-online-mcp.md
 [library]: docs/technical/adr/teacher-settings-and-media-library.md
 [persistence]: docs/technical/adr/atomic-local-persistence.md
+
+## Planning and update policy
+
+[TODO.md](TODO.md) indexes only unfinished work, with one short entry per typed
+record in [docs/todo/open](docs/todo/open/). Criteria, blockers, and evidence
+belong in those records; completion moves them to `docs/todo/completed/` and
+removes the index entry. See [the record workflow](docs/todo/README.md).
+
+[Automatic updates](docs/todo/open/delivery/17-updates.mdc) are planned, not
+implemented. They will use final public GitHub Releases without a teacher GitHub
+account, with independent opt-in update and launch-at-login preferences, trusted
+artifacts, safe restart, and retained data. Both preferences default off; native
+login registration and real Mac/update acceptance remain pending.
+
+The [release/update decision](docs/technical/adr/product-update-lifecycle.md)
+defines one version authority and required package projections. An unavailable
+release source must report a failure rather than “no new version”; trusted
+update metadata and publisher verification are prerequisites, not current
+pipeline claims.

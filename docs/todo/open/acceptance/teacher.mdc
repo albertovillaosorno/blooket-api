@@ -1,0 +1,65 @@
+---
+schema_version: 1
+id: "blooket-15"
+status: "active"
+priority: "p3"
+horizon: "acceptance"
+order: 150
+area: "acceptance"
+task: "TODO - Complete teacher workflow acceptance"
+legacy_task: "TODO 15"
+depends_on:
+  - "blooket-04"
+  - "blooket-07"
+  - "blooket-12"
+  - "blooket-14"
+  - "blooket-17"
+contracts:
+  - "docs/technical/adr/macos-browser-ui-and-online-mcp.md"
+scope:
+  - "docs/agents/user/"
+  - "docs/skills/"
+  - "src/service/"
+  - "src/ui/teacher-workspace/"
+  - "src/mcp/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Complete teacher workflow acceptance
+
+## Objective
+
+Run authoring, media, publication, update, and recovery acceptance on the
+recipient Mac and actual ChatGPT account before declaring the product complete.
+
+## Acceptance
+
+Test restart, sleep/offline, interrupted writes, recovery, revoked access,
+oversized media, and concurrent remote changes. Keep failures actionable and
+logs sanitized. A first-use diagnostic establishes only its narrow checks.
+
+Complete when this real workflow and recovery exercise pass, remaining release
+blockers are resolved, and the user receives concise installation/usage
+instructions. Only then call the initial product usable and complete.
+
+## Implementation notes
+
+Use the recipient's actual Mac and configured ChatGPT account to authorize, load
+the user profile and personal skills, receive an admitted image, find and edit
+media, prepare a quiz, publish it, and change question type/seconds/media. Read
+the final Blooket state back after refresh.
+
+Acceptance now also requires the update workflow in `blooket-17`: independent
+preferences, no-release/offline states, verified compatible artifacts, safe
+restart, retained data, and launch-at-login behavior on the recipient Mac.
+
+## Evidence
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

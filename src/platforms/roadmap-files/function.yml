@@ -1,0 +1,9 @@
+identity:
+  id: function:roadmap-files
+  name: roadmap-files
+  path: src/platforms/roadmap-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

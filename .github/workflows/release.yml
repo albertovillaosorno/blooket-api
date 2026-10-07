@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ["v20*.*.*"]
+    tags: ["v[0-9][0-9].[1-4].*"]
 
 permissions:
   contents: read
@@ -42,8 +42,7 @@ jobs:
   publish:
     needs: [gate, ci]
     if: >-
-      needs.gate.result == 'success' &&
-      needs.ci.result == 'success'
+      needs.gate.result == 'success' && needs.ci.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

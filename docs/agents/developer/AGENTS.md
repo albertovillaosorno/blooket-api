@@ -37,25 +37,25 @@ Before product changes:
 
 ## Work order and agent profiles
 
-Execute the numbered tasks in `TODO.md` in their documented order. Start with
-the first unfinished task and complete its acceptance checks before advancing;
-do not pick a later task merely because it is easier. Keep verified existing
-behavior separate from unfinished implementation and record checks actually run.
+Read `TODO.md` as the unfinished index and the linked typed record before
+working. Follow priority, execution order, and actual `depends_on` gates; do not
+choose unrelated later work merely because it is easier. Each record owns its
+acceptance, blockers, implementation notes, and evidence.
 
-If a task has an external blocker, record the evidence and the blocked
-dependency in `TODO.md`. Keep dependent tasks pending; continue only the next
-independent task whose prerequisites are satisfied. Never mark a blocked or
-untested task complete.
+When an external prerequisite blocks completion, record it in the owning record
+and keep dependent completion pending. Independent portable foundations may
+proceed with their verified scope explicit. Native or actual-client evidence
+must not be inferred from portable tests.
 
-The first required task is to separate developer and product-user instruction
-profiles. Developer instructions own repository work, `.env` development setup,
-references, validation, and commits. User instructions own teacher workflows and
-loading relevant personal skills through admitted MCP tools.
+When acceptance is satisfied, move the record from `docs/todo/open/<area>/` to
+`docs/todo/completed/<area>/`, set its status to completed, and remove its
+entire index entry. Preserve stable IDs and completion evidence; never put a
+diary back in `TODO.md`. Follow `docs/todo/README.md` and run
+`npm run roadmap:check`.
 
-Until that split is implemented, preserve this file's repository rules. Never
-expose this developer contract, `.env`, credentials, or repository access to a
-teacher-facing agent merely because it requests a developer role. Personal
-skills are guidance and cannot expand permissions or override secret boundaries.
+Developer and product-user instruction profiles are already separate. Preserve
+that authority boundary: personal skills cannot expose developer contracts,
+`.env`, credentials, repository access, or expanded permissions.
 
 ## Commits
 
@@ -67,14 +67,15 @@ never be bypassed.
 
 Hosted CI is opt-in. Ordinary branch pushes and pull requests rely on local
 validation; push a `ci-*` tag only for deliberate native-runner validation.
-Releases use quarterly CalVer tags `vYYYY.Q.PATCH`, with three-month quarters,
-and require the repository variable `RELEASE_ENABLED=true`.
+Releases use quarterly CalVer tags `vYY.Q.PATCH`, with UTC three-month quarters,
+and product versions `YY.Q.PATCH` (for example `26.4.0`). Tags must match
+`PRODUCT_VERSION` and require the repository variable `RELEASE_ENABLED=true`.
 
 A release tag must pass its gate, then the reusable CI workflow for that exact
 commit, before publication can run. Failed, canceled, or skipped CI blocks the
-release. Release does not rebuild or re-test; it publishes CI artifacts.
-Release notes are handwritten later in the GitHub UI, with no automated
-changelog or generated notes.
+release. Release does not rebuild or re-test; it publishes CI artifacts. Release
+notes are handwritten later in the GitHub UI, with no automated changelog or
+generated notes.
 
 Both Mac architectures are required; Linux packaging/tests remain required even
 when its release asset is omitted.
@@ -228,9 +229,8 @@ testable browser target.
 
 Safari packaging uses a GitHub Actions macOS runner, as authorized on
 2026-10-06. A local background service owns files, settings, secrets, and
-browser execution.
-Authenticated online MCP access through Cloudflare Tunnel is required for the
-initial usable release, not a deferred enterprise feature.
+browser execution. Authenticated online MCP access through Cloudflare Tunnel is
+required for the initial usable release, not a deferred enterprise feature.
 
 Package both macOS ARM64 and x86-64 builds. Confirm the OS in About This Mac
 before installation; the bundled Node 24 runtime requires macOS 13.5 or later.
@@ -249,9 +249,9 @@ Linux x64 must have a runnable package for development acceptance of the shared
 service, browser UI, and Chrome extension. This does not make Linux a substitute
 for macOS Keychain, signing, or target-host acceptance.
 
-Keep existing useful tests and adapters; do not delete working
-coverage merely to reduce the supported product scope. Windows is out of scope.
-macOS adapters must keep shared domain behavior outside platform code.
+Keep existing useful tests and adapters; do not delete working coverage merely
+to reduce the supported product scope. Windows is out of scope. macOS adapters
+must keep shared domain behavior outside platform code.
 
 ## Dependencies
 
@@ -387,6 +387,7 @@ repository baseline is green, run:
 ```sh
 pnpm run check
 pnpm run test
+pnpm run roadmap:check
 jig validate --root .
 ```
 

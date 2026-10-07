@@ -1,0 +1,142 @@
+---
+schema_version: 1
+id: "blooket-06"
+status: "active"
+priority: "p0"
+horizon: "foundations"
+order: 60
+area: "media"
+task: "TODO - Image and GIF editor"
+legacy_task: "TODO 06"
+depends_on:
+  - "blooket-05"
+contracts:
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+  - "docs/technical/adr/image-processing-engine.md"
+scope:
+  - "src/ui/teacher-workspace/"
+  - "src/api/browser-service/"
+  - "src/media/image-renditions/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Image and GIF editor
+
+## Objective
+
+Verify shrinkable zoom, drag framing, Gaussian or solid backgrounds, color
+selection, and preview/export parity in the target browser.
+
+## Acceptance
+
+Acceptance includes a reduced foreground surrounded by both background types,
+plus/minus and slider zoom in both directions, drag pan, automatic solid-color
+selection and manual overrides, animated previews, and matching final geometry
+for static images and GIFs. Preserve keyboard/accessibility checks below.
+
+Complete when canonical media remains stable, per-image recipes save/reopen,
+preview/export agree, and import, zoom/drag, undo/redo, adjustments, both
+backgrounds, and color picking work in the target browser. Keep native-browser
+checks explicitly pending where no macOS test host is available.
+
+## Implementation notes
+
+Provide visible minus/plus buttons and a zoom slider that support both shrinking
+and enlarging the foreground. A small foreground must remain usable inside the
+fixed canvas instead of being forced to cover it. Mouse dragging moves the
+foreground; wheel zoom may remain an additional gesture.
+
+Keep saturation and the other individual adjustments in the editor. Show a
+background choice between a full-canvas Gaussian-blurred version of the image,
+with the intended WhatsApp-like appearance, and a solid color. The foreground
+stays sharp and independent of the blurred background's fill transform.
+
+Choosing a solid background should generate a suitable initial color from the
+image immediately, using bounded deterministic color analysis. Specify and test
+its palette/contrast criteria; do not claim one universally optimal color. Keep
+a visible color picker and eyedropper, and preserve the teacher's manual color
+override in the recipe rather than replacing it on every preview.
+
+Pending GIF analysis is tied to the active editor identity. A late result cannot
+replace a manual color, an eyedropper choice, or a different image. New GIF
+intake reuses its in-flight base64 read for import and retains the one computed
+suggestion after canonicalization while that editor remains open. Preview and
+preparation use the same selected color, framing, blur, and adjustment recipe.
+
+The prototype already has unified two-field intake/framing, canonical media,
+source previews, zoom minus/plus and slider, drag pan, wheel zoom,
+saturation/contrast, blurred or solid backgrounds, color input, native
+eyedropper/fallback canvas picker, undo/redo, preparation, preview, and
+download. Preserve canonical optimized media and per-image edit recipes in YAML;
+global settings contain export defaults only.
+
+Finish Safari behavior, keyboard/accessibility and responsive checks, file
+chooser/drag-and-drop, GIF preview parity, pixel picking, and both background
+modes. Task 03 preserves unsaved configuration on language changes; retain that
+behavior. Translate diagnostics, state, and failure messages fully rather than
+showing raw English codes in the Spanish UI.
+
+Changing export defaults must not overwrite existing individual recipes. The
+browser framing preview directs the teacher to the prepared file for final
+colors, compression, and GIF timing; it does not claim pixel parity.
+
+## Evidence
+
+The intake framing correction was implemented on 2026-10-06. File selection,
+drag/drop, clipboard, and downloaded images now open directly in the same editor
+used by saved media, using a temporary browser object URL and the current export
+defaults. Name, description, zoom, pan, background, adjustments, and export
+recipe are visible together before the first durable write.
+
+The import request requires that exact validated `EditRecipe`, and the first
+metadata publication stores it atomically with the canonical asset. Cancel
+revokes the temporary object URL and publishes nothing. The separate import
+dialog and its second pre-editor phase were removed; one canvas/recipe now spans
+intake, preview, saved edits, and preparation.
+
+Static-image solid backgrounds now use an 8-by-8 preview sample. Opaque pixels
+are grouped into deterministic 4-bit RGB palette bins; the dominant bin wins,
+ties use the lower palette key, and extreme luminance is brought into a bounded
+48-208 range. The suggestion runs once when entering solid mode, only while the
+recipe still has its initial white color. It never replaces a persisted
+non-default color, manual color, or eyedropper choice.
+
+Animated representative sampling was implemented on 2026-10-06. The isolated
+native worker first validates the whole source, selects at most five frames
+spread deterministically across the animation, and reduces each selected frame
+to 8-by-8 RGBA before returning samples. The browser computes one dominant
+bounded-luminance color across those samples, so the solid background does not
+change as the GIF advances.
+
+Portable editor changes on 2026-10-06 add live recipe controls with grouped undo
+history, keyboard pan/zoom, translated accessible labels and diagnostic states,
+and a one-pixel fallback color sample without a full-image canvas. The stored
+`lossless` value stays compatible; its visible label now explains full-color PNG
+versus the standard GIF palette.
+
+Prepared downloads revalidate the current revision, rendition identity, actual
+bounded bytes, format, and canvas dimensions under the shared library lock.
+Regression checks reject stale URLs, incorrect format/size, mismatched asset
+identity, and a file at the exact 2,500,000-byte ceiling. All 520 portable
+tests, strict TypeScript, and browser-script syntax pass.
+
+Chrome subsequently passed zoom buttons, keyboard pan, solid-background
+selection, the legacy rename path, preparation, and download readiness with
+synthetic media. Editing and rename controls freeze during preparation to
+prevent stale asynchronous results replacing a newer image or recipe. The
+prepared file was below the byte ceiling; this was not a real Blooket upload.
+
+The Chrome UI loaded, switched EN/ES configuration, and prepared a disposable
+static-image edit with zoom and solid background. Preview/download worked.
+Import was exercised through the local API because the Chrome file chooser
+lacked file URL permission; no browser security setting was changed.
+
+## Blockers
+
+**Pending:** Safari accessibility, full preview/export geometry, GIF preview,
+color picking, and responsive visual acceptance remain unverified. Continue
+independent export work in task 07 and retain these acceptance checks.

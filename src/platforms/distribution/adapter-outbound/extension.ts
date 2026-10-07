@@ -30,10 +30,15 @@
 //   - Existing destinations and failed compilation are never accepted.
 //
 import { execFile } from "node:child_process";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { buildExtensionIcons } from "./icons.ts";
+
+import {
+  PRODUCT_VERSION,
+  extensionVersion,
+} from "../../../ir/product-version/contract/version.ts";
 
 const execute = promisify(execFile);
 export async function buildBrowserExtension(
@@ -74,9 +79,14 @@ export async function buildBrowserExtension(
         join(repo, presentation, name),
         join(destination, presentation, name),
       );
-    await cp(
-      join(repo, presentation, "manifest.json"),
+    const manifest = JSON.parse(
+      await readFile(join(repo, presentation, "manifest.json"), "utf8"),
+    );
+    manifest.version = extensionVersion(PRODUCT_VERSION);
+    manifest.version_name = PRODUCT_VERSION;
+    await writeFile(
       join(destination, "manifest.json"),
+      JSON.stringify(manifest, null, 2) + "\n",
     );
     await buildExtensionIcons(repo, destination);
   } catch {

@@ -1,0 +1,159 @@
+---
+schema_version: 1
+id: "blooket-03"
+status: "active"
+priority: "p0"
+horizon: "foundations"
+order: 30
+area: "settings"
+task: "TODO - Settings and development configuration"
+legacy_task: "TODO 03"
+depends_on: []
+contracts:
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+  - "docs/technical/adr/host-secret-storage.md"
+scope:
+  - "src/settings/teacher-preferences/"
+  - "src/api/teacher-configuration/"
+  - "src/platforms/user-storage/"
+  - "src/platforms/host-secret-store/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Settings and development configuration
+
+## Objective
+
+Verify native settings and Keychain behavior while preserving the validated
+development configuration contract.
+
+## Acceptance
+
+Complete when ordinary settings migrate safely, local Save reports partial
+failures accurately, valid development configuration starts, and global export
+defaults remain separate from every individual image recipe. Record native
+Keychain/folder tests as pending until they actually run on macOS.
+
+## Implementation notes
+
+Schema-3 preferences, local Save, EN/ES controls, masked secret replacement,
+online enablement, public MCP URL, media-root selection, and export defaults are
+implemented. Password configuration uses the canonical `blooket.password` secret
+key; the configured session boundary supplies saved email without exposing
+credentials or changing unrelated legacy secret contracts.
+
+The portable configuration work was completed on 2026-10-06. Startup honors
+saved IPv4/IPv6 loopback binding and fixed/automatic port policy, handles the
+final bind race, and durably saves a selected automatic port. The online gateway
+uses the running local port even when a changed port awaits restart; port 65535
+cannot silently redirect the gateway to an unrelated default.
+
+Settings Save validates every replacement's UTF-8 byte limit before writes,
+holds an aggregate writer lock, and reports secret/settings partial failures.
+Ordinary preference writes have their own lock and recovery copy; initial
+defaults use create-if-absent instead of overwriting a concurrent save. Changing
+the library root initializes the selected location without moving old assets.
+
+The configured session entrypoint uses ordinary saved email with the canonical
+password secret. Existing callers retain their legacy login-key behavior.
+Light/dark/system themes and automatic-port controls are available in both UI
+languages. Language changes and diagnostic reruns preserve unsaved settings.
+
+Explicit startup remains a background process without automatically opening a
+browser. Preserved lifecycle flags do not install autostart; bootstrap reports
+an enabled but unimplemented launch-at-login preference. Visible native
+lifecycle implementation remains task 13.
+
+Keep `MCP_PUBLIC_URL` as a full HTTPS `/mcp` URL and preserve its explanatory
+comment in the development template. Test rejection of bare hostnames,
+credentials, unexpected paths, query/fragment values, and unsafe schemes;
+normalization of a bare hostname is outside the agreed configuration.
+
+## Development configuration
+
+The user has prepared the repository-root `.env` and provisioned the Cloudflare
+hostname/tunnel. These are existing development resources; reuse them. Never
+copy their credentials, personal values, or private lesson content into docs,
+source fixtures, logs, or commits.
+
+The canonical development variables are `BLOOKET_EMAIL`, `BLOOKET_PASSWORD`,
+`LOCAL_HTTP_PORT`, `MCP_PUBLIC_URL`, and `CLOUDFLARE_TUNNEL_TOKEN`. The quoted
+`.env.example` documents their purpose and URL format. Passwords/tunnel tokens
+stay in memory; ordinary development values seed saved preferences at startup.
+Normal `npm start` uses saved settings and host secrets without loading `.env`.
+
+```sh
+BLOOKET_DATA_HOME="$PWD/.temp/service-test" npm run dev
+```
+
+That data root is disposable; create/import fixtures if prior temporary data has
+been cleaned. The local UI defaults to port 2607; the separate MCP gateway uses
+the running local port plus one, normally 2608. Point the Cloudflare hostname to
+`http://127.0.0.1:2608` with its Path filter empty so MCP, OAuth, and discovery
+routes can be reached.
+
+`MCP_PUBLIC_URL` requires the full public HTTPS MCP URL, including `/mcp`. The
+user's `.env` now uses the supported form and includes an explanatory comment. A
+bare hostname is invalid; keep the strict URL contract and read the actual
+public URL from local configuration. Credentials were preserved during this
+URL-only update.
+
+Legacy `EMAIL`, `PASSWORD`, `LOCAL_PORT`, `ONLINE_DOMAIN`, and
+`CLOUDFLARE_TOKEN` remain accepted so the existing real `.env` keeps working.
+Different nonempty values for a canonical name and its legacy alias fail before
+writes. Change only the example/documentation when improving naming; the user
+owns their actual credentials and local file.
+
+`MCP_OWNER_PASSWORD` enables additional local connection approval. The explicit
+development entrypoint derives a salted verifier in memory; it accepts the
+legacy `MCP_PASSWORD` alias with conflict detection. Production UI replacement
+saves the verifier through Keychain, never plaintext in JSON.
+
+`MCP_DISPLAY_NAME`, `MCP_DISPLAY_DESCRIPTION`, and `MCP_ICON_PATH` are optional
+decorative metadata, also currently unused. Manual AI-client presentation is
+sufficient; these fields neither authorize requests nor grant filesystem access.
+
+The public gateway intentionally returns 401 for unauthenticated `/mcp` and 404
+for local UI/settings/general API routes. It was connected during the last
+verified test; it needs the process, network, and awake computer to remain
+available. No launch-at-login setup exists yet.
+
+## Evidence
+
+On 2026-10-07, the current monolithic roadmap migrated to fourteen owning typed
+records plus the new update record. All original task paragraphs were checked
+against their migrated records or stable technical documentation; no completed
+status was inferred from portable evidence. File names are descriptive, with
+stable historical IDs and ordering retained only in front matter.
+
+Strict TypeScript, the full 641-test portable suite, typed-record integrity,
+release/version fixtures, and workflow structure checks passed. Linux package
+assembly and extracted smoke verification also passed; `jig validate --root .`
+reports only the pre-existing external `JIG-RULE-GAP-001`, not a regression from
+the planning/version changes.
+
+Portable checks cover byte limits, partial host/filesystem failures, concurrent
+saves, library-root preservation, URL rejection, configured login, and actual
+port collisions. Strict TypeScript and browser-script syntax pass; all 493 tests
+pass. Chrome verified saving the dark theme and changing EN/ES without losing an
+unsaved synthetic email.
+
+Jig retains the pre-existing `JIG-RULE-GAP-001` for the nonexistent external
+`src/repository-model/schema/contract/graph.rs` evidence target. Repository
+rules and commit hooks remain enforced; this external finding is not hidden.
+
+On 2026-10-06, strict TypeScript compilation and 482 portable tests passed with
+zero failures or skips. Jig retained its external evidence gap. No new runtime
+test was performed merely to reorganize this roadmap.
+
+## Blockers
+
+**External blocker:** no recipient macOS host is available. Native Keychain
+read/write, folder selection, native Safari appearance, and filesystem/port
+behavior still require the actual Mac. Keep this task pending for those checks;
+continue independent authorization work in task 04 rather than claiming native
+coverage.

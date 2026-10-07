@@ -1,0 +1,118 @@
+---
+schema_version: 1
+id: "blooket-16"
+status: "active"
+priority: "p3"
+horizon: "acceptance"
+order: 160
+area: "teaching"
+task: "TODO - Adaptive teacher workflow skills"
+legacy_task: "TODO 16"
+depends_on:
+  - "blooket-05"
+contracts:
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+  - "docs/technical/adr/canonical-dependency-direction.md"
+scope:
+  - "docs/skills/"
+  - "docs/agents/user/"
+  - "src/api/teacher-library/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Adaptive teacher workflow skills
+
+## Objective
+
+Accept scoped personal workflow learning and English description normalization
+with the real client, preserving revisions and human checkpoints.
+
+## Acceptance
+
+Verify already-English inputs are genuinely normalized and saved, missing AI
+work remains pending, failed saves do not set completion, and original text,
+canonical asset identity, and human-verification flags remain intact.
+
+Complete when the teacher profile reads the master skill first, discovers only
+relevant task skills afterward, learns scoped preferences through revision-safe
+personal skill updates, preserves corrections without overgeneralizing them, and
+resumes autonomous work after explicit human checkpoints without asking the same
+settled questions again.
+
+## Implementation notes
+
+**Pending description skill correction:** add a focused description-normalizing
+skill and link it from the master workflow and media-enrichment guidance. It
+must normalize English originals as well as other languages, without changing
+teacher-owned text or naming files.
+
+Use consistent semantic order: primary subject, visible attributes/actions,
+setting/composition, then relevant teaching context only when supported. Write
+generalized descriptive English suitable for search and quiz matching, derive
+useful topics, and avoid invented visual facts or guessed identities.
+
+The skill must read current original metadata and admitted image evidence, save
+actual normalized outputs with optimistic revision protection, and mark
+completion only after confirmed persistence. If image evidence is unavailable,
+report the limitation rather than claiming image-grounded analysis. A later
+original-text change invalidates completion for that older source revision.
+
+Build a lightweight `master-workflow` skill that indexes stable teacher defaults
+and points to narrower task-specific skills. Do not put personal information,
+credentials, lesson secrets, or account identifiers in repository defaults.
+Runtime personal skills remain in the teacher's private data root.
+
+When a teacher explains a reusable workflow, save it as personal guidance so it
+does not need to be re-asked on later sessions. For example, a vocabulary
+activity may default to one term, one matching GIF, and four options containing
+one correct answer plus three distractors. Scope such a rule to that activity
+type unless the teacher explicitly makes it universal.
+
+Treat corrections as learning evidence, not automatic permanent rules. Record
+provenance and revision history. If the scope of a correction is clear, update
+the narrow skill; if it is ambiguous, ask one casual question about whether to
+remember it for that type of activity. Ask more setup questions early when
+needed, then rely on learned preferences instead of repeating them.
+
+Add task skills for quiz authoring, human validation, direct browser image
+search, image-bank research/metadata, media analysis, and Codex repository
+access. Image research should use bounded requests, normal provider-supported
+access where available, useful source metadata, and respectful request pacing.
+Analyze candidate images immediately when admitted tools permit it.
+
+CAPTCHA, security challenge, unfamiliar login, organization selection, consent,
+browser permission, or another explicit human checkpoint is always a
+human-validation boundary. Preserve the checkpoint, explain the legitimate local
+action required, wait for confirmation, then re-read session and remote state
+before continuing. Do not solve, bypass, outsource, or silently replay a CAPTCHA
+merely because it is surfaced through localhost.
+
+Codex configuration may use broad repository permissions only after explicit
+user authorization for that workspace. Skill text cannot itself grant access,
+silently escalate permissions, expose secrets, or broaden host authority.
+
+Keep Blooket semantics accurate: Blooket has no remote draft object in this
+product model. Local drafts are private recovery/authoring state only. Once
+canonical create/edit execution is validated, requested publication should
+proceed autonomously unless a real human-validation boundary, ambiguity, or
+safety stop is reached.
+
+## Evidence
+
+Portable skill foundations were implemented on 2026-10-06. Startup now seeds a
+small master index plus workflow-learning, human-validation, browser-image
+search, image-bank research, media-analysis, media-description-normalization,
+and Codex-access guidance without overwriting personal changes. The description
+skill normalizes English and non-English source text with a fixed semantic
+ordering, requires admitted evidence for visual claims, and persists only
+through revision-protected `library.enrich`. Actual client behavior and
+long-term teacher acceptance remain pending.
+
+## Blockers
+
+Acceptance remains open until the checks above run through the actual owning
+product surfaces; portable foundations alone do not complete this record.

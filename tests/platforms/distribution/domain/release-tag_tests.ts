@@ -33,30 +33,48 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   decodeReleaseTag,
+  assertProductReleaseTag,
   initialReleaseTag,
 } from "../../../../src/platforms/distribution/domain/release-tag.ts";
 test("quarterly CalVer changes on three-month UTC boundaries", () => {
   for (const [date, tag] of [
-    ["2026-03-31T23:59:59Z", "v2026.1.0"],
-    ["2026-04-01T00:00:00Z", "v2026.2.0"],
-    ["2026-07-01T00:00:00Z", "v2026.3.0"],
-    ["2026-10-01T00:00:00Z", "v2026.4.0"],
-    ["2027-01-01T00:00:00Z", "v2027.1.0"],
+    ["2026-03-31T23:59:59Z", "v26.1.0"],
+    ["2026-04-01T00:00:00Z", "v26.2.0"],
+    ["2026-07-01T00:00:00Z", "v26.3.0"],
+    ["2026-10-01T00:00:00Z", "v26.4.0"],
+    ["2027-01-01T00:00:00Z", "v27.1.0"],
   ] as const)
     assert.equal(initialReleaseTag(new Date(date)), tag);
-  assert.deepEqual(decodeReleaseTag("v2026.4.2"), {
+  assert.deepEqual(decodeReleaseTag("v26.4.2"), {
     year: 2026,
     quarter: 4,
     revision: 2,
-    tag: "v2026.4.2",
+    tag: "v26.4.2",
   });
   for (const tag of [
-    "v2026.0.0",
-    "v2026.5.0",
-    "v2026.4.01",
-    "v2026.4.0;bad",
+    "v26.0.0",
+    "v26.5.0",
+    "v26.4.01",
+    "v26.4.0;bad",
     "2026.4.0",
-    "v2026.4.-1",
+    "v26.4.-1",
   ])
     assert.throws(() => decodeReleaseTag(tag));
+});
+
+test("release gate rejects obsolete tags and version/source disagreement",
+() => {
+  assert.equal(assertProductReleaseTag("v26.4.0"), "v26.4.0");
+  for (const value of [
+    "v2026.4.0",
+    "2026.4.0",
+    "26.4.0",
+    "v26.04.0",
+    "v26.4.1",
+    "v27.1.0",
+  ])
+    assert.throws(() => assertProductReleaseTag(value));
+  assert.throws(() => initialReleaseTag(new Date("invalid")));
+  assert.throws(() => initialReleaseTag(new Date("2100-01-01T00:00:00Z")));
+  assert.equal(initialReleaseTag(new Date("2000-01-01T00:00:00Z")), "v00.1.0");
 });

@@ -1,0 +1,201 @@
+---
+schema_version: 1
+id: "blooket-05"
+status: "active"
+priority: "p0"
+horizon: "foundations"
+order: 50
+area: "media"
+task: "TODO - Library migration and AI metadata"
+legacy_task: "TODO 05"
+depends_on:
+  - "blooket-03"
+contracts:
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+  - "docs/technical/adr/atomic-local-persistence.md"
+scope:
+  - "src/api/teacher-library/"
+  - "src/platforms/user-library/"
+  - "src/media/library-metadata/"
+  - "docs/skills/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Library migration and AI metadata
+
+## Objective
+
+Finish native library and client acceptance, preserving two-field intake,
+original teacher text, and revision-safe AI normalization.
+
+## Acceptance
+
+Acceptance includes the two-field form on all intake paths, unchanged original
+English and non-English text, generated topics, actual English normalization,
+failed-save/revision-race handling, and correct pending/completed/stale states.
+
+Complete when legacy IDs/bytes/text migrate without loss, legacy rename/move can
+recover from interruption, AI updates preserve teacher-authored text, and
+initial skills are installed without overwriting personal skills. Verify the
+user profile from task 01 can discover and read the resulting skills.
+
+## Implementation notes
+
+**Pending import and enrichment correction:** every intake path, including file
+selection, dragging, and clipboard image/link import, asks only for name and
+description. Remove the language selector and comma-separated topic field from
+intake; do not move the same questions into another required dialog.
+Teacher-authored text remains unchanged; canonical asset paths are internal and
+must not become another teacher-facing naming task.
+
+Do not infer the original text language from the workspace's EN/ES setting.
+Language identification and topics belong to AI enrichment; missing analysis
+stays unknown rather than being invented during import. Review the admitted
+metadata contract before allowing an AI language update.
+
+Normalize every description into useful, generalized, descriptive English, even
+when the original is already English. Use the description skill from task 16 for
+consistent semantic ordering and image-grounded topics. Keep normalized English
+name/description separate from the teacher's originals.
+
+An English original is not proof that AI normalization has occurred. Record
+normalization completion only after the AI's actual output has been validated
+and durably saved for the current original revision. Failed, absent, or stale
+outputs remain pending/stale; completion is distinct from human verification.
+Concurrent original edits must prevent an older result being marked current.
+
+Teacher text edits clear derived language/topics and make older English stale.
+The local media UI shows that state, and manual language/topic maintenance was
+removed.
+
+New intake rejects filename authority and keeps only service-owned canonical
+WebP/GIF assets with UUID-backed paths. Temporary upload, drag/drop, clipboard,
+and downloaded source blobs are discarded after canonicalization. The ordinary
+editor no longer exposes filename/folder renaming. Legacy JSONL migration and
+its local rename/recovery machinery remain intentionally separate: they preserve
+historical files, IDs, paths, and provenance through the durable transfer
+journal.
+
+Filesystem enumeration bounds depth, entries, records, per-file YAML size, and
+aggregate metadata bytes. Regression checks cover duplicate YAML keys, aliases,
+symlink metadata, large paginated results, same-stem files with different actual
+formats, and legacy IDs. Invalid saved drafts fail their exact decoder.
+
+Migration preflights the complete bounded plan before publication, preserves
+legacy sources, and archives the exact JSONL bytes as `media.jsonl.migrated`.
+User rename preserves IDs, canonical media bytes, text, recipes, and provenance
+while invalidating prepared downloads. Neither operation is admitted through
+MCP.
+
+Transfer replay runs under the shared library lock at startup or before another
+locked operation. A pending journal blocks ordinary library reads, checks hashes
+and metadata conflicts, and resumes idempotently without overwriting unrelated
+files. Source changes retain the journal for repair instead of guessing success.
+
+Existing skill and draft tools have logical IDs, revision checks, and recovery
+copies; verify how the actual ChatGPT client reads skills and follows the
+project schema. Validate media/account semantics before publication, beyond
+draft JSON syntax.
+
+## Shared media correction context
+
+These earlier instructions recorded the required correction. Implementation
+evidence above supersedes their historical description of the four-field form.
+
+The human clarified the media workflow on 2026-10-06. Record these requirements
+first, then reopen the relevant parts of tasks 05-07, 12, and 16 in their
+existing order. The current four-field import form and manual oversize workflow
+do not satisfy this correction; previous passing checks do not complete it.
+
+Import asks only for an image name and description supplied by the teacher. The
+AI owns topic selection and English semantic normalization, including text
+originally written in English. The teacher must see the framed image/GIF
+immediately and be able to make it smaller or larger, drag it, and choose
+blurred or solid backgrounds before accepting the image.
+
+Static images and GIFs share one enforced output canvas resolution and aspect
+ratio. Automatic preparation must produce an actual file strictly below
+2,500,000 bytes; resolution/detail optimization comes first, GIF FPS reduction
+second when relevant, and color/encoding optimization afterward. The editor must
+retain that shared final geometry throughout optimization.
+
+These are pending product changes, not claims about the current implementation.
+Keep teacher-authored text intact. New intake source blobs are ephemeral and the
+library retains only its optimized canonical WebP/GIF asset; legacy migration
+continues preserving historical files for recovery.
+
+Retain actual-byte validation and never label an oversized or unverified
+candidate ready for download or publication. The detailed acceptance checks
+belong below.
+
+## Evidence
+
+Two-field intake was implemented on 2026-10-06. File selection, drag/drop, and
+clipboard admission all converge on the same import dialog; that dialog now asks
+only for the teacher's name and description. The import application contract
+accepts no language or topics, records original language as unknown (empty
+string), and starts topics empty instead of inferring either value from the UI
+locale.
+
+Revision-safe AI enrichment was implemented on 2026-10-06. `library.enrich`
+requires detected language, normalized English name/description, topics, and the
+exact current record revision. Completion is derived only after the atomic save:
+current generated English plus detected language is `completed`; missing
+analysis is `pending`; an older source revision is `stale`.
+
+Portable library foundations were extended on 2026-10-06. Logical IDs now admit
+legacy dots and 128-character IDs while preserving current UUIDs. MCP search
+uses bounded pages with a stable-ID continuation cursor; the legacy small-list
+command remains compatible and rejects oversized results explicitly.
+
+Service startup installs the bundled quiz-authoring and media-enrichment skills
+only when absent, preserving personal modifications. Tests exercise skill
+retrieval and the bundled quiz example through the canonical command path. All
+508 portable tests and strict TypeScript pass; Jig has only its documented
+external evidence gap.
+
+Portable migration and rename recovery were implemented on 2026-10-06. Schema-1
+YAML remains readable; migrated schema-2 records retain the legacy
+English-verification flag, original revision, source path, and index digest.
+Unknown original language stays empty; no translation is invented.
+
+Regression tests exercise interrupted publication/archival, unchanged source
+bytes, late invalid records, collisions, traversal, symlinks, concurrent
+renames, and forbidden remote commands. All 519 portable tests, strict
+TypeScript, and browser-script syntax pass; Jig retains only its external
+evidence gap.
+
+Chrome previously passed the now-legacy local rename operation and a prepared
+export using synthetic media. Its native migration confirmation stalled browser
+inspection; the complete visual migration workflow remains unverified. Continue
+independent editor work in task 06; keep client acceptance pending.
+
+On 2026-10-06, the workspace gained clipboard image/direct-link intake and a
+bounded gallery. It renders at most 12 random suggestions using a partial
+shuffle with 12 selections, without copying or sorting the collection. Search
+uses precomputed text and pages all matching records in groups of 12.
+
+Chrome verified the supplied brand icon, 12 distinct cards from 25 synthetic
+records, another selection, search pagination, and a direct-link clipboard
+import through the dialog to the image editor. Ordinary text-field pastes remain
+local text edits. Binary clipboard selection has portable component coverage;
+native Safari clipboard permission behavior remains unverified.
+
+The direct-link downloader rejects private DNS answers at every redirect, pins
+the admitted address for a fresh connection, and sends no cookies or
+credentials. Regression checks cover mixed/private DNS, redirect changes, HTML
+rejection, oversized responses, and HTTPS downgrade. It remains a local UI
+operation, outside remote MCP commands.
+
+Strict TypeScript, browser-script syntax, and all 582 portable tests passed
+after these changes, with no failures or skips.
+
+## Blockers
+
+**External blocker:** no recipient Mac or actual ChatGPT client is available.
+Native case/Unicode filesystem behavior and real skill/schema consumption remain
+unverified.

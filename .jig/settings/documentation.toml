@@ -28,3 +28,10 @@ paths = ["docs/skills/"]
 decision_id = "none"
 section_mode = "required"
 sections = []
+
+[profile.planning-and-development]
+kind = "adr"
+paths = ["docs/technical/development-map.md", "docs/todo/"]
+decision_id = "none"
+section_mode = "required"
+sections = []

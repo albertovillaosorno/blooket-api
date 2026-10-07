@@ -125,7 +125,8 @@ test("error rows expose only a bounded digest", () => {
     assert.throws(() => flightErrorRecords(source), /invalid-flight-error/u);
 });
 
-test("action revalidation metadata preserves exact zero-or-one wire flags", () => {
+test("action revalidation metadata preserves exact zero-or-one wire flags",
+  () => {
   assert.deepEqual(decodeFlightActionRevalidated(null), {
     paths: [],
     tag: 0,
