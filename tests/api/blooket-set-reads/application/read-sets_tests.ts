@@ -160,6 +160,7 @@ test("ready sessions list strictly decoded set summaries", async () => {
 
   assert.equal(result.ok, true);
   if (result.ok && result.kind === "sets") {
+    assert.equal(result.completeness, "unknown");
     assert.equal(result.value.length, 2);
     assert.deepEqual(result.session, {
       state: "my-sets",
@@ -241,6 +242,34 @@ test("invalid list payloads fail without exposing raw values", async () => {
   );
 
   assert.equal(result.ok, false);
+  assert.equal(JSON.stringify(result).includes(rawSecret), false);
+});
+
+test("invalid list completeness fails closed before exposing rows", async () => {
+  const rawSecret = "raw-completeness-secret";
+  const reads = {
+    list: async () => ({
+      ok: true,
+      value: [{
+        schemaVersion: 1,
+        id: "set-a",
+        title: rawSecret,
+      }],
+      completeness: "partial",
+    }),
+    get: async () => ({ ok: false, code: "blooket-browser-failed" }),
+  } as unknown as BlooketSetReadPort;
+  const result = await listBlooketSets(
+    browser([{ ok: true, state: "my-sets" }], []),
+    secretStore([]),
+    reads,
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    stage: "read",
+    code: "blooket-browser-failed",
+  });
   assert.equal(JSON.stringify(result).includes(rawSecret), false);
 });
 
