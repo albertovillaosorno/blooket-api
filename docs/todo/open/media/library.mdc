@@ -194,6 +194,18 @@ operation, outside remote MCP commands.
 Strict TypeScript, browser-script syntax, and all 582 portable tests passed
 after these changes, with no failures or skips.
 
+On 2026-10-07, real Chrome binary clipboard acceptance used a disposable
+16-by-16 PNG in an isolated temporary workspace. Clicking Paste opened the
+framing editor directly with only name and description; preparation then
+published one canonical WebP and its mirrored YAML. The previous clipboard was
+restored and no browser permission or security setting was changed.
+
+The saved English name/description remained exact, original language stayed
+unknown, topics stayed empty, and generated English stayed null. The library
+correctly retained pending AI analysis despite English original text; the
+prepared JPEG was 522 bytes at the shared 320-by-180 canvas. This proves local
+Chrome intake, not real AI normalization or native Safari clipboard acceptance.
+
 ## Blockers
 
 **External blocker:** no recipient Mac or actual ChatGPT client is available.

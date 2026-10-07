@@ -19,7 +19,7 @@ export function representativeSolidColor(rgba) {
     typeof rgba.length !== "number" ||
     rgba.length < 4 ||
     rgba.length % 4 !== 0 ||
-    rgba.length > 256
+    rgba.length > 5 * 8 * 8 * 4
   )
     return null;
   const clusters = new Map();

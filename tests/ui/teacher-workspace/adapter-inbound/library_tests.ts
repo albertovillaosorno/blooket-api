@@ -88,9 +88,25 @@ test("solid color uses a bounded deterministic dominant palette", () => {
     null,
   );
   assert.equal(
-    representativeSolidColor(new Uint8ClampedArray(260)),
+    representativeSolidColor(new Uint8ClampedArray(1284)),
     null,
   );
+});
+
+test("GIF color considers later frames within the five-frame bound", () => {
+  const frames = new Uint8ClampedArray(3 * 8 * 8 * 4);
+  for (let offset = 0; offset < frames.length; offset += 4) {
+    frames.set(
+      offset < 8 * 8 * 4 ? [240, 32, 32, 255] : [20, 100, 220, 255],
+      offset,
+    );
+  }
+  assert.equal(representativeSolidColor(frames), "#1464dc");
+  const maximum = new Uint8ClampedArray(5 * 8 * 8 * 4);
+  for (let offset = 0; offset < maximum.length; offset += 4)
+    maximum.set([0, 0, 0, 255], offset);
+  assert.equal(representativeSolidColor(maximum), "#303030");
+  assert.equal(representativeSolidColor(new Uint8Array(1281)), null);
 });
 
 test(
