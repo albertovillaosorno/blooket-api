@@ -371,13 +371,19 @@ export async function inspectPreparationAdmission(
   } else {
     if (!text(request["base64"], 35_000_000))
       throw new Error("invalid-source-bytes");
-    bytes = Buffer.from(request["base64"] as string, "base64");
+    const source = Buffer.from(request["base64"] as string, "base64");
     if (
-      bytes.length < 1 ||
-      bytes.length > 25_000_000 ||
-      Buffer.from(bytes).toString("base64") !== request["base64"]
+      source.length < 1 ||
+      source.length > 25_000_000 ||
+      Buffer.from(source).toString("base64") !== request["base64"]
     )
       throw new Error("invalid-source-bytes");
+    const compacted = await compactImageIsolated(
+      source,
+      options.signal === undefined ? undefined : { signal: options.signal },
+    );
+    if (!compacted.ok) throw new Error(compacted.code);
+    bytes = compacted.value.bytes;
   }
 
   const rendered = await renderImageIsolated(
