@@ -55,9 +55,10 @@ test("version-one question reads migrate to normalized answer facts", () => {
   assert.deepEqual(decodeBlooketQuestionRead(question), {
     ok: true,
     value: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       number: 1,
       question: "Type sun.",
+      equation: null,
       qType: "typing",
       random: true,
       timeLimit: 10,
@@ -115,9 +116,10 @@ test("version-two reads admit image presence without a provider URL", () => {
   }), {
     ok: true,
     value: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       number: 2,
       question: "Pick the image.",
+      equation: null,
       qType: "mc",
       random: false,
       timeLimit: 20,
@@ -130,6 +132,76 @@ test("version-two reads admit image presence without a provider URL", () => {
     },
   });
 });
+
+test("legacy prompt equations migrate without leaking provider markers", () => {
+  const result = decodeBlooketQuestionRead({
+    schemaVersion: 2,
+    number: 3,
+    question: "Solve this`*`\\frac{1}{2}`*`",
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: [
+      { kind: "text", content: "1/2", correct: true, match: null },
+      { kind: "text", content: "2", correct: false, match: null },
+    ],
+    hasImage: false,
+    hasAudio: false,
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.schemaVersion, 3);
+    assert.equal(result.value.question, "Solve this");
+    assert.equal(result.value.equation, "\\frac{1}{2}");
+    assert.equal(JSON.stringify(result.value).includes("`*`"), false);
+  }
+});
+
+test(
+  "version-three question media is normalized and mutually exclusive",
+  () => {
+  const normalized = {
+    schemaVersion: 3,
+    number: 3,
+    question: "Solve this",
+    equation: "x^2",
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: [
+      { kind: "text", content: "4", correct: true, match: null },
+      { kind: "text", content: "5", correct: false, match: null },
+    ],
+    hasImage: false,
+    hasAudio: false,
+  } as const;
+  assert.deepEqual(decodeBlooketQuestionRead(normalized), {
+    ok: true,
+    value: normalized,
+  });
+  const ambiguous = decodeBlooketQuestionRead({
+    ...normalized,
+    hasImage: true,
+  });
+  assert.equal(ambiguous.ok, false);
+  if (!ambiguous.ok)
+    assert.equal(
+      ambiguous.issues.some((issue) =>
+        issue.code === "ambiguous-question-media"),
+      true,
+    );
+  for (const malformed of [
+    { ...normalized, question: "Solve`*`x^2`*`", equation: null },
+    { ...normalized, equation: "" },
+  ])
+    assert.equal(decodeBlooketQuestionRead(malformed).ok, false);
+  assert.equal(decodeBlooketQuestionRead({
+    ...normalized,
+    schemaVersion: 2,
+    question: "Solve`*`x^2",
+  }).ok, false);
+  },
+);
 
 test(
   "version-two answer kinds reject mismatched content and typing media",

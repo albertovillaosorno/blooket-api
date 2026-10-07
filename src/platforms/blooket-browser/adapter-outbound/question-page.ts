@@ -151,6 +151,34 @@ export function inspectOpenedBlooketQuestion(
     } = value;
     const imageAnswerMarker = "\u0060~\u0060";
     const mathAnswerMarker = "\u0060*\u0060";
+    if (
+      typeof question !== "string" ||
+      question.length < 1 ||
+      question.length > 20_000
+    )
+      return failed();
+    const firstQuestionMath = question.indexOf(mathAnswerMarker);
+    const finalQuestionMath = question.length - mathAnswerMarker.length;
+    let questionText = question;
+    let equation: string | null = null;
+    if (firstQuestionMath !== -1) {
+      const nextQuestionMath = question.indexOf(
+        mathAnswerMarker,
+        firstQuestionMath + mathAnswerMarker.length,
+      );
+      if (
+        firstQuestionMath < 1 ||
+        finalQuestionMath <= firstQuestionMath + mathAnswerMarker.length ||
+        !question.endsWith(mathAnswerMarker) ||
+        nextQuestionMath !== finalQuestionMath
+      )
+        return failed();
+      questionText = question.slice(0, firstQuestionMath);
+      equation = question.slice(
+        firstQuestionMath + mathAnswerMarker.length,
+        finalQuestionMath,
+      );
+    }
     const normalizedAnswerTypes =
       qType === "mc" && Array.isArray(answerTypes) && answerTypes.length === 0
         ? null
@@ -160,9 +188,6 @@ export function inspectOpenedBlooketQuestion(
       : new Set<unknown>();
     if (
       number !== expectedNumber ||
-      typeof question !== "string" ||
-      question.length < 1 ||
-      question.length > 20_000 ||
       (qType !== "mc" && qType !== "typing") ||
       typeof random !== "boolean" ||
       !Number.isSafeInteger(timeLimit) ||
@@ -195,6 +220,12 @@ export function inspectOpenedBlooketQuestion(
       image.length > 20_000 ||
       typeof audio !== "string" ||
       audio.length > 20_000
+    )
+      return failed();
+    if (
+      Number(equation !== null) +
+        Number(image.length > 0) +
+        Number(audio.length > 0) > 1
     )
       return failed();
     const typingAnswerTypes = qType === "typing"
@@ -239,9 +270,10 @@ export function inspectOpenedBlooketQuestion(
     return {
       ok: true,
       value: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         number,
-        question,
+        question: questionText,
+        equation,
         qType,
         random,
         timeLimit,

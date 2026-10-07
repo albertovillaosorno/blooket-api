@@ -172,6 +172,36 @@ test("typing lowering maps match mode to observed Blooket answerTypes", () => {
   );
 });
 
+test("provider text markers fail before browser lowering", () => {
+  const base: BlooketWriteOperation = {
+    operationId: "plan:test:q:marker",
+    kind: "question",
+    localQuestionId: "marker",
+    questionNumber: 1,
+    question: {
+      type: "typing-answer",
+      prompt: "Type sun.",
+      timeLimitSeconds: 10,
+      imageMediaId: null,
+      matchMode: "exact",
+      answer: "sun",
+    },
+  };
+  for (const question of [
+    { ...base.question, prompt: "Solve`*`x^2`*`" },
+    { ...base.question, answer: "sun`*`x`*`" },
+    { ...base.question, answer: "sun`~`https://provider.invalid" },
+  ]) {
+    assert.deepEqual(
+      lowerBlooketWriteSubmission(
+        { ...base, question },
+        { remoteSetId: "remote-set-1" },
+      ),
+      { ok: false, code: "ambiguous-provider-text" },
+    );
+  }
+});
+
 test(
   "target and impossible answer invariants fail before browser mechanics",
   () => {

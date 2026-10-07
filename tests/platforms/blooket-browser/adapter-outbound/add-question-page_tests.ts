@@ -259,6 +259,31 @@ test(
   },
 );
 
+test("provider marker text never reaches the hidden question field", () => {
+  const page = fixture();
+  withPage(
+    page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture",
+    () => {
+      for (const input of [
+        { ...typing, question: "Type`*`x^2`*`" },
+        {
+          ...typing,
+          answers: [{ text: "sun`*`x`*`", correct: true }],
+        },
+        {
+          ...typing,
+          answers: [{ text: "sun`~`https://provider.invalid", correct: true }],
+        },
+      ]) {
+        assert.equal(prepareBlooketAddQuestionForm(input).ok, false);
+        assert.equal(page.hidden.value, "");
+        assert.equal(page.submit.clicked, 0);
+      }
+    },
+  );
+});
+
 test("stale hidden state and file data prevent submission", () => {
   const page = fixture();
   withPage(

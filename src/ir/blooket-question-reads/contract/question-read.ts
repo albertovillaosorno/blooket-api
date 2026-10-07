@@ -23,7 +23,7 @@
 // - Summary:
 //   - Validates only fields established by authenticated edit-page evidence.
 // - Description:
-//   - Provider media URLs are reduced to answer kind and presence facts.
+//   - Provider media URLs are reduced to kind/presence; prompt math is split.
 // - Usage:
 //   - Decode browser observations before conflict or write verification.
 // - Defaults:
@@ -39,7 +39,8 @@ import {
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 
-export const BLOOKET_QUESTION_READ_VERSION = 2 as const;
+export const BLOOKET_QUESTION_READ_VERSION = 3 as const;
+const PREVIOUS_BLOOKET_QUESTION_READ_VERSION = 2 as const;
 const LEGACY_BLOOKET_QUESTION_READ_VERSION = 1 as const;
 const LEGACY_IMAGE_ANSWER_MARKER = "`~`";
 const LEGACY_MATH_ANSWER_MARKER = "`*`";
@@ -58,6 +59,7 @@ export interface BlooketQuestionRead {
   readonly schemaVersion: typeof BLOOKET_QUESTION_READ_VERSION;
   readonly number: number;
   readonly question: string;
+  readonly equation: string | null;
   readonly qType: "mc" | "typing";
   readonly random: boolean;
   readonly timeLimit: number;
@@ -70,6 +72,7 @@ const QUESTION_KEYS = new Set([
   "schemaVersion",
   "number",
   "question",
+  "equation",
   "qType",
   "random",
   "timeLimit",
@@ -77,8 +80,11 @@ const QUESTION_KEYS = new Set([
   "hasImage",
   "hasAudio",
 ]);
+const PREVIOUS_QUESTION_KEYS = new Set(
+  [...QUESTION_KEYS].filter((key) => key !== "equation"),
+);
 const LEGACY_QUESTION_KEYS = new Set([
-  ...QUESTION_KEYS,
+  ...PREVIOUS_QUESTION_KEYS,
   "correctAnswers",
   "answerTypes",
 ]);
@@ -101,28 +107,41 @@ export function decodeBlooketQuestionRead(
   const version = value["schemaVersion"];
   if (
     version !== LEGACY_BLOOKET_QUESTION_READ_VERSION
+    && version !== PREVIOUS_BLOOKET_QUESTION_READ_VERSION
     && version !== BLOOKET_QUESTION_READ_VERSION
   ) {
     issues.push({
       path: path + ".schemaVersion",
       code: "unsupported-version",
-      message: "Expected Blooket question read version 1 or 2.",
+      message: "Expected Blooket question read version 1, 2, or 3.",
     });
   }
   issues.push(...unknownFieldIssues(
     value,
     version === LEGACY_BLOOKET_QUESTION_READ_VERSION
       ? LEGACY_QUESTION_KEYS
-      : QUESTION_KEYS,
+      : version === PREVIOUS_BLOOKET_QUESTION_READ_VERSION
+        ? PREVIOUS_QUESTION_KEYS
+        : QUESTION_KEYS,
     path,
   ));
 
   const number = positiveInteger(value["number"], path + ".number", issues);
-  const question = requiredString(
+  const rawQuestion = requiredString(
     value["question"],
     path + ".question",
     issues,
   );
+  const normalizedQuestion = rawQuestion === undefined
+    ? undefined
+    : version === BLOOKET_QUESTION_READ_VERSION
+      ? decodeCurrentQuestion(
+          rawQuestion,
+          value["equation"],
+          path,
+          issues,
+        )
+      : normalizeLegacyQuestion(rawQuestion, path, issues);
   const qType = value["qType"];
   if (qType !== "mc" && qType !== "typing") {
     issues.push({
@@ -151,10 +170,25 @@ export function decodeBlooketQuestionRead(
     issues,
   );
 
+  if (
+    normalizedQuestion !== undefined &&
+    hasImage !== undefined &&
+    hasAudio !== undefined &&
+    Number(normalizedQuestion.equation !== null) +
+        Number(hasImage) +
+        Number(hasAudio) > 1
+  ) {
+    issues.push({
+      path,
+      code: "ambiguous-question-media",
+      message: "Question image, audio, and equation are mutually exclusive.",
+    });
+  }
+
   if (issues.length > 0) return { ok: false, issues };
   if (
     number === undefined
-    || question === undefined
+    || normalizedQuestion === undefined
     || (qType !== "mc" && qType !== "typing")
     || random === undefined
     || timeLimit === undefined
@@ -170,7 +204,8 @@ export function decodeBlooketQuestionRead(
     value: {
       schemaVersion: BLOOKET_QUESTION_READ_VERSION,
       number,
-      question,
+      question: normalizedQuestion.question,
+      equation: normalizedQuestion.equation,
       qType,
       random,
       timeLimit,
@@ -211,6 +246,71 @@ export function decodeBlooketQuestionReadList(
   return issues.length > 0
     ? { ok: false, issues }
     : { ok: true, value: questions };
+}
+
+function normalizeLegacyQuestion(
+  value: string,
+  path: string,
+  issues: ValidationIssue[],
+): { readonly question: string; readonly equation: string | null } | undefined {
+  const first = value.indexOf(LEGACY_MATH_ANSWER_MARKER);
+  if (first === -1) return { question: value, equation: null };
+  const final = value.length - LEGACY_MATH_ANSWER_MARKER.length;
+  const next = value.indexOf(
+    LEGACY_MATH_ANSWER_MARKER,
+    first + LEGACY_MATH_ANSWER_MARKER.length,
+  );
+  if (
+    first < 1 ||
+    final <= first + LEGACY_MATH_ANSWER_MARKER.length ||
+    !value.endsWith(LEGACY_MATH_ANSWER_MARKER) ||
+    next !== final
+  ) {
+    issues.push({
+      path: path + ".question",
+      code: "invalid-legacy-question-equation",
+      message: "Legacy question equation marker is malformed or ambiguous.",
+    });
+    return undefined;
+  }
+  return {
+    question: value.slice(0, first),
+    equation: value.slice(
+      first + LEGACY_MATH_ANSWER_MARKER.length,
+      final,
+    ),
+  };
+}
+
+function decodeCurrentQuestion(
+  question: string,
+  equation: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): { readonly question: string; readonly equation: string | null } | undefined {
+  if (question.includes(LEGACY_MATH_ANSWER_MARKER)) {
+    issues.push({
+      path: path + ".question",
+      code: "encoded-question-equation",
+      message: "Version 3 question text must not contain the provider marker.",
+    });
+    return undefined;
+  }
+  if (equation === null) return { question, equation: null };
+  if (
+    typeof equation !== "string" ||
+    equation.length < 1 ||
+    equation.length > 20_000 ||
+    equation.includes(LEGACY_MATH_ANSWER_MARKER)
+  ) {
+    issues.push({
+      path: path + ".equation",
+      code: "invalid-question-equation",
+      message: "Expected null or one bounded normalized equation.",
+    });
+    return undefined;
+  }
+  return { question, equation };
 }
 
 function decodeLegacyAnswers(

@@ -202,6 +202,7 @@ function serializedQuestion(
     typeof input.question !== "string" ||
     input.question.length < 1 ||
     input.question.length > 20_000 ||
+    input.question.includes("`*`") ||
     typeof input.random !== "boolean" ||
     !Number.isSafeInteger(input.timeLimit) ||
     input.timeLimit < 1 ||
@@ -224,6 +225,8 @@ function serializedQuestion(
       answer.text.length > 10_000 ||
       typeof answer.correct !== "boolean" ||
       answer.text.includes("\0") ||
+      answer.text.includes("`*`") ||
+      answer.text.includes("`~`") ||
       seen.has(answer.text)
     )
       return null;

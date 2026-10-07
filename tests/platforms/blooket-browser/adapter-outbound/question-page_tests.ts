@@ -165,9 +165,10 @@ test("question panels expose normalized read facts without saving", () => {
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.deepEqual(result.value, {
-        schemaVersion: 2,
+        schemaVersion: 3,
         number: 1,
         question: "Type sun.",
+        equation: null,
         qType: "typing",
         random: true,
         timeLimit: 15,
@@ -212,9 +213,10 @@ test("question panels expose normalized read facts without saving", () => {
     assert.equal(imageAnswer.ok, true);
     if (imageAnswer.ok) {
       assert.deepEqual(imageAnswer.value, {
-        schemaVersion: 2,
+        schemaVersion: 3,
         number: 1,
         question: "Image answer",
+        equation: null,
         qType: "mc",
         random: false,
         timeLimit: 20,
@@ -255,6 +257,56 @@ test("question panels expose normalized read facts without saving", () => {
       }]);
       assert.equal(decodeBlooketQuestionRead(mathAnswer.value).ok, true);
     }
+    hidden.value = JSON.stringify({
+      number: 1,
+      question: "Solve this`*`x^2`*`",
+      qType: "mc",
+      random: false,
+      timeLimit: 20,
+      answers: ["4", "5"],
+      correctAnswers: ["4"],
+      answerTypes: [],
+      image: "",
+      audio: "",
+    });
+    const equationQuestion = inspectOpenedBlooketQuestion(1);
+    assert.equal(equationQuestion.ok, true);
+    if (equationQuestion.ok) {
+      const value = equationQuestion.value as {
+        question?: unknown;
+        equation?: unknown;
+      };
+      assert.equal(value.question, "Solve this");
+      assert.equal(value.equation, "x^2");
+      assert.equal(JSON.stringify(value).includes("`*`"), false);
+      assert.equal(decodeBlooketQuestionRead(equationQuestion.value).ok, true);
+    }
+    hidden.value = JSON.stringify({
+      number: 1,
+      question: "Solve this`*`x^2`*`",
+      qType: "mc",
+      random: false,
+      timeLimit: 20,
+      answers: ["4", "5"],
+      correctAnswers: ["4"],
+      answerTypes: [],
+      image: "opaque-image",
+      audio: "",
+    });
+    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    hidden.value = JSON.stringify({
+      number: 1,
+      question: "Solve this`*`x^2",
+      qType: "mc",
+      random: false,
+      timeLimit: 20,
+      answers: ["4", "5"],
+      correctAnswers: ["4"],
+      answerTypes: [],
+      image: "",
+      audio: "",
+    });
+    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
     hidden.value = JSON.stringify({
       number: 1,
       question: "Malformed image answer",

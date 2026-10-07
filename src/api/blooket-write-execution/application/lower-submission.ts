@@ -59,7 +59,8 @@ export type LowerBlooketWriteSubmissionResult =
         | "unexpected-remote-set-binding"
         | "missing-remote-set-binding"
         | "invalid-question-number"
-        | "invalid-answer-content";
+        | "invalid-answer-content"
+        | "ambiguous-provider-text";
     };
 
 export function lowerBlooketWriteSubmission(
@@ -106,7 +107,16 @@ function lowerQuestion(
   remoteSetId: string,
 ): LowerBlooketWriteSubmissionResult {
   const question = operation.question;
+  const mathMarker = "`*`";
+  const imageMarker = "`~`";
+  if (question.prompt.includes(mathMarker))
+    return { ok: false, code: "ambiguous-provider-text" };
   if (question.type === "typing-answer") {
+    if (
+      question.answer.includes(mathMarker) ||
+      question.answer.includes(imageMarker)
+    )
+      return { ok: false, code: "ambiguous-provider-text" };
     return {
       ok: true,
       value: {
@@ -135,6 +145,8 @@ function lowerQuestion(
   const answers: BlooketQuestionAnswerSubmission[] = [];
   for (const answer of question.answers) {
     if (answer.text !== null && answer.imageMediaId === null) {
+      if (answer.text.includes(mathMarker) || answer.text.includes(imageMarker))
+        return { ok: false, code: "ambiguous-provider-text" };
       answers.push({
         kind: "text",
         text: answer.text,
