@@ -424,8 +424,7 @@ popup senders, exact loopback configuration, bounded replies, navigation,
 unsupported commands, and signed-out page stops. Artifact tests verify emitted
 JavaScript imports and the narrow permission set, with no server/secret modules.
 
-Still pending: canonical CLI/MCP service composition; observed empty-account
-and pagination contracts;
+Still pending: observed empty-account and pagination contracts;
 public set details; capabilities and complete question/media facts; login and
 organization-selection states; Safari worker lifecycle. These prevent completion
 of task 08 and publication tasks 09-12. Portable doubles are not browser
@@ -468,10 +467,43 @@ workspace relay tests reject unrelated origins, applications, malformed tokens,
 and oversized responses. The final native Linux archive must be rebuilt for
 this committed revision rather than reusing an older artifact.
 
-Fresh native Linux archive checks passed before automatic discovery changed.
-Rebuild and verify the final archive for the committed revision; do not treat
-the
-older archive as acceptance of the new worker.
+The clean Linux archive for commit `eff0feb` subsequently passed extracted
+package verification, including the updated automatic-discovery worker,
+clipboard helper, icons, launcher, and native media preparation. This proves
+that revision only; subsequent command composition needs a fresh package check.
+
+Canonical read composition was implemented on 2026-10-06. The admitted
+`blooket.session.inspect`, `blooket.sets.list`, and `blooket.sets.get` commands
+share the existing validated application ports through the running local
+service. Ordinary CLI syntax and the three matching MCP tools use that path;
+MCP still executes the canonical CLI subprocess, never application internals.
+
+Payload decoding rejects unknown fields, credentials, paths, wrong types,
+control characters, and oversized IDs before service/browser access.
+
+These reads reuse the existing session without retrieving secrets or
+submitting a
+login. Signed-out or expired sessions return `blooket-authentication-required`;
+rate limits, organization prompts, and challenges preserve their wait/human
+states. Missing or stale local instances fail closed. Local requests use exact
+loopback discovery, bounded responses, correlation checks, CSRF admission, and
+no redirects.
+
+All 589 portable tests and strict TypeScript passed. A synthetic integration
+exercised the actual CLI subprocess, local server, browser broker, and MCP tool
+projection. The authorized installed Chrome extension then confirmed a ready
+session, two IR-validated set summaries, and one private set detail through the
+same CLI/MCP projection. No account content, credentials, or IDs were logged or
+committed, and no Blooket mutation was performed.
+
+This was a local tool
+projection check, not actual ChatGPT or a new public OAuth acceptance run.
+
+The development service restarted normally, the workspace reconnected
+without configuration, and the configured tunnel returned to connected.
+Native Safari, complete questions/media, capabilities, empty accounts,
+pagination, public detail, and login remain pending. Their absence still blocks
+publication; do not expose unsupported read or write tools as if validated.
 
 Complete when fresh validated remote state can be read reliably, capability
 changes are detected, and a missing/challenged session returns the appropriate

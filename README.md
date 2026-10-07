@@ -328,6 +328,28 @@ The connection follows the workspace's actual port and reconnects after a
 service restart; tokens stay in memory/session storage and never reach an AI.
 IPv6-only local service bindings are not supported by this extension yet.
 
+The connected service exposes three read-only MCP tools:
+`blooket_session_inspect`, `blooket_sets_list`, and `blooket_sets_get`.
+They run through the canonical CLI and the same local browser ports:
+
+```sh
+npm run blooket -- session inspect --json
+npm run blooket -- sets list --json
+npm run blooket -- sets get '<remote-set-id>' --json
+```
+
+Use the same user-data root as the running service. Development commands need
+`BLOOKET_DATA_HOME="$PWD/.temp/service-test"` when the service uses that root.
+These commands reuse the confirmed browser session and never load `.env`, read
+credentials, or submit a login. A closed session requires signing in locally;
+security challenges and organization prompts preserve the human-action stop.
+
+Listing returns observed summaries, not a completeness guarantee. Empty-account
+and pagination acceptance are pending. Detail supports the observed private-set
+controls; public details, question/media reads, capability discovery, and
+publication remain pending. Unsupported page shapes fail validation rather than
+inventing fields.
+
 Keep the local workspace open for automatic discovery and restart recovery.
 The normal launcher opens it. If the service runs without a browser page, the
 popup's **Open workspace** shortcut uses the default local port 2607.

@@ -60,6 +60,9 @@ export interface CliDependencies {
 const HELP = `blooket
 
 Usage:
+  blooket session inspect [--json]
+  blooket sets list [--json]
+  blooket sets get <set-id> [--json]
   blooket media search <query> [options]
   blooket project validate <project.json> [options]
 
@@ -156,6 +159,13 @@ async function prepareCommand(
   operationId: string,
   readText: (path: string) => Promise<string>,
 ): Promise<CommandEnvelope> {
+  if (invocation.kind === "blooket-read")
+    return {
+      version: COMMAND_ENVELOPE_VERSION,
+      operationId,
+      command: invocation.command,
+      payload: invocation.payload,
+    };
   if (invocation.kind === "media-search") {
     const mediaJsonl = await readText(invocation.mediaPath);
     return {

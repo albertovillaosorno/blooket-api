@@ -106,12 +106,23 @@ test("project validation accepts an explicit media index path", () => {
 });
 
 test("unknown options fail before any file access", () => {
-  const result = parseCliArguments([
-    "media",
-    "search",
-    "sun",
-    "--surprise",
-  ]);
+  const result = parseCliArguments(["media", "search", "sun", "--surprise"]);
 
   assert.equal(result.ok, false);
+});
+
+test("read arguments preserve opaque IDs and reject extra authority", () => {
+  for (const args of [
+    ["session", "inspect", "--json"],
+    ["sets", "list"],
+    ["sets", "get", "opaque ID", "--json"],
+  ])
+    assert.equal(parseCliArguments(args).ok, true);
+  for (const args of [
+    ["sets", "get"],
+    ["sets", "get", "a", "b"],
+    ["sets", "list", "--token", "secret"],
+    ["session", "inspect", "--json", "--json"],
+  ])
+    assert.equal(parseCliArguments(args).ok, false);
 });

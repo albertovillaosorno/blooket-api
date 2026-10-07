@@ -34,10 +34,24 @@ import type {
   MediaSearchMode,
 } from "../../../media/media-search/domain/media-search.ts";
 
+import { decodeBlooketReadCommand } from
+  "../../../ir/blooket-read-commands/contract/commands.ts";
+
 export type CliInvocation =
   | { readonly kind: "help" }
   | MediaSearchInvocation
-  | ProjectValidateInvocation;
+  | ProjectValidateInvocation
+  | BlooketReadInvocation;
+
+export interface BlooketReadInvocation {
+  readonly kind: "blooket-read";
+  readonly command:
+    | "blooket.session.inspect"
+    | "blooket.sets.list"
+    | "blooket.sets.get";
+  readonly payload: Record<string, string>;
+  readonly json: boolean;
+}
 
 export interface MediaSearchInvocation {
   readonly kind: "media-search";
@@ -72,6 +86,13 @@ export function parseCliArguments(args: readonly string[]): CliParseResult {
   if (args.length === 0 || args[0] === "help" || args[0] === "--help") {
     return { ok: true, invocation: { kind: "help" } };
   }
+
+  if (args[0] === "session" && args[1] === "inspect")
+    return parseBlooketRead("blooket.session.inspect", args.slice(2));
+  if (args[0] === "sets" && args[1] === "list")
+    return parseBlooketRead("blooket.sets.list", args.slice(2));
+  if (args[0] === "sets" && args[1] === "get")
+    return parseBlooketRead("blooket.sets.get", args.slice(2));
 
   if (args[0] === "media" && args[1] === "search") {
     return parseMediaSearch(args.slice(2));
@@ -194,6 +215,30 @@ function parseProjectValidate(args: readonly string[]): CliParseResult {
       projectPath,
       ...(mediaPath === undefined ? {} : { mediaPath }),
       json,
+    },
+  };
+}
+
+function parseBlooketRead(
+  command: BlooketReadInvocation["command"],
+  args: readonly string[],
+): CliParseResult {
+  const payload: Record<string, string> =
+    command === "blooket.sets.get" ? { setId: args[0] ?? "" } : {};
+  const options = command === "blooket.sets.get" ? args.slice(1) : args;
+  if (
+    (options.length !== 0 &&
+      (options.length !== 1 || options[0] !== "--json")) ||
+    !decodeBlooketReadCommand(command, payload).ok
+  )
+    return { ok: false, message: "Invalid Blooket read arguments." };
+  return {
+    ok: true,
+    invocation: {
+      kind: "blooket-read",
+      command,
+      payload,
+      json: options[0] === "--json",
     },
   };
 }

@@ -29,6 +29,8 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
+import { createBlooketBrowserBridgeAdapters } from
+  "../../blooket-browser-bridge/adapter-outbound/adapters.ts";
 import type { OnlineConnectionController } from
   "../../online-connection/contract/controller.ts";
 import {
@@ -144,6 +146,10 @@ export async function startBrowserService(
   const csrf = randomBytes(32).toString("base64url");
   const browserBridge =
     options.browserBridge ?? createBlooketBrowserBridgeBroker();
+  const blooket = {
+    ...createBlooketBrowserBridgeAdapters(browserBridge),
+    secrets,
+  };
   let origin = "";
   const staticRoot = new URL(
     "../../../ui/teacher-workspace/adapter-inbound/",
@@ -501,7 +507,7 @@ export async function startBrowserService(
           json(response, 400, decoded);
           return;
         }
-        json(response, 200, await executeCommand(decoded.value, root));
+        json(response, 200, await executeCommand(decoded.value, root, blooket));
         return;
       }
       json(response, 404, { code: "not-found" });

@@ -46,10 +46,20 @@ import { LIBRARY_COMMANDS } from
 import { executeLibraryCommand } from
   "../../teacher-library/application/library.ts";
 
+import { isBlooketReadCommand } from
+  "../../../ir/blooket-read-commands/contract/commands.ts";
+import {
+  executeBlooketReadCommand,
+  type BlooketReadDependencies,
+} from "../../blooket-set-reads/application/command.ts";
+
 export async function executeCommand(
   command: CommandEnvelope,
   dataRoot?: string,
+  blooket?: BlooketReadDependencies,
 ): Promise<ResultEnvelope> {
+  if (isBlooketReadCommand(command.command))
+    return executeBlooketReadCommand(command, blooket);
   if (LIBRARY_COMMANDS.some((name) => name === command.command))
     return await executeLibraryCommand(command, dataRoot);
   switch (command.command) {
