@@ -623,7 +623,9 @@ test("visual-only edits preserve current AI normalization", async () => {
   }
 });
 
-test("failed enrichment persistence cannot publish completed metadata", async () => {
+test(
+  "failed enrichment persistence cannot publish completed metadata",
+  async () => {
   const { root, input } = await setup();
   try {
     const record = await importLibraryImage(root, input);
@@ -681,7 +683,8 @@ test("failed enrichment persistence cannot publish completed metadata", async ()
     await chmod(join(root, "media", "metadata"), 0o700).catch(() => {});
     await rm(root, { recursive: true, force: true });
   }
-});
+  },
+);
 
 test(
   "aliases, duplicate keys and symbolic " +
