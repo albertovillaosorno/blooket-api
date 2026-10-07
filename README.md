@@ -88,8 +88,9 @@ before changing dependency layout or validators.
 
 1. Open configuration, choose the UI language and media folder, and save any
    replacement credentials. Saved secrets are never returned to the page.
-2. Import a photo or GIF and choose its filename, name, original description,
-   language, and topics. The AI uses asset IDs, not filesystem names.
+2. Import or paste a photo or GIF and provide only its teacher-authored name
+   and description. Language identification, topics, and normalized English
+   metadata are separate AI enrichment work; the AI uses stable asset IDs.
 3. Edit framing, adjustments, and background. Export defaults initialize new
    recipes; each image keeps its own settings.
 4. Prepare and review/download the rendition. Oversized output or a stale
