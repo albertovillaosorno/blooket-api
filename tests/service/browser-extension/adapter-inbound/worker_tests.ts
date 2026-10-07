@@ -167,6 +167,28 @@ test(
           capabilityPanelReady = false;
           return [{ result: true }];
         }
+        if (func.name === "prepareBlooketLoginForm") {
+          assert.deepEqual(args[0], {
+            loginIdentifier: "teacher@example.invalid",
+            password: "synthetic-password",
+          });
+          return [{ result: { ok: true } }];
+        }
+        if (func.name === "isBlooketLoginFormPrepared") {
+          assert.deepEqual(args[0], {
+            loginIdentifier: "teacher@example.invalid",
+            password: "synthetic-password",
+          });
+          return [{ result: true }];
+        }
+        if (func.name === "submitBlooketLoginForm") {
+          assert.deepEqual(args[0], {
+            loginIdentifier: "teacher@example.invalid",
+            password: "synthetic-password",
+          });
+          tabUrl = "https://dashboard.blooket.com/my-sets";
+          return [{ result: { ok: true } }];
+        }
         if (func.name === "prepareBlooketAddQuestionForm") {
           assert.deepEqual(args[0], {
             setId: "set-fixture",
@@ -227,11 +249,13 @@ test(
               ok: true,
               value:
                 operation.kind === "session.observe"
-                  ? new URL(tabUrl).pathname === "/create"
-                    ? "create"
-                    : new URL(tabUrl).pathname === "/edit"
-                      ? "edit"
-                      : "my-sets"
+                  ? new URL(tabUrl).origin === "https://id.blooket.com"
+                    ? "signed-out"
+                    : new URL(tabUrl).pathname === "/create"
+                      ? "create"
+                      : new URL(tabUrl).pathname === "/edit"
+                        ? "edit"
+                        : "my-sets"
                   : operation.kind === "sets.list"
                     ? [
                         {
@@ -456,18 +480,32 @@ test(
     );
     questionPanelCloses = true;
 
-    const before = scripts.length;
-    for (const unsupported of [
-      {
-        kind: "session.authenticate",
-        loginIdentifier: "teacher@example.invalid",
-        password: "synthetic-password",
-      },
-    ]) {
-      assert.equal((await expectReply(unsupported)).ok, false);
-      assert.equal(scripts.length, before);
-    }
     tabUrl = "https://id.blooket.com/login";
+    const signedOut = await expectReply({ kind: "session.observe" });
+    assert.equal(signedOut.ok, true);
+    assert.equal(signedOut.value, "signed-out");
+    const authentication = await expectReply({
+      kind: "session.authenticate",
+      loginIdentifier: "teacher@example.invalid",
+      password: "synthetic-password",
+    });
+    assert.equal(authentication.ok, true);
+    assert.equal(authentication.value, null);
+    assert.equal(
+      JSON.stringify(authentication).includes("synthetic-password"),
+      false,
+    );
+    assert.equal(
+      scripts.filter((name) => name === "submitBlooketLoginForm").length,
+      1,
+    );
+    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    const ready = await expectReply({ kind: "session.observe" });
+    assert.equal(ready.ok, true);
+    assert.equal(ready.value, "my-sets");
+
+    tabUrl = "https://id.blooket.com/login";
+    const before = scripts.length;
     assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
     assert.equal(scripts.length, before);
     assert.equal(

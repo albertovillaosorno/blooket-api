@@ -58,6 +58,7 @@ test(
     assert.deepEqual(manifest.permissions, ["storage", "scripting"]);
     assert.deepEqual(manifest.host_permissions, [
       "https://dashboard.blooket.com/*",
+      "https://id.blooket.com/*",
       "http://127.0.0.1/*",
       "http://127.0.0.2/*",
     ]);

@@ -37,6 +37,8 @@ import test from "node:test";
 
 import { createBlooketRuntimePorts } from
   "../../../../src/api/browser-service/adapter-inbound/blooket-runtime.ts";
+import { ensureBlooketSession } from
+  "../../../../src/api/blooket-session/application/ensure-session.ts";
 import { executePersistedBlooketWrite } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/api/blooket-write-execution/application/execute-persisted.ts";
@@ -50,6 +52,12 @@ import { loadMutationBudgetFile } from
   "../../../../src/platforms/mutation-budget-files/adapter-outbound/file.ts";
 import type { BlooketWritePlan } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
+import { createBlooketBrowserBridgeBroker } from
+  "../../../../src/platforms/blooket-browser/adapter-outbound/broker.ts";
+import {
+  BLOOKET_LOGIN_IDENTIFIER_SECRET,
+  BLOOKET_PASSWORD_SECRET,
+} from "../../../../src/security/blooket-credentials/domain/credentials.ts";
 import type { HostSecretStore } from
   "../../../../src/security/host-secrets/domain/host-secret.ts";
 
@@ -76,6 +84,84 @@ const questionOperation: BlooketWriteOperation = {
     answer: "sun",
   },
 };
+
+test(
+  "runtime session authenticates only through the bounded broker",
+  async () => {
+  const token = "synthetic-runtime-browser-token-at-least-32-bytes";
+  const bridge = createBlooketBrowserBridgeBroker({
+    token,
+    timeoutMs: 500,
+  });
+  const runtime = createBlooketRuntimePorts(bridge, "/synthetic-unused-root");
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const observations = ["signed-out", "my-sets"];
+  const poll = setInterval(() => {
+    const request = bridge.next(token);
+    if (!request) return;
+    commands.push(request.command);
+    const value = request.command.kind === "session.observe"
+      ? observations.shift()
+      : request.command.kind === "session.authenticate"
+        ? null
+        : undefined;
+    assert.notEqual(value, undefined);
+    assert.equal(
+      bridge.complete(token, {
+        schemaVersion: 1,
+        id: request.id,
+        ok: true,
+        value,
+      }),
+      true,
+    );
+  }, 1);
+  const reads: string[] = [];
+  const secrets: HostSecretStore = {
+    read: async (name) => {
+      reads.push(name);
+      if (name === BLOOKET_LOGIN_IDENTIFIER_SECRET)
+        return {
+          ok: true,
+          kind: "found",
+          secret: "teacher@example.test",
+        };
+      if (name === BLOOKET_PASSWORD_SECRET)
+        return { ok: true, kind: "found", secret: "synthetic-password" };
+      return { ok: true, kind: "missing" };
+    },
+    write: async () => ({ ok: true }),
+    delete: async () => ({ ok: true }),
+  };
+  try {
+    const result = await ensureBlooketSession(runtime.session, secrets);
+    assert.deepEqual(result, {
+      ok: true,
+      kind: "ready",
+      state: "my-sets",
+      reused: false,
+    });
+    assert.deepEqual(reads, [
+      BLOOKET_LOGIN_IDENTIFIER_SECRET,
+      BLOOKET_PASSWORD_SECRET,
+    ]);
+    assert.deepEqual(commands, [
+      { kind: "session.observe" },
+      {
+        kind: "session.authenticate",
+        loginIdentifier: "teacher@example.test",
+        password: "synthetic-password",
+      },
+      { kind: "session.observe" },
+    ]);
+    assert.equal(bridge.status().pending, 0);
+    assert.equal(JSON.stringify(result).includes("synthetic-password"), false);
+  } finally {
+    clearInterval(poll);
+    bridge.close();
+  }
+  },
+);
 
 test(
   "runtime composes bridge Create Set through canonical write execution",

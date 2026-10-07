@@ -60,21 +60,27 @@ freshness evidence was re-fetched from its configured registry providers.
 Payload decoding rejects unknown fields, credentials, paths, wrong types,
 control characters, and oversized IDs before service/browser access.
 
-These reads reuse the existing session without retrieving secrets or submitting
-a login. Signed-out or expired sessions return
+Published read commands reuse the existing session without retrieving secrets
+or submitting a login. Signed-out or expired sessions return
 `blooket-authentication-required`; rate limits, organization prompts, and
-challenges preserve their wait/human states. Missing or stale local instances
-fail closed. Local requests use exact loopback discovery, bounded responses,
-correlation checks, CSRF admission, and no redirects.
+challenges preserve their wait/human states. Internal session establishment may
+submit configured credentials only after an explicit signed-out/expired
+observation, and it still requires a fresh post-submit observation before
+reporting readiness.
+
+Missing or stale local instances fail closed. Local requests use exact loopback
+discovery, bounded responses, correlation checks, CSRF admission, and no
+redirects.
 
 This was a local tool projection check, not a new public OAuth
 acceptance run.
 
 The development service restarted normally, the workspace reconnected without
 configuration, and the configured tunnel returned to connected. Native Safari,
-complete question-level media facts, capabilities, server-side set-list
-completeness, and login remain pending. Their absence still blocks publication;
-do not expose unsupported read or write tools as if validated.
+complete question-level media facts, capability/login live browser acceptance,
+and server-side set-list completeness remain pending. Their absence still
+blocks publication; do not expose unsupported read or write tools as if
+validated.
 
 ## Evidence
 
@@ -180,20 +186,42 @@ Synthetic complete-list tests preserve the exact-difference verifier for a
 future evidence-backed source; unknown live lists remain observational only.
 
 Still pending: server-side set-list completeness; live browser acceptance of
-capability inspection; complete question-level media facts beyond the bounded
-presence currently observed; login and the outcome of organization selection;
-Safari worker lifecycle. These prevent completion of task 08 and publication
-tasks 09-12. Portable doubles are not browser acceptance, and no live question
-read-back or live capability probe is claimed.
+capability inspection and credential submission; complete question-level media
+facts beyond the bounded presence currently observed; the outcome of
+organization selection; Safari worker lifecycle. These prevent completion of
+task 08 and publication tasks 09-12. Portable doubles are not browser
+acceptance, and no live login, question read-back, or capability probe is
+claimed.
 
-The worker keeps browser authentication fail-closed until its required browser
-semantics are observed and implemented. Question listing is a supported
-observational read: the worker navigates to the exact set edit route, bounds the
-visible Edit-question controls, opens each question, decodes the observed
-serialized question and normalized answer facts, and verifies panel cleanup.
+Portable browser authentication is now implemented fail-closed. Question
+listing remains a supported observational read: the worker navigates to the
+exact set edit route, bounds the visible Edit-question controls, opens each
+question, decodes the observed serialized question and normalized answer facts,
+and verifies panel cleanup.
 Answer-image and math encodings now have bounded reference-backed normalization,
 but question image/audio identity and broader media behavior remain
 intentionally unclaimed.
+
+The public Blooket identity login page observed on 2026-10-07 exposes the
+visible heading `Log in`, inputs labeled by the placeholders `Username or email`
+and `Password`, and one `Let's go!` button on `https://id.blooket.com/login`.
+The curated create/edit/My Sets capture does not contain a login route, so this
+public page observation is kept distinct from recovered build evidence.
+
+The extension now grants only the additional `https://id.blooket.com/*` host
+permission needed for that identity page. `session.observe` admits that origin
+only for the exact login observation and maps a matching visible surface to
+`signed-out`; other read operations still require the dashboard origin. Visible
+CAPTCHA frames map to `security-challenge`, while other identity routes or
+ambiguous login controls map to `unexpected-page` or fail closed.
+
+`session.authenticate` now fills those exact visible controls through native
+input setters, verifies the resulting values, and clicks `Let's go!` once. The
+bridge broker holds the credential-bearing job only in bounded memory and the
+extension returns no credential material. A successful submit reply does not
+mean login succeeded: `ensureBlooketSession` performs the required fresh
+observation and only then reports ready, wait, human-action, or authentication
+failure. No challenge or organization choice is automated.
 
 Recovered capability UI establishes the account-specific observation path. Edit
 module 12048 reads `session.hasPlus` and passes it into the question editor.
