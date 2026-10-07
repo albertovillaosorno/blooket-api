@@ -41,6 +41,7 @@ import {
   executeLibraryCommand,
   readPreparedLibraryImage,
   sampleLibraryImageColors,
+  inspectPreparationAdmission,
 } from "../../../../src/api/teacher-library/application/library.ts";
 import {
   loadPreferences,
@@ -588,6 +589,38 @@ test(
         (await listLibrary((await loadPreferences(root)).mediaRoot)).length,
         2,
       );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "preparation admission uses the real bounded renderer without writes",
+  async () => {
+    const { root, input } = await setup();
+    try {
+      const imported = await importLibraryImage(root, input);
+      const admission = await inspectPreparationAdmission(root, {
+        id: imported.id,
+        edit: imported.edit,
+      });
+      assert.equal(admission.feasible, true);
+      assert.equal(admission.highQuality, true);
+      assert.equal(admission.code, null);
+      assert.equal(admission.effective?.compression, "lossless");
+      const library = (await loadPreferences(root)).mediaRoot;
+      const current = (await listLibrary(library)).find(
+        (record) => record.id === imported.id,
+      );
+      assert.equal(current?.prepared, null);
+
+      const inline = await inspectPreparationAdmission(root, {
+        base64: input.base64,
+        edit: imported.edit,
+      });
+      assert.equal(inline.feasible, true);
+      assert.equal(inline.effective?.compression, "lossless");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

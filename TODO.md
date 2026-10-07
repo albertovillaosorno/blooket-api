@@ -497,11 +497,17 @@ must not be described as having one uniform detected FPS when they do not.
 Use the configured default, initially 10 FPS, and bounded automatic reductions
 when required; preserve duration/loop behavior within the documented tolerance.
 
-Make the compression/quality control dynamically admit only prepared choices
-that can satisfy the strict byte ceiling. Recompute admission when framing,
-background, adjustments, source, or output defaults change; an estimate alone
-cannot certify size. Use bounded candidate searches, cancellation, and revision
-checks so a slower old calculation cannot replace a newer edit.
+Dynamic quality admission was implemented on 2026-10-06 using actual encoded
+bytes. A non-writing local probe runs the same isolated bounded candidate search
+with the higher-quality tier requested. The editor debounces recipe changes,
+cancels obsolete probes, and enables higher quality only after that exact source
+and recipe produce a valid high-quality candidate.
+
+While admission is pending, preparation waits. If the real search proves only
+compact succeeds, the control moves to compact; if no candidate succeeds,
+preparation remains blocked until the recipe changes. A transient probe failure
+does not strand the editor: compact remains available and the authoritative
+prepare path still performs the complete byte validation before publication.
 
 Preparation concurrency was hardened on 2026-10-06. The application captures
 the exact record and bounded source bytes under the library lock, releases the

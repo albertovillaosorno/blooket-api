@@ -182,6 +182,8 @@ test(
         /name="height"[\s\S]{0,120}readonly/u,
       );
       assert.match(html, /data-i18n="canvasGlobal"/u);
+      assert.match(html, /id="qualityState"/u);
+      assert.doesNotMatch(html, /data-i18n="limit"/u);
       const app = await (await fetch(service.origin + "/app.js")).text();
       assert.match(app, /URL\.createObjectURL\(file\)/u);
       assert.match(app, /edit: selected\.edit/u);
@@ -193,6 +195,9 @@ test(
       assert.match(app, /editorSession \+= 1/u);
       assert.match(app, /preparationController[?]\.abort\(\)/u);
       assert.match(app, /controller\.signal/u);
+      assert.match(app, /\/api\/media-admission/u);
+      assert.match(app, /schedulePreparationAdmission\(\)/u);
+      assert.match(app, /higherQuality\.disabled/u);
       assert.doesNotMatch(app, /selected\.prepared = null/u);
       assert.doesNotMatch(app, /t\("limit"\)/u);
       const boot = (await (
@@ -248,6 +253,30 @@ test(
       ).json()) as { id: string; edit: { zoom: number } };
       assert.ok(imported.id);
       assert.equal(imported.edit.zoom, 0.7);
+      const admission = (await (
+        await post("/api/media-admission", {
+          id: imported.id,
+          edit: {
+            panX: 0.2,
+            panY: -0.2,
+            zoom: 0.7,
+            contrast: 1,
+            saturation: 1,
+            background: { mode: "solid", color: "#123456" },
+            width: 1280,
+            height: 720,
+            gifFps: 10,
+            compression: "compact",
+          },
+        })
+      ).json()) as {
+        feasible: boolean;
+        highQuality: boolean;
+        effective: { compression: string };
+      };
+      assert.equal(admission.feasible, true);
+      assert.equal(admission.highQuality, true);
+      assert.equal(admission.effective.compression, "lossless");
       const samples = (await (
         await post("/api/media-color-samples", { id: imported.id })
       ).json()) as { rgba: number[] };

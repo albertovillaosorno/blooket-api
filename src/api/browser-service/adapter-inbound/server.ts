@@ -63,6 +63,7 @@ import {
   prepareLibraryImage,
   readPreparedLibraryImage,
   sampleLibraryImageColors,
+  inspectPreparationAdmission,
   libraryRecordView,
   safeCode,
 } from "../../teacher-library/application/library.ts";
@@ -380,7 +381,11 @@ export async function startBrowserService(
       }
       const body = await readBody(
         request,
-        ["/api/import", "/api/media-color-samples"].includes(url.pathname)
+        [
+          "/api/import",
+          "/api/media-color-samples",
+          "/api/media-admission",
+        ].includes(url.pathname)
           ? 36_000_000
           : 1_000_000,
       );
@@ -486,6 +491,22 @@ export async function startBrowserService(
       }
       if (url.pathname === "/api/media-color-samples") {
         json(response, 200, await sampleLibraryImageColors(root, body));
+        return;
+      }
+      if (url.pathname === "/api/media-admission") {
+        const controller = new AbortController();
+        const cancel = () => controller.abort();
+        request.once("aborted", cancel);
+        response.once("close", cancel);
+        try {
+          const admission = await inspectPreparationAdmission(root, body, {
+            signal: controller.signal,
+          });
+          if (!response.destroyed) json(response, 200, admission);
+        } finally {
+          request.removeListener("aborted", cancel);
+          response.removeListener("close", cancel);
+        }
         return;
       }
       if (url.pathname === "/api/import") {
