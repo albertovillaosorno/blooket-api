@@ -48,17 +48,22 @@ test("Blooket read payloads reject credentials, paths and coercion", () => {
       false,
     );
   }
-  for (const setId of [undefined, 1, "", "a\n", "x".repeat(513)])
+  for (const command of [
+    "blooket.sets.get",
+    "blooket.questions.list",
+  ] as const) {
+    for (const setId of [undefined, 1, "", "a\n", "x".repeat(513)])
+      assert.equal(
+        decodeBlooketReadCommand(command, { setId }).ok,
+        false,
+      );
     assert.equal(
-      decodeBlooketReadCommand("blooket.sets.get", { setId }).ok,
-      false,
+      decodeBlooketReadCommand(command, {
+        setId: "opaque ID: unchanged",
+      }).ok,
+      true,
     );
-  assert.equal(
-    decodeBlooketReadCommand("blooket.sets.get", {
-      setId: "opaque ID: unchanged",
-    }).ok,
-    true,
-  );
+  }
   assert.equal(
     decodeBlooketReadCommand("blooket.session.inspect", {}).ok,
     true,
