@@ -92,7 +92,7 @@ notes.
 
 The Mac product target is ARM64. Linux packaging/tests remain useful for
 portable validation, but Linux is never a release asset. Release publishes only
-the ARM64 Mac app archive and Safari host archive.
+`darwin-arm64.zip`; its `Blooket API.app` contains the Safari companion.
 
 ## Architecture rules
 

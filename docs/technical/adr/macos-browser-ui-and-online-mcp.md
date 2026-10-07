@@ -21,8 +21,9 @@ The user restored Safari packaging via GitHub Actions macOS runners on
 2026-10-06. Chrome is tested directly on Linux and macOS; Safari conversion and
 native acceptance use macOS. Releases use vYY.Q.PATCH quarterly CalVer tags.
 
-The product Mac target is ARM64. Release publishes the ARM64 app archive and
-Safari host archive only; Linux remains a development/validation package.
+The product Mac target is ARM64. Release publishes only `darwin-arm64.zip`;
+the Safari companion is embedded in `Blooket API.app`, and Linux remains a
+development/validation package.
 
 The initial recipient is one teacher with a Mac who wants to create quizzes
 quickly with ChatGPT. A browser interface keeps review and editing in the same
