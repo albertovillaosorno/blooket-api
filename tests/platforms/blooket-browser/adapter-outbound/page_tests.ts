@@ -347,7 +347,23 @@ test(
 
   document.selectors[
     'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
-  ] = [node("IFRAME")];
+  ] = [
+    node("IFRAME", "", {
+      src: "https://www.google.com/recaptcha/api2/anchor?size=invisible",
+    }),
+  ];
+  page(document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "signed-out",
+    });
+  });
+
+  document.selectors[
+    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+  ] = [node("IFRAME", "", {
+    src: "https://www.google.com/recaptcha/api2/bframe?k=fixture",
+  })];
   page(document, "https://id.blooket.com/login", () => {
     assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
       ok: true,

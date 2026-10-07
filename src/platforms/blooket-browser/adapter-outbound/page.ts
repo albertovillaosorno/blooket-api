@@ -56,7 +56,18 @@ export function inspectBlooketPage(
       document.querySelectorAll(
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
       ),
-    ).some(visible);
+    ).some((frame) => {
+      if (!visible(frame)) return false;
+      const source = frame.getAttribute("src");
+      if (!source) return true;
+      if (source.includes("hcaptcha")) return true;
+      try {
+        const challengeUrl = new URL(source, location.href);
+        return challengeUrl.searchParams.get("size") !== "invisible";
+      } catch {
+        return true;
+      }
+    });
     if (
       operation.kind === "session.observe" &&
       url.origin === "https://id.blooket.com"

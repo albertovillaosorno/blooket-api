@@ -198,8 +198,8 @@ for a future evidence-backed non-empty source; unknown live lists remain
 observational only.
 
 Still pending: non-empty server-side set-list completeness; live browser
-acceptance of
-capability inspection and credential submission; complete question-level media
+acceptance of capability inspection, credential submission, and successful
+authenticated navigation; complete question-level media
 facts beyond the bounded presence currently observed; the outcome of
 organization selection; Safari worker lifecycle. These prevent completion of
 task 08 and publication tasks 09-12. Portable doubles are not browser
@@ -287,6 +287,18 @@ or differently labeled logout controls become `unexpected-page` or a failed
 read rather than being treated as authenticated. This deliberately does not
 claim `expired-session`: the curated evidence does not distinguish expiry from
 a normal signed-out redirect.
+
+Live Chrome-for-Testing acceptance on 2026-10-07 exposed one login-observer bug:
+Blooket's ordinary `/login` page mounts a visible reCAPTCHA anchor whose URL is
+explicitly `size=invisible`. Treating every visible reCAPTCHA iframe as an
+active challenge made the normal signed-out state unreachable.
+
+Session observation and credential-form admission now ignore only that exact
+invisible anchor while continuing to fail closed for malformed frames, hCaptcha,
+visible reCAPTCHA modes, and reCAPTCHA challenge frames. A second live run with
+the HEAD extension connected through the local broker classified the same real
+login page as `signed-out`. Credential submission and successful authenticated
+navigation remain separate acceptance work.
 
 Recovered module 89770 further bounds the remaining question-media gap. The
 question editor initializes separate image and audio strings plus an optional
