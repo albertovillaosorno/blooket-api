@@ -13,7 +13,8 @@
 // - Must-Not:
 //   - Accept write plans, persist progress, retry, or infer unobserved success.
 // - Allows:
-//   - Inputs: Fully lowered provider submissions with unresolved media slots.
+//   - Inputs: Lowered submissions plus the exact admitted prepared-media
+//     snapshot for their stable-ID slots.
 //   - Outputs: Confirmed form success, navigation stops, or browser failures.
 //   - Side effects: At most one provider form mutation per method call.
 // - Split-When:
@@ -37,6 +38,7 @@ import type {
 } from "../../../ir/blooket-write-submissions/contract/write-submission.ts";
 import type { BlooketBrowserFailureCode } from
   "../../blooket-session/contract/browser-session.ts";
+import type { BlooketPreparedMedia } from "./prepared-media.ts";
 
 export type BlooketBrowserWriteSurfaceFailure =
   | {
@@ -64,9 +66,11 @@ export type BlooketAddQuestionSurfaceResult =
 export interface BlooketBrowserWriteSurfacePort {
   createSet(
     submission: BlooketCreateSetSubmission,
+    media: readonly BlooketPreparedMedia[],
   ): Promise<BlooketCreateSetSurfaceResult>;
 
   addQuestion(
     submission: BlooketAddQuestionSubmission,
+    media: readonly BlooketPreparedMedia[],
   ): Promise<BlooketAddQuestionSurfaceResult>;
 }

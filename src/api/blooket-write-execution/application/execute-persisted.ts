@@ -94,6 +94,12 @@ import type {
   BlooketWriteVerificationPort,
 } from "../contract/write-verification.ts";
 import type { BlooketMutationPacer } from "./mutation-pacing.ts";
+import {
+  admitBlooketPreparedMedia,
+  blooketWriteOperationMediaIds,
+} from "./admit-prepared-media.ts";
+import type { BlooketPreparedMediaReadPort } from
+  "../contract/prepared-media.ts";
 
 type PrepareTerminal = Exclude<
   PrepareNextBlooketWriteResult,
@@ -132,6 +138,7 @@ export interface BlooketWritePersistencePaths {
 export interface ExecutePersistedBlooketWriteOptions {
   readonly pacer?: BlooketMutationPacer;
   readonly signal?: AbortSignal;
+  readonly media?: BlooketPreparedMediaReadPort;
   readonly budget?: {
     readonly path: string;
     readonly policy: BlooketMutationTaskBudgetPolicy;
@@ -158,6 +165,16 @@ export type ExecutePersistedBlooketWriteResult =
       readonly code:
         | "mutation-pacing-cancelled"
         | "mutation-pacing-failed";
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "prepared-media";
+      readonly code:
+        | "blooket-media-not-prepared"
+        | "blooket-media-stale"
+        | "blooket-media-invalid"
+        | "blooket-media-unavailable";
+      readonly mediaId: string;
     }
   | {
       readonly ok: false;
@@ -580,6 +597,31 @@ async function executePersistedBlooketWriteLocked(
     return currentSession.result;
   }
 
+  const requiredMediaIds = blooketWriteOperationMediaIds(
+    prepared.operation,
+  );
+  if (requiredMediaIds.length > 0 && options.media === undefined) {
+    lease?.release();
+    return {
+      ok: false,
+      stage: "prepared-media",
+      code: "blooket-media-unavailable",
+      mediaId: requiredMediaIds[0]!,
+    };
+  }
+  const admittedMedia = options.media === undefined
+    ? { ok: true as const, media: [] }
+    : await admitBlooketPreparedMedia(prepared.operation, options.media);
+  if (!admittedMedia.ok) {
+    lease?.release();
+    return {
+      ok: false,
+      stage: "prepared-media",
+      code: admittedMedia.code,
+      mediaId: admittedMedia.mediaId,
+    };
+  }
+
   const currentBaseline = await captureVerificationBaseline(
     verifier,
     prepared.operation,
@@ -645,6 +687,7 @@ async function executePersistedBlooketWriteLocked(
         writes,
         prepared.operation,
         prepared.checkpoint.remoteSetId,
+        admittedMedia.media,
       );
     }
   } finally {

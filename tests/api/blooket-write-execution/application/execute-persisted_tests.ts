@@ -108,6 +108,16 @@ const SET_RECEIPT = {
   kind: "set-created" as const,
   remoteSetId: "remote-set-1",
 };
+const mediaPlan: BlooketWritePlan = {
+  ...plan,
+  planId: "plan:persisted-media-test",
+  operations: [{
+    ...plan.operations[0]!,
+    operationId: "plan:persisted-media-test:set",
+    coverMediaId: "cover",
+  }],
+};
+
 const SET_SUCCESS = { ok: true as const, receipt: SET_RECEIPT };
 const QUESTION_SUCCESS = { ok: true as const, receipt: null };
 
@@ -788,6 +798,111 @@ test(
       { ok: true, kind: "missing" },
     );
   });
+  },
+);
+
+test(
+  "media-required write stops before budget journal when resolver is absent",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const path = join(directory, "checkpoint.json");
+      const paths = persistence(path);
+      const budgetPath = join(directory, "budget.json");
+      const writeCalls: string[] = [];
+      const pacingEvents: string[] = [];
+      const verificationCalls: Array<{
+        readonly operationId: string;
+        readonly remoteSetId: string | null;
+      }> = [];
+
+      const result = await executePersistedBlooketWrite(
+        paths,
+        mediaPlan,
+        browser([]),
+        secrets(),
+        writes(SET_SUCCESS, writeCalls),
+        verification({
+          ok: true,
+          baseline: SET_BASELINE,
+        }, verificationCalls),
+        {
+          pacer: immediatePacer(pacingEvents),
+          budget: {
+            path: budgetPath,
+            policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+            now: () => 96_000,
+          },
+        },
+      );
+
+      assert.deepEqual(result, {
+        ok: false,
+        stage: "prepared-media",
+        code: "blooket-media-unavailable",
+        mediaId: "cover",
+      });
+      assert.deepEqual(pacingEvents, ["acquire", "release"]);
+      assert.deepEqual(writeCalls, []);
+      assert.equal(verificationCalls.length, 1);
+      assert.deepEqual(
+        await loadMutationBudgetFile(budgetPath, mediaPlan.planId),
+        { ok: true, state: null },
+      );
+      assert.deepEqual(
+        await loadWriteAttemptFile(paths.attempt, mediaPlan),
+        { ok: true, kind: "missing" },
+      );
+    });
+  },
+);
+
+test(
+  "persisted write passes the exact admitted media snapshot to mutation",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const path = join(directory, "checkpoint.json");
+      const paths = persistence(path);
+      const bytes = new Uint8Array([9, 8, 7, 6]);
+      let receivedBytes: Uint8Array | undefined;
+      const writesWithMedia: BlooketWriteExecutionPort = {
+        execute: async (_operation, _target, context) => {
+          receivedBytes = context.preparedMedia[0]?.bytes;
+          return SET_SUCCESS;
+        },
+      };
+
+      const result = await executePersistedBlooketWrite(
+        paths,
+        mediaPlan,
+        browser([]),
+        secrets(),
+        writesWithMedia,
+        verification({
+          ok: true,
+          baseline: SET_BASELINE,
+        }),
+        {
+          media: {
+            read: async (mediaId) => ({
+              ok: true,
+              value: {
+                mediaId,
+                revision: 5,
+                format: "png",
+                bytes,
+              },
+            }),
+          },
+        },
+      );
+
+      assert.equal(result.ok, true);
+      assert.equal(receivedBytes, bytes);
+      const attempt = await loadWriteAttemptFile(paths.attempt, mediaPlan);
+      assert.equal(attempt.ok, true);
+      if (attempt.ok && attempt.kind === "record")
+        assert.equal(attempt.record.phase, "confirmed");
+    });
   },
 );
 
