@@ -46,13 +46,18 @@ interface FixtureNode {
   disabled: boolean;
   clicked: number;
   selectors: Record<string, FixtureNode[]>;
+  getAttribute(name: string): string | null;
   querySelectorAll(selector: string): FixtureNode[];
   getBoundingClientRect(): { width: number; height: number };
   dispatchEvent(event: Event): boolean;
   click(): void;
 }
 
-function node(tagName: string, textContent = ""): FixtureNode {
+function node(
+  tagName: string,
+  textContent = "",
+  attributes: Record<string, string> = {},
+): FixtureNode {
   return {
     tagName,
     textContent,
@@ -60,6 +65,7 @@ function node(tagName: string, textContent = ""): FixtureNode {
     disabled: false,
     clicked: 0,
     selectors: {},
+    getAttribute: (name) => attributes[name] ?? null,
     querySelectorAll(selector) {
       return this.selectors[selector] ?? [];
     },
@@ -170,13 +176,30 @@ test("login submit revalidates values and clicks exactly once", () => {
   });
 });
 
+test("normal invisible reCAPTCHA does not block the login form", () => {
+  const page = fixture();
+  page.document.selectors[
+    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+  ] = [
+    node("IFRAME", "", {
+      src: "https://www.google.com/recaptcha/api2/anchor?size=invisible",
+    }),
+  ];
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+    assert.equal(isBlooketLoginFormPrepared(credentials), true);
+  });
+});
+
 test("a challenge appearing after preparation blocks the submit", () => {
   const page = fixture();
   withPage(page.document, "https://id.blooket.com/login", () => {
     assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
     page.document.selectors[
       'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
-    ] = [node("IFRAME")];
+    ] = [node("IFRAME", "", {
+      src: "https://www.google.com/recaptcha/api2/bframe?k=fixture",
+    })];
     assert.equal(submitBlooketLoginForm(credentials).ok, false);
     assert.equal(page.submit.clicked, 0);
   });
