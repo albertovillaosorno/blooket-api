@@ -78,6 +78,40 @@ test("browser requests admit only bounded exact commands", () => {
   );
 });
 
+test("Create Set bridge commands are exact bounded and text-only", () => {
+  const valid = {
+    kind: "sets.create",
+    title: "Synthetic set",
+    description: "Synthetic description",
+    private: true,
+  };
+  assert.deepEqual(
+    decodeBlooketBrowserBridgeRequest(request(valid)),
+    {
+      ok: true,
+      value: {
+        schemaVersion: 1,
+        id: "fe101cf0-18c3-4f3f-84a3-b9075029e67f",
+        command: valid,
+      },
+    },
+  );
+  for (const command of [
+    { ...valid, title: "" },
+    { ...valid, title: "x".repeat(1_001) },
+    { ...valid, title: "bad\nline" },
+    { ...valid, description: "x".repeat(10_001) },
+    { ...valid, description: "bad\u0000value" },
+    { ...valid, private: "true" },
+    { ...valid, coverImage: "unexpected" },
+    { ...valid, arbitrary: "script" },
+  ])
+    assert.equal(
+      decodeBlooketBrowserBridgeRequest(request(command)).ok,
+      false,
+    );
+});
+
 test("invalid authentication requests never echo secret values", () => {
   const password = "synthetic-secret-that-must-not-be-returned";
   const result = decodeBlooketBrowserBridgeRequest(

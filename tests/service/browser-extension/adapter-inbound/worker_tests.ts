@@ -128,6 +128,31 @@ test(
           return [{ result: questionPanelCloses }];
         if (func.name === "isBlooketQuestionPanelClosed")
           return [{ result: questionPanelCloses }];
+        if (func.name === "prepareBlooketCreateSetForm") {
+          assert.deepEqual(args[0], {
+            title: "Synthetic created set",
+            description: "Created through bridge fixture",
+            private: true,
+          });
+          return [{ result: { ok: true } }];
+        }
+        if (func.name === "submitBlooketCreateSetForm") {
+          assert.deepEqual(args[0], {
+            title: "Synthetic created set",
+            description: "Created through bridge fixture",
+            private: true,
+          });
+          tabUrl =
+            "https://dashboard.blooket.com/edit?id=created-set-fixture";
+          return [{ result: { ok: true } }];
+        }
+        if (func.name === "observeBlooketCreateSetSuccess")
+          return [{
+            result: {
+              ok: true,
+              remoteSetId: "created-set-fixture",
+            },
+          }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
         return [
@@ -136,7 +161,11 @@ test(
               ok: true,
               value:
                 operation.kind === "session.observe"
-                  ? "my-sets"
+                  ? new URL(tabUrl).pathname === "/create"
+                    ? "create"
+                    : new URL(tabUrl).pathname === "/edit"
+                      ? "edit"
+                      : "my-sets"
                   : operation.kind === "sets.list"
                     ? [
                         {
@@ -293,6 +322,27 @@ test(
     assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
     assert.ok(scripts.includes("closeBlooketQuestionPanel"));
     assert.ok(scripts.includes("isBlooketQuestionPanelClosed"));
+
+    const created = await expectReply({
+      kind: "sets.create",
+      title: "Synthetic created set",
+      description: "Created through bridge fixture",
+      private: true,
+    });
+    assert.deepEqual(created.value, {
+      ok: true,
+      remoteSetId: "created-set-fixture",
+    });
+    assert.equal(
+      tabUrl,
+      "https://dashboard.blooket.com/edit?id=created-set-fixture",
+    );
+    assert.equal(
+      scripts.filter((name) => name === "submitBlooketCreateSetForm").length,
+      1,
+    );
+    assert.ok(scripts.includes("prepareBlooketCreateSetForm"));
+    assert.ok(scripts.includes("observeBlooketCreateSetSuccess"));
 
     questionPanelCloses = false;
     assert.equal(
