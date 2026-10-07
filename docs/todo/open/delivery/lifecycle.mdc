@@ -15,6 +15,8 @@ contracts:
   - "docs/technical/adr/macos-browser-ui-and-online-mcp.md"
   - "docs/technical/adr/host-secret-storage.md"
 scope:
+  - "src/ir/first-use-diagnostics/"
+  - "src/api/teacher-configuration/"
   - "src/service/"
   - "src/platforms/service-lifecycle/"
   - "src/platforms/cloudflare-tunnel/"
@@ -78,6 +80,23 @@ observe exactly one owned service, disable it and confirm the next login does
 not start it, and remove only owned persistence on uninstall. Updates preserve
 the preference; registration, launch, and removal failures remain visible and
 recoverable through ordinary supported macOS facilities.
+
+Use Apple's `SMAppService.agent(plistName:)` for the bundled background helper
+on the minimum macOS 13.5 target. Registration and removal must expose actual
+service authorization status, including required user approval; the saved
+preference alone does not prove an enabled login item. Registration may start
+the helper immediately, so it must reuse the existing service lock and never
+open a second UI or replay a remote write.
+
+The native packaging work must compile/sign the Service Management helper and
+include its launch-agent plist inside the application bundle. Keep registration
+explicitly pending until that helper and real login behavior are tested. This
+design follows Apple's
+<!-- jig-ignore-next-line: Preserve canonical Apple API URLs. -->
+[Service Management contract](https://developer.apple.com/documentation/servicemanagement/smappservice)
+and its
+<!-- jig-ignore-next-line: Preserve canonical Apple API URLs. -->
+[registration semantics](https://developer.apple.com/documentation/servicemanagement/smappservice/register()).
 
 ## Evidence
 
