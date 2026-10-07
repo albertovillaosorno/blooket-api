@@ -102,6 +102,9 @@ function base() {
   const main = node("MAIN");
   document.selectors["main"] = [main];
   document.selectors['nav a[href="/my-sets"]'] = [node("A", "My Sets")];
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+    node("A", "Logout"),
+  ];
   main.selectors["h1"] = [node("H1", "My Sets")];
   return { document, main };
 }
@@ -226,6 +229,41 @@ test(
       inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
       false,
     );
+  });
+});
+
+test("dashboard reads require the recovered authenticated shell", () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+    node("A", "Logout"),
+    node("A", "Logout"),
+  ];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+    node("A", "Sign out"),
+  ];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
   });
 });
 
