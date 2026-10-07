@@ -526,6 +526,12 @@ GIF FPS when animated, and effective compression tier. Historic prepared records
 without effective metadata still render their ready state without invented
 parameters.
 
+Editor cancellation is now wired through the full local stack. Each open editor
+gets a monotonic session identity; closing or replacing it invalidates late
+import/edit/prepare responses. Closing during native preparation aborts the
+fetch, the loopback route propagates that abort to the worker, and no stale
+result is installed into a later editor session.
+
 The output must remain strictly below 2,500,000 bytes, including GIF animation;
 2,500,000 bytes exactly fails. If an input is malformed, exceeds admitted
 resources, or cannot be represented under the invariant canvas and bounded

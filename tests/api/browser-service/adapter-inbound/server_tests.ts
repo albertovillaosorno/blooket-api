@@ -181,6 +181,9 @@ test(
       assert.match(app, /effective\.detailScale/u);
       assert.match(app, /effective\.gifFps/u);
       assert.match(app, /effective\.compression/u);
+      assert.match(app, /editorSession \+= 1/u);
+      assert.match(app, /preparationController[?]\.abort\(\)/u);
+      assert.match(app, /controller\.signal/u);
       assert.doesNotMatch(app, /selected\.prepared = null/u);
       assert.doesNotMatch(app, /t\("limit"\)/u);
       const boot = (await (
