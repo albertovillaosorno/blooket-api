@@ -135,8 +135,18 @@ export function inspectBlooketPage(
         ids.add(id);
         result.push({ schemaVersion: 1, id, title });
       }
-      // An empty loading container must not masquerade as an empty account.
-      if (result.length === 0) return failed();
+      if (result.length === 0) {
+        const emptyAccount = Array.from(main.querySelectorAll("h2")).some(
+          (heading) =>
+            heading.textContent?.trim() ===
+            "You'll need a question set to host!",
+        );
+        const createSet = Array.from(main.querySelectorAll("button")).some(
+          (button) => button.textContent?.trim() === "Create a Set",
+        );
+        // Zero cards alone can be loading, search, or folder state.
+        if (!emptyAccount || !createSet) return failed();
+      }
       return { ok: true, value: result };
     }
     if (
@@ -173,12 +183,17 @@ export function inspectBlooketPage(
       .map((item) => item.textContent ?? "")
       .join(" ");
     const checked = privacy.getAttribute("aria-checked");
-    let visibility: "private";
+    let visibility: "private" | "public";
     if (
       checked === "false" &&
       /Private\s*\(Only playable by you\)/u.test(label)
     )
       visibility = "private";
+    else if (
+      checked === "true" &&
+      /Public\s*\(Playable by everyone\)/u.test(label)
+    )
+      visibility = "public";
     else return failed();
     return {
       ok: true,

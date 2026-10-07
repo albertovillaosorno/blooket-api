@@ -138,6 +138,17 @@ test(
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     main.selectors["article"] = [];
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    main.selectors["h2"] = [
+      node("H2", "You'll need a question set to host!"),
+    ];
+    main.selectors["button"] = [node("BUTTON", "Create a Set")];
+    const empty = inspectBlooketPage({ kind: "sets.list" });
+    assert.deepEqual(empty, { ok: true, value: [] });
+    assert.equal(decodeBlooketSetList(empty.ok ? empty.value : null).ok, true);
+    main.selectors["h2"] = [node("H2", "Open a folder to view your sets!")];
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    main.selectors["h2"] = [node("H2", "No sets found.")];
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
   });
 });
 
@@ -193,11 +204,23 @@ test(
       false,
     );
     attributes["aria-checked"] = "true";
+    privacy.labels = [node("LABEL", "Public (Playable by everyone)")];
+    const publicResult = inspectBlooketPage({
+      kind: "sets.get",
+      setId: "fixture",
+    });
+    assert.equal(publicResult.ok, true);
+    if (publicResult.ok) {
+      const decoded = decodeBlooketSetDetail(publicResult.value);
+      assert.equal(decoded.ok, true);
+      if (decoded.ok) assert.equal(decoded.value.visibility, "public");
+    }
+    attributes["aria-checked"] = "false";
+    privacy.labels = [node("LABEL", "Public (Playable by everyone)")];
     assert.equal(
       inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
       false,
     );
-    attributes["aria-checked"] = "false";
     privacy.labels = [node("LABEL", "Unknown visibility")];
     assert.equal(
       inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
