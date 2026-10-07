@@ -48,7 +48,8 @@ export interface BlooketReadInvocation {
   readonly command:
     | "blooket.session.inspect"
     | "blooket.sets.list"
-    | "blooket.sets.get";
+    | "blooket.sets.get"
+    | "blooket.questions.list";
   readonly payload: Record<string, string>;
   readonly json: boolean;
 }
@@ -93,6 +94,8 @@ export function parseCliArguments(args: readonly string[]): CliParseResult {
     return parseBlooketRead("blooket.sets.list", args.slice(2));
   if (args[0] === "sets" && args[1] === "get")
     return parseBlooketRead("blooket.sets.get", args.slice(2));
+  if (args[0] === "questions" && args[1] === "list")
+    return parseBlooketRead("blooket.questions.list", args.slice(2));
 
   if (args[0] === "media" && args[1] === "search") {
     return parseMediaSearch(args.slice(2));
@@ -223,9 +226,12 @@ function parseBlooketRead(
   command: BlooketReadInvocation["command"],
   args: readonly string[],
 ): CliParseResult {
+  const needsSetId =
+    command === "blooket.sets.get" ||
+    command === "blooket.questions.list";
   const payload: Record<string, string> =
-    command === "blooket.sets.get" ? { setId: args[0] ?? "" } : {};
-  const options = command === "blooket.sets.get" ? args.slice(1) : args;
+    needsSetId ? { setId: args[0] ?? "" } : {};
+  const options = needsSetId ? args.slice(1) : args;
   if (
     (options.length !== 0 &&
       (options.length !== 1 || options[0] !== "--json")) ||
