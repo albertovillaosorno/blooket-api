@@ -210,7 +210,11 @@ test(
         afterConflict.generatedEnglish?.description,
         "An example",
       );
-      const prepared = await prepareLibraryImage(root, record.id);
+      const prepared = await prepareLibraryImage(
+        root,
+        record.id,
+        edited.revision,
+      );
       assert.ok(prepared.prepared!.bytes < 2_500_000);
       assert.equal((await loadPreferences(root)).defaults.width, 1280);
       const canonical = await readFile(join(library, record.asset));
@@ -654,7 +658,11 @@ test("configured canvas invalidates historical prepared media", async () => {
   const { root, input } = await setup();
   try {
     const imported = await importLibraryImage(root, input);
-    const prepared = await prepareLibraryImage(root, imported.id);
+    const prepared = await prepareLibraryImage(
+      root,
+      imported.id,
+      imported.revision,
+    );
     const preferences = await loadPreferences(root);
     const library = preferences.mediaRoot;
     await savePreferences(root, {
@@ -689,7 +697,7 @@ test("configured canvas invalidates historical prepared media", async () => {
     assert.equal(view.prepared, null);
 
     await assert.rejects(
-      prepareLibraryImage(root, imported.id),
+      prepareLibraryImage(root, imported.id, imported.revision),
       /canvas-settings-conflict/u,
     );
     await assert.rejects(
@@ -720,7 +728,11 @@ test("configured canvas invalidates historical prepared media", async () => {
     assert.equal(edited.edit.height, 360);
     assert.equal(edited.prepared, null);
 
-    const migrated = await prepareLibraryImage(root, imported.id);
+    const migrated = await prepareLibraryImage(
+      root,
+      imported.id,
+      edited.revision,
+    );
     const current = await readPreparedLibraryImage(
       library,
       imported.id,
@@ -751,7 +763,11 @@ test("a concurrent edit prevents stale preparation publication", async () => {
       ...input,
       edit: { ...input.edit, width: 1920, height: 1920 },
     });
-    const preparing = prepareLibraryImage(root, imported.id).then(
+    const preparing = prepareLibraryImage(
+      root,
+      imported.id,
+      imported.revision,
+    ).then(
       (value) => ({ ok: true as const, value }),
       (error: unknown) => ({ ok: false as const, error }),
     );
@@ -800,7 +816,7 @@ test("cancelled preparation publishes no prepared metadata", async () => {
     const controller = new AbortController();
     controller.abort();
     await assert.rejects(
-      prepareLibraryImage(root, imported.id, {
+      prepareLibraryImage(root, imported.id, imported.revision, {
         signal: controller.signal,
       }),
       /native-media-cancelled/u,
@@ -823,7 +839,11 @@ test(
   try {
     const imported = await importLibraryImage(root, input);
     const library = (await loadPreferences(root)).mediaRoot;
-    const record = await prepareLibraryImage(root, imported.id);
+    const record = await prepareLibraryImage(
+      root,
+      imported.id,
+      imported.revision,
+    );
     const prepared = record.prepared!;
     assert.match(prepared.file, /[.]jpg$/u);
     assert.deepEqual(prepared.effective, {

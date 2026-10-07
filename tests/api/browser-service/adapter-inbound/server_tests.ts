@@ -222,7 +222,11 @@ test(
           body: JSON.stringify(body),
         });
       assert.equal(
-        (await post("/api/prepare", { id: "missing" }, "https://evil.example"))
+        (await post(
+          "/api/prepare",
+          { id: "missing", revision: 1 },
+          "https://evil.example",
+        ))
           .status,
         403,
       );
@@ -250,9 +254,30 @@ test(
             compression: "compact",
           },
         })
-      ).json()) as { id: string; edit: { zoom: number } };
+      ).json()) as {
+        id: string;
+        revision: number;
+        edit: { zoom: number };
+      };
       assert.ok(imported.id);
       assert.equal(imported.edit.zoom, 0.7);
+      const missingPrepareRevision = await post("/api/prepare", {
+        id: imported.id,
+      });
+      assert.equal(missingPrepareRevision.status, 400);
+      assert.deepEqual(await missingPrepareRevision.json(), {
+        ok: false,
+        code: "invalid-prepare-request",
+      });
+      const stalePrepareRevision = await post("/api/prepare", {
+        id: imported.id,
+        revision: imported.revision + 1,
+      });
+      assert.equal(stalePrepareRevision.status, 400);
+      assert.deepEqual(await stalePrepareRevision.json(), {
+        ok: false,
+        code: "prepared-revision-conflict",
+      });
       const admission = (await (
         await post("/api/media-admission", {
           id: imported.id,
@@ -289,7 +314,10 @@ test(
       assert.equal(media[0]!.id, imported.id);
       assert.equal(media[0]!.normalizationStatus, "pending");
       const prepared = (await (
-        await post("/api/prepare", { id: imported.id })
+        await post("/api/prepare", {
+          id: imported.id,
+          revision: imported.revision,
+        })
       ).json()) as { prepared: { file: string; bytes: number } };
       assert.ok(prepared.prepared.bytes < 2_500_000);
       assert.match(prepared.prepared.file, /[.]jpg$/u);
@@ -399,7 +427,12 @@ test("configured canvas is enforced across local media routes", async () => {
       })
     ).json()) as { id: string; revision: number };
     assert.equal(
-      (await post("/api/prepare", { id: imported.id })).status,
+      (
+        await post("/api/prepare", {
+          id: imported.id,
+          revision: imported.revision,
+        })
+      ).status,
       200,
     );
 
@@ -434,7 +467,10 @@ test("configured canvas is enforced across local media routes", async () => {
       code: "prepared-settings-conflict",
     });
 
-    const stalePrepare = await post("/api/prepare", { id: imported.id });
+    const stalePrepare = await post("/api/prepare", {
+      id: imported.id,
+      revision: imported.revision,
+    });
     assert.equal(stalePrepare.status, 400);
     assert.deepEqual(await stalePrepare.json(), {
       ok: false,

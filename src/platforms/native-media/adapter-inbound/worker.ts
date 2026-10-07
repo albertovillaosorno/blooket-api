@@ -43,6 +43,8 @@ import {
 } from "../../../media/library-metadata/domain/metadata.ts";
 import { loadSharp } from
   "../../../media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
+import { MAX_PREPARED_MEDIA_BYTES } from
+  "../../../media/rendition-optimization/domain/limits.ts";
 
 import type { MediaEditorState } from
   "../../../media/editor-state/domain/editor-state.ts";
@@ -227,7 +229,7 @@ async function work(input: unknown) {
     {
       maxInputPixels: 40_000_000,
       maxOutputPixels: 80_000_000,
-      maxOutputBytes: 2_499_999,
+      maxOutputBytes: MAX_PREPARED_MEDIA_BYTES,
     },
     {
       blurSigma: 20,

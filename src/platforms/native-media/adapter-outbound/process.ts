@@ -51,6 +51,10 @@ import {
   decodeRenditionOptimizationCandidate,
   renditionOptimizationCandidates,
 } from "../../../media/rendition-optimization/domain/candidates.ts";
+import {
+  MAX_PREPARED_MEDIA_BYTES,
+  preparedMediaBytesAdmitted,
+} from "../../../media/rendition-optimization/domain/limits.ts";
 
 import type { MediaEditorState } from
   "../../../media/editor-state/domain/editor-state.ts";
@@ -272,7 +276,7 @@ export async function renderImageIsolated(
       reply,
       recipe,
       80_000_000,
-      2_499_999,
+      MAX_PREPARED_MEDIA_BYTES,
       recipe,
     ) as OptimizedEditorRenditionResult;
   } catch {
@@ -406,7 +410,7 @@ function decodeRenderedReply(
     reply["ok"] !== true ||
     !(output instanceof Uint8Array) ||
     output.length < 1 ||
-    output.length >= 2_500_000 ||
+    !preparedMediaBytesAdmitted(output.length) ||
     output.length > maxOutputBytes ||
     !format ||
     !(expectedRecipe === undefined
