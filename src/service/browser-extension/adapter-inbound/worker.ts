@@ -35,6 +35,14 @@ import {
   blooketReadUrl,
   type PageReadOperation,
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import {
+  closeBlooketQuestionPanel,
+  inspectOpenedBlooketQuestion,
+  isBlooketQuestionPanelClosed,
+  listBlooketQuestionNumbers,
+  openBlooketQuestionPanel,
+} from
+  "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
 
@@ -177,8 +185,17 @@ async function script(
     throw new Error("browser-read-unavailable");
   return replies[0].result;
 }
-async function read(current: Connection, operation: PageReadOperation) {
-  const target = blooketReadUrl(operation);
+async function read(
+  current: Connection,
+  operation:
+    | PageReadOperation
+    | { readonly kind: "questions.list"; readonly setId: string },
+) {
+  const target =
+    operation.kind === "questions.list"
+      ? "https://dashboard.blooket.com/edit?id=" +
+        encodeURIComponent(operation.setId)
+      : blooketReadUrl(operation);
   let tab = await chrome.tabs.get(current.tabId);
   if (!tab.url || new URL(tab.url).origin !== "https://dashboard.blooket.com")
     throw new Error("manual-blooket-sign-in-required");
@@ -192,6 +209,83 @@ async function read(current: Connection, operation: PageReadOperation) {
   } while (Date.now() < deadline);
   if (tab.status !== "complete" || (target && tab.url !== target))
     throw new Error("browser-navigation-timeout");
+  if (operation.kind === "questions.list") {
+    const listed = await script(
+      current,
+      listBlooketQuestionNumbers as (...args: never[]) => unknown,
+      [operation.setId],
+    );
+    if (
+      !listed ||
+      typeof listed !== "object" ||
+      !("ok" in listed) ||
+      listed.ok !== true ||
+      !("value" in listed) ||
+      !Array.isArray(listed.value) ||
+      listed.value.length > 200
+    )
+      throw new Error("browser-questions-unavailable");
+    const questions: unknown[] = [];
+    for (const number of listed.value) {
+      if (
+        typeof number !== "number" ||
+        !Number.isSafeInteger(number) ||
+        number < 1
+      )
+        throw new Error("browser-questions-unavailable");
+      const opened = await script(
+        current,
+        openBlooketQuestionPanel as (...args: never[]) => unknown,
+        [number],
+      );
+      if (opened !== true) throw new Error("browser-questions-unavailable");
+      let inspected: unknown;
+      let closed = false;
+      try {
+        for (let attempt = 0; attempt < 15; attempt++) {
+          inspected = await script(
+            current,
+            inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
+            [number],
+          );
+          if (
+            inspected &&
+            typeof inspected === "object" &&
+            "ok" in inspected &&
+            inspected.ok === true
+          )
+            break;
+          await pause(100);
+        }
+      } finally {
+        const cancel = await script(
+          current,
+          closeBlooketQuestionPanel,
+        ).catch(() => false);
+        if (cancel === true) {
+          for (let attempt = 0; attempt < 15; attempt++) {
+            closed = await script(
+              current,
+              isBlooketQuestionPanelClosed,
+            ).catch(() => false) === true;
+            if (closed) break;
+            await pause(50);
+          }
+        }
+      }
+      if (
+        !closed ||
+        !inspected ||
+        typeof inspected !== "object" ||
+        !("ok" in inspected) ||
+        inspected.ok !== true ||
+        !("value" in inspected)
+      )
+        throw new Error("browser-questions-unavailable");
+      questions.push(inspected.value);
+    }
+    return { ok: true, value: questions };
+  }
   if (operation.kind === "sets.get") {
     await script(current, openBlooketDetailPanel);
     // Opening details is asynchronous; retry reads, never a form submission.
@@ -236,7 +330,8 @@ async function relay(current: Connection, activeGeneration: number) {
           if (
             job.command.kind === "session.observe" ||
             job.command.kind === "sets.list" ||
-            job.command.kind === "sets.get"
+            job.command.kind === "sets.get" ||
+            job.command.kind === "questions.list"
           )
             result = await read(current, job.command);
         } catch {

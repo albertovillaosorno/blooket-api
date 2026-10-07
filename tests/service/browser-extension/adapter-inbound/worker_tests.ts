@@ -45,6 +45,7 @@ test(
   let creates = 0;
   let closed = false;
   let validStatus = true;
+  let questionPanelCloses = true;
   const jobs = [];
   const replies = [];
   const scripts = [];
@@ -100,6 +101,33 @@ test(
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
         if (func.name === "openBlooketDetailPanel") return [{ result: true }];
+        if (func.name === "listBlooketQuestionNumbers")
+          return [{ result: { ok: true, value: [1] } }];
+        if (func.name === "openBlooketQuestionPanel")
+          return [{ result: args[0] === 1 }];
+        if (func.name === "inspectOpenedBlooketQuestion")
+          return [{
+            result: {
+              ok: true,
+              value: {
+                schemaVersion: 1,
+                number: 1,
+                question: "Type sun.",
+                qType: "typing",
+                random: true,
+                timeLimit: 15,
+                answers: ["sun"],
+                correctAnswers: ["sun"],
+                answerTypes: ["exactly"],
+                hasImage: false,
+                hasAudio: false,
+              },
+            },
+          }];
+        if (func.name === "closeBlooketQuestionPanel")
+          return [{ result: questionPanelCloses }];
+        if (func.name === "isBlooketQuestionPanelClosed")
+          return [{ result: questionPanelCloses }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
         return [
@@ -238,6 +266,46 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    const questions = await expectReply({
+      kind: "questions.list",
+      setId: "set-fixture",
+    });
+    assert.equal(questions.ok, true);
+    assert.deepEqual(questions.value, [{
+      schemaVersion: 1,
+      number: 1,
+      question: "Type sun.",
+      qType: "typing",
+      random: true,
+      timeLimit: 15,
+      answers: ["sun"],
+      correctAnswers: ["sun"],
+      answerTypes: ["exactly"],
+      hasImage: false,
+      hasAudio: false,
+    }]);
+    assert.equal(
+      tabUrl,
+      "https://dashboard.blooket.com/edit?id=set-fixture",
+    );
+    assert.ok(scripts.includes("listBlooketQuestionNumbers"));
+    assert.ok(scripts.includes("openBlooketQuestionPanel"));
+    assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
+    assert.ok(scripts.includes("closeBlooketQuestionPanel"));
+    assert.ok(scripts.includes("isBlooketQuestionPanelClosed"));
+
+    questionPanelCloses = false;
+    assert.equal(
+      (
+        await expectReply({
+          kind: "questions.list",
+          setId: "set-fixture",
+        })
+      ).ok,
+      false,
+    );
+    questionPanelCloses = true;
+
     const before = scripts.length;
     for (const unsupported of [
       {
@@ -246,7 +314,6 @@ test(
         password: "synthetic-password",
       },
       { kind: "capabilities.inspect" },
-      { kind: "questions.list", setId: "set-fixture" },
     ]) {
       assert.equal((await expectReply(unsupported)).ok, false);
       assert.equal(scripts.length, before);
