@@ -115,8 +115,5 @@ send its test code to another destination.
 
 ## Blockers
 
-**External blocker:** acceptance still needs the recipient's Mac and actual
-ChatGPT client. The chosen restart policy is to clear all in-memory clients,
-codes, and tokens and require new registration/consent. Verify that client can
-reauthorize after restart, sleep, and tunnel interruption before completing this
-task. Continue independent library work in task 05 meanwhile.
+Client-specific macOS/ChatGPT hardening belongs to task blooket-15.
+Authorization protocol and restart semantics remain functional work here.

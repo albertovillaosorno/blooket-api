@@ -102,7 +102,7 @@ export function decodeUpdateManifest(
       value["minimumMacos"],
     ) ||
     !Array.isArray(value["assets"]) ||
-    value["assets"].length !== 2
+    value["assets"].length !== 1
   )
     return failure();
   try {
@@ -120,7 +120,7 @@ export function decodeUpdateManifest(
     if (extra.length) return { ok: false, issues: extra };
     const target = entry["target"];
     if (
-      (target !== "darwin-arm64" && target !== "darwin-x64") ||
+      target !== "darwin-arm64" ||
       targets.has(target) ||
       entry["name"] !== target + ".zip" ||
       entry["url"] !==

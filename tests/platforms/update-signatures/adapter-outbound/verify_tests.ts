@@ -59,7 +59,7 @@ function fixture() {
     tag: "v26.4.1",
     sourceCommit: "a".repeat(40),
     minimumMacos: "13.5",
-    assets: ["darwin-arm64", "darwin-x64"].map((target) => ({
+    assets: ["darwin-arm64"].map((target) => ({
       target,
       name: target + ".zip",
       url: releaseAssetUrl("v26.4.1", target + ".zip"),
@@ -94,7 +94,7 @@ function fixture() {
 }
 
 test(
-  "publisher signature binds both archives and preserves Apple trust boundary",
+  "publisher signature binds ARM64 archive and preserves Apple trust boundary",
   () => {
   const { options, bytes } = fixture();
   const verified = verifySignedUpdateManifest(options);
@@ -104,20 +104,6 @@ test(
   assert.deepEqual(verifyUpdateArchiveBytes(verified.asset, bytes), {
     ok: true,
   });
-  const intel = verifySignedUpdateManifest({
-    ...options,
-    release: {
-      ...options.release,
-      target: "darwin-x64",
-      asset: {
-        id: 2,
-        ...options.document.manifest.assets[1]!,
-        state: "uploaded",
-      },
-    },
-  });
-  assert.ok(intel.ok);
-  assert.equal(intel.asset.target, "darwin-x64");
 });
 
 test("signed fields and context resist tampering and reserialization", () => {

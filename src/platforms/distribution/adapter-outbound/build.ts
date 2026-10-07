@@ -51,7 +51,7 @@ import {
   appleBuildVersion,
 } from "../../../ir/product-version/contract/version.ts";
 
-export const TARGETS = ["linux-x64", "darwin-arm64", "darwin-x64"] as const;
+export const TARGETS = ["linux-x64", "darwin-arm64"] as const;
 export type DistributionTarget = (typeof TARGETS)[number];
 const NODE_VERSION = "24.21.0";
 const CLOUDFLARED_VERSION = "2026.10.0";
@@ -63,10 +63,6 @@ const CONNECTOR_ASSETS = {
   "darwin-arm64": [
     "cloudflared-darwin-arm64.tgz",
     "a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70",
-  ],
-  "darwin-x64": [
-    "cloudflared-darwin-amd64.tgz",
-    "903845b81828c8cb3c5d13d816a2de71c06a3da5785469df8eb0e1b736d92f9f",
   ],
 } as const;
 interface PackageManifest {

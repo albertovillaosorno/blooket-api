@@ -40,7 +40,7 @@ import {
   type UpdateAsset,
 } from "../contract/releases.ts";
 
-export type MacUpdateTarget = "darwin-arm64" | "darwin-x64";
+export type MacUpdateTarget = "darwin-arm64";
 export type UpdateSelection =
   | { readonly status: "current"; readonly skippedTags: number }
   | {
@@ -72,7 +72,7 @@ export function selectPublicUpdate(
 ): UpdateSelection {
   const current = decodeProductVersion(currentVersion);
   if (!Number.isFinite(now.getTime())) throw new Error("invalid-update-clock");
-  if (target !== "darwin-arm64" && target !== "darwin-x64")
+  if (target !== "darwin-arm64")
     return { status: "unsupported-platform" };
   if (!Array.isArray(entries) || entries.length > MAX_RELEASES)
     return { status: "untrusted-metadata", reason: "malformed" };

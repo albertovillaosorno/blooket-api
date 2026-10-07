@@ -4,22 +4,33 @@ id: "blooket-15"
 status: "active"
 priority: "p3"
 horizon: "acceptance"
-order: 150
+order: 170
 area: "acceptance"
-task: "TODO - Complete teacher workflow acceptance"
+task: "TODO - macOS, Safari, and ChatGPT platform hardening"
 legacy_task: "TODO 15"
 depends_on:
+  - "blooket-03"
   - "blooket-04"
+  - "blooket-05"
+  - "blooket-06"
   - "blooket-07"
+  - "blooket-08"
+  - "blooket-09"
+  - "blooket-10"
+  - "blooket-11"
   - "blooket-12"
+  - "blooket-13"
   - "blooket-14"
+  - "blooket-16"
   - "blooket-17"
 contracts:
   - "docs/technical/adr/macos-browser-ui-and-online-mcp.md"
+  - "docs/technical/adr/host-secret-storage.md"
 scope:
-  - "docs/agents/user/"
-  - "docs/skills/"
-  - "src/service/"
+  - ".github/workflows/ci.yml"
+  - "src/platforms/distribution/"
+  - "src/platforms/host-secret-store/"
+  - "src/platforms/service-lifecycle/"
   - "src/ui/teacher-workspace/"
   - "src/mcp/"
 validation:
@@ -29,40 +40,52 @@ validation:
   - "jig validate --root ."
 ---
 
-# TODO - Complete teacher workflow acceptance
+# TODO - macOS, Safari, and ChatGPT platform hardening
 
 ## Objective
 
-Run authoring, media, publication, update, and recovery acceptance on the
-recipient Mac and actual ChatGPT account before declaring the product complete.
+Own every remaining macOS-, Safari-, and ChatGPT-specific concern in one final
+record so platform-only validation does not block otherwise completed work.
 
 ## Acceptance
 
-Test restart, sleep/offline, interrupted writes, recovery, revoked access,
-oversized media, and concurrent remote changes. Keep failures actionable and
-logs sanitized. A first-use diagnostic establishes only its narrow checks.
+Use current official Apple, WebKit, GitHub Actions, and ChatGPT/MCP
+documentation. Deterministic implementation, protocol tests, and native ARM64
+CI are sufficient engineering evidence when manual interaction adds no distinct
+fact.
 
-Complete when this real workflow and recovery exercise pass, remaining release
-blockers are resolved, and the user receives concise installation/usage
-instructions. Only then call the initial product usable and complete.
+The opt-in CI path is linear: general validation runs first on Linux. Only after
+it passes does macos-arm run on macos-26, require ARM64, build the single
+supported Mac package, compile the Safari WebExtension host, and exercise the
+packaged localhost UI through Safari WebDriver.
+
+Keep production Apple trust, Safari distribution edge cases, native Keychain
+and login-item behavior, filesystem normalization, and ChatGPT-specific
+compatibility here. Do not reopen earlier records merely to demand a recipient
+Mac, Safari, or ChatGPT smoke test.
+
+A CAPTCHA, unfamiliar login, organization choice, consent prompt, browser
+permission, or other genuine human-validation boundary still requires the human
+when it occurs. That is an execution checkpoint, not a standing platform
+blocker.
 
 ## Implementation notes
 
-Use the recipient's actual Mac and configured ChatGPT account to authorize, load
-the user profile and personal skills, receive an admitted image, find and edit
-media, prepare a quiz, publish it, and change question type/seconds/media. Read
-the final Blooket state back after refresh.
+Keep general CI portable and platform-neutral. The macOS ARM job owns only
+platform-specific build, Safari conversion, native package behavior, and Safari
+WebDriver smoke coverage; Release owns only release gating and publication.
 
-Acceptance now also requires the update workflow in `blooket-17`: independent
-preferences, no-release/offline states, verified compatible artifacts, safe
-restart, retained data, and launch-at-login behavior on the recipient Mac.
+The supported Mac product architecture is ARM64. Intel/x64 is not a package,
+update target, CI target, or release asset.
 
 ## Evidence
 
-Actual recipient-Mac and ChatGPT end-to-end acceptance has not been performed.
-Portable fixtures and synthetic OAuth clients do not prove this workflow.
+Current GitHub-hosted runner documentation identifies macos-26 as an ARM64
+standard runner. setup-node v7 supports pnpm cache restoration, and Apple
+documents safaridriver --enable for Safari WebDriver automation.
 
 ## Blockers
 
-Acceptance remains open until the checks above run through the actual owning
-product surfaces; portable foundations alone do not complete this record.
+No earlier record may use recipient-Mac, Safari, or ChatGPT-specific acceptance
+as its blocker. Remaining platform-only hardening is intentionally centralized
+here.

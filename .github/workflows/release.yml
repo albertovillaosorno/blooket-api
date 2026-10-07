@@ -12,7 +12,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   gate:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -33,16 +37,9 @@ jobs:
           node src/platforms/distribution/adapter-inbound/release-tag.ts \
             "$RELEASE_TAG"
 
-  ci:
-    needs: gate
-    uses: ./.github/workflows/ci.yml
-    with:
-      release: true
-
   publish:
-    needs: [gate, ci]
-    if: >-
-      needs.gate.result == 'success' && needs.ci.result == 'success'
+    needs: gate
+    if: needs.gate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -51,22 +48,17 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          pattern: package-*
+          pattern: package-darwin-arm64
           path: .temp/release-assets
           merge-multiple: true
-      - name: Publish verified native archives
+      - name: Publish verified ARM64 archive
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-          INCLUDE_LINUX: ${{ vars.RELEASE_INCLUDE_LINUX }}
         shell: bash
         run: |
           set -euo pipefail
-          assets=(.temp/release-assets/darwin-arm64.zip
-                  .temp/release-assets/darwin-x64.zip)
-          if [[ "$INCLUDE_LINUX" == true ]]; then
-            assets+=(.temp/release-assets/linux-x64.tar.gz)
-          fi
-          for asset in "${assets[@]}"; do test -s "$asset"; done
-          gh release create "$RELEASE_TAG" "${assets[@]}" \
+          asset=.temp/release-assets/darwin-arm64.zip
+          test -s "$asset"
+          gh release create "$RELEASE_TAG" "$asset" \
             --verify-tag --title "$RELEASE_TAG" --notes ""

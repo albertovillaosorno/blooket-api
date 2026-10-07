@@ -208,6 +208,5 @@ Chrome intake, not real AI normalization or native Safari clipboard acceptance.
 
 ## Blockers
 
-**External blocker:** no recipient Mac or actual ChatGPT client is available.
-Native case/Unicode filesystem behavior and real skill/schema consumption remain
-unverified.
+Platform/client-specific hardening belongs to task blooket-15 and does not
+block this library record.

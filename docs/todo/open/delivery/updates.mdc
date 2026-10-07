@@ -37,7 +37,7 @@ validation:
   - npm test
   - jig validate --root .
   - npm run package:verify -- darwin-arm64 --release
-  - npm run package:verify -- darwin-x64 --release
+  - npm run package:verify -- darwin-arm64 --release
 ---
 
 # TODO - Safe automatic application updates
@@ -111,7 +111,7 @@ ahead of the current clock. Reject malformed objects; skip malformed tags with
 bounded diagnostics, but report untrusted metadata if all candidate tags are
 malformed. A higher patch must remain monotonic within its quarter.
 
-Select exactly one `darwin-arm64.zip` or `darwin-x64.zip` using actual CPU/OS
+Select exactly one `darwin-arm64.zip` or `darwin-arm64.zip` using actual CPU/OS
 capabilities, never appearance. Missing, duplicate, foreign, and incompatible
 assets have explicit outcomes. Linux is a developer package; automatic Linux
 installation needs a separately admitted update contract before support.

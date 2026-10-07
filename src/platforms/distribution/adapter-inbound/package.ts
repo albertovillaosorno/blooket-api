@@ -54,7 +54,7 @@ if (args.length === 1 && args[0] === "--extension") {
   !TARGETS.some((value) => value === target) ||
   extra.some((item) => !verify || item !== "--release")
 ) {
-  process.stderr.write("Choose linux-x64, darwin-arm64, or darwin-x64.\n");
+  process.stderr.write("Choose linux-x64 or darwin-arm64.\n");
   process.exitCode = 1;
 } else {
   try {
