@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   decodeFlightActionRedirect,
+  decodeFlightActionRevalidated,
   decodeFlightRows,
   flightActionState,
   flightErrorRecords,
@@ -122,6 +123,32 @@ test("error rows expose only a bounded digest", () => {
     "0:E{bad}\n",
   ])
     assert.throws(() => flightErrorRecords(source), /invalid-flight-error/u);
+});
+
+test("action revalidation metadata preserves exact zero-or-one wire flags", () => {
+  assert.deepEqual(decodeFlightActionRevalidated(null), {
+    paths: [],
+    tag: 0,
+    cookie: 0,
+  });
+  assert.deepEqual(
+    decodeFlightActionRevalidated('[["/sets","/edit"],1,0]'),
+    { paths: ["/sets", "/edit"], tag: 1, cookie: 0 },
+  );
+  for (const value of [
+    "{}",
+    "[[],0]",
+    "[[],true,0]",
+    "[[],0,false]",
+    "[[1],0,0]",
+    '[[""],0,0]',
+    "[[],2,0]",
+    "[[],0,-1]",
+  ])
+    assert.throws(
+      () => decodeFlightActionRevalidated(value),
+      /invalid-flight-revalidated/u,
+    );
 });
 
 test("action redirects are same-origin HTTPS metadata, not Flight rows", () => {
