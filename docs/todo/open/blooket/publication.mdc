@@ -93,9 +93,11 @@ browser bridge. It navigates the dedicated Blooket tab to the observed create
 form and fills only the verified title/description/privacy controls. It
 revalidates the
 exact prepared state before one submit click, and confirms success only after
-the provider reaches an exact /edit?id=... redirect. Challenge, organization,
-rate-limit, expired-session, signed-out, timeout, malformed DOM, and malformed
-bridge outcomes remain explicit stops or failures rather than success.
+the provider reaches an exact /edit?id=... redirect.
+
+Challenge, organization, rate-limit, expired-session, signed-out, timeout,
+malformed DOM, and malformed bridge outcomes remain explicit stops or failures
+rather than success.
 
 The browser-service runtime composes that bridge surface through the existing
 canonical BlooketWriteExecutionPort and prepared-media port. The bridge
