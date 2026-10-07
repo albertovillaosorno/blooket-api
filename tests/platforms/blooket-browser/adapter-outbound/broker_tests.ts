@@ -37,6 +37,35 @@ import { createBlooketBrowserBridgeBroker } from
 
 const TOKEN = "synthetic-browser-bridge-token-32-bytes-minimum";
 
+test("pairing reset revokes old access and settles pending jobs", async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  const pending = broker.request({ kind: "sets.list" });
+  const dispatched = broker.next(TOKEN);
+  assert.ok(dispatched);
+  assert.equal(broker.status().connected, true);
+  broker.resetPairing();
+  const replacement = broker.pairingToken();
+  assert.notEqual(replacement, TOKEN);
+  assert.equal(broker.authenticated(TOKEN), false);
+  assert.equal(broker.authenticated(replacement), true);
+  assert.equal(broker.status().connected, false);
+  assert.equal(
+    broker.complete(TOKEN, {
+      schemaVersion: 1,
+      id: dispatched.id,
+      ok: true,
+      value: [],
+    }),
+    false,
+  );
+  assert.deepEqual(await pending, {
+    ok: false,
+    code: "blooket-browser-unavailable",
+  });
+  broker.close();
+  assert.equal(broker.authenticated(replacement), false);
+});
+
 test(
   "authenticated completion resolves only the dispatched request",
   async () => {

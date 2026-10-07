@@ -170,7 +170,7 @@ lifecycle implementation remains task 13.
 Portable checks cover byte limits, partial host/filesystem failures, concurrent
 saves, library-root preservation, URL rejection, configured login, and actual
 port collisions. Strict TypeScript and browser-script syntax pass; all 493 tests
-pass. Safari verified saving the dark theme and changing EN/ES without losing
+pass. Chrome verified saving the dark theme and changing EN/ES without losing
 an unsaved synthetic email.
 
 **External blocker:** no recipient macOS host is available. Native Keychain
@@ -318,7 +318,7 @@ browser-script syntax pass; Jig retains only its external evidence gap.
 Native case/Unicode filesystem behavior and real skill/schema consumption remain
 unverified.
 
-Safari subsequently passed a user rename and prepared export using
+Chrome subsequently passed a user rename and prepared export using
 synthetic media. Its native migration confirmation stalled browser inspection;
 the complete visual migration workflow remains unverified. Continue independent
 editor work in task 06; keep client acceptance pending.
@@ -365,7 +365,7 @@ Changing export defaults must not overwrite existing individual recipes.
 The browser framing preview directs the teacher to the prepared file
 for final colors, compression, and GIF timing; it does not claim pixel parity.
 
-Safari subsequently passed zoom buttons, keyboard pan, solid-background
+Chrome subsequently passed zoom buttons, keyboard pan, solid-background
 selection, user filename/folder changes, preparation, and download readiness
 with synthetic media. Editing and rename controls freeze during preparation to
 prevent stale asynchronous results replacing a newer image or recipe. The
@@ -416,7 +416,7 @@ All 533 portable tests, strict TypeScript, and browser-script syntax passed on
 2026-10-06 after these changes. Jig reports only the external
 `scalability.repository-graph` evidence gap; repository checks were not
 weakened.
-Safari editor acceptance used synthetic local data, without changing Blooket.
+Chrome editor acceptance used synthetic local data, without changing Blooket.
 
 **Pending:** native macOS worker/package behavior and accepted resource budgets
 need a real target host. Native memory is bounded by admitted work, not an OS
@@ -473,11 +473,49 @@ reproduces the pre-write collection. Unchanged state is `not-confirmed`; media
 writes, concurrent edits, malformed reads, and ambiguous additions remain
 `inconclusive`.
 
-The local browser bridge now has a versioned request/response contract, bounded
-in-memory broker, bearer-authenticated loopback routes, and API adapters for
-session, capability, set, and question reads. The concrete WebExtension worker,
-page extractor, and service composition are still missing, so this does not
-complete task 08 or claim live question read-back.
+The local browser bridge has a versioned request/response contract, bounded
+in-memory broker, bearer-authenticated loopback routes, and API port adapters.
+The concrete Chrome worker and page extractor now support session observation,
+nonempty My Sets summaries, and the observed private set-detail controls.
+Local Configuration supplies a temporary pairing code with explicit revocation;
+reset invalidates the old code and settles pending jobs without replay.
+
+Authorized Chrome DOM inspection on 2026-10-06 confirmed My Sets article/h3/Edit
+link structure and the detail controls: input#title[name="title"],
+textarea#desc[name="desc"], and input#private[name="private"] with role=switch.
+The observed unchecked switch displays "Private (Only playable by you)";
+the adapter admits only that combination. No public mapping was inferred.
+
+Inspecting the existing synthetic typing question confirmed its visible text,
+answer, match mode, and seconds, but did not establish every required question
+field. No edits or Save actions were submitted during this inspection.
+
+The unpacked extension compiles with the pinned repository compiler and is
+included in native package resources. Synthetic worker tests cover trusted
+popup senders, exact loopback configuration, bounded replies, navigation,
+unsupported commands, and signed-out page stops. Artifact tests verify emitted
+JavaScript imports and the narrow permission set, with no server/secret modules.
+
+Still pending: actual installation/pairing and live application reads; canonical
+CLI/MCP service composition; observed empty-account and pagination contracts;
+public set details; capabilities and complete question/media facts; login and
+organization-selection states; Safari worker lifecycle. These prevent completion
+of task 08 and publication tasks 09-12. Portable doubles are not browser
+acceptance, and no live question read-back is claimed.
+
+Validation for this increment: 572 portable tests, strict TypeScript, both
+browser-script syntax checks, and compiled-extension assembly pass. Chrome
+displayed the new local connection controls and revocation acknowledgement in
+a disposable workspace, with EN/ES presentation checked. Browser inspection
+redacts password-field values; backend tests verify actual token replacement.
+
+Jig reports only the existing external `JIG-RULE-GAP-001`. Package-release
+freshness evidence was re-fetched from its configured registry providers.
+
+**Installation blocker:** the browser-control URL policy rejects
+`chrome://extensions/` and forbids bypassing it through another control surface.
+The human must load the reviewed unpacked extension manually before live
+pairing/read acceptance. This does not require changing the real `.env`.
 
 Complete when fresh validated remote state can be read reliably, capability
 changes are detected, and a missing/challenged session returns the appropriate
@@ -751,9 +789,9 @@ CLI. It used a synthetic client, not ChatGPT. Public UI/settings routes returned
 404 and unauthorized MCP returned 401; the test did not visit the callback or
 send its test code to another destination.
 
-The Safari UI loaded, switched EN/ES configuration, and prepared a disposable
+The Chrome UI loaded, switched EN/ES configuration, and prepared a disposable
 static-image edit with zoom and solid background. Preview/download worked.
-Import was exercised through the local API because the Safari file chooser
+Import was exercised through the local API because the Chrome file chooser
 lacked file URL permission; no browser security setting was changed.
 
 A private one-question quiz was created through the authorized Blooket UI and

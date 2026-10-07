@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "110",
+  "name": "Blooket Studio",
+  "version": "0.1.0",
+  "description": "Connect Blooket to your local teaching workspace.",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": [
+    "https://dashboard.blooket.com/*",
+    "http://127.0.0.1/*",
+    "http://127.0.0.2/*"
+  ],
+  "background": {
+    "service_worker": "src/service/browser-extension/adapter-inbound/worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Blooket Studio",
+    "default_popup": "src/ui/browser-extension/adapter-inbound/popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  }
+}

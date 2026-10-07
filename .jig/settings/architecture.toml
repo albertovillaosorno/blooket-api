@@ -38,4 +38,4 @@ depends_on = ["ir", "ui_general"]
 depends_on = ["ir"]
 
 [component.service]
-depends_on = ["api", "mcp", "platforms", "security", "settings"]
+depends_on = ["api", "ir", "mcp", "platforms", "security", "settings"]

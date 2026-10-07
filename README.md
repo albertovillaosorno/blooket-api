@@ -38,8 +38,13 @@ list/read/write skills and drafts. Media search returns bounded pages and a
 continuation cursor. **Saving a draft does not publish a quiz.**
 The Linux package has passed local startup, native media preparation, the
 packaged CLI, repeated launch, and shutdown. The macOS bundle assembler exists;
-native Mac verification, browser extensions, signing, and launch-at-login
+native Mac verification, Safari packaging, signing, and launch-at-login
 remain roadmap work.
+
+The Chrome extension can be assembled locally. It reads observed set summaries
+and private set details in a dedicated Blooket tab; it cannot publish quizzes.
+Question/capability reads, empty accounts, pagination, public set details, and
+native browser acceptance remain pending. Unsupported pages stop the read.
 
 See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
 cannot establish Keychain or native macOS compatibility. Chrome is the initial
@@ -274,6 +279,36 @@ Distribution metadata records the source commit, dirty state, dependency
 versions, and integrity scope.
 
 An unsigned local build is a development artifact.
+
+To assemble the unpacked Chrome development extension:
+
+```sh
+npm run package -- --extension
+```
+
+In Chrome 110 or newer, open the Extensions page, enable Developer mode, and
+choose **Load unpacked** with `.temp/distributions/browser-extension/`.
+Native packages include the same directory under `extensions/chrome/` in their
+resources. This is a manual development installation, not a store installer.
+
+The extension requests scripting/storage and access only to the Blooket
+dashboard and the two admitted IPv4 loopback addresses. No cookie permission
+or general web access is requested.
+
+Open **Configuration** in the local workspace, copy its temporary connection
+code, and paste the local address and code into the extension popup. Connect
+opens a separate Blooket tab; sign in there yourself if needed. Keep that tab
+open for reads.
+
+Codes live in memory/session storage and change on service or
+browser restart; local **Revoke connection and change code** immediately
+invalidates the old code and pending jobs. Never give the code to an AI client.
+IPv6-only local service bindings are not supported by this extension yet.
+
+The portable tests exercise the compiled worker and synthetic browser APIs.
+They do not establish an installed Chrome extension, Safari worker lifecycle,
+or live publication. Safari conversion/signing remains task 14 and still blocks
+release-mode verification.
 
 Extract the Linux archive and run `./blooket-studio` to open the workspace.
 `--no-open` starts without opening a browser, `--status` reports the service,

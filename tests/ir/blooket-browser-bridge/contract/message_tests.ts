@@ -31,18 +31,88 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { decodeBlooketBrowserBridgeResponse } from
-  "../../../../src/ir/blooket-browser-bridge/contract/message.ts";
+import {
+  decodeBlooketBrowserBridgeRequest,
+  decodeBlooketBrowserBridgeResponse,
+} from "../../../../src/ir/blooket-browser-bridge/contract/message.ts";
+
+const request = (command: unknown) => ({
+  schemaVersion: 1,
+  id: "fe101cf0-18c3-4f3f-84a3-b9075029e67f",
+  command,
+});
+
+test("browser requests admit only bounded exact commands", () => {
+  for (const kind of ["session.observe", "sets.list", "capabilities.inspect"])
+    assert.equal(decodeBlooketBrowserBridgeRequest(request({ kind })).ok, true);
+  assert.equal(
+    decodeBlooketBrowserBridgeRequest(
+      request({
+        kind: "sets.get",
+        setId: "opaque/id with spaces",
+      }),
+    ).ok,
+    true,
+  );
+  for (const command of [
+    { kind: "sets.get", setId: "" },
+    { kind: "sets.get", setId: "x".repeat(513) },
+    { kind: "sets.get", setId: "a\0b" },
+    { kind: "sets.list", script: "arbitrary code" },
+    { kind: "navigate", url: "https://untrusted.invalid" },
+  ])
+    assert.equal(decodeBlooketBrowserBridgeRequest(request(command)).ok, false);
+  assert.equal(
+    decodeBlooketBrowserBridgeRequest({
+      ...request({ kind: "sets.list" }),
+      id: "not-a-uuid",
+    }).ok,
+    false,
+  );
+  assert.equal(
+    decodeBlooketBrowserBridgeRequest({
+      ...request({ kind: "sets.list" }),
+      schemaVersion: 2,
+    }).ok,
+    false,
+  );
+});
+
+test("invalid authentication requests never echo secret values", () => {
+  const password = "synthetic-secret-that-must-not-be-returned";
+  const result = decodeBlooketBrowserBridgeRequest(
+    request({
+      kind: "session.authenticate",
+      loginIdentifier: "",
+      password,
+    }),
+  );
+  assert.equal(result.ok, false);
+  assert.equal(JSON.stringify(result).includes(password), false);
+  assert.equal(
+    decodeBlooketBrowserBridgeRequest(
+      request({
+        kind: "session.authenticate",
+        loginIdentifier: "teacher@example.invalid",
+        password,
+      }),
+    ).ok,
+    true,
+  );
+});
 
 test("bridge responses preserve unknown successful values", () => {
   const value = { privatePageValue: "opaque" };
   assert.deepEqual(
-    decodeBlooketBrowserBridgeResponse({
-      schemaVersion: 1,
-      id: "request-a",
-      ok: true,
-      value,
-    }, "request-a"),
+    decodeBlooketBrowserBridgeResponse(
+      {
+        schemaVersion: 1,
+        id: "request-a",
+        ok: true,
+        value,
+      },
+      "request-a",
+    ),
     {
       ok: true,
       value: {
@@ -56,13 +126,16 @@ test("bridge responses preserve unknown successful values", () => {
 });
 
 test("bridge responses reject cross-request and unknown fields", () => {
-  const result = decodeBlooketBrowserBridgeResponse({
-    schemaVersion: 1,
-    id: "request-b",
-    ok: true,
-    value: null,
-    leakedCookie: "must-not-cross",
-  }, "request-a");
+  const result = decodeBlooketBrowserBridgeResponse(
+    {
+      schemaVersion: 1,
+      id: "request-b",
+      ok: true,
+      value: null,
+      leakedCookie: "must-not-cross",
+    },
+    "request-a",
+  );
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(
@@ -80,12 +153,15 @@ test("bridge responses reject cross-request and unknown fields", () => {
 
 test("bridge failures admit only stable browser codes", () => {
   assert.equal(
-    decodeBlooketBrowserBridgeResponse({
-      schemaVersion: 1,
-      id: "request-a",
-      ok: false,
-      code: "raw-extension-error",
-    }, "request-a").ok,
+    decodeBlooketBrowserBridgeResponse(
+      {
+        schemaVersion: 1,
+        id: "request-a",
+        ok: false,
+        code: "raw-extension-error",
+      },
+      "request-a",
+    ).ok,
     false,
   );
 });
