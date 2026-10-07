@@ -405,7 +405,7 @@ Architecture decisions cover [browser hosting and online MCP][browser-mcp],
 > algunas naranjas de su bolsa y comenzó a tirarlas al aire, haciendo
 > malabarismos, que era lo único que sabía hacer.
 
-— Paulo Coelho, *El Alquimista*, Grijalbo, p. 12 («Prefacio»).
+— Paulo Coelho, *El Alquimista*, Grijalbo, p. 13 («Prefacio»).
 [Publisher's excerpt][coelho-excerpt].
 
 <!-- jig-ignore-next-line: Exact publisher excerpt URL is indivisible. -->
