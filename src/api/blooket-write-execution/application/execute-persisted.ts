@@ -49,8 +49,15 @@ import {
   type WriteCheckpointFileSaveResult,
 } from
   "../../../platforms/write-checkpoint-files/adapter-outbound/file.ts";
+import {
+  reserveMutationBudgetStart,
+  type MutationBudgetFileFailure,
+} from
+  "../../../platforms/mutation-budget-files/adapter-outbound/file.ts";
 import type { BlooketWriteCheckpoint } from
   "../../../projects/blooket-write-plans/domain/checkpoint.ts";
+import type { BlooketMutationTaskBudgetPolicy } from
+  "../../../projects/blooket-write-plans/domain/mutation-budget.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { HostSecretStore } from
@@ -115,6 +122,11 @@ export interface BlooketWritePersistencePaths {
 export interface ExecutePersistedBlooketWriteOptions {
   readonly pacer?: BlooketMutationPacer;
   readonly signal?: AbortSignal;
+  readonly budget?: {
+    readonly path: string;
+    readonly policy: BlooketMutationTaskBudgetPolicy;
+    readonly now?: () => number;
+  };
 }
 
 export type ExecutePersistedBlooketWriteResult =
@@ -134,6 +146,11 @@ export type ExecutePersistedBlooketWriteResult =
       readonly ok: false;
       readonly stage: "mutation-pacing";
       readonly code: "mutation-pacing-cancelled";
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "mutation-budget";
+      readonly code: MutationBudgetFileFailure["code"];
     }
   | {
       readonly ok: false;
@@ -419,6 +436,23 @@ async function executePersistedBlooketWriteLocked(
       stage: "mutation-pacing",
       code: "mutation-pacing-cancelled",
     };
+  }
+
+  if (options.budget !== undefined) {
+    const reserved = await reserveMutationBudgetStart(
+      options.budget.path,
+      plan.planId,
+      options.budget.policy,
+      options.budget.now?.() ?? Date.now(),
+    );
+    if (!reserved.ok) {
+      lease?.release();
+      return {
+        ok: false,
+        stage: "mutation-budget",
+        code: reserved.code,
+      };
+    }
   }
 
   let begun: Awaited<ReturnType<typeof beginWriteAttempt>>;

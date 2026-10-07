@@ -1,0 +1,9 @@
+identity:
+  id: function:mutation-budget-files
+  name: mutation-budget-files
+  path: src/platforms/mutation-budget-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

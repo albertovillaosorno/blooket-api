@@ -60,6 +60,8 @@ import type {
   "../../../../src/api/blooket-write-execution/contract/write-verification.ts";
 import { loadWriteAttemptFile } from
   "../../../../src/platforms/write-attempt-files/adapter-outbound/file.ts";
+import { loadMutationBudgetFile } from
+  "../../../../src/platforms/mutation-budget-files/adapter-outbound/file.ts";
 import { tryAcquireFileLock } from
   "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 import type { FileLock } from
@@ -339,6 +341,7 @@ test("pacing lease releases when journal admission fails", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
     const paths = persistence(path);
+    const budgetPath = join(directory, "budget.json");
     const events: string[] = [];
     const writeCalls: string[] = [];
 
@@ -352,15 +355,173 @@ test("pacing lease releases when journal admission fails", async () => {
         ok: true,
         baseline: QUESTION_BASELINE,
       }),
-      { pacer: immediatePacer(events) },
+      {
+        pacer: immediatePacer(events),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 30_000,
+        },
+      },
     );
 
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.stage, "attempt-begin");
     assert.deepEqual(events, ["acquire", "release"]);
     assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      {
+        ok: true,
+        state: { version: 1, startedAtMs: 30_000, starts: 1 },
+      },
+    );
   });
 });
+
+test("durable budget reservation precedes journaled mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const events: string[] = [];
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, [], async () => {
+        events.push("write");
+        assert.deepEqual(
+          await loadMutationBudgetFile(budgetPath, plan.planId),
+          {
+            ok: true,
+            state: { version: 1, startedAtMs: 10_000, starts: 1 },
+          },
+        );
+        const attempt = await loadWriteAttemptFile(paths.attempt, plan);
+        assert.equal(attempt.ok, true);
+        if (attempt.ok && attempt.kind === "record")
+          assert.equal(attempt.record.phase, "attempting");
+      }),
+      undefined,
+      {
+        pacer: immediatePacer(events),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 10_000,
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(events, ["acquire", "write", "release"]);
+  });
+});
+
+test(
+  "exhausted durable budget stops before journal and releases pacing",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const policy = { maximumStarts: 1, maximumDurationMs: 60_000 };
+    const events: string[] = [];
+    const writeCalls: string[] = [];
+
+    const first = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      {
+        pacer: immediatePacer(events),
+        budget: { path: budgetPath, policy, now: () => 10_000 },
+      },
+    );
+    assert.equal(first.ok, true);
+
+    const secondPaths = persistence(join(directory, "second.json"));
+    const second = await executePersistedBlooketWrite(
+      secondPaths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      {
+        pacer: immediatePacer(events),
+        budget: { path: budgetPath, policy, now: () => 12_000 },
+      },
+    );
+
+    assert.deepEqual(second, {
+      ok: false,
+      stage: "mutation-budget",
+      code: "mutation-task-start-budget-exhausted",
+    });
+    assert.deepEqual(writeCalls, ["plan:persisted-test:set"]);
+    assert.deepEqual(
+      await loadWriteAttemptFile(secondPaths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+    assert.deepEqual(events, [
+      "acquire",
+      "release",
+      "acquire",
+      "release",
+    ]);
+  });
+  },
+);
+
+test(
+  "ambiguous writes retain their consumed durable budget start",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const checkpoint = join(directory, "checkpoint.json");
+    const paths = persistence(checkpoint);
+    const budgetPath = join(directory, "budget.json");
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes({
+        ok: false,
+        kind: "navigation",
+        state: "rate-limited",
+      }, []),
+      undefined,
+      {
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 3, maximumDurationMs: 60_000 },
+          now: () => 20_000,
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.kind, "reconciliation-required");
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      {
+        ok: true,
+        state: { version: 1, startedAtMs: 20_000, starts: 1 },
+      },
+    );
+    const attempt = await loadWriteAttemptFile(paths.attempt, plan);
+    assert.equal(attempt.ok, true);
+    if (attempt.ok && attempt.kind === "record")
+      assert.equal(attempt.record.phase, "attempting");
+  });
+  },
+);
 
 test("pacing lease spans only journaled remote mutation", async () => {
   await withTemporaryDirectory(async (directory) => {
@@ -556,6 +717,7 @@ test("baseline capture stops happen before journal or mutation", async () => {
     const paths = persistence(path);
     const writeCalls: string[] = [];
     const pacingEvents: string[] = [];
+    const budgetPath = join(directory, "budget.json");
 
     const result = await executePersistedBlooketWrite(
       paths,
@@ -568,7 +730,14 @@ test("baseline capture stops happen before journal or mutation", async () => {
         kind: "navigation",
         state: "security-challenge",
       }),
-      { pacer: immediatePacer(pacingEvents) },
+      {
+        pacer: immediatePacer(pacingEvents),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 40_000,
+        },
+      },
     );
 
     assert.equal(result.ok, true);
@@ -577,6 +746,10 @@ test("baseline capture stops happen before journal or mutation", async () => {
     }
     assert.deepEqual(writeCalls, []);
     assert.deepEqual(pacingEvents, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
     assert.deepEqual(
       await loadWriteAttemptFile(paths.attempt, plan),
       { ok: true, kind: "missing" },
@@ -907,6 +1080,7 @@ test("session stop states never create an attempt journal", async () => {
     const browserCalls: string[] = [];
     const writeCalls: string[] = [];
     const pacingEvents: string[] = [];
+    const budgetPath = join(directory, "budget.json");
     const stoppedBrowser: BlooketBrowserSessionPort = {
       observe: async () => {
         browserCalls.push("observe");
@@ -925,7 +1099,14 @@ test("session stop states never create an attempt journal", async () => {
       secrets(),
       writes(SET_SUCCESS, writeCalls),
       undefined,
-      { pacer: immediatePacer(pacingEvents) },
+      {
+        pacer: immediatePacer(pacingEvents),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 50_000,
+        },
+      },
     );
 
     assert.deepEqual(result, {
@@ -942,6 +1123,10 @@ test("session stop states never create an attempt journal", async () => {
     assert.deepEqual(browserCalls, ["observe"]);
     assert.deepEqual(writeCalls, []);
     assert.deepEqual(pacingEvents, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
     assert.deepEqual(
       await loadWriteAttemptFile(paths.attempt, plan),
       { ok: true, kind: "missing" },
