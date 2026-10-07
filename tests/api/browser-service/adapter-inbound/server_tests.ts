@@ -176,6 +176,10 @@ test(
       const app = await (await fetch(service.origin + "/app.js")).text();
       assert.match(app, /URL\.createObjectURL\(file\)/u);
       assert.match(app, /edit: selected\.edit/u);
+      assert.match(app, /preparedDirty = true/u);
+      assert.match(app, /preparing = true/u);
+      assert.doesNotMatch(app, /selected\.prepared = null/u);
+      assert.doesNotMatch(app, /t\("limit"\)/u);
       const boot = (await (
         await fetch(service.origin + "/api/bootstrap")
       ).json()) as {

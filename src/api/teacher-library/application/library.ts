@@ -410,31 +410,52 @@ export async function editLibraryImage(
 export async function prepareLibraryImage(
   root: string,
   id: string,
+  options: { readonly signal?: AbortSignal } = {},
 ): Promise<LibraryMetadata> {
   const library = (await loadPreferences(root)).mediaRoot;
-  return await withLibraryLock(library, async () => {
+  const snapshot = await withLibraryLock(library, async () => {
     const record = (await listLibrary(library)).find((item) => item.id === id);
     if (!record) throw new Error("media-not-found");
     const originalPath = await safeLibraryPath(library, record.asset);
     if ((await lstat(originalPath)).size > 25_000_000)
       throw new Error("source-too-large");
-    const rendered = await renderImageIsolated(
-      await boundedBytes(originalPath, 25_000_000),
-      record.edit,
-    );
-    if (!rendered.ok) throw new Error(rendered.sourceCode ?? rendered.code);
-    const extension = rendered.value.format === "jpeg" ? "jpg" : "gif";
-    const file = "renditions/" + id + "/" + record.revision + "." + extension;
+    return {
+      record,
+      bytes: await boundedBytes(originalPath, 25_000_000),
+    };
+  });
+  const rendered = await renderImageIsolated(
+    snapshot.bytes,
+    snapshot.record.edit,
+    options.signal === undefined ? undefined : { signal: options.signal },
+  );
+  if (!rendered.ok) throw new Error(rendered.sourceCode ?? rendered.code);
+  const extension = rendered.value.format === "jpeg" ? "jpg" : "gif";
+  const file =
+    "renditions/" +
+    id +
+    "/" +
+    snapshot.record.revision +
+    "." +
+    extension;
+  return await withLibraryLock(library, async () => {
+    const current = (await listLibrary(library)).find((item) => item.id === id);
+    if (!current) throw new Error("media-not-found");
+    if (
+      current.revision !== snapshot.record.revision ||
+      current.asset !== snapshot.record.asset
+    )
+      throw new Error("prepared-revision-conflict");
     await writeAtomicFile(
       await safeLibraryPath(library, file, true),
       rendered.value.bytes,
     );
     const next = {
-      ...record,
+      ...current,
       prepared: {
         file,
         bytes: rendered.value.bytes.length,
-        recipeRevision: record.revision,
+        recipeRevision: current.revision,
         effective: rendered.value.effective,
       },
     };

@@ -159,6 +159,7 @@ export async function startBrowserService(
   );
   const server = createServer((request, response) => {
     void handle(request, response).catch((error: unknown) => {
+      if (response.destroyed) return;
       if (!response.headersSent)
         json(response, 400, { ok: false, code: safeCode(error) });
       else response.end();
@@ -510,7 +511,19 @@ export async function startBrowserService(
           typeof body.id !== "string"
         )
           throw new Error("invalid-prepare-request");
-        json(response, 200, await prepareLibraryImage(root, body.id));
+        const controller = new AbortController();
+        const cancel = () => controller.abort();
+        request.once("aborted", cancel);
+        response.once("close", cancel);
+        try {
+          const prepared = await prepareLibraryImage(root, body.id, {
+            signal: controller.signal,
+          });
+          if (!response.destroyed) json(response, 200, prepared);
+        } finally {
+          request.removeListener("aborted", cancel);
+          response.removeListener("close", cancel);
+        }
         return;
       }
       if (url.pathname === "/api/command") {
