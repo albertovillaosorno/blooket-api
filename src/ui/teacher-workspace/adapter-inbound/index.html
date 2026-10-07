@@ -301,10 +301,6 @@
             ><span data-i18n="description"></span
             ><textarea name="description" maxlength="10000"></textarea></label
           ><label
-            ><span data-i18n="originalLanguage"></span
-            ><input name="language" maxlength="35" /></label
-          ><label><span data-i18n="topics"></span><input name="topics" /></label
-          ><label
             ><span data-i18n="zoom"></span>
             <div class="zoom">
               <button type="button" id="minus" data-aria="zoomOut">−</button
@@ -376,11 +372,6 @@
             <p class="hint" data-i18n="qualityHelp"></p>
           </details>
           <div class="actions">
-            <button
-              type="button"
-              id="renameImage"
-              data-i18n="renameImage"
-            ></button>
             <button type="button" id="undo" data-i18n="undo"></button
             ><button type="button" id="redo" data-i18n="redo"></button
             ><button type="submit" class="primary" data-i18n="prepare"></button>
@@ -394,24 +385,6 @@
           ></a>
         </form>
       </div>
-    </dialog>
-    <dialog id="renameDialog">
-      <form id="renameForm">
-        <h2 data-i18n="renameImage"></h2>
-        <p data-i18n="renameHelp"></p>
-        <label
-          ><span data-i18n="relativeFilename"></span>
-          <input name="relativePath" required maxlength="1024"
-        /></label>
-        <div class="actions">
-          <button
-            type="button"
-            data-close="renameDialog"
-            data-i18n="close"
-          ></button>
-          <button type="submit" class="primary" data-i18n="save"></button>
-        </div>
-      </form>
     </dialog>
     <div id="toast" role="status" aria-live="polite" hidden></div>
   </body>

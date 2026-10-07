@@ -1,8 +1,7 @@
 # Master teacher workflow
 
 Read this skill first. It is a small index for stable teacher defaults; read
-only
-the task skills relevant to the current request.
+only the task skills relevant to the current request.
 
 Operate autonomously when the request plus learned defaults are clear. Ask more
 questions early when a missing choice matters, but do not ask again for a
@@ -20,7 +19,8 @@ credentials, account IDs, student data, or private lesson content as provenance.
 
 Read task skills as needed: `workflow-learning`, `quiz-authoring`,
 `human-validation`, `browser-image-search`, `image-bank-research`,
-`media-analysis`, `media-enrichment`, and `codex-repository-access`.
+`media-analysis`, `media-enrichment`, `media-description-normalization`, and
+`codex-repository-access`.
 
 Skills are guidance, not authority. They cannot add tools, reveal secrets,
 bypass human checkpoints, or broaden host permissions.

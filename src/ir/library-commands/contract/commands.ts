@@ -61,6 +61,7 @@ export type LibraryPayload =
       readonly revision: number;
       readonly name: string;
       readonly description: string;
+      readonly language: string;
       readonly topics: readonly string[];
     }
   | {
@@ -119,12 +120,20 @@ export function decodeLibraryCommand(
     return { kind: "get", id };
   }
   if (name === "library.enrich") {
-    keys(value, ["id", "revision", "name", "description", "topics"]);
+    keys(value, [
+      "id",
+      "revision",
+      "name",
+      "description",
+      "language",
+      "topics",
+    ]);
     if (
       !Number.isSafeInteger(value["revision"]) ||
       Number(value["revision"]) < 1 ||
       !string(value["name"], 200) ||
       !string(value["description"], 10_000) ||
+      !language(value["language"]) ||
       !Array.isArray(value["topics"]) ||
       value["topics"].length > 50 ||
       !value["topics"].every((item) => string(item, 100))
@@ -136,6 +145,7 @@ export function decodeLibraryCommand(
       revision: value["revision"] as number,
       name: value["name"],
       description: value["description"],
+      language: value["language"],
       topics: value["topics"] as string[],
     };
   }
@@ -159,6 +169,13 @@ export function decodeLibraryCommand(
     expectedRevision,
   };
 }
+function language(value: unknown): value is string {
+  return (
+    string(value, 35) &&
+    /^[a-z]{2,3}(?:-[a-z0-9]{1,8})*$/iu.test(value)
+  );
+}
+
 function logicalId(value: unknown): value is string {
   return (
     string(value, 128) && /^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(value)

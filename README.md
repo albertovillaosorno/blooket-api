@@ -179,18 +179,19 @@ logs/               Sanitized local diagnostic records
 skills/             Personal authoring guidance
 drafts/             Recoverable local quiz documents
 media/              Default media root; selectable in local configuration
-  photos/           Immutable sources with user-chosen filenames
-  metadata/         Mirrored YAML metadata
+  photos/           Service-owned canonical WebP/GIF assets
+  metadata/         YAML mirrored by canonical asset filename
   renditions/       Derived export files
 ```
 
-For example, `photos/animals/My cat.gif` has metadata at
-`metadata/animals/My cat.gif.yaml`. Original names/descriptions remain intact;
-English enrichment records its source revision and verification status. Local
-filename/folder changes preserve IDs and bytes and use a recovery journal.
+New intake keeps the teacher's name and description but not the uploaded
+source blob or filename. Static media is canonicalized to high-quality WebP and
+animated media to optimized GIF, then addressed by stable ID. Language, topics,
+and normalized English are separate revision-protected AI enrichment.
 
 When a previous `media.jsonl` exists in the selected library folder, use
-**Import the previous library**. Migration preserves original files, archives
+**Import the previous library**. Legacy migration preserves historical files,
+archives
 the exact index as `media.jsonl.migrated`, and creates mirrored YAML. Migrated
 schema-2 records retain historical English verification and its source revision;
 an unspecified original language stays empty.

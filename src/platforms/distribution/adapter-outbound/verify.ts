@@ -196,7 +196,6 @@ export async function verifyDistribution(
       "WXMAAAPoAAAD6AG1e1JrAAAAE0lEQVQImWP4z8DwHwwZGP6DAQBJyAn3iFfy" +
       "TAAAAABJRU5ErkJggg==";
     const imported = await post("/api/import", {
-      filename: "Fixture.png",
       name: "Package fixture",
       description: "Synthetic image",
       base64: source,

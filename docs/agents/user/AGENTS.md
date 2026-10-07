@@ -28,12 +28,14 @@ wins when editing an existing online quiz.
 ## Media
 
 Use media stable IDs returned by the library tools. Search the library before
-assuming an image is unavailable. Preserve teacher-authored filenames, original
-names, original descriptions, and their original language.
+assuming an image is unavailable. Preserve teacher-authored names and
+descriptions. Canonical asset filenames are internal service details; do not ask
+the teacher to manage them or choose filesystem paths.
 
-AI-generated English names, descriptions, and topics belong only in their
-separate enrichment fields. They do not rename source files and are not human
-verification. Never choose filesystem paths for media.
+Language identification is an AI enrichment operation, not an interface-locale
+guess. AI-generated English names/descriptions and topics remain separate from
+teacher-authored text and are not human verification. Legacy filenames may
+appear in migrated records, but remote tools still address only stable IDs.
 
 ## Skills
 

@@ -20,9 +20,10 @@ data explicitly rather than changing a published schema in place.
 ## Context
 
 The teacher uses ChatGPT to prepare quizzes and a local browser interface to
-configure the Mac service and manage photos or GIFs. She chooses filenames and
-writes names/descriptions in any language. The AI searches and enriches metadata
-without taking ownership of the original text or filesystem names.
+configure the Mac service and manage photos or GIFs. She writes names and
+descriptions in any language; canonical filenames are internal service details.
+The AI searches and enriches metadata without taking ownership of original text
+or filesystem paths.
 
 The service needs durable local configuration, optional user-selected media
 storage, personal skills, and repair information from its first real macOS run.
@@ -80,36 +81,26 @@ Use a new settings schema version and tested migration for the new fields.
 Preserve valid theme, lifecycle, and port preferences. No remote tool manages
 credentials, tunnel access, or arbitrary filesystem roots.
 
-### User filenames and mirrored YAML
+### Canonical media and mirrored YAML
 
-Keep user-named immutable source bytes in `mediaRoot/photos/`. Editing changes
-the render recipe and prepared rendition, not the source file. Only an explicit
-user naming/move operation changes the visible filename or relative directory.
+New file, drag/drop, clipboard, and downloaded-image intake accepts only the
+teacher-authored name and description plus admitted image bytes. Decode and
+canonicalize those bytes immediately. Static media is stored as high-quality
+WebP and animated media as an optimized GIF. The temporary source blob is not a
+durable library artifact and must be discarded after successful
+canonicalization.
 
-Mirror relative directories under `mediaRoot/metadata/` and append `.yaml` to
-the complete source filename. For example:
+Assign every new asset a stable ID and service-owned canonical path such as
+`photos/<uuid>.webp` or `photos/<uuid>.gif`. Mirror metadata at the matching
+`metadata/<canonical-filename>.yaml`. The teacher never needs to choose or
+maintain that path; UI, MCP, drafts, and quiz operations address the stable ID.
 
-```text
-photos/animals/Mi gato.jpg
-metadata/animals/Mi gato.jpg.yaml
-photos/animals/Mi gato.gif
-metadata/animals/Mi gato.gif.yaml
-```
-
-Assign a stable asset ID independent of all names and paths. MCP metadata and
-quiz tools address that ID; the service resolves paths internally. User rename
-operations preserve the ID and update metadata/references transactionally.
-
-Admit user filenames through a trusted local operation with traversal checks,
-Unicode handling, extension validation, and visible collision resolution. Do not
-let AI-generated metadata create a path or silently rename a source asset.
-
-The target YAML document contains:
+The target YAML shape remains:
 
 ```yaml
 schemaVersion: 1
-id: asset-001
-asset: photos/animals/Mi gato.jpg
+id: 5ea11e5d-8bc0-4fa2-b633-108e64a92248
+asset: photos/5ea11e5d-8bc0-4fa2-b633-108e64a92248.webp
 original:
   revision: 1
   name: Mi gato
@@ -119,49 +110,44 @@ topics:
   - animals
   - pets
 generatedEnglish:
-  name: My cat
-  description: An orange cat looking through a window.
+  name: Orange cat
+  description: An orange cat sitting beside a window.
   generatedBy: ai
   sourceRevision: 1
   verified: false
 ```
 
-This is a target-schema illustration, not the current runtime format. `asset`,
-`id`, and the original text are service/user-owned fields. The model can propose
-topics and update admitted generated-English fields through a bounded metadata
-operation; it cannot overwrite originals or alter the asset reference.
+At initial import, `original.language` is empty, `topics` is empty, and
+`generatedEnglish` is null. A revision-protected AI enrichment may identify the
+source language, add topics, and save normalized English. It cannot overwrite
+the teacher's name/description or alter the asset reference. A teacher text edit
+increments `original.revision`, clears language/topics derived from the older
+text, and makes older generated English stale through `sourceRevision`.
 
-Changing original text increments its revision and marks old generated text
-stale. Generating English text does not assert verification. Preserve the
-original language without guessing it when unspecified.
+Normalization completion is derived, not independently persisted. Current AI
+English plus a detected language for the current original revision is
+`completed`; no current output is `pending`; an older generated result is
+`stale`. Generated English never asserts human verification.
 
 YAML is the authoritative per-asset metadata; any JSONL search index is a
 rebuildable cache of validated records. Use a reviewed YAML parser with safe,
-bounded decoding and an exact versioned runtime contract. Migrate the existing
-JSONL/display-name records while retaining stable IDs, bytes, and recovery
-state.
+bounded decoding and an exact versioned runtime contract.
 
-The implemented migration uses schema 2 only for records with legacy provenance.
-It adds `legacy.englishVerified`, `legacy.sourceRevision`, `legacy.sourcePath`,
-and `legacy.indexDigest`; schema-1 documents keep their existing exact contract.
-This historical verification is not an inferred language or AI translation.
+Legacy migration is intentionally different from new intake. It preflights the
+bounded JSONL index and historical image files, preserves those legacy source
+bytes and paths, archives the exact index bytes, and records provenance in
+schema-2 metadata. The legacy local rename/move operation and transfer journal
+remain for recovery and compatibility, not as a normal teacher-facing filename
+workflow. Canonical old vault records still select the unique immutable legacy
+source under `originals/`; missing or conflicting historical sources stop
+migration before publication.
 
-An explicit local import preflights the bounded JSONL index and actual images,
-preserves source files, and archives the exact index bytes. User rename/move
-preserves IDs, bytes, text, recipes, and provenance while clearing prepared
-status. Canonical legacy vault paths select the unique immutable source under
-`originals/`; the working `media/` rendition never replaces a missing original.
-Migration and its recovery acquire the legacy writer lock after the new library
-lock, recovering any old pending transaction before preflight or replay.
-
-A durable transfer journal is replayed under the library lock before
-other locked operations; ordinary reads refuse a pending transaction.
-
-Recovery checks source/destination hashes and metadata before removing old
-rename paths. Changed files stop recovery with the journal intact; no automatic
-merge or
-unrelated overwrite is admitted. Migration and filenames remain local user
-operations outside the remote command registry.
+A durable transfer journal is replayed under the library lock before other
+locked operations; ordinary reads refuse a pending transaction. Recovery checks
+source/destination hashes and metadata before changing old rename paths. Changed
+files stop recovery with the journal intact; no automatic merge or unrelated
+overwrite is admitted. Migration and legacy path operations stay outside the
+remote command registry.
 
 ### Personal skills and online quiz authority
 
@@ -206,7 +192,7 @@ requested animation cannot fit; 10 FPS alone is not a size guarantee.
 
 ## Consequences
 
-- The teacher owns filenames and original text in any language.
+- The teacher owns original names/descriptions; canonical paths are internal.
 - The AI can search English enrichment and topics without renaming files.
 - Settings remain a readable JSON file while Keychain stores secret values.
 - YAML mirrors the visible library and replaces authoritative JSONL metadata.
@@ -217,8 +203,8 @@ requested animation cannot fit; 10 FPS alone is not a size guarantee.
 
 - Overwriting original descriptions with AI translations loses user-authored
   information and is excluded from the metadata update contract.
-- Model-selected filenames couple search text to filesystem identity and are
-  excluded from AI operations.
+- Teacher- or model-selected canonical filenames couple presentation text to
+  storage identity and are excluded from ordinary intake and AI operations.
 - Keeping YAML and JSONL independently writable would create two authorities;
   derived indexes must be rebuildable from YAML.
 - Preserving arbitrary source GIF FPS would ignore the required explicit rate.

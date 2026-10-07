@@ -45,6 +45,7 @@ export async function installInitialSkills(root: string): Promise<void> {
     "image-bank-research",
     "media-analysis",
     "media-enrichment",
+    "media-description-normalization",
     "codex-repository-access",
   ]) {
     const source = await readFile(

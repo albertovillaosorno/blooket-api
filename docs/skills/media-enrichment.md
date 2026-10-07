@@ -11,10 +11,16 @@ original
 names, descriptions, language, and filenames intact. Generated English belongs
 in separate fields; it does not rename assets or establish human verification.
 
-Use `library_enrich` with the record's ID/revision, generated English name and
-description, and relevant topics. Read again after a revision conflict instead
-of overwriting concurrent changes. A translation is stale when its
-`sourceRevision` differs from `original.revision`.
+Before writing enrichment, read `media-description-normalization`. Use
+`library_enrich` with the current record ID/revision, detected source language,
+normalized English name/description, and relevant topics. Read again after a
+revision conflict instead of overwriting concurrent changes.
+
+The returned `normalizationStatus` is derived rather than separately persisted.
+`completed` requires current-revision generated English plus detected language;
+`pending` means current analysis is incomplete, and `stale` means saved English
+belongs to an older original revision. Generated text is never human
+verification.
 
 Canonical library media and prepared renditions are different. Temporary intake
 source bytes are not retained. An image is eligible for

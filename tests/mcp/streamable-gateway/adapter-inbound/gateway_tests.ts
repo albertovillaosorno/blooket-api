@@ -178,12 +178,26 @@ test(
         200,
       );
       const listed = JSON.parse((await call("tools/list", {})).body) as {
-        result: { tools: { name: string }[] };
+        result: {
+          tools: {
+            name: string;
+            inputSchema: {
+              required?: string[];
+              properties?: Record<string, unknown>;
+            };
+          }[];
+        };
       };
       assert.ok(
         listed.result.tools.some((tool) => tool.name === "instructions_get"),
       );
       assert.ok(listed.result.tools.some((tool) => tool.name === "skills_put"));
+      const enrichment = listed.result.tools.find(
+        (tool) => tool.name === "library_enrich",
+      );
+      assert.ok(enrichment);
+      assert.ok(enrichment.inputSchema.required?.includes("language"));
+      assert.ok(enrichment.inputSchema.properties?.["language"]);
       assert.equal(
         listed.result.tools.some((tool) =>
           /settings|password|shell/u.test(tool.name),
