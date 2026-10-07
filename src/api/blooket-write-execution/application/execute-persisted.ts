@@ -579,8 +579,8 @@ async function executePersistedBlooketWriteLocked(
     };
   }
   const lease = pacing?.ok === true ? pacing.lease : undefined;
-  if (lease !== undefined && options.signal?.aborted) {
-    lease.release();
+  if (options.signal?.aborted) {
+    lease?.release();
     return {
       ok: false,
       stage: "mutation-pacing",
@@ -643,6 +643,14 @@ async function executePersistedBlooketWriteLocked(
       stage: "remote-precondition",
       code: "blooket-remote-state-changed",
       operationId: prepared.operation.operationId,
+    };
+  }
+  if (options.signal?.aborted) {
+    lease?.release();
+    return {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled",
     };
   }
 
