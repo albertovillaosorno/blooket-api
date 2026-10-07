@@ -44,6 +44,8 @@ import test from "node:test";
 import { executePersistedBlooketWrite } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/api/blooket-write-execution/application/execute-persisted.ts";
+import type { BlooketMutationPacer } from
+  "../../../../src/api/blooket-write-execution/application/mutation-pacing.ts";
 import type { BlooketBrowserSessionPort } from
   "../../../../src/api/blooket-session/contract/browser-session.ts";
 import type {
@@ -199,6 +201,264 @@ function persistence(path: string) {
   };
 }
 
+function immediatePacer(
+  events: string[],
+  signalSeen: AbortSignal[] = [],
+): BlooketMutationPacer {
+  return {
+    acquire: async (signal) => {
+      events.push("acquire");
+      if (signal !== undefined) signalSeen.push(signal);
+      return {
+        ok: true,
+        lease: {
+          startedAtMs: 0,
+          release: () => {
+            events.push("release");
+          },
+        },
+      };
+    },
+  };
+}
+
+function serialPacer(events: string[]): BlooketMutationPacer {
+  let tail: Promise<void> = Promise.resolve();
+  return {
+    acquire: async () => {
+      const previous = tail;
+      let releaseSlot!: () => void;
+      tail = new Promise<void>((resolve) => {
+        releaseSlot = resolve;
+      });
+      await previous;
+      events.push("acquire");
+      let released = false;
+      return {
+        ok: true,
+        lease: {
+          startedAtMs: 0,
+          release: () => {
+            if (released) return;
+            released = true;
+            events.push("release");
+            releaseSlot();
+          },
+        },
+      };
+    },
+  };
+}
+
+test("abort after pacing grant still stops before journal", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const controller = new AbortController();
+    const events: string[] = [];
+    const pacer: BlooketMutationPacer = {
+      acquire: async () => {
+        events.push("acquire");
+        controller.abort();
+        return {
+          ok: true,
+          lease: {
+            startedAtMs: 0,
+            release: () => {
+              events.push("release");
+            },
+          },
+        };
+      },
+    };
+    const writeCalls: string[] = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      { pacer, signal: controller.signal },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled",
+    });
+    assert.deepEqual(events, ["acquire", "release"]);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
+test("pacing cancellation stops before journal and mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const writeCalls: string[] = [];
+    const controller = new AbortController();
+    const signals: AbortSignal[] = [];
+    const pacer: BlooketMutationPacer = {
+      acquire: async (signal) => {
+        if (signal !== undefined) signals.push(signal);
+        return { ok: false, code: "mutation-pacing-cancelled" };
+      },
+    };
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      { pacer, signal: controller.signal },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled",
+    });
+    assert.deepEqual(signals, [controller.signal]);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+  });
+});
+
+test("pacing lease releases when journal admission fails", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const events: string[] = [];
+    const writeCalls: string[] = [];
+
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      verification({
+        ok: true,
+        baseline: QUESTION_BASELINE,
+      }),
+      { pacer: immediatePacer(events) },
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "attempt-begin");
+    assert.deepEqual(events, ["acquire", "release"]);
+    assert.deepEqual(writeCalls, []);
+  });
+});
+
+test("pacing lease spans only journaled remote mutation", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "checkpoint.json");
+    const paths = persistence(path);
+    const events: string[] = [];
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, [], async () => {
+        events.push("write");
+        assert.deepEqual(events, ["acquire", "write"]);
+        const attempt = await loadWriteAttemptFile(paths.attempt, plan);
+        assert.equal(attempt.ok, true);
+        if (attempt.ok && attempt.kind === "record")
+          assert.equal(attempt.record.phase, "attempting");
+      }),
+      undefined,
+      { pacer: immediatePacer(events) },
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(events, ["acquire", "write", "release"]);
+  });
+});
+
+test("one shared pacer serializes distinct persisted write paths", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const firstPaths = persistence(join(directory, "first.json"));
+    const secondPaths = persistence(join(directory, "second.json"));
+    const events: string[] = [];
+    const pacer = serialPacer(events);
+    let enterFirst!: () => void;
+    const firstEntered = new Promise<void>((resolve) => {
+      enterFirst = resolve;
+    });
+    let releaseFirst!: () => void;
+    const holdFirst = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const firstWrites: string[] = [];
+    const secondWrites: string[] = [];
+
+    const first = executePersistedBlooketWrite(
+      firstPaths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, firstWrites, async () => {
+        events.push("first-write");
+        enterFirst();
+        await holdFirst;
+      }),
+      undefined,
+      { pacer },
+    );
+    await firstEntered;
+
+    const second = executePersistedBlooketWrite(
+      secondPaths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, secondWrites, async () => {
+        events.push("second-write");
+      }),
+      undefined,
+      { pacer },
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.deepEqual(firstWrites, ["plan:persisted-test:set"]);
+    assert.deepEqual(secondWrites, []);
+    assert.deepEqual(
+      await loadWriteAttemptFile(secondPaths.attempt, plan),
+      { ok: true, kind: "missing" },
+    );
+
+    releaseFirst();
+    const firstResult = await first;
+    const secondResult = await second;
+    assert.equal(firstResult.ok, true);
+    assert.equal(secondResult.ok, true);
+    assert.deepEqual(secondWrites, ["plan:persisted-test:set"]);
+    assert.deepEqual(events, [
+      "acquire",
+      "first-write",
+      "release",
+      "acquire",
+      "second-write",
+      "release",
+    ]);
+  });
+});
+
 test("confirmed writes persist before advanced success returns", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
@@ -295,6 +555,7 @@ test("baseline capture stops happen before journal or mutation", async () => {
     const path = join(directory, "checkpoint.json");
     const paths = persistence(path);
     const writeCalls: string[] = [];
+    const pacingEvents: string[] = [];
 
     const result = await executePersistedBlooketWrite(
       paths,
@@ -307,6 +568,7 @@ test("baseline capture stops happen before journal or mutation", async () => {
         kind: "navigation",
         state: "security-challenge",
       }),
+      { pacer: immediatePacer(pacingEvents) },
     );
 
     assert.equal(result.ok, true);
@@ -314,6 +576,7 @@ test("baseline capture stops happen before journal or mutation", async () => {
       assert.equal(result.kind, "human-action-required");
     }
     assert.deepEqual(writeCalls, []);
+    assert.deepEqual(pacingEvents, []);
     assert.deepEqual(
       await loadWriteAttemptFile(paths.attempt, plan),
       { ok: true, kind: "missing" },
@@ -643,6 +906,7 @@ test("session stop states never create an attempt journal", async () => {
     const paths = persistence(path);
     const browserCalls: string[] = [];
     const writeCalls: string[] = [];
+    const pacingEvents: string[] = [];
     const stoppedBrowser: BlooketBrowserSessionPort = {
       observe: async () => {
         browserCalls.push("observe");
@@ -660,6 +924,8 @@ test("session stop states never create an attempt journal", async () => {
       stoppedBrowser,
       secrets(),
       writes(SET_SUCCESS, writeCalls),
+      undefined,
+      { pacer: immediatePacer(pacingEvents) },
     );
 
     assert.deepEqual(result, {
@@ -675,6 +941,7 @@ test("session stop states never create an attempt journal", async () => {
     });
     assert.deepEqual(browserCalls, ["observe"]);
     assert.deepEqual(writeCalls, []);
+    assert.deepEqual(pacingEvents, []);
     assert.deepEqual(
       await loadWriteAttemptFile(paths.attempt, plan),
       { ok: true, kind: "missing" },

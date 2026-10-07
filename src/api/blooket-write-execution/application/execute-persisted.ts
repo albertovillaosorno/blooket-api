@@ -16,7 +16,7 @@
 //   - Inputs: Trusted checkpoint/journal paths, plan, and execution
 //     dependencies.
 //   - Outputs: Durable advancement, explicit recovery, or stable failures.
-//   - Side effects: Local recovery plus at most one journaled remote write.
+//   - Side effects: Optional bounded pacing, recovery, and one remote write.
 // - Split-When:
 //   - Pacing or provider reconciliation becomes independently versioned.
 // - Merge-When:
@@ -26,9 +26,9 @@
 // - Description:
 //   - Recovery precedes browser work; ambiguous attempts block future writes.
 // - Usage:
-//   - Supply trusted sibling or otherwise owned checkpoint and journal paths.
+//   - Supply owned persistence paths and one shared pacer when configured.
 // - Defaults:
-//   - No retry or pacing delay is guessed.
+//   - Pacing is explicit; retries and ambiguous success are never guessed.
 //
 import {
   blooketNavigationDecision,
@@ -76,6 +76,7 @@ import type {
   BlooketWriteVerificationBaselineResult,
   BlooketWriteVerificationPort,
 } from "../contract/write-verification.ts";
+import type { BlooketMutationPacer } from "./mutation-pacing.ts";
 
 type PrepareTerminal = Exclude<
   PrepareNextBlooketWriteResult,
@@ -111,6 +112,11 @@ export interface BlooketWritePersistencePaths {
   readonly attempt: string;
 }
 
+export interface ExecutePersistedBlooketWriteOptions {
+  readonly pacer?: BlooketMutationPacer;
+  readonly signal?: AbortSignal;
+}
+
 export type ExecutePersistedBlooketWriteResult =
   | PrepareTerminal
   | AdvancedWrite
@@ -123,6 +129,11 @@ export type ExecutePersistedBlooketWriteResult =
       readonly attempt: WriteAttemptRecord;
       readonly checkpoint: BlooketWriteCheckpoint;
       readonly outcome: ExecuteNextBlooketWriteResult;
+    }
+  | {
+      readonly ok: false;
+      readonly stage: "mutation-pacing";
+      readonly code: "mutation-pacing-cancelled";
     }
   | {
       readonly ok: false;
@@ -199,6 +210,7 @@ export async function executePersistedBlooketWrite(
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
   verifier?: BlooketWriteVerificationPort,
+  options: ExecutePersistedBlooketWriteOptions = {},
 ): Promise<ExecutePersistedBlooketWriteResult> {
   const acquired = await tryAcquireFileLock(
     writeAttemptExecutionLockPath(paths.attempt),
@@ -226,6 +238,7 @@ export async function executePersistedBlooketWrite(
       secrets,
       writes,
       verifier,
+      options,
     );
   } catch (error: unknown) {
     threw = true;
@@ -357,7 +370,8 @@ async function executePersistedBlooketWriteLocked(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   writes: BlooketWriteExecutionPort,
-  verifier?: BlooketWriteVerificationPort,
+  verifier: BlooketWriteVerificationPort | undefined,
+  options: ExecutePersistedBlooketWriteOptions,
 ): Promise<ExecutePersistedBlooketWriteResult> {
   const recovery = await recoverPersistedBlooketWriteUnderLock(
     paths.checkpoint,
@@ -387,12 +401,46 @@ async function executePersistedBlooketWriteLocked(
     return baseline.result;
   }
 
-  const begun = await beginWriteAttempt(
-    paths.attempt,
-    plan,
-    prepared.checkpoint.nextOperationIndex,
-    baseline.value,
-  );
+  const pacing = options.pacer === undefined
+    ? undefined
+    : await options.pacer.acquire(options.signal);
+  if (pacing !== undefined && !pacing.ok) {
+    return {
+      ok: false,
+      stage: "mutation-pacing",
+      code: pacing.code,
+    };
+  }
+  const lease = pacing?.ok === true ? pacing.lease : undefined;
+  if (lease !== undefined && options.signal?.aborted) {
+    lease.release();
+    return {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled",
+    };
+  }
+
+  let begun: Awaited<ReturnType<typeof beginWriteAttempt>>;
+  let attempted: Awaited<ReturnType<typeof attemptBlooketWrite>> | undefined;
+  try {
+    begun = await beginWriteAttempt(
+      paths.attempt,
+      plan,
+      prepared.checkpoint.nextOperationIndex,
+      baseline.value,
+    );
+    if (begun.ok && begun.record !== undefined) {
+      attempted = await attemptBlooketWrite(
+        writes,
+        prepared.operation,
+        prepared.checkpoint.remoteSetId,
+      );
+    }
+  } finally {
+    lease?.release();
+  }
+
   if (!begun.ok) {
     return {
       ok: false,
@@ -401,7 +449,7 @@ async function executePersistedBlooketWriteLocked(
       cause: begun,
     };
   }
-  if (begun.record === undefined) {
+  if (begun.record === undefined || attempted === undefined) {
     return {
       ok: false,
       stage: "attempt-begin",
@@ -413,12 +461,6 @@ async function executePersistedBlooketWriteLocked(
       },
     };
   }
-
-  const attempted = await attemptBlooketWrite(
-    writes,
-    prepared.operation,
-    prepared.checkpoint.remoteSetId,
-  );
   const completed = completeBlooketWriteAttempt(
     plan,
     prepared.checkpoint,
