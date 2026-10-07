@@ -295,15 +295,20 @@ The extension requests scripting/storage and access only to the Blooket
 dashboard and the two admitted IPv4 loopback addresses. No cookie permission
 or general web access is requested.
 
-Open **Configuration** in the local workspace, copy its temporary connection
-code, and paste the local address and code into the extension popup. Connect
-opens a separate Blooket tab; sign in there yourself if needed. Keep that tab
-open for reads.
+Open Blooket Studio normally. Its local workspace announces the connection
+inside the extension's isolated page context; the extension discovers already
+open workspace tabs when it starts. It connects automatically and opens its own
+Blooket tab without changing the teacher's existing tabs.
 
-Codes live in memory/session storage and change on service or
-browser restart; local **Revoke connection and change code** immediately
-invalidates the old code and pending jobs. Never give the code to an AI client.
+There is no connection form, pairing code, or Blooket credential entry in the
+extension. Its popup shows readiness and shortcuts to the workspace and Blooket.
+The connection follows the workspace's actual port and reconnects after a
+service restart; tokens stay in memory/session storage and never reach an AI.
 IPv6-only local service bindings are not supported by this extension yet.
+
+Keep the local workspace open for automatic discovery and restart recovery.
+The normal launcher opens it. If the service runs without a browser page, the
+popup's **Open workspace** shortcut uses the default local port 2607.
 
 The portable tests exercise the compiled worker and synthetic browser APIs.
 They do not establish an installed Chrome extension, Safari worker lifecycle,
