@@ -245,7 +245,9 @@ test("invalid list payloads fail without exposing raw values", async () => {
   assert.equal(JSON.stringify(result).includes(rawSecret), false);
 });
 
-test("invalid list completeness fails closed before exposing rows", async () => {
+test(
+  "invalid list completeness fails closed before exposing rows",
+  async () => {
   const rawSecret = "raw-completeness-secret";
   const reads = {
     list: async () => ({
@@ -271,7 +273,8 @@ test("invalid list completeness fails closed before exposing rows", async () => 
     code: "blooket-browser-failed",
   });
   assert.equal(JSON.stringify(result).includes(rawSecret), false);
-});
+  },
+);
 
 test("invalid set IDs fail before all side effects", async () => {
   const browserCalls: string[] = [];
