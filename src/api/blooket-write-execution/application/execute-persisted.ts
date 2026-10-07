@@ -60,7 +60,9 @@ import type { BlooketWriteCheckpoint } from
 import type { BlooketMutationTaskBudgetPolicy } from
   "../../../projects/blooket-write-plans/domain/mutation-budget.ts";
 import {
+  decodeBlooketWriteVerificationBaseline,
   sameBlooketWriteVerificationBaseline,
+  verificationBaselineKindForOperation,
   type BlooketWriteVerificationBaseline,
 } from
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
@@ -220,6 +222,7 @@ export type ExecutePersistedBlooketWriteResult =
       readonly stage: "verification-baseline";
       readonly code:
         | BlooketBrowserFailureCode
+        | "blooket-write-baseline-invalid"
         | "blooket-write-baseline-not-captured";
     }
   | {
@@ -335,7 +338,24 @@ async function captureVerificationBaseline(
     };
   }
   if (captured.ok) {
-    return { ok: true, value: captured.baseline };
+    if (captured.baseline === null) {
+      return { ok: true, value: null };
+    }
+    const decoded = decodeBlooketWriteVerificationBaseline(
+      captured.baseline,
+      verificationBaselineKindForOperation(operation.kind),
+    );
+    if (!decoded.ok) {
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          stage: "verification-baseline",
+          code: "blooket-write-baseline-invalid",
+        },
+      };
+    }
+    return { ok: true, value: decoded.value };
   }
   if (captured.kind === "browser") {
     return {

@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import {
+  mkdir,
   mkdtemp,
   readFile,
   rm,
@@ -469,6 +470,21 @@ test("pacing lease releases when journal admission fails", async () => {
     const events: string[] = [];
     const writeCalls: string[] = [];
 
+    const pacer: BlooketMutationPacer = {
+      acquire: async () => {
+        events.push("acquire");
+        await mkdir(paths.attempt);
+        return {
+          ok: true,
+          lease: {
+            startedAtMs: 0,
+            release: () => {
+              events.push("release");
+            },
+          },
+        };
+      },
+    };
     const result = await executePersistedBlooketWrite(
       paths,
       plan,
@@ -477,10 +493,10 @@ test("pacing lease releases when journal admission fails", async () => {
       writes(SET_SUCCESS, writeCalls),
       verification({
         ok: true,
-        baseline: QUESTION_BASELINE,
+        baseline: SET_BASELINE,
       }),
       {
-        pacer: immediatePacer(events),
+        pacer,
         budget: {
           path: budgetPath,
           policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
@@ -559,6 +575,62 @@ test(
       { ok: true, kind: "missing" },
     );
   });
+  },
+);
+
+test(
+  "invalid second baseline releases pacing before budget or journal",
+  async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const checkpoint = join(directory, "checkpoint.json");
+      const paths = persistence(checkpoint);
+      const budgetPath = join(directory, "budget.json");
+      const pacingEvents: string[] = [];
+      const writeCalls: string[] = [];
+      const invalidSecond = {
+        ok: true,
+        baseline: {
+          ...SET_BASELINE,
+          sha256: "not-a-digest",
+        },
+      } as unknown as BlooketWriteVerificationBaselineResult;
+
+      const result = await executePersistedBlooketWrite(
+        paths,
+        plan,
+        browser([]),
+        secrets(),
+        writes(SET_SUCCESS, writeCalls),
+        verificationSequence([
+          { ok: true, baseline: SET_BASELINE },
+          invalidSecond,
+        ]),
+        {
+          pacer: immediatePacer(pacingEvents),
+          budget: {
+            path: budgetPath,
+            policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+            now: () => 95_000,
+          },
+        },
+      );
+
+      assert.deepEqual(result, {
+        ok: false,
+        stage: "verification-baseline",
+        code: "blooket-write-baseline-invalid",
+      });
+      assert.deepEqual(pacingEvents, ["acquire", "release"]);
+      assert.deepEqual(writeCalls, []);
+      assert.deepEqual(
+        await loadMutationBudgetFile(budgetPath, plan.planId),
+        { ok: true, state: null },
+      );
+      assert.deepEqual(
+        await loadWriteAttemptFile(paths.attempt, plan),
+        { ok: true, kind: "missing" },
+      );
+    });
   },
 );
 
@@ -1000,11 +1072,15 @@ test("baseline capture stops happen before journal or mutation", async () => {
   });
 });
 
-test("mismatched captured baseline fails before remote mutation", async () => {
+test(
+  "mismatched captured baseline fails before pacing budget or mutation",
+  async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
     const paths = persistence(path);
+    const budgetPath = join(directory, "budget.json");
     const writeCalls: string[] = [];
+    const pacingEvents: string[] = [];
 
     const result = await executePersistedBlooketWrite(
       paths,
@@ -1016,19 +1092,34 @@ test("mismatched captured baseline fails before remote mutation", async () => {
         ok: true,
         baseline: QUESTION_BASELINE,
       }),
+      {
+        pacer: immediatePacer(pacingEvents),
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 90_000,
+        },
+      },
     );
 
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-      assert.equal(result.stage, "attempt-begin");
-    }
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "verification-baseline",
+      code: "blooket-write-baseline-invalid",
+    });
+    assert.deepEqual(pacingEvents, []);
     assert.deepEqual(writeCalls, []);
+    assert.deepEqual(
+      await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null },
+    );
     assert.deepEqual(
       await loadWriteAttemptFile(paths.attempt, plan),
       { ok: true, kind: "missing" },
     );
   });
-});
+  },
+);
 
 test("persisted progress resumes at the exact next operation", async () => {
   await withTemporaryDirectory(async (directory) => {
