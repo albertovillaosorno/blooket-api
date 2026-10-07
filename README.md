@@ -36,10 +36,12 @@ endorsed by the platform.
 Current MCP tools retrieve teacher instructions, search/read/enrich media, and
 list/read/write skills and drafts. Media search returns bounded pages and a
 continuation cursor. **Saving a draft does not publish a quiz.**
+
 The Linux package has passed local startup, native media preparation, the
-packaged CLI, repeated launch, and shutdown. The macOS bundle assembler exists;
-native Mac verification, Safari packaging, signing, and launch-at-login
-remain roadmap work.
+packaged CLI, repeated launch, and shutdown. The macOS product target is ARM64;
+CI is configured to build its Safari WebExtension companion into `Blooket
+API.app`. Native Mac acceptance, signing/notarization, launch-at-login, and safe
+application replacement remain roadmap work.
 
 The Chrome extension can be assembled locally. It reads observed set summaries
 and private set details in a dedicated Blooket tab; it cannot publish quizzes.
@@ -264,12 +266,13 @@ Remote CI is deliberately opt-in so ordinary pushes and pull requests do not
 consume hosted-runner time. Local TypeScript and tests are the default
 development gate.
 
-Push a tag matching `ci-*` only when remote native validation is useful. That
-single CI workflow runs three native targets in parallel: macOS ARM64, macOS
-Intel, and Linux x64. Each target installs dependencies, runs strict TypeScript
-and the full test suite, assembles its native archive, executes the extracted
-package smoke test, and uploads that verified archive as a workflow artifact.
-A CI tag never creates a GitHub Release.
+Push a tag matching `ci-*` only when remote native validation is useful. That CI
+workflow first runs strict TypeScript, roadmap validation, the full test suite,
+and Linux package assembly/verification on Ubuntu. Only after that job passes
+does `macos-arm` run on `macos-26`, require ARM64, build and verify the Mac
+package, compile/embed the Safari companion, exercise Safari WebDriver, and
+upload the single verified `package-darwin-arm64` workflow artifact. A CI tag
+never creates a GitHub Release.
 
 Product versions use `YY.Q.PATCH`; Git tags retain the `v` prefix. Tags use UTC
 three-month quarters: `vYY.Q.PATCH`, with Q from 1 through 4. For example,
@@ -305,7 +308,8 @@ A `vYY.Q.PATCH` release tag invokes CI itself, so do not add a second CI tag
 for the same release commit.
 
 Jig is a local repository validator and is not part of GitHub Actions. Apple
-signing and Safari build setup remain tracked in task 14.
+signing and remaining native macOS/Safari hardening stay centralized in
+`blooket-15`.
 
 To build and verify a local package on the matching host:
 
@@ -314,7 +318,8 @@ npm run package -- linux-x64
 npm run package:verify -- linux-x64
 ```
 
-The other targets are `darwin-arm64` and `darwin-arm64`. Outputs live under
+The product package target is `darwin-arm64`; `linux-x64` remains the portable
+development/validation package target. Outputs live under
 `.temp/distributions/`; assembly refuses to overwrite an existing target
 directory.
 

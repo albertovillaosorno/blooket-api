@@ -53,9 +53,9 @@ error states, architecture-specific assets, verified publisher authenticity, and
 preserved Apple signing/Gatekeeper/notarization requirements.
 
 Schema-one update manifests own the exact repository/version/tag/source commit,
-Mac bundle identity, minimum OS, and the ARM64 application archive
-name/URL/size/hash. The Safari host archive is a release companion, not a
-separate application-update target.
+Mac bundle identity, minimum OS, and the single ARM64 application archive
+name/URL/size/hash. The Safari companion is embedded in `Blooket API.app` inside
+that archive; it is neither a release asset nor a separate update target.
 The portable signature format is Ed25519 with canonical manifest JSON, prefixed
 by `blooket-api:update-manifest:v1` and a newline. An envelope names an admitted
 key by its SPKI DER SHA-256 fingerprint; it cannot introduce a trust root.
