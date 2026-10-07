@@ -72,6 +72,12 @@ atomically persisted; restart reloads the same start count and deadline. Shared
 MCP/CLI/UI product composition remains pending because those publication
 entrypoints are not yet active, so owning-surface acceptance is still open.
 
+After a pacing lease is granted, persisted execution now re-observes the browser
+session without authenticating and then re-reads the verification baseline
+before budget reservation or journaling. Session expiry, rate limiting, human
+challenges, malformed baseline evidence, or a changed remote digest release the
+lease and stop without consuming the task budget or opening a mutation journal.
+
 Make pacing, mutations per minute, task mutation budget, and maximum task
 duration configurable within bounded ranges. Persist progress and yield with a
 clear status when a task budget is exhausted; do not silently drop operations.
