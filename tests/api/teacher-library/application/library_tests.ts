@@ -604,6 +604,7 @@ test(
     const library = (await loadPreferences(root)).mediaRoot;
     const record = await prepareLibraryImage(root, imported.id);
     const prepared = record.prepared!;
+    assert.match(prepared.file, /[.]jpg$/u);
     assert.deepEqual(prepared.effective, {
       stage: "requested",
       detailScale: 1,
@@ -634,6 +635,21 @@ test(
       /prepared-media-invalid/u,
     );
     await writeFile(path, valid.bytes);
+    const sharp = await loadSharp();
+    const legacyBytes = await sharp(valid.bytes).png().toBuffer();
+    const legacyFile =
+      "renditions/" + record.id + "/" + record.revision + ".png";
+    await writeFile(join(library, legacyFile), legacyBytes);
+    await saveMetadata(library, {
+      ...record,
+      prepared: {
+        ...prepared,
+        file: legacyFile,
+        bytes: legacyBytes.length,
+      },
+    });
+    const legacy = await readPreparedLibraryImage(library, record.id);
+    assert.deepEqual(legacy.bytes, legacyBytes);
     await saveMetadata(library, {
       ...record,
       prepared: {

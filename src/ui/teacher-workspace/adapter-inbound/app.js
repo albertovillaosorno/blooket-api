@@ -93,7 +93,7 @@ const words = {
     fps: "FPS de GIF",
     compression: "Compresión",
     compact: "Compacta",
-    lossless: "Color completo PNG / paleta estándar GIF",
+    lossless: "JPEG de mayor calidad / paleta estándar GIF",
     qualityHelp: "Los GIF siempre usan paleta; esto no significa sin pérdida.",
     previewHelp:
       "Esta vista muestra el encuadre. Revisa el archivo preparado " +
@@ -273,7 +273,7 @@ const words = {
     fps: "GIF FPS",
     compression: "Compression",
     compact: "Compact",
-    lossless: "Full-color PNG / standard GIF palette",
+    lossless: "Higher-quality JPEG / standard GIF palette",
     qualityHelp: "GIFs always use a palette; this does not mean lossless.",
     previewHelp:
       "This view shows framing. Review the prepared file to confirm " +
@@ -829,7 +829,11 @@ function showPrepared() {
     $("#download").href = url;
     $("#download").download =
       selected.original.name +
-      (prepared.file.endsWith(".gif") ? ".gif" : ".png");
+      (prepared.file.endsWith(".gif")
+        ? ".gif"
+        : prepared.file.endsWith(".jpg")
+          ? ".jpg"
+          : ".png");
   }
 }
 function preview() {

@@ -423,8 +423,8 @@ export async function prepareLibraryImage(
       record.edit,
     );
     if (!rendered.ok) throw new Error(rendered.sourceCode ?? rendered.code);
-    const file =
-      "renditions/" + id + "/" + record.revision + "." + rendered.value.format;
+    const extension = rendered.value.format === "jpeg" ? "jpg" : "gif";
+    const file = "renditions/" + id + "/" + record.revision + "." + extension;
     await writeAtomicFile(
       await safeLibraryPath(library, file, true),
       rendered.value.bytes,
@@ -467,7 +467,9 @@ export async function readPreparedLibraryImage(
     )
       throw new Error("prepared-revision-conflict");
     const prefix = "renditions/" + record.id + "/" + record.revision;
-    if (![prefix + ".png", prefix + ".gif"].includes(prepared.file))
+    if (![prefix + ".png", prefix + ".jpg", prefix + ".gif"].includes(
+      prepared.file,
+    ))
       throw new Error("prepared-media-invalid");
     const bytes = await boundedBytes(
       await safeLibraryPath(library, prepared.file),
@@ -480,7 +482,11 @@ export async function readPreparedLibraryImage(
       !decoded.ok ||
       decoded.value.frameWidth !== record.edit.width ||
       decoded.value.frameHeight !== record.edit.height ||
-      !prepared.file.endsWith("." + decoded.value.format.format)
+      !prepared.file.endsWith(
+        decoded.value.format.format === "jpeg"
+          ? ".jpg"
+          : "." + decoded.value.format.format,
+      )
     )
       throw new Error("prepared-media-invalid");
     return { bytes, file: prepared.file, revision: record.revision };

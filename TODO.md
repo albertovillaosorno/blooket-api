@@ -484,7 +484,13 @@ lossless is still too large, and a GIF forced over its output-pixel budget at
 20 FPS falls to 10 FPS while preserving final canvas dimensions and loop/timing
 semantics.
 
-Normalize static prepared images to JPEG with the chosen background flattened.
+Static preparation normalization was implemented on 2026-10-06. New static
+prepared files are JPEG with the chosen background flattened before final byte
+admission; historic prepared PNG files remain readable. The ordinary editor
+renderer remains PNG/GIF internally, so JPEG is restricted to the prepared
+artifact boundary. The compatible lossless recipe value now means the
+higher-quality JPEG tier for static files rather than a lossless output format.
+
 Keep animated media animated and detect actual source frame delays, duration,
 and cadence before choosing an explicit output FPS. Variable-delay sources
 must not be described as having one uniform detected FPS when they do not.

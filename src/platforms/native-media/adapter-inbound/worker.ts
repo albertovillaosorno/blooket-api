@@ -197,7 +197,12 @@ async function work(input: unknown) {
     const options = object(request["options"]);
     exact(options, [
       "blurSigma",
-      ...["gifFps", "background", "compression", "detailScale"].filter(
+      ...[
+        "gifFps",
+        "background",
+        "compression",
+        "detailScale",
+      ].filter(
         (key) => key in options,
       ),
     ]);

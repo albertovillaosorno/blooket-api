@@ -141,7 +141,17 @@ async function candidateBytes(
     },
   );
   assert.ok(rendered.ok);
-  return rendered.ok ? rendered.value.bytes.length : 0;
+  if (!rendered.ok) return 0;
+  const sharp = await loadSharp();
+  return (
+    await sharp(rendered.value.bytes)
+      .flatten({ background: "#ffffff" })
+      .jpeg({
+        quality: compression === "compact" ? 80 : 92,
+        mozjpeg: true,
+      })
+      .toBuffer()
+  ).length;
 }
 
 test("neutral editor rendering preserves equal-canvas pixels", async () => {
@@ -381,7 +391,13 @@ test("optimization lowers working detail before compression", async () => {
   });
   assert.equal(optimized.value.width, 96);
   assert.equal(optimized.value.height, 96);
+  assert.equal(optimized.value.format, "jpeg");
+  assert.equal(optimized.value.mediaType, "image/jpeg");
   assert.ok(optimized.value.bytes.length <= size55);
+  const metadata = await (await loadSharp())(optimized.value.bytes).metadata();
+  assert.equal(metadata.format, "jpeg");
+  assert.equal(metadata.width, 96);
+  assert.equal(metadata.height, 96);
 });
 
 test(
@@ -420,6 +436,44 @@ test(
     assert.equal(optimized.value.width, 96);
     assert.equal(optimized.value.height, 96);
     assert.ok(optimized.value.bytes.length <= limit);
+  },
+);
+
+test(
+  "prepared JPEG flattens transparency onto the chosen background",
+  async () => {
+  const sharp = await loadSharp();
+  const transparent = await sharp(
+    new Uint8Array(8 * 8 * 4),
+    { raw: { width: 8, height: 8, channels: 4 } },
+  )
+    .png()
+    .toBuffer();
+  const optimized = await renderOptimizedImageRendition(
+    transparent,
+    state(),
+    { width: 8, height: 8 },
+    {
+      maxInputPixels: 1_000,
+      maxOutputPixels: 1_000,
+      maxOutputBytes: 100_000,
+    },
+    {
+      blurSigma: 20,
+      gifFps: 10,
+      compression: "lossless",
+      background: { mode: "blur", color: "#123456" },
+    },
+  );
+  assert.ok(optimized.ok);
+  if (!optimized.ok) return;
+  assert.equal(optimized.value.format, "jpeg");
+  const pixels = await sharp(optimized.value.bytes).raw().toBuffer();
+  for (let offset = 0; offset < pixels.length; offset += 3) {
+    assert.ok(Math.abs(pixels[offset]! - 0x12) <= 3);
+    assert.ok(Math.abs(pixels[offset + 1]! - 0x34) <= 3);
+    assert.ok(Math.abs(pixels[offset + 2]! - 0x56) <= 3);
+  }
   },
 );
 

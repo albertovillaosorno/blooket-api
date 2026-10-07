@@ -92,6 +92,13 @@ export interface SharpPipeline {
     readonly quality?: number;
     readonly compressionLevel?: number;
   }): SharpPipeline;
+  flatten(options?: {
+    readonly background?: string;
+  }): SharpPipeline;
+  jpeg(options?: {
+    readonly quality?: number;
+    readonly mozjpeg?: boolean;
+  }): SharpPipeline;
   webp(options?: {
     readonly quality?: number;
     readonly alphaQuality?: number;
