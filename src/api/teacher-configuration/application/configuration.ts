@@ -57,6 +57,8 @@ import { tryAcquireFileLock } from
   "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import { writeAtomicFile } from
   "../../../platforms/atomic-files/adapter-outbound/atomic-file.ts";
+import { resolveConfiguredTcpPort } from
+  "../../../platforms/tcp-ports/adapter-outbound/tcp-port.ts";
 import { loadSharp } from
   "../../../media/sharp-runtime/adapter-outbound/sharp-runtime.ts";
 import { decodeImageIsolated } from
@@ -240,16 +242,28 @@ export async function chooseMediaFolder(): Promise<string> {
 export async function runFirstUseDiagnostics(
   root: string,
   rerun = false,
+  secrets: HostSecretStore = createHostSecretStore(),
+  ownedServicePort?: number,
 ): Promise<FirstUseDiagnostic> {
   const acquired = await tryAcquireFileLock(join(root, ".diagnostics.lock"));
   if (!acquired.ok) throw new Error("diagnostics-" + acquired.reason);
   try {
-    return await inspectFirstUseDiagnostics(root, rerun);
+    return await inspectFirstUseDiagnostics(
+      root,
+      rerun,
+      secrets,
+      ownedServicePort,
+    );
   } finally {
     await acquired.lock.release();
   }
 }
-async function inspectFirstUseDiagnostics(root: string, rerun: boolean) {
+async function inspectFirstUseDiagnostics(
+  root: string,
+  rerun: boolean,
+  secrets: HostSecretStore,
+  ownedServicePort?: number,
+) {
   const statePath = join(root, "diagnostics.json");
   if (!rerun) {
     try {
@@ -280,27 +294,71 @@ async function inspectFirstUseDiagnostics(root: string, rerun: boolean) {
         ? "macos-" + process.arch
         : "development-host",
   });
+  let preferences: Awaited<ReturnType<typeof loadPreferences>> | undefined;
+  let servicePort: number | undefined;
   try {
-    const preferences = await loadPreferences(root);
-    checks.push({ name: "settings", status: "passed", code: "settings-valid" });
-    await initializeLibrary(preferences.mediaRoot);
-    const probe = join(preferences.mediaRoot, ".diagnostic-write");
-    await writeAtomicFile(probe, "storage-probe");
-    await rm(probe);
+    preferences = await loadPreferences(root);
+    if (ownedServicePort === preferences.service.port) {
+      servicePort = ownedServicePort;
+      checks.push({
+        name: "settings",
+        status: "passed",
+        code: "settings-valid",
+      });
+    } else {
+      const resolved = await resolveConfiguredTcpPort(preferences.service);
+      if (!resolved.ok) {
+        checks.push({
+          name: "settings",
+          status: "failed",
+          code: resolved.code,
+        });
+      } else {
+        servicePort = resolved.settings.port;
+        checks.push({
+          name: "settings",
+          status: "passed",
+          code: "settings-valid",
+        });
+      }
+    }
+  } catch (error) {
+    checks.push({
+      name: "settings",
+      status: "failed",
+      code: safeCode(error),
+    });
+  }
+  if (preferences) {
+    try {
+      await initializeLibrary(preferences.mediaRoot);
+      const probe = join(preferences.mediaRoot, ".diagnostic-write");
+      await writeAtomicFile(probe, "storage-probe");
+      await rm(probe);
+      checks.push({
+        name: "storage",
+        status: "passed",
+        code: "storage-writable",
+      });
+    } catch (error) {
+      checks.push({
+        name: "storage",
+        status: "failed",
+        code: safeCode(error),
+      });
+    }
+    checks.push(await onlineDiagnostic(preferences, servicePort, secrets));
+  } else {
     checks.push({
       name: "storage",
-      status: "passed",
-      code: "storage-writable",
+      status: "failed",
+      code: "settings-unavailable",
     });
     checks.push({
       name: "online",
-      status: preferences.online.enabled ? "unverified" : "unconfigured",
-      code: preferences.online.enabled
-        ? "connection-verification-required"
-        : "online-disabled",
+      status: "unconfigured",
+      code: "settings-unavailable",
     });
-  } catch (error) {
-    checks.push({ name: "storage", status: "failed", code: safeCode(error) });
   }
   try {
     const sharp = await loadSharp();
@@ -359,6 +417,68 @@ async function inspectFirstUseDiagnostics(root: string, rerun: boolean) {
   );
   await writeAtomicFile(statePath, JSON.stringify(state, null, 2) + "\n");
   return state;
+}
+
+async function onlineDiagnostic(
+  preferences: Awaited<ReturnType<typeof loadPreferences>>,
+  servicePort: number | undefined,
+  secrets: HostSecretStore,
+): Promise<DiagnosticCheck> {
+  if (!preferences.online.enabled) {
+    return {
+      name: "online",
+      status: "unconfigured",
+      code: "online-disabled",
+    };
+  }
+  if (servicePort === undefined || servicePort >= 65535) {
+    return {
+      name: "online",
+      status: "failed",
+      code: "gateway-port-unavailable",
+    };
+  }
+  const owner = await safeSecretRead(secrets, OWNER_VERIFIER_SECRET);
+  if (!owner.ok) {
+    return { name: "online", status: "failed", code: owner.code };
+  }
+  if (owner.kind !== "found") {
+    return {
+      name: "online",
+      status: "unconfigured",
+      code: "owner-password-missing",
+    };
+  }
+  const tunnel = await safeSecretRead(secrets, "cloudflare-tunnel");
+  if (!tunnel.ok) {
+    return { name: "online", status: "failed", code: tunnel.code };
+  }
+  if (tunnel.kind !== "found") {
+    return {
+      name: "online",
+      status: "unconfigured",
+      code: "tunnel-token-missing",
+    };
+  }
+  return {
+    name: "online",
+    status: "unverified",
+    code: "connection-verification-required",
+  };
+}
+
+async function safeSecretRead(
+  secrets: HostSecretStore,
+  name: string,
+) {
+  try {
+    return await secrets.read(name);
+  } catch {
+    return {
+      ok: false as const,
+      code: "host-secret-store-failed" as const,
+    };
+  }
 }
 
 async function boundedDiagnostic(path: string): Promise<string> {

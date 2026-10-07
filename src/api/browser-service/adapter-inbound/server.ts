@@ -164,7 +164,7 @@ export async function startBrowserService(
   await initializeLibrary(preferences.mediaRoot);
   await withLibraryLock(preferences.mediaRoot, async () => {});
   await installInitialSkills(root);
-  const diagnostic = await runFirstUseDiagnostics(root);
+  const diagnostic = await runFirstUseDiagnostics(root, false, secrets);
   const csrf = randomBytes(32).toString("base64url");
   const browserBridge =
     options.browserBridge ?? createBlooketBrowserBridgeBroker();
@@ -174,6 +174,7 @@ export async function startBrowserService(
     secrets,
   };
   let origin = "";
+  let ownedPort: number | undefined;
   const staticRoot = new URL(
     "../../../ui/teacher-workspace/adapter-inbound/",
     import.meta.url,
@@ -523,7 +524,11 @@ export async function startBrowserService(
         return;
       }
       if (url.pathname === "/api/diagnostics") {
-        json(response, 200, await runFirstUseDiagnostics(root, true));
+        json(
+          response,
+          200,
+          await runFirstUseDiagnostics(root, true, secrets, ownedPort),
+        );
         return;
       }
       if (url.pathname === "/api/library-migrate") {
@@ -659,6 +664,7 @@ export async function startBrowserService(
   if (!address || typeof address === "string")
     throw new Error("invalid-service-address");
   const localPort = address.port;
+  ownedPort = localPort;
   origin =
     "http://" +
     (bindAddress === "::1" ? "[::1]" : bindAddress) +

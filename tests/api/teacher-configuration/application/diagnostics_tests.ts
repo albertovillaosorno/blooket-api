@@ -11,7 +11,7 @@
 // - Owns:
 //   - Verification of persisted first-use diagnostic integrity.
 // - Must-Not:
-//   - Read credentials or claim native host acceptance from portable checks.
+//   - Return credentials or claim native host acceptance from portable checks.
 // - Allows:
 //   - Inputs: Untrusted diagnostic records.
 //   - Outputs: Validated state or bounded decoding failures.
@@ -35,12 +35,21 @@ import { mkdtemp, rm, readFile, writeFile, symlink, mkdir } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:net";
 import { runFirstUseDiagnostics } from
   "../../../../src/api/teacher-configuration/application/configuration.ts";
 import { tryAcquireFileLock } from
   "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
 import { DIAGNOSTIC_MAX_BYTES } from
   "../../../../src/ir/first-use-diagnostics/contract/state.ts";
+import { defaultTeacherPreferences } from
+  "../../../../src/settings/teacher-preferences/domain/preferences.ts";
+import { savePreferences } from
+  "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
+import { OWNER_VERIFIER_SECRET } from
+  "../../../../src/security/owner-password/domain/verifier.ts";
+import type { HostSecretStore } from
+  "../../../../src/security/host-secrets/domain/host-secret.ts";
 
 async function temporary(action: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), "first-use-diagnostic-"));
@@ -48,9 +57,32 @@ async function temporary(action: (root: string) => Promise<void>) {
   finally { await rm(root, { recursive: true, force: true }); }
 }
 
+function secrets(
+  reads: string[],
+  owner: "found" | "missing" = "found",
+  tunnel: "found" | "missing" = "found",
+): HostSecretStore {
+  return {
+    read: async (name) => {
+      reads.push(name);
+      const kind = name === OWNER_VERIFIER_SECRET ? owner : tunnel;
+      return kind === "found"
+        ? { ok: true, kind, secret: "fixture-secret" }
+        : { ok: true, kind };
+    },
+    write: async () => ({ ok: true }),
+    delete: async () => ({ ok: true }),
+  };
+}
+
 test("first-use reuses validated state and manual rerun repairs corruption",
   async () => {
     await temporary(async root => {
+      const preferences = defaultTeacherPreferences(join(root, "media"));
+      await savePreferences(root, {
+        ...preferences,
+        service: { ...preferences.service, port: 1, portMode: "automatic" },
+      });
       const first = await runFirstUseDiagnostics(root);
       assert.deepEqual(
         first.checks.map((check) => check.name),
@@ -90,6 +122,133 @@ test("first-use reuses validated state and manual rerun repairs corruption",
       const repaired = await runFirstUseDiagnostics(root, true);
       assert.notEqual(repaired.at, first.at);
       assert.deepEqual(await runFirstUseDiagnostics(root), repaired);
+    });
+  });
+
+test(
+  "online diagnostics require owner and tunnel secrets without exposing them",
+  async () => {
+    await temporary(async root => {
+      const preferences = defaultTeacherPreferences(join(root, "media"));
+      await savePreferences(root, {
+        ...preferences,
+        service: { ...preferences.service, port: 1, portMode: "automatic" },
+        online: {
+          enabled: true,
+          publicUrl: "https://example.test/mcp",
+          provider: "cloudflare",
+        },
+      });
+      const reads: string[] = [];
+      const ready = await runFirstUseDiagnostics(
+        root,
+        true,
+        secrets(reads),
+      );
+      assert.deepEqual(
+        ready.checks.find((check) => check.name === "online"),
+        {
+          name: "online",
+          status: "unverified",
+          code: "connection-verification-required",
+        },
+      );
+      assert.deepEqual(reads, [OWNER_VERIFIER_SECRET, "cloudflare-tunnel"]);
+      assert.equal(JSON.stringify(ready).includes("fixture-secret"), false);
+
+      reads.length = 0;
+      const missingOwner = await runFirstUseDiagnostics(
+        root,
+        true,
+        secrets(reads, "missing"),
+      );
+      assert.deepEqual(
+        missingOwner.checks.find((check) => check.name === "online"),
+        {
+          name: "online",
+          status: "unconfigured",
+          code: "owner-password-missing",
+        },
+      );
+      assert.deepEqual(reads, [OWNER_VERIFIER_SECRET]);
+
+      reads.length = 0;
+      const missingTunnel = await runFirstUseDiagnostics(
+        root,
+        true,
+        secrets(reads, "found", "missing"),
+      );
+      assert.deepEqual(
+        missingTunnel.checks.find((check) => check.name === "online"),
+        {
+          name: "online",
+          status: "unconfigured",
+          code: "tunnel-token-missing",
+        },
+      );
+      assert.deepEqual(reads, [OWNER_VERIFIER_SECRET, "cloudflare-tunnel"]);
+    });
+  },
+);
+
+test("diagnostics distinguish fixed port conflicts from automatic recovery",
+  async () => {
+    await temporary(async root => {
+      const blocker = createServer();
+      await new Promise<void>((resolve, reject) => {
+        blocker.once("error", reject);
+        blocker.listen(0, "127.0.0.1", resolve);
+      });
+      try {
+        const address = blocker.address();
+        assert.ok(address && typeof address !== "string");
+        if (!address || typeof address === "string") return;
+        const preferences = defaultTeacherPreferences(join(root, "media"));
+        await savePreferences(root, {
+          ...preferences,
+          service: {
+            ...preferences.service,
+            port: address.port,
+            portMode: "fixed",
+          },
+        });
+        const fixed = await runFirstUseDiagnostics(root, true);
+        assert.deepEqual(
+          fixed.checks.find((check) => check.name === "settings"),
+          {
+            name: "settings",
+            status: "failed",
+            code: "configured-port-in-use",
+          },
+        );
+        assert.equal(fixed.outcome, "failed");
+        const owned = await runFirstUseDiagnostics(
+          root,
+          true,
+          secrets([]),
+          address.port,
+        );
+        assert.deepEqual(
+          owned.checks.find((check) => check.name === "settings"),
+          { name: "settings", status: "passed", code: "settings-valid" },
+        );
+
+        await savePreferences(root, {
+          ...preferences,
+          service: {
+            ...preferences.service,
+            port: address.port,
+            portMode: "automatic",
+          },
+        });
+        const automatic = await runFirstUseDiagnostics(root, true);
+        assert.deepEqual(
+          automatic.checks.find((check) => check.name === "settings"),
+          { name: "settings", status: "passed", code: "settings-valid" },
+        );
+      } finally {
+        await new Promise<void>((resolve) => blocker.close(() => resolve()));
+      }
     });
   });
 

@@ -50,9 +50,10 @@ ambiguous Blooket write.
 
 The lightweight first-use check, persisted `diagnostics.json`, sanitized local
 log, and manual rerun exist. It checks runtime, host, settings/storage, a tiny
-native image round-trip, and secret-client presence. Complete settings linkage,
-port and configured tunnel prerequisites, and meaningful Keychain availability
-checks without saving real credentials or mutating Blooket.
+native image round-trip, and secret-client presence. Fresh checks now validate
+the configured local port and online prerequisites without persisting secret
+values. Meaningful Keychain availability beyond client presence still requires
+native acceptance without saving real credentials or mutating Blooket.
 
 Shutdown/reload serialization and terminal stop were implemented and tested in
 task 04. Preserve useful `cloudflared-unavailable`/timeout failure codes instead
@@ -146,6 +147,18 @@ and plist and, on macOS, executes the helper before the ordinary launcher reuse
 check. This repository session has no local Swift compiler, so compilation,
 registration authorization, signing, and actual login startup remain unclaimed
 until the ARM64 macOS path runs.
+
+Fresh first-use diagnostics now reuse the same configured TCP-port resolver as
+service startup. Fixed occupied ports fail explicitly, automatic mode may select
+an available candidate, and a running service can identify its own persisted
+port so a manual rerun does not mistake itself for a collision. When online MCP
+is enabled, diagnostics require a usable gateway port plus the presence of the
+owner verifier and Cloudflare tunnel token through the injected host-secret
+store.
+
+Missing or failed secret-store reads produce bounded codes; secret values never
+enter diagnostic state or logs. Portable regressions cover fixed/automatic port
+behavior, owned-port reruns, prerequisite ordering, and secret containment.
 
 ## Blockers
 
