@@ -52,6 +52,30 @@ test("first-use reuses validated state and manual rerun repairs corruption",
   async () => {
     await temporary(async root => {
       const first = await runFirstUseDiagnostics(root);
+      assert.deepEqual(
+        first.checks.map((check) => check.name),
+        [
+          "runtime",
+          "macos",
+          "settings",
+          "storage",
+          "online",
+          "native-image",
+          "secret-store-client",
+        ],
+      );
+      assert.deepEqual(
+        first.checks.find((check) => check.name === "settings"),
+        { name: "settings", status: "passed", code: "settings-valid" },
+      );
+      assert.deepEqual(
+        first.checks.find((check) => check.name === "online"),
+        {
+          name: "online",
+          status: "unconfigured",
+          code: "online-disabled",
+        },
+      );
       const state = await readFile(join(root, "diagnostics.json"), "utf8");
       const log = await readFile(join(root, first.log), "utf8");
       assert.equal(log, state);
