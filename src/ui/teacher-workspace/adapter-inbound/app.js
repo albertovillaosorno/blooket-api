@@ -123,9 +123,7 @@ const words = {
     sourceTooLarge: "El original supera 25 MB. Elige una copia más pequeña.",
     invalidImage: "No se pudo decodificar la imagen. Revisa el archivo.",
     stalePrepared: "La imagen cambió. Vuelve a guardarla y prepararla.",
-    limit:
-      "El archivo preparado debe pesar menos de 2,5 MB. " +
-      "Si no cumple, no puede continuar.",
+    processing: "Optimizando y comprobando el archivo…",
     saveSettings: "Guardar configuración",
     diagnostics: "Diagnóstico inicial",
     runDiagnostics: "Repetir diagnóstico",
@@ -168,9 +166,8 @@ const words = {
     operationFailed:
       "No se pudo completar. Revisa los campos e inténtalo de nuevo.",
     tooLarge:
-      "El resultado excede el límite. Reduce dimensiones " +
-      "o FPS y vuelve a preparar; no está listo para " +
-      "subir.",
+      "No se pudo preparar un archivo válido bajo el límite. " +
+      "La imagen sigue editable.",
     conflict: "Esta imagen cambió. Vuelve a abrirla antes de guardar.",
     collision: "Ya existe un archivo con ese nombre. Elige otro.",
     folderMac:
@@ -303,9 +300,7 @@ const words = {
     sourceTooLarge: "The original exceeds 25 MB. Choose a smaller copy.",
     invalidImage: "The image could not be decoded. Check the source file.",
     stalePrepared: "The image changed. Save and prepare it again.",
-    limit:
-      "Prepared files must be smaller than 2.5 MB. Export " +
-      "is blocked until they fit.",
+    processing: "Optimizing and checking the prepared file…",
     saveSettings: "Save settings",
     diagnostics: "First-use diagnostics",
     runDiagnostics: "Run diagnostics again",
@@ -345,8 +340,8 @@ const words = {
     operationFailed:
       "Could not complete the operation. Check the fields " + "and try again.",
     tooLarge:
-      "The result exceeds the limit. Reduce dimensions or " +
-      "FPS and prepare again; it cannot be uploaded yet.",
+      "A valid file could not be prepared under the limit. " +
+      "The image remains editable.",
     conflict: "This image has changed. Reopen it before saving.",
     collision: "A file with that name exists. Choose another name.",
     folderMac:
@@ -375,7 +370,10 @@ let locale = "es",
   sourceBase64,
   sourceBase64Promise,
   animatedColorSuggestion;
-let editorBusy = false;
+let editorBusy = false,
+  preparedDirty = false,
+  preparing = false,
+  hadPreparedPreview = false;
 let clipboardReading = false;
 let suggestions = [],
   searchIndex = [],
@@ -776,6 +774,9 @@ function openEditor(record, sourceUrl) {
     return;
   }
   selected = structuredClone(record);
+  preparedDirty = false;
+  preparing = false;
+  hadPreparedPreview = Boolean(record.prepared);
   history = [];
   future = [];
   picking = false;
@@ -814,12 +815,15 @@ function syncRecipe() {
 }
 function showPrepared() {
   const prepared = selected.prepared;
-  $("#preparedPreview").hidden = !prepared;
-  $("#download").hidden = !prepared;
-  $("#preparedState").textContent = prepared
-    ? t("ready") + " · " + (prepared.bytes / 1_000_000).toFixed(3) + " MB"
-    : t("limit");
-  if (prepared) {
+  const current = Boolean(prepared) && !preparedDirty && !preparing;
+  $("#download").hidden = !current;
+  $("#preparedPreview").hidden = current ? false : !hadPreparedPreview;
+  $("#preparedState").textContent = preparing
+    ? t("processing")
+    : current
+      ? t("ready") + " · " + (prepared.bytes / 1_000_000).toFixed(3) + " MB"
+      : t("pending");
+  if (current) {
     const url =
       "/media/" +
       selected.id +
@@ -834,6 +838,7 @@ function showPrepared() {
         : prepared.file.endsWith(".jpg")
           ? ".jpg"
           : ".png");
+    hadPreparedPreview = true;
   }
 }
 function preview() {
@@ -892,7 +897,7 @@ function remember() {
   future = [];
 }
 function invalidate() {
-  selected.prepared = null;
+  preparedDirty = true;
   showPrepared();
   preview();
 }
@@ -1094,7 +1099,8 @@ editForm.addEventListener("submit", async (event) => {
   if (editorBusy) return;
   setEditorBusy(true);
   drag = undefined;
-  $("#download").hidden = true;
+  preparing = true;
+  showPrepared();
   try {
     const original = {
       name: field(editForm, "name").value,
@@ -1122,9 +1128,12 @@ editForm.addEventListener("submit", async (event) => {
       });
     }
     selected = await api("/api/prepare", { id: selected.id });
+    preparedDirty = false;
+    preparing = false;
     showPrepared();
     await refresh();
   } catch (error) {
+    preparing = false;
     showPrepared();
     await refresh().catch(() => {});
     report(error);

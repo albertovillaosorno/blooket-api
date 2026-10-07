@@ -594,6 +594,28 @@ test(
   },
 );
 
+test("cancelled preparation publishes no prepared metadata", async () => {
+  const { root, input } = await setup();
+  try {
+    const imported = await importLibraryImage(root, input);
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      prepareLibraryImage(root, imported.id, {
+        signal: controller.signal,
+      }),
+      /native-media-cancelled/u,
+    );
+    const library = (await loadPreferences(root)).mediaRoot;
+    const current = (await listLibrary(library)).find(
+      (record) => record.id === imported.id,
+    );
+    assert.equal(current?.prepared, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test(
   "prepared reads reject stale revisions " +
     "and changed format or byte count",

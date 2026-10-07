@@ -503,11 +503,23 @@ background, adjustments, source, or output defaults change; an estimate alone
 cannot certify size. Use bounded candidate searches, cancellation, and revision
 checks so a slower old calculation cannot replace a newer edit.
 
-Keep the last valid result while a new candidate is being optimized. Show
-processing state until actual encoding and byte checks establish the new valid
-result; do not expose failed temporary files or enable continuation early.
-Remove the ordinary workflow's manual size-warning text once automatic
-optimization is implemented.
+Preparation concurrency was hardened on 2026-10-06. The application captures
+the exact record and bounded source bytes under the library lock, releases the
+lock for native optimization, then reacquires it before publication. A changed
+revision or asset identity rejects the stale result before any rendition write.
+The local HTTP route propagates client disconnects through AbortSignal to the
+native worker, and cancelled preparation publishes no prepared metadata.
+
+The editor now retains the last rendered prepared preview while recipe changes
+are pending or a replacement is being optimized. That stale preview is display
+only: its download action is disabled until actual encoding and byte checks
+produce a current-revision prepared file. New media with no prior prepared file
+shows no synthetic preview.
+
+The ordinary manual size-warning state was removed. The editor reports pending,
+processing, and ready states; exhausting all bounded candidates reports that a
+valid file could not be prepared while retaining editable source state. It no
+longer tells the teacher to tune dimensions or FPS by trial and error.
 
 The output must remain strictly below 2,500,000 bytes, including GIF animation;
 2,500,000 bytes exactly fails. If an input is malformed, exceeds admitted
