@@ -337,6 +337,70 @@ export async function sampleLibraryImageColors(
   return { rgba: [...(await sampleImageColorsIsolated(bytes))] };
 }
 
+export async function inspectPreparationAdmission(
+  root: string,
+  input: unknown,
+  options: { readonly signal?: AbortSignal } = {},
+) {
+  const request = object(input);
+  const hasId = "id" in request;
+  exact(request, ["edit", hasId ? "id" : "base64"]);
+  const recipe = decodeEditRecipe(request["edit"]);
+  const preferences = await loadPreferences(root);
+  if (
+    recipe.width !== preferences.defaults.width ||
+    recipe.height !== preferences.defaults.height
+  )
+    throw new Error("canvas-settings-conflict");
+
+  let bytes: Uint8Array;
+  if (hasId) {
+    if (
+      !text(request["id"], 128) ||
+      !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(request["id"])
+    )
+      throw new Error("invalid-media-id");
+    bytes = await withLibraryLock(preferences.mediaRoot, async () => {
+      const record = (await listLibrary(preferences.mediaRoot)).find(
+        (item) => item.id === request["id"],
+      );
+      if (!record) throw new Error("media-not-found");
+      const path = await safeLibraryPath(preferences.mediaRoot, record.asset);
+      return await boundedBytes(path, 25_000_000);
+    });
+  } else {
+    if (!text(request["base64"], 35_000_000))
+      throw new Error("invalid-source-bytes");
+    bytes = Buffer.from(request["base64"] as string, "base64");
+    if (
+      bytes.length < 1 ||
+      bytes.length > 25_000_000 ||
+      Buffer.from(bytes).toString("base64") !== request["base64"]
+    )
+      throw new Error("invalid-source-bytes");
+  }
+
+  const rendered = await renderImageIsolated(
+    bytes,
+    { ...recipe, compression: "lossless" },
+    options.signal === undefined ? undefined : { signal: options.signal },
+  );
+  if (!rendered.ok) {
+    return {
+      feasible: false as const,
+      highQuality: false as const,
+      code: rendered.sourceCode ?? rendered.code,
+      effective: null,
+    };
+  }
+  return {
+    feasible: true as const,
+    highQuality: rendered.value.effective.compression === "lossless",
+    code: null,
+    effective: rendered.value.effective,
+  };
+}
+
 export async function importLibraryImage(
   root: string,
   input: unknown,

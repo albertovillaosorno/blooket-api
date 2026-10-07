@@ -95,6 +95,12 @@ const words = {
     compact: "Compacta",
     lossless: "JPEG de mayor calidad / paleta estándar GIF",
     qualityHelp: "Los GIF siempre usan paleta; esto no significa sin pérdida.",
+    qualityChecking: "Comprobando calidad con el archivo real…",
+    qualityBoth: "Calidad alta y compacta disponibles.",
+    qualityCompactOnly: "Para esta edición sólo está disponible compacta.",
+    qualityNone: "Esta edición no cabe con ningún candidato permitido.",
+    qualityUnknown:
+      "No se pudo comprobar la calidad; compacta se validará al preparar.",
     previewHelp:
       "Esta vista muestra el encuadre. Revisa el archivo preparado " +
       "para confirmar colores, compresión y ritmo del GIF.",
@@ -276,6 +282,12 @@ const words = {
     compact: "Compact",
     lossless: "Higher-quality JPEG / standard GIF palette",
     qualityHelp: "GIFs always use a palette; this does not mean lossless.",
+    qualityChecking: "Checking quality against the real file…",
+    qualityBoth: "Higher quality and compact are available.",
+    qualityCompactOnly: "Only compact is available for this edit.",
+    qualityNone: "This edit does not fit any permitted candidate.",
+    qualityUnknown:
+      "Quality could not be checked; compact will be validated on prepare.",
     previewHelp:
       "This view shows framing. Review the prepared file to confirm " +
       "colors, compression and GIF timing.",
@@ -384,7 +396,14 @@ let editorBusy = false,
   preparing = false,
   hadPreparedPreview = false,
   editorSession = 0,
-  preparationController;
+  preparationController,
+  admissionController,
+  admissionTimer,
+  admissionGeneration = 0,
+  admissionPending = false,
+  admissionKnown = false,
+  admissionFeasible = true,
+  highQualityAdmitted = false;
 let clipboardReading = false;
 let suggestions = [],
   searchIndex = [],
@@ -399,11 +418,39 @@ const t = (key) => words[locale][key] ?? key;
 const field = (form, name) => form.elements.namedItem(name);
 const settingsForm = $("#settingsForm"),
   editForm = $("#editForm");
+function updateAdmissionControls() {
+  const compression = field(editForm, "compression");
+  const higherQuality = Array.from(compression.options).find(
+    (option) => option.value === "lossless",
+  );
+  if (higherQuality)
+    higherQuality.disabled =
+      editorBusy ||
+      admissionPending ||
+      !admissionKnown ||
+      !highQualityAdmitted;
+  const submit = editForm.querySelector("[type=submit]");
+  if (submit)
+    submit.disabled =
+      editorBusy ||
+      admissionPending ||
+      (admissionKnown && !admissionFeasible);
+  $("#qualityState").textContent = admissionPending
+    ? t("qualityChecking")
+    : !admissionKnown
+      ? t("qualityUnknown")
+      : !admissionFeasible
+        ? t("qualityNone")
+        : highQualityAdmitted
+          ? t("qualityBoth")
+          : t("qualityCompactOnly");
+}
 function setEditorBusy(value) {
   editorBusy = value;
   Array.from(editForm.elements).forEach((control) => {
     control.disabled = value;
   });
+  if (!value) updateAdmissionControls();
   if (value) $("#canvas").setAttribute("aria-disabled", "true");
   else $("#canvas").removeAttribute("aria-disabled");
 }
@@ -420,6 +467,7 @@ function translate() {
     el.setAttribute("aria-label", t(el.dataset.aria));
   });
   $("#preparedPreview").alt = t("preparedLabel");
+  if (selected) updateAdmissionControls();
   renderGallery();
 }
 function toast(message) {
@@ -684,6 +732,94 @@ async function fileBase64(file) {
       sourceBase64Promise = undefined;
   }
 }
+function cancelPreparationAdmission() {
+  clearTimeout(admissionTimer);
+  admissionTimer = undefined;
+  admissionController?.abort();
+  admissionController = undefined;
+  admissionGeneration += 1;
+  admissionPending = false;
+}
+
+function schedulePreparationAdmission(delay = 250) {
+  if (!selected || !$("#editor").open) return;
+  clearTimeout(admissionTimer);
+  admissionController?.abort();
+  const generation = ++admissionGeneration;
+  const session = editorSession;
+  const target = selected;
+  const file = sourceFile;
+  const edit = structuredClone(selected.edit);
+  admissionPending = true;
+  admissionKnown = false;
+  highQualityAdmitted = false;
+  updateAdmissionControls();
+  admissionTimer = setTimeout(async () => {
+    admissionTimer = undefined;
+    const controller = new AbortController();
+    admissionController = controller;
+    try {
+      const source = file
+        ? { base64: await fileBase64(file) }
+        : { id: target.id };
+      if (
+        controller.signal.aborted ||
+        generation !== admissionGeneration ||
+        session !== editorSession ||
+        selected !== target
+      )
+        return;
+      const result = await api(
+        "/api/media-admission",
+        { ...source, edit },
+        controller.signal,
+      );
+      if (
+        controller.signal.aborted ||
+        generation !== admissionGeneration ||
+        session !== editorSession ||
+        selected !== target
+      )
+        return;
+      admissionKnown = true;
+      admissionFeasible = result.feasible === true;
+      highQualityAdmitted =
+        admissionFeasible && result.highQuality === true;
+      if (
+        admissionFeasible &&
+        !highQualityAdmitted &&
+        selected.edit.compression === "lossless"
+      ) {
+        selected.edit.compression = "compact";
+        field(editForm, "compression").value = "compact";
+        preparedDirty = true;
+        showPrepared();
+      }
+    } catch {
+      if (controller.signal.aborted || generation !== admissionGeneration)
+        return;
+      admissionKnown = false;
+      admissionFeasible = true;
+      highQualityAdmitted = false;
+      if (
+        selected === target &&
+        selected.edit.compression === "lossless"
+      ) {
+        selected.edit.compression = "compact";
+        field(editForm, "compression").value = "compact";
+        preparedDirty = true;
+        showPrepared();
+      }
+    } finally {
+      if (generation === admissionGeneration) {
+        admissionController = undefined;
+        admissionPending = false;
+        updateAdmissionControls();
+      }
+    }
+  }, delay);
+}
+
 async function loadAnimatedColorSuggestion(target, id) {
   try {
     const file = sourceFile;
@@ -805,6 +941,10 @@ function openEditor(record, sourceUrl) {
   syncRecipe();
   showPrepared();
   $("#editor").showModal();
+  admissionKnown = false;
+  admissionFeasible = true;
+  highQualityAdmitted = false;
+  schedulePreparationAdmission(0);
   if (record.asset.endsWith(".gif") && !solidColorSuggested) {
     const target = selected;
     void loadAnimatedColorSuggestion(target, record.id || undefined);
@@ -928,6 +1068,7 @@ function invalidate() {
   preparedDirty = true;
   showPrepared();
   preview();
+  schedulePreparationAdmission();
 }
 let recipeGesture;
 editForm.addEventListener("input", (event) => {
@@ -1124,7 +1265,13 @@ $("#eyedropper").addEventListener("click", async () => {
 });
 editForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (editorBusy) return;
+  if (
+    editorBusy ||
+    admissionPending ||
+    (admissionKnown && !admissionFeasible)
+  )
+    return;
+  cancelPreparationAdmission();
   setEditorBusy(true);
   const session = editorSession;
   drag = undefined;
@@ -1322,6 +1469,7 @@ $("#editor").addEventListener("close", () => {
   editorSession += 1;
   preparationController?.abort();
   preparationController = undefined;
+  cancelPreparationAdmission();
   preparing = false;
   clearSourceDraft();
   selected = undefined;
