@@ -247,6 +247,28 @@ test(
   },
 );
 
+test("create page observation requires the exact observed form", () => {
+  const { document } = base();
+  const form = node("FORM");
+  const button = node("BUTTON", "Create Set");
+  document.selectors["form#question-set-form"] = [form];
+  document.selectors["form#question-set-form button"] = [button];
+  page(document, "https://dashboard.blooket.com/create", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "create",
+    });
+    document.selectors["form#question-set-form button"] = [
+      button,
+      node("BUTTON", "Create Set"),
+    ];
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
+  });
+});
+
 test(
   "challenge and unknown origin observations never proceed to set reads",
   () => {

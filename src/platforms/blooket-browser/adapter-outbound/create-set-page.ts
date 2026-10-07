@@ -129,6 +129,69 @@ export function prepareBlooketCreateSetForm(
   }
 }
 
+export function submitBlooketCreateSetForm(
+  expected: BlooketCreateSetPageInput,
+): BlooketCreateSetPrepareResult {
+  const failed = (): BlooketCreateSetPrepareResult => ({
+    ok: false,
+    code: "blooket-browser-failed",
+  });
+  try {
+    if (
+      location.origin !== "https://dashboard.blooket.com" ||
+      location.pathname !== "/create"
+    )
+      return failed();
+    const form = document.querySelector("form#question-set-form");
+    const title = document.querySelector('input#title[name="title"]');
+    const description = document.querySelector(
+      'textarea#desc[name="desc"]',
+    );
+    const privacy = document.querySelector(
+      'input#private[name="private"]',
+    );
+    if (
+      form?.tagName !== "FORM" ||
+      title?.tagName !== "INPUT" ||
+      description?.tagName !== "TEXTAREA" ||
+      privacy?.tagName !== "INPUT"
+    )
+      return failed();
+
+    const titleInput = title as HTMLInputElement;
+    const descriptionInput = description as HTMLTextAreaElement;
+    const privacyInput = privacy as HTMLInputElement;
+    const label = Array.from(privacyInput.labels ?? [])
+      .map((item) => item.textContent ?? "")
+      .join(" ");
+    const ariaChecked = privacyInput.getAttribute("aria-checked");
+    const currentPrivate =
+      ariaChecked === "false" &&
+      /Private\s*\(Only playable by you\)/u.test(label)
+        ? true
+        : ariaChecked === "true" &&
+            /Public\s*\(Playable by everyone\)/u.test(label)
+          ? false
+          : undefined;
+    if (
+      currentPrivate === undefined ||
+      titleInput.value !== expected.title ||
+      descriptionInput.value !== expected.description ||
+      currentPrivate !== expected.private
+    )
+      return failed();
+
+    const buttons = Array.from(form.querySelectorAll("button")).filter(
+      (button) => button.textContent?.trim() === "Create Set",
+    );
+    if (buttons.length !== 1) return failed();
+    (buttons[0] as HTMLButtonElement).click();
+    return { ok: true };
+  } catch {
+    return failed();
+  }
+}
+
 export function observeBlooketCreateSetSuccess():
   BlooketCreateSetObservation {
   const failed = (): BlooketCreateSetObservation => ({
