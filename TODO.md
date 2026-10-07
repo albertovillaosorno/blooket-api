@@ -521,6 +521,11 @@ processing, and ready states; exhausting all bounded candidates reports that a
 valid file could not be prepared while retaining editable source state. It no
 longer tells the teacher to tune dimensions or FPS by trial and error.
 
+Ready state now exposes the persisted effective detail percentage, effective
+GIF FPS when animated, and effective compression tier. Historic prepared records
+without effective metadata still render their ready state without invented
+parameters.
+
 The output must remain strictly below 2,500,000 bytes, including GIF animation;
 2,500,000 bytes exactly fails. If an input is malformed, exceeds admitted
 resources, or cannot be represented under the invariant canvas and bounded
