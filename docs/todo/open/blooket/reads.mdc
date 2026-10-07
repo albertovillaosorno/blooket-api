@@ -72,19 +72,19 @@ acceptance run.
 
 The development service restarted normally, the workspace reconnected without
 configuration, and the configured tunnel returned to connected. Native Safari,
-complete questions/media, capabilities, server-side set-list completeness, and
-login remain pending. Their absence still blocks publication; do not expose
-unsupported read or write tools as if validated.
+complete question-level media facts, capabilities, server-side set-list
+completeness, and login remain pending. Their absence still blocks publication;
+do not expose unsupported read or write tools as if validated.
 
 ## Evidence
 
-Portable question-read foundations were added on 2026-10-06. The version-one
-read contract normalizes question number/text, `mc`/`typing`, randomization,
-seconds, answers/correct answers, typing match modes, and only the presence of
-question image/audio media. It deliberately does not retain provider media URLs
-or invent remote question IDs. Authenticated `listBlooketQuestions` validates
-the opaque set ID before browser or secret access and decodes every adapter
-result before returning it.
+Portable question-read foundations were added on 2026-10-06. The original
+version-one contract normalizes question number/text, `mc`/`typing`,
+randomization, seconds, answers/correct answers, typing match modes, and only
+the presence of question image/audio media. It deliberately does not retain
+provider media URLs or invent remote question IDs. Authenticated
+`listBlooketQuestions` validates the opaque set ID before browser or secret
+access and decodes every adapter result before returning it.
 
 The field evidence comes from recovered build
 `86784c3d4c38fcd559c92f38fbadd7a160947de2`: edit module 12048
@@ -98,6 +98,30 @@ answers, correct answers, and answer types. Neither module has a recorded
 factory variant. The previously authorized Chrome observation on the newer build
 confirmed that changing a private test question to typing with a 15-second limit
 persisted after reload; keep the two builds distinct.
+
+On 2026-10-07, recovered answer rendering established enough additional client
+semantics to version this read contract without exposing provider media
+identity. Module 46933 exports `` `~` `` as the answer-image marker and
+`` `*` `` as the math marker. Module 89770 (factory
+`52429dd04e935943f77f422a6e22e7cabafa8ecc24ad8b50fcffc1c24b1e87de`) writes
+an inserted answer image as the image marker followed by `e.url`; module 35211
+renders an answer as an image when splitting on that marker yields exactly two
+parts and uses only the second part as `src`. Neither module has a recorded
+factory variant in this build.
+
+Question-read schema version two therefore normalizes each answer to `text`,
+`math`, or `image`, carries correctness and typing match mode with that answer,
+and represents image content as `null`. The browser adapter validates the exact
+observed marker shape, discards the provider image URL before crossing its
+boundary, and fails closed on ambiguous marker placement. Math answers retain
+only their marker-delimited expression. Version-one text-only observations
+remain accepted and migrate to the normalized shape.
+
+Portable regressions prove that image-answer reads cross the application
+boundary without provider identity and cannot confirm a text write. Differential
+write verification continues to confirm only exact text-only additions with no
+question media; image/media writes remain `inconclusive`. This is recovered
+client evidence, not a new live Blooket read-back or mutation.
 
 Question write recovery now captures a normalized question-list digest and can
 confirm one exact text-only addition only when removing that candidate
@@ -156,19 +180,19 @@ Synthetic complete-list tests preserve the exact-difference verifier for a
 future evidence-backed source; unknown live lists remain observational only.
 
 Still pending: server-side set-list completeness; capabilities and complete
-question/media facts; login and the outcome of organization selection; Safari
-worker lifecycle. These prevent completion of task 08 and publication tasks
-09-12. Portable doubles are not browser acceptance, and no live question
-read-back is claimed.
+question-level media facts beyond the bounded presence currently observed; login
+and the outcome of organization selection; Safari worker lifecycle. These
+prevent completion of task 08 and publication tasks 09-12. Portable doubles are
+not browser acceptance, and no live question read-back is claimed.
 
 The worker keeps capability inspection and browser authentication fail-closed
 until their required browser semantics are observed and implemented. Question
-listing is now a supported observational read: the worker navigates to the exact
+listing is a supported observational read: the worker navigates to the exact
 set edit route, bounds the visible Edit-question controls, opens each question,
-decodes the observed serialized text-question fields, and verifies panel
-cleanup.
-Answer-image encodings remain unsupported and fail closed, so this does not
-remove the complete question/media blocker or claim a live question read-back.
+decodes the observed serialized question and normalized answer facts, and
+verifies panel cleanup. Answer-image and math encodings now have bounded
+reference-backed normalization, but question image/audio identity and broader
+media behavior remain intentionally unclaimed.
 
 Initial validation: 572 portable tests, strict TypeScript, browser-script
 syntax, and compiled-extension assembly passed. Manual pairing controls were

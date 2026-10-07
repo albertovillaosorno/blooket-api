@@ -9,12 +9,12 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Bounded text-question extraction from the observed Blooket edit modal.
+//   - Bounded normalized question extraction from the observed Blooket modal.
 // - Must-Not:
 //   - Submit forms, read React internals, expose media URLs, or mutate.
 // - Allows:
 //   - Inputs: Exact set/question identity on the confirmed dashboard edit page.
-//   - Outputs: Text-only question facts for the canonical runtime IR decoder.
+//   - Outputs: Normalized question facts for the canonical runtime IR decoder.
 //   - Side effects: Open and cancel one existing question edit modal at a time.
 // - Split-When:
 //   - Another question family needs different page controls or media semantics.
@@ -27,7 +27,7 @@
 // - Usage:
 //   - Execute through WebExtension scripting as one serial read workflow.
 // - Defaults:
-//   - Ambiguous, loading, media-answer, oversized, or malformed state fails.
+//   - Ambiguous, loading, oversized, or malformed provider state fails.
 //
 export type QuestionPanelResult =
   | { readonly ok: true; readonly value: unknown }
@@ -149,11 +149,15 @@ export function inspectOpenedBlooketQuestion(
       image,
       audio,
     } = value;
-    const mediaAnswerMarker = "\u0060~\u0060";
+    const imageAnswerMarker = "\u0060~\u0060";
+    const mathAnswerMarker = "\u0060*\u0060";
     const normalizedAnswerTypes =
       qType === "mc" && Array.isArray(answerTypes) && answerTypes.length === 0
         ? null
         : answerTypes;
+    const uniqueCorrect = Array.isArray(correctAnswers)
+      ? new Set(correctAnswers)
+      : new Set<unknown>();
     if (
       number !== expectedNumber ||
       typeof question !== "string" ||
@@ -170,17 +174,18 @@ export function inspectOpenedBlooketQuestion(
         (answer) =>
           typeof answer === "string" &&
           answer.length > 0 &&
-          answer.length <= 10_000 &&
-          !answer.includes(mediaAnswerMarker),
+          answer.length <= 10_000,
       ) ||
       !Array.isArray(correctAnswers) ||
       correctAnswers.length > answers.length ||
+      uniqueCorrect.size !== correctAnswers.length ||
       !correctAnswers.every(
         (answer) => typeof answer === "string" && answers.includes(answer),
       ) ||
       !(
-        normalizedAnswerTypes === null ||
-        (Array.isArray(normalizedAnswerTypes) &&
+        (qType === "mc" && normalizedAnswerTypes === null) ||
+        (qType === "typing" &&
+          Array.isArray(normalizedAnswerTypes) &&
           normalizedAnswerTypes.length === answers.length &&
           normalizedAnswerTypes.every(
             (kind) => kind === "exactly" || kind === "contains",
@@ -192,18 +197,55 @@ export function inspectOpenedBlooketQuestion(
       audio.length > 20_000
     )
       return failed();
+    const typingAnswerTypes = qType === "typing"
+      ? normalizedAnswerTypes as ("exactly" | "contains")[]
+      : [];
+    const normalizedAnswers = answers.map((answer, index) => {
+      const correct = correctAnswers.includes(answer);
+      const match = qType === "typing"
+        ? typingAnswerTypes[index] ?? null
+        : null;
+      if (answer.startsWith(imageAnswerMarker)) {
+        if (
+          qType !== "mc" ||
+          answer.length <= imageAnswerMarker.length ||
+          answer.indexOf(imageAnswerMarker, imageAnswerMarker.length) !== -1
+        )
+          return undefined;
+        return { kind: "image", content: null, correct, match: null };
+      }
+      if (answer.includes(imageAnswerMarker)) return undefined;
+      if (answer.startsWith(mathAnswerMarker)) {
+        if (
+          qType !== "mc" ||
+          !answer.endsWith(mathAnswerMarker) ||
+          answer.length <= mathAnswerMarker.length * 2
+        )
+          return undefined;
+        return {
+          kind: "math",
+          content: answer.slice(
+            mathAnswerMarker.length,
+            -mathAnswerMarker.length,
+          ),
+          correct,
+          match: null,
+        };
+      }
+      return { kind: "text", content: answer, correct, match };
+    });
+    if (normalizedAnswers.some((answer) => answer === undefined))
+      return failed();
     return {
       ok: true,
       value: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         number,
         question,
         qType,
         random,
         timeLimit,
-        answers,
-        correctAnswers,
-        answerTypes: normalizedAnswerTypes,
+        answers: normalizedAnswers,
         hasImage: image.length > 0,
         hasAudio: audio.length > 0,
       },

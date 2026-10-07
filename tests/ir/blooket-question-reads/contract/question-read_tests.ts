@@ -23,7 +23,7 @@
 // - Summary:
 //   - Locks down the minimal fields proven by edit-page evidence.
 // - Description:
-//   - Media are presence booleans and answer strings remain opaque.
+//   - Legacy strings migrate while v2 answers retain kind without media URLs.
 // - Usage:
 //   - Run through the repository Node test command.
 // - Defaults:
@@ -51,11 +51,129 @@ const question = {
   hasAudio: false,
 } as const;
 
-test("question reads accept observed edit-page semantics", () => {
+test("version-one question reads migrate to normalized answer facts", () => {
   assert.deepEqual(decodeBlooketQuestionRead(question), {
     ok: true,
-    value: question,
+    value: {
+      schemaVersion: 2,
+      number: 1,
+      question: "Type sun.",
+      qType: "typing",
+      random: true,
+      timeLimit: 10,
+      answers: [{
+        kind: "text",
+        content: "sun",
+        correct: true,
+        match: "exactly",
+      }],
+      hasImage: false,
+      hasAudio: false,
+    },
   });
+});
+
+test("legacy image answers migrate without retaining provider identity", () => {
+  const providerUrl = "https://provider.invalid/media";
+  const result = decodeBlooketQuestionRead({
+    schemaVersion: 1,
+    number: 2,
+    question: "Pick the image.",
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: ["`~`" + providerUrl, "`*`x^2`*`"],
+    correctAnswers: ["`~`" + providerUrl],
+    answerTypes: null,
+    hasImage: false,
+    hasAudio: false,
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.value.answers, [
+      { kind: "image", content: null, correct: true, match: null },
+      { kind: "math", content: "x^2", correct: false, match: null },
+    ]);
+    assert.equal(JSON.stringify(result.value).includes(providerUrl), false);
+  }
+});
+
+test("version-two reads admit image presence without a provider URL", () => {
+  assert.deepEqual(decodeBlooketQuestionRead({
+    schemaVersion: 2,
+    number: 2,
+    question: "Pick the image.",
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: [
+      { kind: "image", content: null, correct: true, match: null },
+      { kind: "math", content: "x^2", correct: false, match: null },
+    ],
+    hasImage: false,
+    hasAudio: false,
+  }), {
+    ok: true,
+    value: {
+      schemaVersion: 2,
+      number: 2,
+      question: "Pick the image.",
+      qType: "mc",
+      random: false,
+      timeLimit: 20,
+      answers: [
+        { kind: "image", content: null, correct: true, match: null },
+        { kind: "math", content: "x^2", correct: false, match: null },
+      ],
+      hasImage: false,
+      hasAudio: false,
+    },
+  });
+});
+
+test(
+  "version-two answer kinds reject mismatched content and typing media",
+  () => {
+  for (const answer of [
+    {
+      kind: "image",
+      content: "https://provider.invalid",
+      correct: true,
+      match: null,
+    },
+    { kind: "math", content: null, correct: true, match: null },
+    { kind: "image", content: null, correct: true, match: "exactly" },
+  ]) {
+    const result = decodeBlooketQuestionRead({
+      schemaVersion: 2,
+      number: 1,
+      question: "Type sun.",
+      qType: "typing",
+      random: false,
+      timeLimit: 10,
+      answers: [answer],
+      hasImage: false,
+      hasAudio: false,
+    });
+    assert.equal(result.ok, false);
+  }
+  },
+);
+
+test("legacy typing reads require match modes before migration", () => {
+  const result = decodeBlooketQuestionRead({
+    ...question,
+    answerTypes: null,
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(
+      result.issues.some(
+        (issue) => issue.code === "typing-answer-types-required",
+      ),
+      true,
+    );
+  }
 });
 
 test("question reads reject invented fields and inconsistent answers", () => {

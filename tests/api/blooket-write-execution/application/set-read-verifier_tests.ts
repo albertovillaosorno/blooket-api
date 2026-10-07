@@ -384,6 +384,60 @@ test("exact text question addition is confirmed from differential reads",
   );
   },);
 
+test("answer-image reads cannot confirm an expected text write", async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => {
+      throw new Error("question verification must not list sets");
+    },
+    get: async () => {
+      throw new Error("question verification must not read set detail");
+    },
+  };
+  const imageQuestion = {
+    schemaVersion: 2,
+    number: 1,
+    question: "Which is the sun?",
+    qType: "mc",
+    random: false,
+    timeLimit: 20,
+    answers: [
+      { kind: "image", content: null, correct: true, match: null },
+      { kind: "text", content: "Moon", correct: false, match: null },
+    ],
+    hasImage: false,
+    hasAudio: false,
+  } as const;
+  const expected: BlooketWriteOperation = {
+    operationId: "plan:test:q:0",
+    kind: "question",
+    localQuestionId: "q1",
+    questionNumber: 1,
+    question: {
+      type: "multiple-choice",
+      prompt: "Which is the sun?",
+      timeLimitSeconds: 20,
+      randomOrder: false,
+      imageMediaId: null,
+      answers: [
+        { text: "Sun", correct: true, imageMediaId: null },
+        { text: "Moon", correct: false, imageMediaId: null },
+      ],
+    },
+  };
+  const verifier = blooketSetReadWriteVerifier(
+    sets,
+    questionReads([[], [imageQuestion]]),
+  );
+  const target = { remoteSetId: "remote-set-1" };
+  const captured = await verifier.captureBaseline(expected, target);
+  assert.equal(captured.ok, true);
+  if (!captured.ok) return;
+  assert.deepEqual(
+    await verifier.verify(expected, target, captured.baseline),
+    { ok: true, outcome: "inconclusive" },
+  );
+});
+
 test("unchanged question collection proves non-confirmation", async () => {
   const sets: BlooketSetReadPort = {
     list: async () => ({

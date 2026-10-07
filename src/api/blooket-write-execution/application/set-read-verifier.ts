@@ -219,22 +219,24 @@ function questionMatches(
   >["value"],
 ): boolean {
   if (expected.kind !== "add-question") return false;
-  const answers = expected.answers.flatMap((answer) =>
-    answer.kind === "text" ? [answer.text] : []
+  const answers = expected.answers.flatMap((answer, index) =>
+    answer.kind === "text"
+      ? [{
+          kind: "text" as const,
+          content: answer.text,
+          correct: answer.correct,
+          match: expected.answerTypes?.[index] ?? null,
+        }]
+      : []
   );
   if (answers.length !== expected.answers.length) return false;
-  const correctAnswers = expected.answers.flatMap((answer) =>
-    answer.kind === "text" && answer.correct ? [answer.text] : []
-  );
 
   return actual.number === expected.number
     && actual.question === expected.question
     && actual.qType === expected.qType
     && actual.random === expected.random
     && actual.timeLimit === expected.timeLimit
-    && equalArray(actual.answers, answers)
-    && equalArray(actual.correctAnswers, correctAnswers)
-    && equalArray(actual.answerTypes, expected.answerTypes)
+    && equalQuestionAnswers(actual.answers, answers)
     && actual.hasImage === false
     && actual.hasAudio === false;
 }
@@ -335,8 +337,6 @@ function questionBaselineFor(
     question.random,
     question.timeLimit,
     question.answers,
-    question.correctAnswers,
-    question.answerTypes,
     question.hasImage,
     question.hasAudio,
   ]));
@@ -366,13 +366,19 @@ function withoutIndex<T>(
   ];
 }
 
-function equalArray<T>(
-  left: readonly T[] | null,
-  right: readonly T[] | null,
+function equalQuestionAnswers(
+  left: readonly BlooketQuestionRead["answers"][number][],
+  right: readonly BlooketQuestionRead["answers"][number][],
 ): boolean {
-  if (left === null || right === null) return left === right;
   return left.length === right.length
-    && left.every((value, index) => value === right[index]);
+    && left.every((answer, index) => {
+      const expected = right[index];
+      return expected !== undefined
+        && answer.kind === expected.kind
+        && answer.content === expected.content
+        && answer.correct === expected.correct
+        && answer.match === expected.match;
+    });
 }
 
 function browserFailure(): Extract<
