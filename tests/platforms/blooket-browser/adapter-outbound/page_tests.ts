@@ -46,6 +46,7 @@ interface FixtureNode {
   textContent: string;
   value?: string;
   labels?: FixtureNode[];
+  parentElement?: FixtureNode;
   selectors: Record<string, FixtureNode[]>;
   getAttribute(name: string): string | null;
   querySelector(selector: string): FixtureNode | null;
@@ -108,6 +109,14 @@ function base() {
   main.selectors["h1"] = [node("H1", "My Sets")];
   return { document, main };
 }
+function privacyLabel(text: string): FixtureNode {
+  const label = node("LABEL");
+  const row = node("DIV");
+  row.selectors[":scope > p"] = [node("P", text)];
+  label.parentElement = row;
+  return label;
+}
+
 function card(id = "fixture-set") {
   const article = node("ARTICLE");
   article.selectors["h3"] = [node("H3", "Synthetic fixture")];
@@ -248,7 +257,7 @@ test(
     "aria-checked": "false",
   };
   const privacy = node("INPUT", "", attributes);
-  privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+  privacy.labels = [privacyLabel("Private (Only playable by you)")];
   document.selectors['input#title[name="title"]'] = [title];
   document.selectors['textarea#desc[name="desc"]'] = [description];
   document.selectors['input#private[name="private"]'] = [privacy];
@@ -269,7 +278,7 @@ test(
       false,
     );
     attributes["aria-checked"] = "true";
-    privacy.labels = [node("LABEL", "Public (Playable by everyone)")];
+    privacy.labels = [privacyLabel("Public (Playable by everyone)")];
     const publicResult = inspectBlooketPage({
       kind: "sets.get",
       setId: "fixture",
@@ -281,17 +290,17 @@ test(
       if (decoded.ok) assert.equal(decoded.value.visibility, "public");
     }
     attributes["aria-checked"] = "false";
-    privacy.labels = [node("LABEL", "Public (Playable by everyone)")];
+    privacy.labels = [privacyLabel("Public (Playable by everyone)")];
     assert.equal(
       inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
       false,
     );
-    privacy.labels = [node("LABEL", "Unknown visibility")];
+    privacy.labels = [privacyLabel("Unknown visibility")];
     assert.equal(
       inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
       false,
     );
-    privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+    privacy.labels = [privacyLabel("Private (Only playable by you)")];
     identity.value = "another";
     assert.equal(inspectBlooketPage({
       kind: "sets.get", setId: "fixture",
@@ -344,6 +353,71 @@ test(
   });
 });
 
+test("set privacy comes from the recovered visible sibling paragraph", () => {
+  const { document } = base();
+  const form = node("FORM");
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  const title = node("INPUT");
+  title.value = "Synthetic fixture";
+  const description = node("TEXTAREA");
+  description.value = "Original text";
+  const attributes = {
+    type: "checkbox", role: "switch", "aria-checked": "false",
+  };
+  const privacy = node("INPUT", "", attributes);
+  const switchLabel = node("LABEL", "");
+  const toggleContainer = node("DIV");
+  const state = node("P", "Private (Only playable by you)");
+  toggleContainer.selectors[":scope > p"] = [state];
+  switchLabel.parentElement = toggleContainer;
+  privacy.labels = [switchLabel];
+  form.selectors['input#title[name="title"]'] = [title];
+  form.selectors['textarea#desc[name="desc"]'] = [description];
+  form.selectors['input#private[name="private"]'] = [privacy];
+  document.selectors['form#question-set-form'] = [form];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    let result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal((result.value as { visibility: string }).visibility,
+        "private");
+    }
+    attributes["aria-checked"] = "true";
+    state.textContent = "Public (Playable by everyone)";
+    result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal((result.value as { visibility: string }).visibility,
+        "public");
+    }
+    attributes["aria-checked"] = "false";
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    state.textContent = "Private (Only playable by you)";
+    state.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    state.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    toggleContainer.selectors[":scope > p"] = [state, state];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    toggleContainer.selectors[":scope > p"] = [];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    toggleContainer.selectors[":scope > p"] = [state];
+    switchLabel.parentElement = undefined;
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+  });
+});
+
 test("set detail refuses duplicate set IDs in the current route", () => {
   const { document } = base();
   const title = node("INPUT");
@@ -353,7 +427,7 @@ test("set detail refuses duplicate set IDs in the current route", () => {
   const privacy = node("INPUT", "", {
     type: "checkbox", role: "switch", "aria-checked": "false",
   });
-  privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+  privacy.labels = [privacyLabel("Private (Only playable by you)")];
   document.selectors['input#title[name="title"]'] = [title];
   document.selectors['textarea#desc[name="desc"]'] = [description];
   document.selectors['input#private[name="private"]'] = [privacy];
@@ -411,7 +485,7 @@ test("dashboard password overlays cannot establish reads or signed-out", () => {
   const privacy = node("INPUT", "", {
     type: "checkbox", role: "switch", "aria-checked": "false",
   });
-  privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+  privacy.labels = [privacyLabel("Private (Only playable by you)")];
   form.selectors['input#title[name="title"]'] = [title];
   form.selectors['textarea#desc[name="desc"]'] = [description];
   form.selectors['input#private[name="private"]'] = [privacy];

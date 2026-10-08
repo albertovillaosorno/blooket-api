@@ -332,21 +332,25 @@ export function inspectBlooketPage(
       descriptionValue.length > 10_000
     )
       return failed();
-    // The field name is inverted; use the displayed privacy label as evidence.
-    const label = Array.from((privacy as HTMLInputElement).labels ?? [])
-      .map((item) => item.textContent ?? "")
-      .join(" ");
+    // Module 31017 renders the state wording in a paragraph *beside* the
+    // toggle's <label>, not inside it. Check the visible direct sibling and
+    // the inverted aria-checked state without guessing framework CSS classes.
+    const labels = Array.from((privacy as HTMLInputElement).labels ?? []);
+    if (labels.length !== 1 || labels[0]?.tagName !== "LABEL")
+      return failed();
+    const row = labels[0]!.parentElement;
+    if (row?.tagName !== "DIV") return failed();
+    const states = Array.from(row.querySelectorAll(":scope > p"));
+    if (
+      states.length !== 1 || states[0]?.tagName !== "P" ||
+      !visible(states[0])
+    ) return failed();
+    const text = states[0]!.textContent?.replace(/\s+/gu, " ").trim();
     const checked = privacy.getAttribute("aria-checked");
     let visibility: "private" | "public";
-    if (
-      checked === "false" &&
-      /Private\s*\(Only playable by you\)/u.test(label)
-    )
+    if (checked === "false" && text === "Private (Only playable by you)")
       visibility = "private";
-    else if (
-      checked === "true" &&
-      /Public\s*\(Playable by everyone\)/u.test(label)
-    )
+    else if (checked === "true" && text === "Public (Playable by everyone)")
       visibility = "public";
     else return failed();
     return {
