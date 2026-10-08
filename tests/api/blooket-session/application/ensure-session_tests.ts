@@ -156,7 +156,9 @@ function browserDouble(
       if (options.throwOnAuthenticate) {
         throw new Error("authentication fixture failure");
       }
-      return options.authentication ?? { ok: true };
+      return options.authentication === undefined
+        ? { ok: true }
+        : options.authentication;
     },
   };
 }
@@ -432,4 +434,28 @@ test(
     code: "blooket-browser-unavailable",
   });
   assert.equal(JSON.stringify(result).includes(PASSWORD), false);
+});
+
+test("malformed login adapter replies never establish a session", async () => {
+  for (const authentication of [
+    { ok: true, unexpected: "sensitive" },
+    { ok: false, code: "other", unexpected: "sensitive" },
+    { ok: false, code: "blooket-browser-failed", extra: "sensitive" },
+    null,
+  ]) {
+    const calls: string[] = [];
+    const result = await ensureBlooketSession(
+      browserDouble({
+        observations: [
+          { ok: true, state: "signed-out" },
+          { ok: true, state: "dashboard" },
+        ],
+        authentication: authentication as BlooketBrowserAuthenticationResult,
+      }, calls, []), secretStore([]),
+    );
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(calls, ["observe", "authenticate"]);
+  }
 });

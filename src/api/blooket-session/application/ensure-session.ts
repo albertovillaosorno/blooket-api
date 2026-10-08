@@ -207,7 +207,16 @@ async function safeAuthenticate(
   credentials: BlooketCredentials,
 ): Promise<BlooketBrowserAuthenticationResult> {
   try {
-    return await browser.authenticate(credentials);
+    const result = await browser.authenticate(credentials);
+    if (!result || typeof result !== "object" || Array.isArray(result))
+      return { ok: false, code: "blooket-browser-failed" };
+    const keys = Object.keys(result).sort().join();
+    if (result.ok === true && keys === "ok") return { ok: true };
+    if (result.ok === false && keys === "code,ok" &&
+        (result.code === "blooket-browser-unavailable" ||
+          result.code === "blooket-browser-failed"))
+      return { ok: false, code: result.code };
+    return { ok: false, code: "blooket-browser-failed" };
   } catch {
     return {
       ok: false,

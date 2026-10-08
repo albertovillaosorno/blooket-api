@@ -228,6 +228,11 @@ task 08 and publication tasks 09-12. Portable doubles are not browser
 acceptance, and no live login, question read-back, or capability probe is
 claimed.
 
+Session observation and one-shot authentication now validate the browser port's
+exact runtime result shape, not merely its TypeScript declaration. Unexpected
+fields, synthetic success flags, and unknown failure codes become a stable
+secret-free browser failure; only a fresh observed ready page grants access.
+
 Portable browser authentication is now implemented fail-closed. Question
 listing remains a supported observational read: the worker navigates to the
 exact set edit route, bounds the visible Edit-question controls, opens each
