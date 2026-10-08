@@ -1,0 +1,9 @@
+identity:
+  id: function:update-extraction
+  name: update-extraction
+  path: src/platforms/update-extraction
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

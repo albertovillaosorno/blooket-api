@@ -120,3 +120,13 @@ and owned failed output was removed. Neither failed run is package acceptance.
 None. Signing, notarization, Gatekeeper, installed Safari behavior, native
 Keychain/login-item behavior, and other platform-specific acceptance belong only
 to task blooket-15.
+
+
+On 2026-10-08, the clean committed `16c14dc` passed actual Linux assembly and
+extracted-package release verification using the isolated
+`acceptance-final-package` output namespace. This exercised the packaged
+launcher,
+single instance, media processing, canonical CLI, synthetic bridge reads, CSRF,
+and owned shutdown. The session-owned 415 MiB assembly/archive was removed after
+verification; pre-existing packages and the shared 230 MiB runtime cache were
+preserved. Nonfatal postject ELF section warnings did not fail this acceptance.

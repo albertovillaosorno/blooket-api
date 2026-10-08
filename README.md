@@ -103,7 +103,7 @@ produces a nonzero exit status; portable success does not prove Mac acceptance.
 
 The current workstation's pnpm launcher has a documented external failure;
 npm scripts work with installed dependencies. Read the
-[configuration record](docs/todo/open/settings/configuration.mdc) before
+[configuration record](docs/todo/completed/settings/configuration.mdc) before
 changing dependency layout or validators.
 
 ## Use the local workspace

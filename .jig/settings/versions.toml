@@ -111,3 +111,33 @@ source = "https://registry.npmjs.org/yaml/latest"
 kind = "package"
 target = "yaml"
 template = "{version}"
+
+[authority.yauzl]
+current = "3.4.0"
+stable = "3.4.0"
+
+[authority.yauzl.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/yauzl/latest"
+
+[authority.yauzl.projection.package]
+kind = "package"
+target = "yauzl"
+template = "{version}"
+
+[authority.yauzl-types]
+current = "3.4.0"
+stable = "3.4.0"
+
+[authority.yauzl-types.freshness]
+integrity_kind = "provider-response-sha256"
+maximum_age_days = 1
+provider = "npm-registry"
+source = "https://registry.npmjs.org/@types%2fyauzl/latest"
+
+[authority.yauzl-types.projection.package]
+kind = "package"
+target = "@types/yauzl"
+template = "{version}"

@@ -81,6 +81,13 @@ read-only native tools with bounded output, cancellation, and a shared deadline.
 It neither extracts nor installs a bundle; portable command doubles do not
 establish native acceptance or a production publisher trust root.
 
+`src/platforms/update-extraction/` copies and authenticates a private immutable
+archive, validates its bounded physical ZIP layout, and invokes only silent
+native extraction. The extracted tree must match byte hashes, executable bits,
+paths, and admitted internal links before syncing/freezing it for Apple
+assessment. Cancellation retains ownership until the native writer stops;
+staged results still require Apple trust and transactional installation.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and

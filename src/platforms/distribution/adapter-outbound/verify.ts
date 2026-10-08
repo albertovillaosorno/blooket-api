@@ -312,6 +312,22 @@ export async function verifyDistribution(
     });
     assert.equal(denied.status, 403);
     const node = join(resources, "runtime/node");
+    // Import the actual packaged extraction/parser closure with bundled Node.
+    // A malformed synthetic ZIP must fail before native extraction or install.
+    const invalidZip = join(data, "malformed-update.zip");
+    await writeFile(invalidZip, "synthetic malformed archive", { mode: 0o600 });
+    await execute(node, ["--input-type=module", "-e", `
+      import assert from "node:assert/strict";
+      import { pathToFileURL } from "node:url";
+      const base = pathToFileURL(process.argv[1] + "/");
+      const stage = await import(new URL(
+        "src/platforms/update-extraction/adapter-outbound/stage.ts", base));
+      const reader = await import(new URL(
+        "src/platforms/update-extraction/adapter-outbound/inspect.ts", base));
+      assert.equal(typeof stage.stageSignedUpdate, "function");
+      await assert.rejects(reader.inspectUpdateArchive(process.argv[2],
+        new AbortController().signal));
+    `, app, invalidZip], { env, timeout: 10_000, maxBuffer: 4_096 });
     // Exercise the real JSON CLI subprocess, including the bundled profile.
     const cli = execFile(
       node,
