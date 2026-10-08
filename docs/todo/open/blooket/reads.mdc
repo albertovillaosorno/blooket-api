@@ -292,6 +292,11 @@ Module 89770 renders explicit Cancel controls for the Add Question form and its
 nested drawer; module 72398 confirms the parent form modal disables overlay
 closure.
 
+Capability inspection cleanup now converts errors from post-close browser
+confirmation polls into stable failures, then continues the other cleanup
+and original-tab restoration. Synthetic Chrome exceptions verify that a
+failed capability probe cannot abandon the tab or return a snapshot.
+
 Portable capability inspection is now implemented behind the existing
 `capabilities.inspect` browser bridge command. The worker selects one already
 visible My Sets ID, opens Add Question without submitting it, opens only the

@@ -44,6 +44,7 @@ function fixture(options: {
   readonly cleanupFails?: boolean;
   readonly malformedList?: boolean;
   readonly restoreFails?: boolean;
+  readonly cleanupPollThrows?: "drawer" | "question";
 } = {}) {
   const originalUrl = "https://dashboard.blooket.com/edit?id=original-set";
   let tabUrl = originalUrl;
@@ -134,12 +135,16 @@ function fixture(options: {
               },
             }];
           case "isBlooketAudioCapabilityDrawerClosed":
+            if (!drawerOpen && options.cleanupPollThrows === "drawer")
+              throw new Error("synthetic drawer confirmation unavailable");
             return [{ result: !drawerOpen }];
           case "closeBlooketAudioCapabilityDrawer":
             if (options.cleanupFails) return [{ result: false }];
             drawerOpen = false;
             return [{ result: true }];
           case "isBlooketCapabilityQuestionPanelClosed":
+            if (!panelOpen && options.cleanupPollThrows === "question")
+              throw new Error("synthetic question confirmation unavailable");
             return [{ result: !panelOpen && !drawerOpen }];
           case "closeBlooketCapabilityQuestionPanel":
             if (drawerOpen || options.cleanupFails) return [{ result: false }];
@@ -264,4 +269,18 @@ test("malformed set-list evidence fails before Add Question", async () => {
     page.scripts.includes("openBlooketCapabilityQuestionPanel"),
     false,
   );
+});
+
+test("cleanup polling exceptions still restore the original tab", async () => {
+  for (const cleanupPollThrows of ["drawer", "question"] as const) {
+    const page = fixture({ cleanupPollThrows });
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+  }
 });

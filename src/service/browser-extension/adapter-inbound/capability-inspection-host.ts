@@ -293,7 +293,7 @@ async function closeDrawer(
     isBlooketAudioCapabilityDrawerClosed,
     [setId],
     pause,
-  );
+  ).catch(() => false);
 }
 
 async function closeQuestionPanel(
@@ -319,7 +319,7 @@ async function closeQuestionPanel(
     isBlooketCapabilityQuestionPanelClosed,
     [setId],
     pause,
-  );
+  ).catch(() => false);
 }
 
 function firstSetId(value: unknown): string | null | undefined {
