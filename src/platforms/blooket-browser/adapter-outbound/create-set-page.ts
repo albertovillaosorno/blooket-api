@@ -220,6 +220,11 @@ export function observeBlooketCreateSetSuccess():
     code: "blooket-browser-failed",
   });
   try {
+    // A provider interstitial can retain the previous edit URL while the
+    // authenticated controls are unavailable. Its URL is not a receipt.
+    if (document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]') !== null)
+      return failed();
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
