@@ -82,6 +82,21 @@ worker discards the result instead of asserting a stale ready, signed-out, or
 challenge state. Synthetic tests cover identity-origin transitions and a
 same-origin dashboard page switch; no credentials are read by this operation.
 
+A read can fail after its initial ready-session observation because the browser
+has changed to a challenge or another human-action state. For an exact
+`blooket-browser-failed` read response, the list, detail, and question
+applications now perform one fresh **read-only** session observation before
+reporting the error. A confirmed wait or human stop supersedes the generic read
+failure; a signed-out result becomes authentication-required without attempting
+a login. If the follow-up observation cannot establish a specific state, the
+original read error remains unchanged.
+
+Unavailable transports do not trigger this extra probe, and the original failed
+read is never retried. This is a controlled stop classification after failure,
+not a second attempt at data extraction or evidence of remote completeness.
+Portable tests cover all three read applications and verify zero secret access
+and zero authentication calls during the follow-up check.
+
 Positive dashboard session states now also require the route's observed
 controls to be uniquely identified and visible. Create needs one visible form
 and one visible Create Set button inside it. Edit needs a visible page heading

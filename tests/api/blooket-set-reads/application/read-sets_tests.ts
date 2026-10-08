@@ -610,3 +610,134 @@ test("read adapters cannot attach extra fields to success", async () => {
     });
   }
 });
+
+test(
+  "a challenge discovered after a failed read becomes a human stop",
+  async () => {
+    for (const state of [
+      "security-challenge", "organization-prompt", "rate-limited",
+    ] as const) {
+      const calls: string[] = [];
+      const readSets: BlooketSetReadPort = {
+        list: async () => {
+          calls.push("sets:list");
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+        get: async () => {
+          calls.push("sets:get");
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+      };
+      const questionReads: BlooketQuestionReadPort = {
+        list: async () => {
+          calls.push("questions:list");
+          return { ok: false, code: "blooket-browser-failed" };
+        },
+      };
+      const makeBrowser = () => browser([
+        { ok: true, state: "my-sets" },
+        { ok: true, state },
+      ], calls);
+      const expectedKind = state === "rate-limited"
+        ? "wait" : "human-action-required";
+      for (const action of [
+        (b: BlooketBrowserSessionPort) => listBlooketSets(
+          b, secretStore(calls), readSets, { readOnly: true },
+        ),
+        (b: BlooketBrowserSessionPort) => getBlooketSet(
+          b, secretStore(calls), readSets, "fixture", { readOnly: true },
+        ),
+        (b: BlooketBrowserSessionPort) => listBlooketQuestions(
+          b, secretStore(calls), questionReads, "fixture",
+          { readOnly: true },
+        ),
+      ]) {
+        calls.length = 0;
+        const result = await action(makeBrowser());
+        assert.deepEqual(result, {
+          ok: true, kind: expectedKind, state,
+        });
+        assert.equal(calls.filter((call) => call === "browser:observe")
+          .length, 2);
+        assert.equal(calls.some((call) => call.startsWith("secret:")), false);
+        assert.equal(calls.includes("browser:authenticate"), false);
+      }
+    }
+  },
+);
+
+test(
+  "a signed-out state after a failed read requests authentication only",
+  async () => {
+  const calls: string[] = [];
+  const read: BlooketSetReadPort = {
+    list: async () => {
+      calls.push("sets:list");
+      return { ok: false, code: "blooket-browser-failed" };
+    },
+    get: async () => ({ ok: false, code: "blooket-browser-failed" }),
+  };
+  const result = await listBlooketSets(
+    browser([
+      { ok: true, state: "my-sets" },
+      { ok: true, state: "signed-out" },
+    ], calls),
+    secretStore(calls), read,
+  );
+  assert.deepEqual(result, {
+    ok: false, stage: "session", code: "blooket-authentication-required",
+  });
+  assert.deepEqual(calls, [
+    "browser:observe", "sets:list", "browser:observe",
+  ]);
+  },
+);
+
+test(
+  "unknown follow-up state preserves the original browser failure",
+  async () => {
+  const calls: string[] = [];
+  const read: BlooketSetReadPort = {
+    list: async () => {
+      calls.push("sets:list");
+      return { ok: false, code: "blooket-browser-failed" };
+    },
+    get: async () => ({ ok: false, code: "blooket-browser-failed" }),
+  };
+  const result = await listBlooketSets(
+    browser([
+      { ok: true, state: "my-sets" },
+      { ok: false, code: "blooket-browser-unavailable" },
+    ], calls),
+    secretStore(calls), read, { readOnly: true },
+  );
+  assert.deepEqual(result, {
+    ok: false, stage: "read", code: "blooket-browser-failed",
+  });
+  assert.deepEqual(calls, [
+    "browser:observe", "sets:list", "browser:observe",
+  ]);
+  },
+);
+
+test(
+  "unavailable read transport is not retried or re-observed",
+  async () => {
+  const calls: string[] = [];
+  const read: BlooketSetReadPort = {
+    list: async () => {
+      calls.push("sets:list");
+      return { ok: false, code: "blooket-browser-unavailable" };
+    },
+    get: async () => ({ ok: false, code: "blooket-browser-failed" }),
+  };
+  const result = await listBlooketSets(
+    browser([{ ok: true, state: "my-sets" }], calls),
+    secretStore(calls), read, { readOnly: true },
+  );
+  assert.deepEqual(result, {
+    ok: false, stage: "read", code: "blooket-browser-unavailable",
+  });
+  assert.deepEqual(calls, ["browser:observe", "sets:list"]);
+  },
+);
