@@ -76,6 +76,7 @@ export interface BlooketBrowserBridgeBroker
   status(): {
     readonly pending: number;
     readonly connected: boolean;
+    readonly incompatibleClients: number;
   };
 }
 
@@ -281,6 +282,7 @@ export function createBlooketBrowserBridgeBroker(
     status: () => ({
       pending: pending.size,
       connected: !closed && lastPollAt > 0 && now() - lastPollAt <= timeoutMs,
+      incompatibleClients: incompatibleClients.size,
     }),
   };
 }

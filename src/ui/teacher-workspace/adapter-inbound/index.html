@@ -257,14 +257,20 @@
           <p data-i18n="consentHelp"></p>
           <div id="connections"></div>
         </article>
-        <article class="notice" id="safariExtensionPanel" hidden>
+        <article class="notice">
           <h2 data-i18n="browserExtensions"></h2>
-          <p data-i18n="safariExtensionHelp"></p>
-          <button
-            id="installSafariExtension"
-            type="button"
-            data-i18n="installSafariExtension"
-          ></button>
+          <p id="browserConnectionState" role="status"></p>
+          <p id="browserCompatibilityState" role="status" hidden></p>
+          <button id="refreshBrowserConnection"
+            data-i18n="refreshBrowserConnection"></button>
+          <div id="safariExtensionPanel" hidden>
+            <p data-i18n="safariExtensionHelp"></p>
+            <button
+              id="installSafariExtension"
+              type="button"
+              data-i18n="installSafariExtension"
+            ></button>
+          </div>
         </article>
         <article class="notice" id="updatePanel" hidden>
           <h2 data-i18n="updates"></h2>

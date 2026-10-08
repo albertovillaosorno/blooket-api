@@ -26,6 +26,16 @@ const words = {
       "Blooket API se detuvo. Abre la aplicación para iniciarla otra " +
       "vez.",
     browserExtensions: "Extensiones del navegador",
+    refreshBrowserConnection: "Comprobar conexión",
+    browserConnected: "La extensión está conectada al espacio local.",
+    browserDisconnected:
+      "No hay una extensión conectada. Activa Blooket API en el navegador " +
+      "y mantén abierto este espacio.",
+    browserConnectionUnknown: "No se pudo comprobar la conexión del navegador.",
+    browserIncompatible:
+      "Una copia antigua de la extensión respondió con un formato " +
+      "incompatible y se detuvo. Desactiva las copias antiguas, activa " +
+      "la actual y reinicia Blooket API antes de comprobar de nuevo.",
     safariExtensionHelp:
       "Safari viene incluida con Blooket API. Abre la instalación y " +
       "actívala en Safari cuando el sistema te lo pida.",
@@ -258,6 +268,16 @@ const words = {
     serviceStopped:
       "Blooket API stopped. Open the application to start it again.",
     browserExtensions: "Browser extensions",
+    refreshBrowserConnection: "Check connection",
+    browserConnected: "The extension is connected to the local workspace.",
+    browserDisconnected:
+      "No extension is connected. Enable Blooket API in your browser " +
+      "and keep this workspace open.",
+    browserConnectionUnknown: "The browser connection could not be checked.",
+    browserIncompatible:
+      "An older extension copy replied with an incompatible format and " +
+      "was stopped. Disable old copies, enable the current one, and " +
+      "restart Blooket API before checking again.",
     safariExtensionHelp:
       "Safari is included with Blooket API. Open setup, then enable it " +
       "in Safari when macOS asks.",
@@ -1487,6 +1507,15 @@ function renderUpdates() {
 }
 function renderSettingsState() {
   renderUpdates();
+  const bridge = bootstrap.browserBridge;
+  $("#browserConnectionState").textContent = t(
+    bridge?.connected === true ? "browserConnected" :
+      bridge?.connected === false ? "browserDisconnected" :
+        "browserConnectionUnknown",
+  );
+  $("#browserCompatibilityState").hidden =
+    !(bridge?.incompatibleClients > 0);
+  $("#browserCompatibilityState").textContent = t("browserIncompatible");
   const login = bootstrap.service?.loginItem?.state;
   const allowed = ["enabled", "not-registered", "requires-approval"];
   $("#launchAtLogin").disabled = !allowed.includes(login);
@@ -1549,6 +1578,17 @@ $("#refreshLoginItem").addEventListener("click", async event => {
     renderSettingsState();
   } catch (error) { report(error); }
   finally { event.target.disabled = false; }
+});
+$("#refreshBrowserConnection").addEventListener("click", async event => {
+  event.target.disabled = true;
+  try {
+    bootstrap = await api("/api/bootstrap");
+    renderSettingsState();
+  } catch (error) {
+    bootstrap.browserBridge = undefined;
+    renderSettingsState();
+    report(error);
+  } finally { event.target.disabled = false; }
 });
 $("#stopService").addEventListener("click", async event => {
   event.target.disabled = true;
