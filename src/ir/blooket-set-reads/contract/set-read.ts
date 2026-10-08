@@ -139,6 +139,17 @@ export function decodeBlooketSetList(
     };
   }
 
+  // Mirror the local browser extraction cap, not a provider account limit.
+  if (value.length > 200) {
+    return {
+      ok: false,
+      issues: [{
+        path: "$",
+        code: "too-many-sets",
+        message: "Expected at most 200 observed set summaries.",
+      }],
+    };
+  }
   const items: BlooketSetSummary[] = [];
   const issues: ValidationIssue[] = [];
   const seenIds = new Set<string>();

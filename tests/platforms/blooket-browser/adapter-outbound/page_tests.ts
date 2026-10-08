@@ -182,6 +182,8 @@ test(
     "/delete?id=fixture",
     "/edit",
     "/edit?id=",
+    "/edit?id=fixture&id=other",
+    "/edit?id=fixture&id=fixture",
   ]) {
     const article = card();
     article.selectors["a[href]"] = [node("A", "Edit", { href })];
@@ -248,6 +250,31 @@ test(
       false,
     );
   });
+});
+
+test("set detail refuses duplicate set IDs in the current route", () => {
+  const { document } = base();
+  const title = node("INPUT");
+  title.value = "Synthetic fixture";
+  const description = node("TEXTAREA");
+  description.value = "Original text";
+  const privacy = node("INPUT", "", {
+    type: "checkbox", role: "switch", "aria-checked": "false",
+  });
+  privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+  document.selectors['input#title[name="title"]'] = [title];
+  document.selectors['textarea#desc[name="desc"]'] = [description];
+  document.selectors['input#private[name="private"]'] = [privacy];
+  for (const href of [
+    "https://dashboard.blooket.com/edit?id=fixture&id=other",
+    "https://dashboard.blooket.com/edit?id=fixture&id=fixture",
+  ]) {
+    page(document, href, () => {
+      assert.equal(inspectBlooketPage({
+        kind: "sets.get", setId: "fixture",
+      }).ok, false);
+    });
+  }
 });
 
 test("dashboard reads require the recovered authenticated shell", () => {

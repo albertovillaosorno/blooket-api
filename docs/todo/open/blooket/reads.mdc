@@ -159,6 +159,11 @@ closed so loading cannot masquerade as an empty account.
 
 The canonical `sets.list` URL strips search/folder query state before
 reading.
+The set summary and detail readers reject duplicate `id` query parameters,
+even if each duplicate has the same value. The canonical set-list decoder
+also bounds observed lists to the existing 200-card local browser safety cap
+before item traversal; neither check claims a provider collection-size limit.
+
 Because the page boundary can emit an empty array only for that exact recovered
 empty-account state, the browser bridge marks only `[]` as `complete`. Non-empty
 card lists remain `unknown`: curated module 52644 consumes `sets`, `allSets`,

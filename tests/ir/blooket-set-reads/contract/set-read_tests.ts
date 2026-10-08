@@ -186,3 +186,20 @@ test("future set read versions fail closed", () => {
     assert.equal(result.issues[0]?.code, "unsupported-version");
   }
 });
+
+test("set lists use the browser local read safety cap", () => {
+  const items = Array.from({ length: 200 }, (_, index) => ({
+    schemaVersion: 1, id: "set-" + index, title: "Synthetic set",
+  }));
+  const accepted = decodeBlooketSetList(items);
+  assert.equal(accepted.ok, true);
+  if (accepted.ok) assert.equal(accepted.value.length, 200);
+  const oversized = decodeBlooketSetList([...items, {
+    schemaVersion: 1, id: "set-200", title: "Extra",
+  }]);
+  assert.equal(oversized.ok, false);
+  if (!oversized.ok) {
+    assert.equal(oversized.issues[0]?.path, "$");
+    assert.equal(oversized.issues[0]?.code, "too-many-sets");
+  }
+});
