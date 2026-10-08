@@ -128,7 +128,7 @@ test("question panels expose normalized read facts without saving", () => {
     '[role="button"][aria-label="Edit question 1"]'
   ] = [group];
 
-  const hidden = node("INPUT");
+  const hidden = node("INPUT", "", { type: "hidden" });
   hidden.value = JSON.stringify({
     number: 1,
     question: "Type sun.",
@@ -144,6 +144,9 @@ test("question panels expose normalized read facts without saving", () => {
   });
   const form = node("FORM");
   hidden.parent = form;
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input#setId[name="setId"]'] = [identity];
   const cancel = node("BUTTON", "Cancel", { type: "button" });
   let closed = 0;
   cancel.click = () => {
@@ -350,8 +353,11 @@ test("question modal operations reject switched and duplicate set IDs", () => {
   ] = [group];
 
   const form = node("FORM");
-  const hidden = node("INPUT");
+  const hidden = node("INPUT", "", { type: "hidden" });
   hidden.parent = form;
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input#setId[name="setId"]'] = [identity];
   hidden.value = JSON.stringify({
     number: 1, question: "Type sun.", qType: "typing",
     random: true, timeLimit: 15, answers: ["sun"],
@@ -441,3 +447,59 @@ test(
   });
   },
 );
+
+test("question reads require one modal tied to the requested set ID", () => {
+  const document = node("DOCUMENT");
+  const form = node("FORM");
+  const question = node("INPUT", "", { type: "hidden" });
+  question.value = JSON.stringify({
+    number: 1, question: "Type sun.", qType: "typing",
+    random: true, timeLimit: 15, answers: ["sun"],
+    correctAnswers: ["sun"], answerTypes: ["exactly"],
+    image: "", audio: "",
+  });
+  question.parent = form;
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "wrong-set";
+  form.selectors['input#setId[name="setId"]'] = [identity];
+  const cancel = node("BUTTON", "Cancel", { type: "button" });
+  let cancels = 0;
+  cancel.click = () => { cancels++; };
+  form.selectors['button[type="button"]'] = [cancel];
+  document.selectors['input#question[name="question"]'] = [question];
+  document.selectors['form input#question[name="question"]'] = [question];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    assert.equal(cancels, 0);
+    identity.value = "fixture";
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, true);
+    form.selectors['input#setId[name="setId"]'] = [identity, identity];
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    form.selectors['input#setId[name="setId"]'] = [identity];
+    document.selectors['input#question[name="question"]'] = [
+      question, question,
+    ];
+    document.selectors['form input#question[name="question"]'] = [
+      question, question,
+    ];
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    assert.equal(cancels, 0);
+    document.selectors['input#question[name="question"]'] = [question];
+    document.selectors['form input#question[name="question"]'] = [question];
+    form.selectors['input#setId[name="setId"]'] = [];
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    form.selectors['input#setId[name="setId"]'] = [identity];
+    identity.getAttribute = (name) => name === "type" ? "text" : null;
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    identity.getAttribute = (name) => name === "type" ? "hidden" : null;
+    question.getAttribute = (name) => name === "type" ? "text" : null;
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    assert.equal(cancels, 0);
+  });
+});
