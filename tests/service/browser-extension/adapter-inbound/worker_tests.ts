@@ -51,6 +51,7 @@ test(
   let detailReadCount = 0;
   let detailSwitchTabAfterScript = false;
   let sessionSwitchAfterScript: string | null = null;
+  let observedSessionOverride: string | null = null;
   let driftSessionAtSameRoute = false;
   let sessionObservations = 0;
   let listFailuresRemaining = 0;
@@ -239,6 +240,10 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "session.observe" &&
+            observedSessionOverride !== null) {
+          return [{ result: { ok: true, value: observedSessionOverride } }];
+        }
         if (operation.kind === "session.observe" &&
             driftSessionAtSameRoute) {
           sessionObservations++;
@@ -616,11 +621,15 @@ test(
       false,
     );
     questionPanelCloses = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
+    assert.equal((await message({ kind: "status" })).status, "connected");
 
     tabUrl = "https://id.blooket.com/login";
     const signedOut = await expectReply({ kind: "session.observe" });
     assert.equal(signedOut.ok, true);
     assert.equal(signedOut.value, "signed-out");
+    assert.equal((await message({ kind: "status" })).status,
+      "blooket-attention-required");
     const authentication = await expectReply({
       kind: "session.authenticate",
       loginIdentifier: "teacher@example.invalid",
@@ -628,6 +637,9 @@ test(
     });
     assert.equal(authentication.ok, true);
     assert.equal(authentication.value, null);
+    // A submit acknowledgment is not evidence that login completed.
+    assert.equal((await message({ kind: "status" })).status,
+      "blooket-attention-required");
     assert.equal(
       JSON.stringify(authentication).includes("synthetic-password"),
       false,
@@ -640,6 +652,16 @@ test(
     const ready = await expectReply({ kind: "session.observe" });
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
+    assert.equal((await message({ kind: "status" })).status, "connected");
+    observedSessionOverride = "security-challenge";
+    const challenged = await expectReply({ kind: "session.observe" });
+    assert.equal(challenged.ok, true);
+    assert.equal(challenged.value, "security-challenge");
+    assert.equal((await message({ kind: "status" })).status,
+      "blooket-attention-required");
+    observedSessionOverride = null;
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
+    assert.equal((await message({ kind: "status" })).status, "connected");
     driftSessionAtSameRoute = true;
     sessionObservations = 0;
     const changingSession = await expectReply({ kind: "session.observe" });

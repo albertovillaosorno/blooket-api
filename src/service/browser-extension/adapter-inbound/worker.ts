@@ -490,6 +490,26 @@ async function relay(current: Connection, activeGeneration: number) {
         } catch {
           status = "blooket-attention-required";
         }
+        // Popup status tracks the last *confirmed* session observation.
+        // Successful form submission never implies authenticated readiness.
+        if (
+          job.command.kind === "session.observe" &&
+          result && typeof result === "object" && !Array.isArray(result) &&
+          Object.keys(result).sort().join() === "ok,value" &&
+          "ok" in result && result.ok === true &&
+          "value" in result && typeof result.value === "string"
+        ) {
+          const state = result.value;
+          if (
+            state === "signed-out" || state === "expired-session" ||
+            state === "security-challenge" ||
+            state === "organization-prompt" || state === "unexpected-page"
+          ) status = "blooket-attention-required";
+          else if (
+            state === "dashboard" || state === "my-sets" ||
+            state === "create" || state === "edit"
+          ) status = "connected";
+        }
         if (generation !== activeGeneration) return;
         await bridgeFetch(current, "/api/browser-bridge/result", {
           schemaVersion: job.schemaVersion,
@@ -497,7 +517,7 @@ async function relay(current: Connection, activeGeneration: number) {
           ...(result as Record<string, unknown>),
         });
       }
-      if (status !== "blooket-attention-required") status = "connected";
+      if (status === "connection-unavailable") status = "connected";
     } catch {
       status = "connection-unavailable";
     }
