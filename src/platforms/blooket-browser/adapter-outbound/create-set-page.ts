@@ -53,6 +53,24 @@ export function prepareBlooketCreateSetForm(
     code: "blooket-browser-failed",
   });
   try {
+    // Each Chrome-injected step must still own a confirmed dashboard shell.
+    // The account menu may hide Logout while the signed-in page stays live.
+    const visibleUnique = (selector: string): boolean => {
+      const nodes = Array.from(document.querySelectorAll(selector));
+      if (nodes.length !== 1) return false;
+      const bounds = nodes[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const logoutSelector = 'a[href="https://id.blooket.com/logout"]';
+    const logout = Array.from(document.querySelectorAll(logoutSelector));
+    const accountSelector = 'a[href="https://id.blooket.com/login"]';
+    const authenticated = visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      logout.length === 1 && logout[0]!.textContent?.trim() === "Logout" &&
+      (visibleUnique(logoutSelector) ||
+        (visibleUnique(accountSelector) &&
+          !!document.querySelector(accountSelector)?.textContent?.trim()));
+    if (!authenticated) return failed();
     // Chrome executes each function in isolation. The prior preparation
     // cannot authorize a click behind a newly mounted human/security stop.
     const blockedByChallenge = Array.from(document.querySelectorAll(
@@ -166,6 +184,24 @@ export function submitBlooketCreateSetForm(
     code: "blooket-browser-failed",
   });
   try {
+    // Each Chrome-injected step must still own a confirmed dashboard shell.
+    // The account menu may hide Logout while the signed-in page stays live.
+    const visibleUnique = (selector: string): boolean => {
+      const nodes = Array.from(document.querySelectorAll(selector));
+      if (nodes.length !== 1) return false;
+      const bounds = nodes[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const logoutSelector = 'a[href="https://id.blooket.com/logout"]';
+    const logout = Array.from(document.querySelectorAll(logoutSelector));
+    const accountSelector = 'a[href="https://id.blooket.com/login"]';
+    const authenticated = visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      logout.length === 1 && logout[0]!.textContent?.trim() === "Logout" &&
+      (visibleUnique(logoutSelector) ||
+        (visibleUnique(accountSelector) &&
+          !!document.querySelector(accountSelector)?.textContent?.trim()));
+    if (!authenticated) return failed();
     // Chrome executes each function in isolation. The prior preparation
     // cannot authorize a click behind a newly mounted human/security stop.
     const blockedByChallenge = Array.from(document.querySelectorAll(
