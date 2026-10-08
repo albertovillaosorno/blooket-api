@@ -46,6 +46,7 @@ interface FixtureNode {
   value: string;
   labels: FixtureNode[];
   clicked: number;
+  disabled?: boolean;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
   getAttribute(name: string): string | null;
@@ -303,6 +304,24 @@ test("submit refuses stale privacy and ambiguous submit controls", () => {
     assert.equal(submitBlooketCreateSetForm(expected).ok, false);
     assert.equal(submit.clicked, 0);
   });
+});
+
+test("hidden or disabled Create Set buttons cannot be clicked", () => {
+  const input = { title: "Synthetic", description: "", private: true };
+  for (const reason of ["disabled", "aria", "hidden", "wrong-tag"] as const) {
+    const page = fixture(true);
+    const button = page.form.selectors["button"]![0]!;
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.deepEqual(prepareBlooketCreateSetForm(input), { ok: true });
+      if (reason === "disabled") button.disabled = true;
+      if (reason === "aria") button.attributes["aria-disabled"] = "true";
+      if (reason === "hidden")
+        button.getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (reason === "wrong-tag") button.tagName = "DIV";
+      assert.equal(submitBlooketCreateSetForm(input).ok, false);
+      assert.equal(button.clicked, 0);
+    });
+  }
 });
 
 test("success observation accepts only one exact edit ID", () => {
