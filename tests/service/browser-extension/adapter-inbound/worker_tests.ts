@@ -66,6 +66,8 @@ test(
   let capabilityPanelReady = false;
   let capabilityDrawerOpen = false;
   let holdWriteOpen = false;
+  let expireWriteAtOpen = false;
+  const realNow = Date.now;
   let holdReadScript = false;
   let reportReadScript!: () => void;
   let releaseReadScript!: () => void;
@@ -186,6 +188,10 @@ test(
           if (args[0] === "open") {
             assert.equal(args[1], "set-fixture");
             addQuestionPanelReady = true;
+            if (expireWriteAtOpen) {
+              expireWriteAtOpen = false;
+              Date.now = () => realNow() + 15_000;
+            }
             if (holdWriteOpen) {
               holdWriteOpen = false;
               reportWriteOpen();
@@ -415,9 +421,9 @@ test(
   async function expectReply(command) {
     const request = job(command);
     jobs.push(request);
-    const deadline = Date.now() + 3000;
+    const deadline = realNow() + 3000;
     while (!replies.some((reply) => reply.id === request.id)) {
-      assert.ok(Date.now() < deadline, "worker did not settle its request");
+      assert.ok(realNow() < deadline, "worker did not settle its request");
       await pause(20);
     }
     return replies.find((reply) => reply.id === request.id);
@@ -780,7 +786,25 @@ test(
       (name) => name === "inspectBlooketPage",
     ), ["inspectBlooketPage"]);
     assert.equal(replies.some((reply) => reply.id === staleReadJob.id), false);
+
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    expireWriteAtOpen = true;
+    const beforeExpiredWrite = scripts.length;
+    const expiredWrite = await expectReply({
+      kind: "questions.create",
+      setId: "set-fixture", number: 1, question: "Type sun.",
+      answers: [{ text: "sun", correct: true }], qType: "typing",
+      random: true, answerTypes: ["exactly"], timeLimit: 15,
+    });
+    Date.now = realNow;
+    assert.deepEqual(expiredWrite.value, {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+    assert.deepEqual(scripts.slice(beforeExpiredWrite).filter(
+      (name) => name === "runBlooketAddQuestionPageAction",
+    ), ["runBlooketAddQuestionPageAction"]);
   } finally {
+    Date.now = realNow;
     releaseReadScript();
     releaseWriteOpen();
     closed = true;
