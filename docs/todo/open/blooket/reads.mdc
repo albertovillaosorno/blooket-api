@@ -54,8 +54,16 @@ The extension discovers the workspace automatically through its isolated local
 page relay. It never asks the teacher for an address, pairing code, Blooket
 credentials, or a Connect action. The popup shows state and page shortcuts.
 
-Jig reports only the existing external `JIG-RULE-GAP-001`. Package-release
-freshness evidence was re-fetched from its configured registry providers.
+An earlier Jig 26.3.0 validator build reported `JIG-RULE-GAP-001` because
+it sought Jig-owned graph-schema source files in the inspected product checkout.
+Those files belong to the Jig validator, not Blooket API; copying them into
+this repository would fabricate evidence rather than fix the validation defect.
+
+Jig's corrected build binds that support to its own compiled sources. It still
+reports `scalability.repository-graph` as explicitly `not-evaluated`, pending
+an authoritative graph schema and migration contract; that is not a claim that
+the graph rule has passed. Package-release freshness evidence was re-fetched
+from its configured registry providers.
 
 Payload decoding rejects unknown fields, credentials, paths, wrong types,
 control characters, and oversized IDs before service/browser access.
