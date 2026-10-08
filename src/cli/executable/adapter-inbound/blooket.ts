@@ -38,6 +38,8 @@ import { executeCommand } from
   "../../../api/command-execution/application/execute-command.ts";
 import { isBlooketReadCommand } from
   "../../../ir/blooket-read-commands/contract/commands.ts";
+import { isBlooketPublicationCommand } from
+  "../../../ir/blooket-publication-commands/contract/commands.ts";
 import { executeLocalBlooketRead } from
   "../../../platforms/service-lifecycle/adapter-outbound/command.ts";
 import { userDataRoot } from
@@ -45,7 +47,8 @@ import { userDataRoot } from
 
 const exitCode = await runCli(process.argv.slice(2), {
   execute: (command) =>
-    isBlooketReadCommand(command.command)
+    isBlooketReadCommand(command.command) ||
+      isBlooketPublicationCommand(command.command)
       ? executeLocalBlooketRead(command, userDataRoot())
       : executeCommand(command),
   readStdin: async () => {

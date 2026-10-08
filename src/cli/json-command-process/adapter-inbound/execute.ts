@@ -35,6 +35,8 @@ import {
   decodeResultEnvelope,
   type ResultEnvelope,
 } from "../../../ir/wire-envelopes/contract/result-envelope.ts";
+import { isBlooketPublicationCommand } from
+  "../../../ir/blooket-publication-commands/contract/commands.ts";
 export type { ResultEnvelope } from
   "../../../ir/wire-envelopes/contract/result-envelope.ts";
 
@@ -55,6 +57,8 @@ export async function executeJsonCommand(
         XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
         BLOOKET_DATA_HOME: dataRoot,
       },
+      // Execute the bundled runtime directly, without Terminal or a shell.
+      shell: false,
       stdio: ["pipe", "pipe", "ignore"],
     });
     const chunks: Buffer[] = [];
@@ -62,7 +66,7 @@ export async function executeJsonCommand(
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       reject(new Error("cli-timeout"));
-    }, 30_000);
+    }, isBlooketPublicationCommand(command) ? 125_000 : 30_000);
     child.once("error", () => {
       clearTimeout(timer);
       reject(new Error("cli-unavailable"));

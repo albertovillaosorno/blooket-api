@@ -9,19 +9,19 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Bounded local-service transport for canonical Blooket read commands.
+//   - Bounded local-service transport for canonical Blooket commands.
 // - Must-Not:
-//   - Expose credentials, infer provider fields, or admit publication.
+//   - Expose credentials, infer provider fields, or replay uncertain writes.
 // - Allows:
 //   - Inputs: Validated command inputs and explicit local ports.
-//   - Outputs: Canonical read results or stable failures.
+//   - Outputs: Canonical command results or stable failures.
 //   - Side effects: Only explicitly delegated local operations.
 // - Split-When:
 //   - One port family needs independent browser lifecycle management.
 // - Merge-When:
 //   - Application ports directly consume bridge commands.
 // - Summary:
-//   - Bounded local-service transport for canonical Blooket read commands.
+//   - Bounded local-service transport for canonical Blooket commands.
 // - Description:
 //   - Preserves the canonical runtime validation boundary.
 // - Usage:
@@ -38,6 +38,8 @@ import {
   isBlooketReadCommand,
   decodeBlooketReadCommand,
 } from "../../../ir/blooket-read-commands/contract/commands.ts";
+import { isBlooketPublicationCommand, decodeBlooketPublicationCommand } from
+  "../../../ir/blooket-publication-commands/contract/commands.ts";
 
 // The CLI uses local CSRF admission; no browser token enters its arguments,
 // environment, stdin envelope, or result. Redirects are never followed.
@@ -57,8 +59,15 @@ export async function executeLocalBlooketRead(
       },
     ],
   });
-  if (!isBlooketReadCommand(command.command)) return failure("unknown-command");
-  const decoded = decodeBlooketReadCommand(command.command, command.payload);
+  const publication = isBlooketPublicationCommand(command.command);
+  if (!publication && !isBlooketReadCommand(command.command))
+    return failure("unknown-command");
+  const decoded = isBlooketPublicationCommand(command.command)
+    ? decodeBlooketPublicationCommand(command.command, command.payload)
+    : decodeBlooketReadCommand(
+        command.command as Parameters<typeof decodeBlooketReadCommand>[0],
+        command.payload,
+      );
   if (!decoded.ok)
     return {
       version: 1 as const,
@@ -69,7 +78,7 @@ export async function executeLocalBlooketRead(
   try {
     const runtime = await existingService(root);
     if (!runtime) return failure("blooket-browser-unavailable");
-    const signal = AbortSignal.timeout(25_000);
+    const signal = AbortSignal.timeout(publication ? 120_000 : 25_000);
     const bootResponse = await fetch(runtime.origin + "/api/bootstrap", {
       redirect: "error",
       signal,

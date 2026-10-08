@@ -133,6 +133,12 @@ The same EN/ES browser check exposed a stale empty-draft message after changing
 language. Its generated paragraph now participates in ordinary translation,
 preserving draft contents while updating the surrounding product message.
 
+On 2026-10-08, the owner confirmed that native Mac/Safari checks stay in this
+ongoing record rather than blocking P2/P3 completion. Native visual checks must
+also confirm that MCP commands, service startup, and updater restart do not
+open Terminal windows. Functional implementation and portable safety/recovery
+evidence remain required in their owning records.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto

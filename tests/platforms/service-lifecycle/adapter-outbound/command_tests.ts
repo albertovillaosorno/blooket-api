@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -213,7 +213,7 @@ test("local reads and MCP traverse the real CLI and service bridge",
     assert.equal(
       listTeacherTools().filter((tool) => tool.name.startsWith("blooket_"))
         .length,
-      5,
+      9,
     );
     assert.equal(JSON.stringify(mcp).includes(bridge.pairingToken()), false);
     legacyList = true;
@@ -275,3 +275,115 @@ test("local read discovery rejects stale and non-loopback runtimes",
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("MCP publication crosses CLI service and journaled browser transport",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "canonical-publication-"));
+    const bridge = createBlooketBrowserBridgeBroker();
+    const instance = randomUUID();
+    const service = await startBrowserService({
+      root, port: 0, instance, browserBridge: bridge,
+    });
+    const capabilities = JSON.parse(await readFile(new URL(
+      "../../../ir/capability-snapshots/contract/" +
+        "blooket-official-2026-10-05.json", import.meta.url,
+    ), "utf8"));
+    let remote: Record<string, unknown> | undefined;
+    const questions: Record<string, unknown>[] = [];
+    const mutations: string[] = [];
+    const poll = setInterval(() => {
+      const job = bridge.next(bridge.pairingToken());
+      if (!job) return;
+      let value: unknown;
+      const request = job.command;
+      switch (request.kind) {
+        case "session.observe": value = "my-sets"; break;
+        case "capabilities.inspect": value = capabilities; break;
+        case "sets.list": value = {
+          items: remote ? [{ schemaVersion: 1, id: remote["id"],
+            title: remote["title"] }] : [],
+          completeness: remote ? "unknown" : "complete",
+        }; break;
+        case "sets.get": value = remote; break;
+        case "questions.list": value = structuredClone(questions); break;
+        case "sets.create":
+          mutations.push(request.kind);
+          remote = { schemaVersion: 1, id: "synthetic-created",
+            title: request.title, description: request.description,
+            visibility: request.private ? "private" : "public" };
+          value = { ok: true, remoteSetId: remote["id"] }; break;
+        case "questions.create":
+          mutations.push(request.kind);
+          questions.push({ schemaVersion: 3, number: request.number,
+            question: request.question, equation: null,
+            qType: request.qType, random: request.random,
+            timeLimit: request.timeLimit, hasImage: false, hasAudio: false,
+            answers: request.answers.map((answer, index) => ({
+              kind: "text", content: answer.text, correct: answer.correct,
+              match: request.answerTypes?.[index] ?? null,
+            })),
+          });
+          value = { ok: true }; break;
+        default: throw new Error("Unexpected publication bridge command.");
+      }
+      assert.ok(bridge.complete(bridge.pairingToken(), {
+        schemaVersion: 1, id: job.id, ok: true, value,
+      }));
+    }, 5);
+    try {
+      await writeFile(join(root, "service-runtime.json"), JSON.stringify({
+        version: 1, pid: process.pid, instance, origin: service.origin,
+      }));
+      const saved = await executeJsonCommand("drafts.put", {
+        id: "publication-fixture", expectedRevision: null,
+        document: { schemaVersion: 1, title: "Synthetic publication",
+          description: "Fixture", quizLanguage: "English",
+          visibility: "private", mediaIndex: "media.jsonl", coverImage: null,
+          questions: [{ id: "q1", type: "typing-answer",
+            prompt: "Type sun.", timeLimitSeconds: 10, image: null,
+            matchMode: "contains", answer: "sun" }],
+        },
+      }, "cli:publication-draft", root);
+      assert.ok(saved.ok);
+      const expectedRevision = (saved.value as { revision: string }).revision;
+      for (let index = 0; index < 2; index++) {
+        const reply = await callTeacherTool("blooket_publication_step", {
+          draftId: "publication-fixture", expectedRevision,
+        }, root);
+        assert.equal(reply.isError, false, reply.content[0]?.text);
+        const envelope = decodeResultEnvelope(
+          JSON.parse(reply.content[0]!.text),
+        );
+        assert.ok(envelope.ok && envelope.value.ok);
+        if (envelope.ok && envelope.value.ok) {
+          const progress = envelope.value.value as {
+            completedOperations: number; published: boolean };
+          assert.equal(progress.completedOperations, index + 1);
+          assert.equal(progress.published, false);
+        }
+        assert.equal(mutations.length, index + 1);
+      }
+      const verified = await callTeacherTool("blooket_publication_verify", {
+        draftId: "publication-fixture",
+      }, root);
+      assert.equal(verified.isError, false, verified.content[0]?.text);
+      const envelope = decodeResultEnvelope(
+        JSON.parse(verified.content[0]!.text),
+      );
+      assert.ok(envelope.ok && envelope.value.ok);
+      if (envelope.ok && envelope.value.ok)
+        assert.equal((envelope.value.value as { published: boolean }).published,
+          true);
+      assert.deepEqual(mutations, ["sets.create", "questions.create"]);
+      assert.equal(JSON.stringify(verified).includes(bridge.pairingToken()),
+        false);
+      assert.equal(JSON.stringify(verified).includes(root), false);
+    } finally {
+      clearInterval(poll);
+      bridge.close();
+      service.server.close();
+      service.server.closeAllConnections();
+      await rm(root, { recursive: true, force: true });
+    }
+  });

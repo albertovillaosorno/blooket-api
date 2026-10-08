@@ -233,6 +233,32 @@ const tools = [
     { id, document: { type: "object" }, expectedRevision: revision },
     false,
   ),
+  ...["step", "status", "verify", "reconcile"].map(action => tool(
+    "blooket_publication_" + action,
+    "blooket.publication." + action,
+    action === "step"
+      ? "Create an admitted text-only saved draft in Blooket, one journaled " +
+        "set/question write per call. Supply its saved revision. " +
+        "Inspect progress; never retry an uncertain write blindly. " +
+        "Images and editing existing quizzes are not supported yet."
+      : action === "verify"
+        ? "Freshly verify all text quiz metadata, questions, answers, " +
+          "types and timing after all publication writes finish. " +
+          "Only this successful check reports published=true."
+        : action === "reconcile"
+          ? "Observe and reconcile an uncertain publication step without " +
+            "another remote write. Inconclusive results retain recovery."
+          : "Read local publication progress. Completed writes do not " +
+            "prove the current remote quiz; use publication verify.",
+    action === "step" ? { draftId: id, expectedRevision: {
+      type: "string", pattern: "^[a-f0-9]{64}$",
+      description: "The exact revision returned by drafts_get or drafts_put.",
+    } }
+      : { draftId: id },
+    action === "status" || action === "verify",
+    action === "step" ? ["draftId", "expectedRevision"] : ["draftId"],
+    action !== "status",
+  )),
 ];
 export function listTeacherTools() {
   return tools.map(({ command: _command, ...metadata }) => metadata);

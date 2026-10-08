@@ -702,6 +702,13 @@ async function executePersistedBlooketWriteLocked(
       baseline.value,
     );
     if (begun.ok && begun.record !== undefined) {
+      // Journal persistence is asynchronous. Keep that recovery record when
+      // cancellation arrives here, but do not start a remote write afterward.
+      if (options.signal?.aborted)
+        return {
+          ok: false, stage: "mutation-pacing",
+          code: "mutation-pacing-cancelled",
+        };
       attempted = await attemptBlooketWrite(
         writes,
         prepared.operation,

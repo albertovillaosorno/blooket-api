@@ -65,6 +65,8 @@ Usage:
   blooket sets list [--json]
   blooket sets get <set-id> [--json]
   blooket questions list <set-id> [--json]
+  blooket publication step <draft-id> <revision> [--json]
+  blooket publication status|verify|reconcile <draft-id> [--json]
   blooket media search <query> [options]
   blooket project validate <project.json> [options]
 
@@ -161,7 +163,8 @@ async function prepareCommand(
   operationId: string,
   readText: (path: string) => Promise<string>,
 ): Promise<CommandEnvelope> {
-  if (invocation.kind === "blooket-read")
+  if (invocation.kind === "blooket-read" ||
+      invocation.kind === "blooket-publication")
     return {
       version: COMMAND_ENVELOPE_VERSION,
       operationId,

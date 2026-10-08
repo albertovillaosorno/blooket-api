@@ -52,12 +52,20 @@ import {
   executeBlooketReadCommand,
   type BlooketReadDependencies,
 } from "../../blooket-set-reads/application/command.ts";
+import { isBlooketPublicationCommand } from
+  "../../../ir/blooket-publication-commands/contract/commands.ts";
+import { executeBlooketPublicationCommand,
+  type BlooketPublicationDependencies } from
+  "../../blooket-write-execution/application/command.ts";
 
 export async function executeCommand(
   command: CommandEnvelope,
   dataRoot?: string,
   blooket?: BlooketReadDependencies,
+  publication?: BlooketPublicationDependencies,
 ): Promise<ResultEnvelope> {
+  if (isBlooketPublicationCommand(command.command))
+    return executeBlooketPublicationCommand(command, publication);
   if (isBlooketReadCommand(command.command))
     return executeBlooketReadCommand(command, blooket);
   if (LIBRARY_COMMANDS.some((name) => name === command.command))

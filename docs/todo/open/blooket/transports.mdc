@@ -219,9 +219,10 @@ results, and Add Question remain fail-closed.
 
 The local browser-service composition routes this bridge surface through the
 canonical browser write execution adapter, so an observed remote set ID is
-decoded again before it can become a durable receipt. No external publication
-command is registered yet, and no live application-driven Create Set acceptance
-has been claimed from these synthetic transport tests.
+decoded again before it can become a durable receipt. External text-only
+publication commands now compose through persisted execution and MCP/CLI;
+no live application-driven Create Set acceptance is claimed from their
+synthetic transport tests.
 
 A private one-question quiz was created through the authorized Blooket UI and
 changed from multiple choice to typing with a 15-second limit. Its final type

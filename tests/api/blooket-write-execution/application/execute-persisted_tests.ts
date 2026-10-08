@@ -30,6 +30,7 @@
 //   - Missing checkpoint files imply operation index zero.
 //
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -1844,3 +1845,33 @@ test(
   });
   },
 );
+
+
+test("cancellation after journal persistence blocks mutation and replay",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const events: string[] = [], calls: string[] = [];
+      const signal = new AbortController().signal;
+      // Deterministically expose cancellation at the asynchronous durable
+      // journal boundary, rather than relying on a timing-sensitive timeout.
+      Object.defineProperty(signal, "aborted", {
+        get: () => existsSync(paths.attempt),
+      });
+      const result = await executePersistedBlooketWrite(
+        paths, plan, browser([]), secrets(), writes(SET_SUCCESS, calls),
+        undefined, { signal, pacer: immediatePacer(events) },
+      );
+      assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+        code: "mutation-pacing-cancelled" });
+      assert.deepEqual(events, ["acquire", "release"]);
+      assert.deepEqual(calls, []);
+      const journal = await readFile(paths.attempt, "utf8");
+      const resumed = await executePersistedBlooketWrite(
+        paths, plan, browser([]), secrets(), writes(SET_SUCCESS, calls),
+      );
+      assert.ok(resumed.ok && resumed.kind === "reconciliation-required");
+      assert.deepEqual(calls, []);
+      assert.equal(await readFile(paths.attempt, "utf8"), journal);
+    });
+  });

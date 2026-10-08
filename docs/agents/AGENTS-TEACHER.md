@@ -25,6 +25,26 @@ Use the validated quiz contracts exposed by the admitted tools. Keep recoverable
 local drafts distinct from published Blooket state. Fresh, verified remote state
 wins when editing an existing online quiz.
 
+## Text-only publication
+
+For an authorized new text-only quiz, save the validated draft with
+`drafts_put` and retain its returned revision. Call
+`blooket_publication_step` with that draft ID and exact revision, observing each
+result before continuing. Each step performs at most one remote mutation; a
+completed write sequence is not final publication proof.
+
+Use `blooket_publication_status` after a disconnect. An uncertain result or
+`reconciliation-required` phase requires `blooket_publication_reconcile`;
+never blindly retry or create a replacement draft to evade its journal.
+Inconclusive reconciliation preserves the stop. A human browser stop needs the
+legitimate local action before continuation.
+
+After all writes complete, call `blooket_publication_verify`. Report publication
+only when that fresh check returns `published: true`; retain the returned remote
+set ID for the teacher. Media and editing an existing quiz are unsupported by
+these tools at present; do not silently remove requested images or replace an
+existing quiz with a new one.
+
 ## Media
 
 Use media stable IDs returned by the library tools. Search the library before

@@ -88,8 +88,9 @@ lifecycle, and trusted packaging; it exposes no remote installation authority.
 
 The updater stages at a safe boundary, preserves the private user-data root,
 never replaces a running application blindly, and never replays an ambiguous
-Blooket write after restart. Missing manifests/authenticity or native acceptance
-block completion rather than being relaxed for convenience.
+Blooket write after restart. Missing manifests/authenticity and unimplemented
+safe installation/recovery block functional completion. Native Mac/Safari
+acceptance belongs to task blooket-15; lack of those hosts does not block P2/P3.
 
 ## Consequences
 
@@ -115,8 +116,9 @@ tag/source matching, and bounded package projections. Roadmap integrity checks
 verify record identity, dependencies, links, and completion status/path.
 
 Portable catalog and local manual-check tests are implemented. The remaining
-updater matrix and real Mac/release acceptance are pending in
-[the update record](../../todo/open/delivery/updates.mdc). Portable tests do
+updater matrix and trusted release acceptance are pending in
+[the update record](../../todo/open/delivery/updates.mdc). Native Mac/Safari
+acceptance stays in the final ongoing record. Portable tests do
 not establish Safari, Keychain, signing, notarization, or recipient acceptance.
 
 [chrome]:
