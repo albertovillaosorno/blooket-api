@@ -401,3 +401,38 @@ test("capability probes refuse a human prompt or missing session", () => {
     });
   }
 });
+
+test("every injected capability action works without module imports", () => {
+  const injected = <T extends (...args: never[]) => unknown>(fn: T): T =>
+    Function("return (" + fn.toString() + ")")() as T;
+  const openQuestion = injected(openBlooketCapabilityQuestionPanel);
+  const isReady = injected(isBlooketCapabilityQuestionPanelReady);
+  const openAudio = injected(openBlooketAudioCapabilityDrawer);
+  const inspectAudio = injected(inspectBlooketAudioCapabilityDrawer);
+  const closeAudio = injected(closeBlooketAudioCapabilityDrawer);
+  const isAudioClosed = injected(isBlooketAudioCapabilityDrawerClosed);
+  const closeQuestion = injected(closeBlooketCapabilityQuestionPanel);
+  const isQuestionClosed = injected(isBlooketCapabilityQuestionPanelClosed);
+  const page = fixture();
+  const activeDrawer = drawer("unsupported");
+  withPage(page.document, () => {
+    assert.equal(openQuestion("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isReady("set-fixture"), true);
+    assert.equal(openAudio("set-fixture"), true);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [
+      activeDrawer,
+    ];
+    assert.deepEqual(inspectAudio("set-fixture"), {
+      ok: true, value: "unsupported",
+    });
+    assert.equal(closeAudio("set-fixture"), true);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [];
+    assert.equal(isAudioClosed("set-fixture"), true);
+    assert.equal(closeQuestion("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [];
+    assert.equal(isQuestionClosed("set-fixture"), true);
+  });
+});
