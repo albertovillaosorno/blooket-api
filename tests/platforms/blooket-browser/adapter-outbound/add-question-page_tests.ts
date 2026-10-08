@@ -51,6 +51,7 @@ interface FixtureNode {
   parent?: FixtureNode;
   parentElement?: FixtureNode;
   clicked: number;
+  disabled?: boolean;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
   getAttribute(name: string): string | null;
@@ -247,6 +248,23 @@ test("unknown serialized Add Question actions never submit", () => {
       assert.equal(page.submit.clicked, 0);
     },
   );
+});
+
+test("unusable Save Question buttons cannot authorize a click", () => {
+  for (const reason of ["disabled", "aria", "hidden", "wrong-tag"] as const) {
+    const page = fixture();
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.deepEqual(prepareBlooketAddQuestionForm(typing), { ok: true });
+      if (reason === "disabled") page.submit.disabled = true;
+      if (reason === "aria") page.submit.attributes["aria-disabled"] = "true";
+      if (reason === "hidden")
+        page.submit.getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (reason === "wrong-tag") page.submit.tagName = "DIV";
+      assert.equal(submitBlooketAddQuestionForm(typing).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
 });
 
 test("Add Question opens and serializes exact typing state", () => {
