@@ -308,6 +308,7 @@ async function read(
         opened = true;
         break;
       }
+      if (result !== false) throw new Error("browser-details-unavailable");
       await pause(100);
     }
     if (!opened) throw new Error("browser-details-unavailable");
@@ -323,7 +324,36 @@ async function read(
         result && typeof result === "object" && !Array.isArray(result) &&
         Object.keys(result).sort().join() === "ok,value" &&
         "ok" in result && result.ok === true
-      ) return result;
+      ) {
+        if (Date.now() >= readDeadline)
+          throw new Error("browser-details-unavailable");
+        const confirmed = await chrome.tabs.get(current.tabId);
+        if (confirmed.status !== "complete" || confirmed.url !== target)
+          throw new Error("browser-details-unavailable");
+        // A freshly opened metadata panel can still hydrate asynchronously.
+        await pause(100);
+        if (Date.now() >= readDeadline)
+          throw new Error("browser-details-unavailable");
+        const again = await script(
+          current,
+          inspectBlooketPage as (...args: never[]) => unknown,
+          [operation],
+        );
+        if (JSON.stringify(result) !== JSON.stringify(again))
+          throw new Error("browser-details-unavailable");
+        const after = await chrome.tabs.get(current.tabId);
+        if (
+          Date.now() >= readDeadline || after.status !== "complete" ||
+          after.url !== target
+        ) throw new Error("browser-details-unavailable");
+        return result;
+      }
+      if (
+        !result || typeof result !== "object" || Array.isArray(result) ||
+        Object.keys(result).sort().join() !== "code,ok" ||
+        !("ok" in result) || result.ok !== false ||
+        !("code" in result) || result.code !== "blooket-browser-failed"
+      ) throw new Error("browser-details-unavailable");
       await pause(100);
     }
     throw new Error("browser-details-unavailable");

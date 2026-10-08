@@ -46,6 +46,10 @@ test(
   let closed = false;
   let validStatus = true;
   let detailOpenSucceeds = true;
+  let detailMalformedReply = false;
+  let detailDrifts = false;
+  let detailReadCount = 0;
+  let detailSwitchTabAfterScript = false;
   let listFailuresRemaining = 0;
   let listDrifts = false;
   let listEmpty = false;
@@ -232,6 +236,23 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "sets.get") {
+          detailReadCount++;
+          if (detailMalformedReply) {
+            detailMalformedReply = false;
+            return [{ result: {
+              ok: true, extra: "untrusted",
+              value: {
+                schemaVersion: 1, id: operation.setId,
+                title: "Synthetic", description: "", visibility: "private",
+              },
+            } }];
+          }
+          if (detailSwitchTabAfterScript) {
+            detailSwitchTabAfterScript = false;
+            tabUrl = "https://dashboard.blooket.com/edit?id=another-set";
+          }
+        }
         if (operation.kind === "sets.list") {
           setListReads++;
           if (listFailuresRemaining > 0) {
@@ -289,7 +310,8 @@ test(
                     : {
                         schemaVersion: 1,
                         id: operation.setId,
-                        title: "Synthetic",
+                        title: detailDrifts && detailReadCount % 2 === 0
+                          ? "Changed synthetic title" : "Synthetic",
                         description: "",
                         visibility: "private",
                       },
@@ -454,6 +476,30 @@ test(
       (name) => name === "openBlooketDetailPanel",
     ), true);
     detailOpenSucceeds = true;
+    detailMalformedReply = true;
+    const beforeMalformedDetail = scripts.length;
+    const malformedDetail = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(malformedDetail.ok, false);
+    assert.equal(scripts.slice(beforeMalformedDetail).filter(
+      (name) => name === "inspectBlooketPage",
+    ).length, 1);
+    detailSwitchTabAfterScript = true;
+    const switchedDetail = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(switchedDetail.ok, false);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=another-set");
+    detailDrifts = true;
+    detailReadCount = 0;
+    const driftedDetail = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(driftedDetail.ok, false);
+    assert.equal(detailReadCount, 2);
+    detailDrifts = false;
     const questions = await expectReply({
       kind: "questions.list",
       setId: "set-fixture",

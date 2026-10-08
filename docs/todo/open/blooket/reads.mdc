@@ -181,6 +181,16 @@ unique form, rejecting missing or duplicate controls. Unrelated title,
 description, or privacy controls elsewhere in the document cannot be returned
 as evidence for the requested set.
 
+The extension's set-detail worker now retries only an exact page-unavailable
+reply while the Edit Info panel hydrates. A malformed success envelope or
+unexpected opener result is rejected immediately rather than accepted after
+a later retry. Before returning metadata, the worker rechecks the exact edit
+URL and requires two identical observations separated by an event-loop yield.
+
+Synthetic worker tests reject tab switches and changes to the visible set title
+between those observations. These checks do not establish a remote atomic
+snapshot and never submit the set metadata form.
+
 This adds no claim of live provider acceptance or server-side atomicity.
 
 Recovered My Sets module 52644 and its captured route HTML establish the true
