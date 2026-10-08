@@ -398,3 +398,53 @@ test(
   assert.equal(fake.calls.filter((call) => call === "script").length, 1);
   },
 );
+
+test(
+  "Create Set submit acknowledgement refuses unrelated browser routes",
+  async () => {
+  const expected = { title: "Test", description: "", private: true };
+  for (const url of [
+    "https://dashboard.blooket.com/my-sets",
+    "https://id.blooket.com/login",
+    "https://dashboard.blooket.com/edit?id=one&id=two",
+    "https://example.invalid/",
+  ]) {
+    const fake = fakeChrome({ scripts: [prepared] });
+    fake.setTab({ url: "https://dashboard.blooket.com/create",
+      status: "complete" });
+    const submit = fake.chrome.scripting.executeScript;
+    fake.chrome.scripting.executeScript = async (request) => {
+      const response = await submit(request);
+      fake.setTab({ url, status: "complete" });
+      return response;
+    };
+    assert.deepEqual(await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => {},
+    ).submitCreateSet(expected), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  }
+  },
+);
+
+test(
+  "Create Set submit permits the expected loading edit redirect",
+  async () => {
+  const fake = fakeChrome({ scripts: [prepared] });
+  fake.setTab({ url: "https://dashboard.blooket.com/create",
+    status: "complete" });
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async (request) => {
+    const reply = await execute(request);
+    fake.setTab({
+      url: "https://dashboard.blooket.com/edit?id=opaque%20set",
+      status: "loading",
+    });
+    return reply;
+  };
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => {},
+  ).submitCreateSet({ title: "Test", description: "", private: true }), {
+    ok: true,
+  });
+});

@@ -55,6 +55,11 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the Create Set browser host added a post-submit route
+check to reject acknowledgments from an unrelated tab destination. It still
+permits a legitimate in-progress Edit redirect, but requires separate stable
+read-back before reporting the new set. Synthetic tests cover both outcomes.
+
 On 2026-10-08, Create Set preparation and submission began requiring one
 unique form and one copy of each scoped title, description, and privacy
 control. Duplicate forms and values outside the intended form now fail
