@@ -64,6 +64,8 @@ export function inspectBlooketPage(
       try {
         const challengeUrl = new URL(source, location.href);
         return !(
+          url.origin === "https://id.blooket.com" &&
+          url.pathname === "/login" &&
           challengeUrl.origin === "https://www.google.com" &&
           challengeUrl.pathname === "/recaptcha/api2/anchor" &&
           challengeUrl.searchParams.getAll("size").length === 1 &&
