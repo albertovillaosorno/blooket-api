@@ -1797,3 +1797,50 @@ test("journal confirmation failure blocks checkpoint persistence", async () => {
     await assert.rejects(readFile(path, "utf8"));
   });
 });
+
+test(
+  "cancel after durable budget reservation never opens a write journal",
+  async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const budgetPath = join(directory, "budget.json");
+    const controller = new AbortController();
+    const events: string[] = [];
+    const writeCalls: string[] = [];
+    const result = await executePersistedBlooketWrite(
+      paths,
+      plan,
+      browser([]),
+      secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      undefined,
+      {
+        pacer: immediatePacer(events),
+        signal: controller.signal,
+        budget: {
+          path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => {
+            controller.abort();
+            return 10_000;
+          },
+        },
+      },
+    );
+    assert.deepEqual(result, {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled",
+    });
+    assert.deepEqual(events, ["acquire", "release"]);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan), {
+      ok: true, kind: "missing",
+    });
+    assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId), {
+      ok: true,
+      state: { version: 1, startedAtMs: 10_000, starts: 1 },
+    });
+  });
+  },
+);

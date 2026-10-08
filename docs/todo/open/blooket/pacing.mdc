@@ -103,6 +103,13 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-08, persisted write execution added a second cancellation
+checkpoint immediately after durable budget reservation. An abort while the
+budget adapter is working now prevents journal creation and remote mutation,
+although the already-persisted budget start remains conservatively consumed.
+A deterministic regression aborts during the injected reservation clock and
+verifies the missing journal, absent remote call, and released pacing lease.
+
 On 2026-10-08, the in-process mutation pacer was hardened so an aborted
 reservation can complete while an earlier lease is still held. Its reserved
 queue slot still resolves only after the incumbent, preventing a later caller

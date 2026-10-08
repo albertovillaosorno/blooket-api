@@ -680,6 +680,17 @@ async function executePersistedBlooketWriteLocked(
       };
     }
   }
+  // Durable reservation is asynchronous; cancellation can arrive after the
+  // previous check. A reserved start remains conservatively consumed, but an
+  // aborted task must not open a journal or invoke the remote mutation.
+  if (options.signal?.aborted) {
+    lease?.release();
+    return {
+      ok: false,
+      stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled",
+    };
+  }
 
   let begun: Awaited<ReturnType<typeof beginWriteAttempt>>;
   let attempted: Awaited<ReturnType<typeof attemptBlooketWrite>> | undefined;
