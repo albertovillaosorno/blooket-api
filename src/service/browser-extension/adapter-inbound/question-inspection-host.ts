@@ -152,6 +152,11 @@ export function createExtensionQuestionInspectionHost(
     ).catch(() => false);
     if (canceled !== true) return false;
     for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+      // A route change after Cancel must not authorize a closure probe in
+      // the teacher's newly selected page, even during best-effort cleanup.
+      const current = await chrome.tabs.get(tabId).catch(() => undefined);
+      if (current?.status !== "complete" || current.url !== url)
+        return false;
       const closed = await script(
         isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
         [setId],
@@ -192,10 +197,18 @@ export function createExtensionQuestionInspectionHost(
           try {
             for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
               attempt++) {
+              if (!await ready(url, deadline)) {
+                invalid = true;
+                break;
+              }
               const inspected = await script(
                 inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
                 [setId, number],
               );
+              if (!await ready(url, deadline)) {
+                invalid = true;
+                break;
+              }
               // Only an exact page-unavailable reply can reflect hydration.
               // Invalid successful data cannot be repaired by a later reply.
               if (
