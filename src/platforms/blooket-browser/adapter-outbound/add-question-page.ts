@@ -184,6 +184,26 @@ export function runBlooketAddQuestionPageAction(
   };
 
   try {
+    // Browser scripts are serialized separately. A prior edit-page read
+    // cannot establish that this injected action still owns a valid session.
+    const visibleUnique = (selector: string): boolean => {
+      const nodes = Array.from(document.querySelectorAll(selector));
+      if (nodes.length !== 1) return false;
+      const bounds = nodes[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const logoutSelector = 'a[href="https://id.blooket.com/logout"]';
+    const logout = Array.from(document.querySelectorAll(logoutSelector));
+    const accountSelector = 'a[href="https://id.blooket.com/login"]';
+    const authenticated = visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      logout.length === 1 &&
+      logout[0]!.textContent?.trim() === "Logout" &&
+      (visibleUnique(logoutSelector) ||
+        (visibleUnique(accountSelector) &&
+          !!document.querySelector(accountSelector)?.textContent?.trim()));
+    if (!authenticated)
+      return action === "open" || action === "is-ready" ? false : failed();
     // Independently reject human/security overlays on every injected step.
     // The old Edit controls can remain mounted behind a new provider stop.
     const challenge = Array.from(document.querySelectorAll(
