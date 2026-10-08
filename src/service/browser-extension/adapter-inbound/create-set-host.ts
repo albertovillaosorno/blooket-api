@@ -134,16 +134,30 @@ export function createExtensionCreateSetHost(
     return replies[0].result;
   };
 
+  const createTabReady = async (): Promise<boolean> => {
+    const tab = await chrome.tabs.get(tabId);
+    return tab.status === "complete" && tab.url === CREATE_URL;
+  };
   return {
     openCreateSet: async () => {
       try {
         const before = await chrome.tabs.get(tabId);
-        if (!dashboardTab(before)) return browserFailure();
-        await chrome.tabs.update(tabId, { url: CREATE_URL });
+        if (!dashboardTab(before) || before.status !== "complete")
+          return browserFailure();
+        // A manual route selection between browser calls belongs to the user.
+        const current = await chrome.tabs.get(tabId);
+        if (current.status !== "complete" || current.url !== before.url)
+          return browserFailure();
+        if (current.url !== CREATE_URL)
+          await chrome.tabs.update(tabId, { url: CREATE_URL });
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
           if (tab.status === "complete") {
+            // A page-level state alone cannot authorize writes on a different
+            // route; a post-script tab check rejects late navigation as well.
+            if (tab.url !== CREATE_URL) return browserFailure();
             const observed = await observe(script);
+            if (!await createTabReady()) return browserFailure();
             if (observed === "create") return { ok: true };
             if (observed !== undefined)
               return navigationFailure(normalizeUnexpected(observed));
@@ -158,11 +172,13 @@ export function createExtensionCreateSetHost(
 
     prepareCreateSet: async (input) => {
       try {
+        if (!await createTabReady()) return browserFailure();
         const result = await script(
           prepareBlooketCreateSetForm as (...args: never[]) => unknown,
           [input],
         );
-        return exactOk(result) ? { ok: true } : browserFailure();
+        return await createTabReady() && exactOk(result)
+          ? { ok: true } : browserFailure();
       } catch {
         return browserFailure();
       }
@@ -170,10 +186,13 @@ export function createExtensionCreateSetHost(
 
     submitCreateSet: async (expected) => {
       try {
+        if (!await createTabReady()) return browserFailure();
         const result = await script(
           submitBlooketCreateSetForm as (...args: never[]) => unknown,
           [expected],
         );
+        // Submission may immediately redirect to /edit. A successful page
+        // click is only an acknowledgment; observeCreateSet owns confirmation.
         return exactOk(result) ? { ok: true } : browserFailure();
       } catch {
         return browserFailure();
@@ -194,6 +213,9 @@ export function createExtensionCreateSetHost(
                 observeBlooketCreateSetSuccess as
                   (...args: never[]) => unknown,
               );
+              const after = await chrome.tabs.get(tabId);
+              if (after.status !== "complete" || after.url !== tab.url)
+                return browserFailure();
               if (
                 result &&
                 typeof result === "object" &&
