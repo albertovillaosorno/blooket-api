@@ -155,6 +155,11 @@ function withPage(
 
 function fixture() {
   const document = node("DOCUMENT");
+  document.selectors["main"] = [node("MAIN")];
+  document.selectors['nav a[href="/my-sets"]'] = [node("A", "My Sets")];
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+    node("A", "Logout"),
+  ];
   const add = node("BUTTON", "Add Question");
   document.selectors["button"] = [add];
 
@@ -452,3 +457,41 @@ test(
   }
   },
 );
+
+
+test(
+  "stale Add Question controls cannot replace a lost dashboard shell",
+  () => {
+  for (const missing of ["main", "navigation", "logout"] as const) {
+    const page = fixture();
+    const selector = missing === "main" ? "main" : missing === "navigation"
+      ? 'nav a[href="/my-sets"]'
+      : 'a[href="https://id.blooket.com/logout"]';
+    page.document.selectors[selector] = [];
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
+      assert.equal(isBlooketAddQuestionPanelReady("set-fixture"), false);
+      assert.equal(prepareBlooketAddQuestionForm(typing).ok, false);
+      assert.equal(submitBlooketAddQuestionForm(typing).ok, false);
+      assert.equal(page.add.clicked, 0);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+});
+
+test("closed Blooket account menu still permits authenticated edits", () => {
+  const page = fixture();
+  const logout = page.document.selectors[
+    'a[href="https://id.blooket.com/logout"]'
+  ]![0]!;
+  logout.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  page.document.selectors['a[href="https://id.blooket.com/login"]'] = [
+    node("A", "Account"),
+  ];
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(openBlooketAddQuestionPanel("set-fixture"), true);
+    assert.equal(page.add.clicked, 1);
+  });
+});
