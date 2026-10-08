@@ -114,7 +114,8 @@ credentials or attempting a set probe. No authenticated set baseline resulted.
 After a confirmed session observation, the extension popup now reflects the
 last human-action stop as "Blooket needs your attention" rather than "Ready".
 A later confirmed ready observation clears the warning; merely submitting a
-login form does not. This is a last-observation UI hint, not a live status
+login form does not. An obsolete relay generation cannot overwrite status after
+workspace reconnection. This is a last-observation UI hint, not a live status
 stream or a reason to override the read application's separate session gate.
 
 Missing or stale local instances fail closed. Local requests use exact loopback
