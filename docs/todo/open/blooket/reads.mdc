@@ -450,11 +450,26 @@ rather than accepting another set's question as the requested result. Portable
 regressions cover the identity checks; no new live question-read claim follows.
 
 Question enumeration now also requires positive on-screen geometry for every
-recovered accessible Edit-question control. A loaded zero-question observation
-requires exactly one geometrically visible Add Question button. Opening an
-existing question requires both the uniquely labeled card and its Edit button
-to be visible; hidden controls cannot count toward the list or trigger clicks.
-These are structural visibility checks, not evidence of server completeness.
+recovered accessible Edit-question control. Opening an existing question needs
+both its uniquely labeled card and its Edit button to be visible; concealed
+controls cannot count toward the list or trigger clicks.
+
+An earlier zero-question admission was unsound: recovered edit module 12048
+renders Add Question after mapping the questions array, including nonempty
+sets. A visible Add Question button plus zero visible cards cannot distinguish
+a truly empty set from a temporarily unrendered collection. The concrete page
+extractor and extension inspection host now reject zero-row observations
+rather than return `[]` as if the absence were verified.
+
+Curated module 34719 has a separate "No questions in this set" marker, but
+that belongs to the question-bank picker, not this edit-page list. That
+marker is not borrowed as false evidence for this surface. A verified
+empty-question read must wait for an independent provider-backed edit-page
+marker or equivalent evidence.
+
+This is a local data-integrity admission rule, not a provider minimum-question
+limit. Nonempty list observations still require canonical per-modal validation,
+cleanup, and structural stability before crossing the read boundary.
 
 The recovered question editor in module 89770 renders a hidden serialized
 `input#question[name="question"]` and a separate hidden

@@ -179,16 +179,14 @@ test(
 );
 
 test(
-  "a proven empty set is re-enumerated without opening a panel",
+  "an empty visible enumeration cannot establish complete questions",
   async () => {
   const fixture = synthetic({
     initial: { ok: true, value: [] },
     after: { ok: true, value: [] },
   });
-  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
-    ok: true, value: [],
-  });
-  assert.equal(fixture.enumerations(), 2);
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.enumerations(), 1);
   assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
@@ -421,8 +419,8 @@ test(
     ],
   });
   assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), failed);
-  assert.equal(page.enumerations(), 2);
-  assert.equal(page.tick(), 100);
+  assert.equal(page.enumerations(), 1);
+  assert.equal(page.tick(), 0);
   assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
