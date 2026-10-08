@@ -144,9 +144,27 @@ export function inspectOpenedBlooketQuestion(
     )
       return failed();
     // Recovered module 89770 serializes the current question into this field.
-    const hidden = document.querySelector('input#question[name="question"]');
-    if (hidden?.tagName !== "INPUT") return failed();
-    const raw = (hidden as HTMLInputElement).value;
+    const fields = Array.from(
+      document.querySelectorAll('input#question[name="question"]'),
+    );
+    if (
+      fields.length !== 1 ||
+      fields[0]?.tagName !== "INPUT" ||
+      fields[0].getAttribute("type") !== "hidden"
+    ) return failed();
+    const hidden = fields[0]! as HTMLInputElement;
+    const form = hidden.closest("form");
+    if (form?.tagName !== "FORM") return failed();
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return failed();
+    const raw = hidden.value;
     if (typeof raw !== "string" || raw.length < 2 || raw.length > 100_000)
       return failed();
     const candidate = JSON.parse(raw) as unknown;
@@ -321,12 +339,25 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
       new URL(location.href).searchParams.get("id") !== setId
     )
       return false;
-    const forms = Array.from(
-      document.querySelectorAll('form input#question[name="question"]'),
+    const fields = Array.from(
+      document.querySelectorAll('input#question[name="question"]'),
     );
-    if (forms.length !== 1) return false;
-    const form = forms[0]!.closest("form");
-    if (!form) return false;
+    if (
+      fields.length !== 1 ||
+      fields[0]?.tagName !== "INPUT" ||
+      fields[0].getAttribute("type") !== "hidden"
+    ) return false;
+    const form = fields[0]!.closest("form");
+    if (form?.tagName !== "FORM") return false;
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return false;
     const buttons = Array.from(form.querySelectorAll('button[type="button"]'))
       .filter((button) => button.textContent?.trim() === "Cancel");
     if (buttons.length !== 1) return false;

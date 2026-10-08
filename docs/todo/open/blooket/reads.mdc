@@ -320,6 +320,19 @@ closure. A switched edit route or duplicate `id` query parameter fails closed
 rather than accepting another set's question as the requested result. Portable
 regressions cover the identity checks; no new live question-read claim follows.
 
+The recovered question editor in module 89770 renders a hidden serialized
+`input#question[name="question"]` and a separate hidden
+`input#setId[name="setId"]` inside its form. Module 89035 emits both hidden
+inputs. The reader and modal canceller require one serialized input and one
+matching hidden form ID,
+and the exact expected edit-route ID. Duplicate forms, a stale ID from another
+set, or wrong control types fail before returning data or clicking Cancel.
+
+The injected functions each enforce those facts independently: extension
+`executeScript` serializes a function without its module's lexical imports.
+Synthetic page tests cover mismatched, missing, duplicated, and wrong-type
+controls; this adds identity protection, not authenticated media acceptance.
+
 The canonical question-list decoder also enforces the worker's 200-item local
 read safety cap before traversing results. This is a resource bound, not a
 claim about Blooket's account or question-count limits.
