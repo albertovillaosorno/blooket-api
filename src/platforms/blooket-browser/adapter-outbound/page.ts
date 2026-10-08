@@ -195,6 +195,7 @@ export function inspectBlooketPage(
         if (
           link.origin !== url.origin ||
           link.pathname !== "/edit" ||
+          link.searchParams.getAll("id").length !== 1 ||
           !id ||
           id.length > 512 ||
           !title ||
@@ -230,6 +231,7 @@ export function inspectBlooketPage(
       url.pathname !== "/edit" ||
       !operation.setId ||
       operation.setId.length > 512 ||
+      url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== operation.setId
     )
       return failed();
