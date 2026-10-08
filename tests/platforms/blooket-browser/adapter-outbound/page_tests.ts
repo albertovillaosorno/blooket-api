@@ -130,6 +130,13 @@ test(
       ok: true,
       value: "my-sets",
     });
+    const pageTitle = main.selectors["h1"]![0]!;
+    pageTitle.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    pageTitle.getBoundingClientRect = () => ({ width: 20, height: 20 });
     const result = inspectBlooketPage({ kind: "sets.list" });
     assert.equal(result.ok, true);
     if (!result.ok) return;
@@ -145,6 +152,18 @@ test(
       ).ok,
       true,
     );
+    const shown = main.selectors["article"]![0]!;
+    shown.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    shown.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    const heading = shown.selectors["h3"]![0]!;
+    heading.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    heading.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    const editLink = shown.selectors["a[href]"]![0]!;
+    editLink.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    editLink.getBoundingClientRect = () => ({ width: 20, height: 20 });
     main.selectors["article"] = [card(), card()];
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     main.selectors["article"] = [];
@@ -158,6 +177,20 @@ test(
       ok: true,
       value: { items: [], completeness: "complete" },
     });
+    const emptyHeading = main.selectors["h2"]![0]!;
+    emptyHeading.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    emptyHeading.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    const create = main.selectors["button"]![0]!;
+    create.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    create.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    main.selectors["h2"] = [emptyHeading, emptyHeading];
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    main.selectors["h2"] = [emptyHeading];
+    main.selectors["button"] = [create, create];
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    main.selectors["button"] = [create];
     assert.equal(
       decodeBlooketSetList(
         empty.ok
