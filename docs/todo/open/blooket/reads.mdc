@@ -257,6 +257,21 @@ consume a set-list baseline unless the source declares the collection
 for a future evidence-backed non-empty source; unknown live lists remain
 observational only.
 
+My Sets browser reads now tolerate delayed client hydration: after exact route
+navigation, the worker retries only the standard page-unavailable envelope for
+up to 15 polls within the shared eight-second read deadline. It requires two
+identical bounded visible snapshots separated by an event-loop yield, and
+rechecks the tab's exact route at each stage. Malformed responses, duplicate
+fields, and any insertion, removal, or changed title between snapshots fail
+closed before a collection is returned.
+
+The initial and final My Sets snapshots are two observations of one browser
+view, not evidence of an atomic server transaction. Only the recovered
+empty-account controls can still produce `complete`, and nonempty collections
+remain `unknown`; neither snapshot establishes nonempty server completeness.
+Synthetic bridge tests cover slow hydration, stable empty accounts, transient
+empty-to-nonempty drift, changed cards, and malformed success envelopes.
+
 Still pending: non-empty server-side set-list completeness; live browser
 acceptance of capability inspection, credential submission, and successful
 authenticated navigation; complete question-level media
