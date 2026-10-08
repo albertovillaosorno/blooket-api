@@ -266,3 +266,21 @@ test("login refuses foreign ambiguous challenged and disabled surfaces", () => {
     assert.equal(page.submit.clicked, 0);
   });
 });
+
+test(
+  "verification interstitial blocks stale login controls without a frame",
+  () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+    // Chrome observed this title with no challenge iframe on both Blooket
+    // origins. Old login controls can remain mounted during the transition.
+    (page.document as FixtureNode & { title: string }).title =
+      "Just a moment...";
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);

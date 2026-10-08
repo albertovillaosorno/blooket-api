@@ -155,6 +155,12 @@ shell to ready. The question, capability, and Edit Info injected helpers also
 refuse to click or read behind that exact observed title. Synthetic fixtures
 cover retained dashboard controls during an interstitial transition.
 
+The separately serialized public-login form runner now refuses that same
+observed security-interstitial title, even if stale login inputs remain mounted
+and no CAPTCHA iframe is visible. Prepare, prepared-state checking, and Submit
+all fail before credential filling or button clicks. This does not bypass the
+provider's challenge, and successful authentication is still unverified.
+
 The worker now confirms session state twice on the same completed browser tab,
 with a short event-loop yield and URL rechecks, within the existing read budget.
 A ready state that changes to a challenge at the same URL is rejected instead
