@@ -45,6 +45,7 @@ import { createExtensionCapabilityInspectionHost } from
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
+import { confirmBlooketReadNavigation } from "./read-navigation.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
 
@@ -211,16 +212,11 @@ async function read(
       : origin !== "https://dashboard.blooket.com"
   )
     throw new Error("manual-blooket-sign-in-required");
-  if (target && tab.url !== target)
-    await chrome.tabs.update(current.tabId, { url: target });
-  const deadline = Date.now() + 5000;
-  do {
-    tab = await chrome.tabs.get(current.tabId);
-    if (tab.status === "complete" && (!target || tab.url === target)) break;
-    await pause(100);
-  } while (Date.now() < deadline);
-  if (tab.status !== "complete" || (target && tab.url !== target))
-    throw new Error("browser-navigation-timeout");
+  const confirmed = await confirmBlooketReadNavigation(
+    chrome.tabs, current.tabId, tab, target, readDeadline, pause,
+  );
+  if (!confirmed) throw new Error("browser-navigation-timeout");
+  tab = confirmed;
   if (operation.kind === "questions.list") {
     const host = createExtensionQuestionInspectionHost(
       chrome, current.tabId, pause,
