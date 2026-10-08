@@ -117,6 +117,7 @@ test(
       prepared,
       prepared,
       observed,
+      observed,
     ],
   });
   const host = createExtensionCreateSetHost(
@@ -138,6 +139,7 @@ test(
     status: "complete",
   });
   assert.deepEqual(await host.observeCreateSet(), observed);
+  assert.equal(fake.calls.filter((call) => call === "script").length, 5);
   },
 );
 
@@ -328,7 +330,10 @@ test(
 
 test("Create Set receipts retain opaque encoded edit IDs", async () => {
   const id = "opaque id/with spaces";
-  const fake = fakeChrome({ scripts: [{ ok: true, remoteSetId: id }] });
+  const fake = fakeChrome({ scripts: [
+    { ok: true, remoteSetId: id },
+    { ok: true, remoteSetId: id },
+  ] });
   fake.setTab({
     url: "https://dashboard.blooket.com/edit?id=" + encodeURIComponent(id),
     status: "complete",
@@ -337,3 +342,59 @@ test("Create Set receipts retain opaque encoded edit IDs", async () => {
     fake.chrome, 7, async () => {},
   ).observeCreateSet(), { ok: true, remoteSetId: id });
 });
+
+
+test(
+  "a single redirect observation never proves persisted creation",
+  async () => {
+  const fake = fakeChrome({ scripts: [observed] });
+  fake.setTab({
+    url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete",
+  });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => {},
+  ).observeCreateSet();
+  assert.deepEqual(result, {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(fake.calls.filter((call) => call === "script").length, 2);
+  },
+);
+
+test("redirect evidence changing after a yield is rejected", async () => {
+  for (const replies of [
+    [observed, { ok: true, remoteSetId: "different-set" }],
+    [observed, { ok: true, remoteSetId: "remote-set-1", extra: "unknown" }],
+    [observed, { ok: false, code: "blooket-browser-failed" }],
+  ]) {
+    const fake = fakeChrome({ scripts: replies });
+    fake.setTab({
+      url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete",
+    });
+    assert.equal((await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => {},
+    ).observeCreateSet()).ok, false);
+  }
+});
+
+test(
+  "a route changed during redirect confirmation is not accepted",
+  async () => {
+  const fake = fakeChrome({ scripts: [observed, observed] });
+  fake.setTab({
+    url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete",
+  });
+  const host = createExtensionCreateSetHost(
+    fake.chrome, 7,
+    async () => fake.setTab({
+      url: "https://dashboard.blooket.com/my-sets",
+      status: "complete",
+    }),
+  );
+  assert.equal((await host.observeCreateSet()).ok, false);
+  assert.equal(fake.calls.filter((call) => call === "script").length, 1);
+  },
+);
