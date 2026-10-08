@@ -603,3 +603,34 @@ test("Edit Info opener refuses human-action overlays and lost sessions", () => {
     });
   }
 });
+
+test(
+  "observed interstitial on either Blooket origin is a security stop",
+  () => {
+  for (const origin of [
+    "https://id.blooket.com/login",
+    "https://dashboard.blooket.com/my-sets",
+  ]) {
+    const document = node("DOCUMENT");
+    (document as FixtureNode & { title: string }).title = "Just a moment...";
+    document.selectors["h1, h2, h3"] = [
+      node("H1", new URL(origin).hostname),
+      node("H2", "Performing security verification"),
+      node("H3", "Verification successful. Waiting for " +
+        new URL(origin).hostname + " to respond"),
+    ];
+    page(document, origin, () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "security-challenge",
+      });
+      assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    });
+    (document as FixtureNode & { title: string }).title = "Unknown page";
+    page(document, origin, () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "unexpected-page",
+      });
+    });
+  }
+  },
+);
