@@ -451,6 +451,15 @@ failure invalidates the whole snapshot. The account-specific observation is
 recorded as capability evidence without retaining a set ID or provider media
 identity.
 
+The recovered Add Question module 89770 writes both serialized question and
+set ID as hidden inputs through module 89035. The capability probe now requires
+one hidden question input inside a real form and one matching hidden `setId`
+before opening the Audio drawer, inspecting its account gate, confirming drawer
+closure, or clicking either Cancel. A stale set ID, duplicate form identity,
+or an unexpected input type fails closed without interacting with another set's
+modal. Browser-injected functions repeat the admission guard independently;
+they cannot call module-scoped helpers through Chrome scripting.
+
 Capability inspection now shares a six-second observation budget between
 My Sets navigation, edit navigation, page-state checks, and Plus-gate probing.
 The remaining three seconds of the local bridge's ten-second response window

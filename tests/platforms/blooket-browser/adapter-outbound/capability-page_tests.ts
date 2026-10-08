@@ -110,7 +110,9 @@ function fixture() {
     type: "hidden",
   });
   question.parent = form;
-  const setId = node("INPUT", "", { id: "setId", name: "setId" });
+  const setId = node("INPUT", "", {
+    id: "setId", name: "setId", type: "hidden",
+  });
   setId.value = "set-fixture";
   setId.parent = form;
   const audio = node("BUTTON", " Audio ", { type: "button" });
@@ -120,7 +122,7 @@ function fixture() {
   form.selectors['input#setId[name="setId"]'] = [setId];
   form.selectors["button"] = [audio, cancel];
   form.selectors['button[type="button"]'] = [audio, cancel];
-  return { document, add, form, question, audio, cancel };
+  return { document, add, form, question, setId, audio, cancel };
 }
 
 function drawer(kind: "supported" | "unsupported") {
@@ -268,3 +270,77 @@ test("capability snapshot resolves only the shared account media gate", () => {
     }
   }
 });
+
+test("capability drawer never trusts a stale question-form set ID", () => {
+  const page = fixture();
+  const openDrawer = drawer("supported");
+  page.document.selectors['input#question[name="question"]'] = [
+    page.question,
+  ];
+  page.document.selectors['aside[data-drawer-open="true"]'] = [openDrawer];
+  page.setId.value = "another-set";
+  withPage(page.document, () => {
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok, false);
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [];
+    assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.audio.clicked, 0);
+    assert.equal(page.cancel.clicked, 0);
+    assert.equal(openDrawer.selectors[
+      'button[aria-label="Cancel"]'
+    ]?.[0]?.clicked, 0);
+  });
+});
+
+test(
+  "capability controls refuse malformed and duplicate form identities",
+  () => {
+  const page = fixture();
+  const existingDrawer = drawer("unsupported");
+  page.document.selectors['input#question[name="question"]'] = [
+    page.question,
+  ];
+  withPage(page.document, () => {
+    for (const identities of [
+      [],
+      [page.setId, page.setId],
+      [node("INPUT", "", { type: "text" })],
+    ]) {
+      page.form.selectors['input#setId[name="setId"]'] = identities;
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [
+        existingDrawer,
+      ];
+      assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+        false);
+      assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [];
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    }
+    assert.equal(page.audio.clicked, 0);
+    page.form.selectors['input#setId[name="setId"]'] = [page.setId];
+    for (const questions of [
+      [page.question, page.question],
+      [node("INPUT", "", { type: "text" })],
+    ]) {
+      page.document.selectors['input#question[name="question"]'] = questions;
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [
+        existingDrawer,
+      ];
+      assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+        false);
+      assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [];
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    }
+    assert.equal(page.audio.clicked, 0);
+    assert.equal(page.cancel.clicked, 0);
+  });
+  },
+);
