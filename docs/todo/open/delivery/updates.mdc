@@ -338,6 +338,14 @@ provisioning, signed-manifest fetching/publication, opt-in scheduling and UI,
 Apple validation, extraction/installation/recovery, and real release acceptance
 remain pending.
 
+### Download response ownership
+
+On 2026-10-08, two regressions reproduced unconsumed network responses when
+an archive's Content-Length was rejected and when a fetch ignored cancellation
+and resolved afterward. Both responses now cancel their owned bodies without
+waiting for an uncooperative stream. The focused download suite passes nine
+tests; strict TypeScript also passes. No installation or Apple trust is implied.
+
 ## Blockers
 
 Lifecycle safety, production publisher keys/manifest publication, extraction,
