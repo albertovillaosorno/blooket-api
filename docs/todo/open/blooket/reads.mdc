@@ -196,6 +196,14 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, the capability host began rechecking its exact owned Edit
+tab around each cleanup script, including the post-Cancel closed-state polls
+and the subsequent modal level. A manual same-tab route change during Audio or
+question cancellation now prevents any follow-up script or automatic route
+restoration; the capability snapshot fails instead. Two synthetic regressions
+verified the previous stale cleanup and the new stop. This does not establish
+atomic tab ownership or authenticated Plus availability.
+
 On 2026-10-08, question inspection added tab-ownership confirmations around
 each modal content script and before every post-Cancel closure poll. Synthetic
 route changes during open, read, and Cancel previously caused an additional

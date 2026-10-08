@@ -1010,3 +1010,53 @@ test(
   ), false);
   },
 );
+
+test(
+  "manual navigation during Audio cancellation stops remaining cleanup",
+  async () => {
+  const page = fixture();
+  const manualRoute = "https://dashboard.blooket.com/create";
+  const execute = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (request) => {
+    const response = await execute(request);
+    if (request.func.name === "closeBlooketAudioCapabilityDrawer")
+      await page.chrome.tabs.update(7, { url: manualRoute });
+    return response;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  const cancellation = page.scripts.indexOf(
+    "closeBlooketAudioCapabilityDrawer",
+  );
+  assert.ok(cancellation >= 0);
+  assert.equal(page.scripts.length, cancellation + 1);
+  assert.equal(page.currentUrl(), manualRoute);
+  },
+);
+
+test(
+  "manual navigation during question cancellation stops closure polling",
+  async () => {
+  const page = fixture();
+  const manualRoute = "https://dashboard.blooket.com/create";
+  const execute = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (request) => {
+    const response = await execute(request);
+    if (request.func.name === "closeBlooketCapabilityQuestionPanel")
+      await page.chrome.tabs.update(7, { url: manualRoute });
+    return response;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  const cancellation = page.scripts.indexOf(
+    "closeBlooketCapabilityQuestionPanel",
+  );
+  assert.ok(cancellation >= 0);
+  assert.equal(page.scripts.length, cancellation + 1);
+  assert.equal(page.currentUrl(), manualRoute);
+  },
+);
