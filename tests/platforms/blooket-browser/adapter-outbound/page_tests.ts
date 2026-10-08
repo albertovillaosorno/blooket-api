@@ -370,6 +370,63 @@ test("set detail refuses duplicate set IDs in the current route", () => {
   }
 });
 
+test("dashboard password overlays cannot establish reads or signed-out", () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  const password = node("INPUT", "", { type: "password" });
+  document.selectors['input[type="password"]'] = [password];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    document.selectors[
+      '[role="dialog"][aria-modal="true"] h3'
+    ] = [node("H3", "Select your organization")];
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "organization-prompt",
+    });
+    document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "security-challenge",
+    });
+    document.selectors[
+      '[role="dialog"][aria-modal="true"] h3'
+    ] = [];
+    document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [];
+  });
+  const form = node("FORM");
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  const title = node("INPUT");
+  title.value = "Synthetic fixture";
+  const description = node("TEXTAREA");
+  description.value = "Original text";
+  const privacy = node("INPUT", "", {
+    type: "checkbox", role: "switch", "aria-checked": "false",
+  });
+  privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+  form.selectors['input#title[name="title"]'] = [title];
+  form.selectors['textarea#desc[name="desc"]'] = [description];
+  form.selectors['input#private[name="private"]'] = [privacy];
+  document.selectors['form#question-set-form'] = [form];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "unexpected-page",
+    });
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+  });
+});
+
 test("dashboard reads require the recovered authenticated shell", () => {
   const { document, main } = base();
   main.selectors["article"] = [card()];

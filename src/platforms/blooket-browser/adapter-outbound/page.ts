@@ -157,12 +157,19 @@ export function inspectBlooketPage(
         heading.textContent?.trim() === "Select your organization"
       );
     });
+    if (operation.kind === "session.observe" && visibleChallenges)
+      return { ok: true, value: "security-challenge" };
+    if (operation.kind === "session.observe" && organizationPrompt)
+      return { ok: true, value: "organization-prompt" };
+    // Only the exact public identity login form can prove "signed-out".
+    // A dashboard password control is an unknown authentication overlay, not
+    // permission to read cached set cards or submit credentials automatically.
+    if (document.querySelector('input[type="password"]')) {
+      return operation.kind === "session.observe"
+        ? { ok: true, value: "unexpected-page" }
+        : failed();
+    }
     if (operation.kind === "session.observe") {
-      if (visibleChallenges) return { ok: true, value: "security-challenge" };
-      if (organizationPrompt)
-        return { ok: true, value: "organization-prompt" };
-      if (document.querySelector('input[type="password"]'))
-        return { ok: true, value: "signed-out" };
       if (!authenticatedShell)
         return { ok: true, value: "unexpected-page" };
       const heading = main.querySelector("h1");

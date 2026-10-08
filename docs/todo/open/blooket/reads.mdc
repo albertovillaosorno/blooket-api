@@ -122,8 +122,20 @@ and one visible Create Set button inside it. Edit needs a visible page heading
 and exactly one visible Save Set button.
 
 Hidden or duplicate readiness controls become `unexpected-page` rather than
-authorizing reads from a stale UI. These
-checks do not press Save and do not assert that the remote session is durable.
+authorizing reads from a stale UI. These checks do not press Save and do not
+assert that the remote session is durable.
+
+Only the recovered login form at `https://id.blooket.com/login` proves a
+`signed-out` session. A password control on the dashboard origin may be an
+unfamiliar overlay, not a fresh login form. Such controls now produce an
+`unexpected-page` observation and reject both set-list and set-detail reads,
+even if old authenticated shell and set controls remain mounted.
+
+A visible CAPTCHA or organization prompt takes precedence, preserving its
+specific human-action stop.
+
+Portable fixtures cover all three classifications without reading stored
+credentials or submitting forms.
 
 On 2026-10-07, an isolated Chrome for Testing 151 session loaded the freshly
 built unpacked extension and connected to an isolated local service. Both
