@@ -163,6 +163,21 @@ test("serialized login runner preserves injected-browser semantics", () => {
   });
 });
 
+test("unknown serialized login actions never submit", () => {
+  const page = fixture();
+  const serialized = Function(
+    "return (" + runBlooketLoginPageAction.toString() + ")",
+  )() as typeof runBlooketLoginPageAction;
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(serialized("prepare", credentials), { ok: true });
+    assert.deepEqual(serialized("unknown" as never, credentials), {
+      ok: false,
+      code: "blooket-browser-failed",
+    });
+    assert.equal(page.submit.clicked, 0);
+  });
+});
+
 test("login preparation fills exact controls without submitting", () => {
   const page = fixture();
   withPage(page.document, "https://id.blooket.com/login", () => {

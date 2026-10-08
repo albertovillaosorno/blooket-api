@@ -209,6 +209,25 @@ test("serialized Add Question runner preserves browser semantics", () => {
   );
 });
 
+test("unknown serialized Add Question actions never submit", () => {
+  const page = fixture();
+  const serialized = Function(
+    "return (" + runBlooketAddQuestionPageAction.toString() + ")",
+  )() as typeof runBlooketAddQuestionPageAction;
+  withPage(
+    page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture",
+    () => {
+      assert.deepEqual(serialized("prepare", typing), { ok: true });
+      assert.deepEqual(serialized("unknown" as never, typing), {
+        ok: false,
+        code: "blooket-browser-failed",
+      });
+      assert.equal(page.submit.clicked, 0);
+    },
+  );
+});
+
 test("Add Question opens and serializes exact typing state", () => {
   const page = fixture();
   withPage(
