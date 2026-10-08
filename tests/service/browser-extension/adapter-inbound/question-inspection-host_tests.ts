@@ -64,9 +64,11 @@ interface Scenario {
   readonly canceled?: unknown;
   readonly panelClosed?: unknown;
   readonly inspectThrows?: boolean;
+  readonly throwAtInspection?: number;
   readonly tabUrl?: string;
   readonly tabStatus?: string;
   readonly scriptLatencyMs?: number;
+  readonly tabReadLatencyMs?: number;
   readonly switchAtEnumeration?: number;
 }
 
@@ -80,6 +82,7 @@ function synthetic(options: Scenario = {}) {
     tabs: {
       get: async (id: number) => {
         assert.equal(id, 7);
+        tick += options.tabReadLatencyMs ?? 0;
         return {
           url: currentUrl,
           status: options.tabStatus ?? "complete",
@@ -117,8 +120,10 @@ function synthetic(options: Scenario = {}) {
         }
         if (name === "inspectOpenedBlooketQuestion") {
           assert.ok([1, 2].includes(request.args?.[1] as number));
-          if (options.inspectThrows) throw new Error("synthetic-script-failed");
           inspections++;
+          if (options.inspectThrows ||
+              inspections === options.throwAtInspection)
+            throw new Error("synthetic-script-failed");
           return [{
             result: options.inspectedReplies
               ? options.inspectedReplies[inspections - 1]
@@ -164,6 +169,7 @@ test(
   assert.deepEqual(fixture.calls, [
     "listBlooketQuestionNumbers",
     "openBlooketQuestionPanel",
+    "inspectOpenedBlooketQuestion",
     "inspectOpenedBlooketQuestion",
     "closeBlooketQuestionPanel",
     "isBlooketQuestionPanelClosed",
@@ -309,7 +315,7 @@ test(
   async () => {
   const fixture = synthetic({ scriptLatencyMs: 150 });
   assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 800), failed);
-  assert.equal(fixture.enumerations(), 2);
+  assert.equal(fixture.enumerations(), 1);
   assert.ok(fixture.calls.includes("closeBlooketQuestionPanel"));
   },
 );
@@ -453,14 +459,80 @@ test("only a known page-unavailable modal reply can be retried", async () => {
   const unavailable = { ok: false, code: "blooket-browser-failed" };
   const fixture = synthetic({
     inspectedReplies: [
-      unavailable, unavailable, { ok: true, value: validQuestion },
+      unavailable, unavailable,
+      { ok: true, value: validQuestion },
+      { ok: true, value: validQuestion },
     ],
   });
   assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
     ok: true, value: [validQuestion],
   });
-  assert.equal(fixture.inspections(), 3);
+  assert.equal(fixture.inspections(), 4);
   assert.equal(fixture.calls.filter(
     (name) => name === "closeBlooketQuestionPanel",
   ).length, 1);
 });
+
+test(
+  "an overdue tab-read reply must not initiate a question script",
+  async () => {
+  const fixture = synthetic({ tabReadLatencyMs: 150 });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 100), failed);
+  assert.deepEqual(fixture.calls, []);
+  assert.equal(fixture.tick(), 150);
+  },
+);
+
+test("a late second tab confirmation cannot open a question", async () => {
+  const fixture = synthetic({ tabReadLatencyMs: 60 });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 100), failed);
+  assert.deepEqual(fixture.calls, ["listBlooketQuestionNumbers"]);
+  assert.equal(fixture.tick(), 120);
+});
+
+test(
+  "question content changing while its modal is open fails closed",
+  async () => {
+  const fixture = synthetic({ inspectedReplies: [
+    { ok: true, value: validQuestion },
+    { ok: true, value: { ...validQuestion, question: "Changed prompt." } },
+  ] });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.inspections(), 2);
+  assert.equal(fixture.enumerations(), 1);
+  assert.equal(fixture.calls.filter(
+    (name) => name === "closeBlooketQuestionPanel",
+  ).length, 1);
+  },
+);
+
+test(
+  "second modal read refuses malformed and unavailable replies",
+  async () => {
+  for (const second of [
+    { ok: false, code: "blooket-browser-failed" },
+    { ok: true, value: validQuestion, diagnostic: "private" },
+    { ok: true, value: { ...validQuestion, number: 2 } },
+  ]) {
+    const fixture = synthetic({ inspectedReplies: [
+      { ok: true, value: validQuestion }, second,
+    ] });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.inspections(), 2);
+    assert.ok(fixture.calls.includes("closeBlooketQuestionPanel"));
+  }
+  },
+);
+
+test(
+  "a second modal script exception still cancels the owned panel",
+  async () => {
+  const fixture = synthetic({ throwAtInspection: 2 });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.inspections(), 2);
+  assert.equal(fixture.calls.filter(
+    (name) => name === "closeBlooketQuestionPanel",
+  ).length, 1);
+  assert.equal(fixture.enumerations(), 1);
+  },
+);
