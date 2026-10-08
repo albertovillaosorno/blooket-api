@@ -104,6 +104,12 @@ options and refusal of an existing archive before build activity. Synthetic
 previous bytes remain unchanged. Names cannot select arbitrary paths; an
 actual extracted package remains the integration gate for launcher/CLI behavior.
 
+The first isolated assembly at commit `64fc808` failed when tar observed the
+new partial archive changing its input directory during traversal. No package
+was accepted; cleanup removed the owned output and left prior artifacts intact.
+The correction reserves the excluded partial before traversal, with a real tar
+regression verifying contents, absence of self-inclusion, and no-clobber retry.
+
 ## Blockers
 
 None. Signing, notarization, Gatekeeper, installed Safari behavior, native

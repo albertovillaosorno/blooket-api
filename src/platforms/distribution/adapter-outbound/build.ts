@@ -218,6 +218,14 @@ export function distributionDirectory(repo: string, outputName?: string) {
     throw new Error("invalid-package-output-name");
   return join(repo, ".temp/distributions", outputName ?? "");
 }
+export async function createLinuxArchive(output: string, partial: string) {
+  // Reserve before tar scans the root; creating it during the scan changes
+  // the directory and correctly makes tar reject that unstable input.
+  const reserved = await open(partial, "wx", 0o600);
+  await reserved.close();
+  await run("tar", ["-czf", partial,
+    "--exclude=./" + basename(partial), "-C", output, "."]);
+}
 export async function buildDistribution(
   target: DistributionTarget, outputName?: string,
 ) {
@@ -447,14 +455,7 @@ export async function buildDistribution(
       );
     } else {
       await createLinuxLauncher(output, cache);
-      await run("tar", [
-        "-czf",
-        partialArchive,
-        "--exclude=./" + basename(partialArchive),
-        "-C",
-        output,
-        ".",
-      ]);
+      await createLinuxArchive(output, partialArchive);
     }
     const file = await open(partialArchive, "r");
     try { await file.sync(); }
