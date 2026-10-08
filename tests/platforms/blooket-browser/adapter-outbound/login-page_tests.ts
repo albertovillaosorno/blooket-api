@@ -224,13 +224,18 @@ test("a challenge appearing after preparation blocks the submit", () => {
   const page = fixture();
   withPage(page.document, "https://id.blooket.com/login", () => {
     assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
-    page.document.selectors[
-      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
-    ] = [node("IFRAME", "", {
-      src: "https://www.google.com/recaptcha/api2/bframe?k=fixture",
-    })];
-    assert.equal(submitBlooketLoginForm(credentials).ok, false);
-    assert.equal(page.submit.clicked, 0);
+    for (const source of [
+      "https://www.google.com/recaptcha/api2/bframe?size=invisible",
+      "https://example.invalid/recaptcha/api2/anchor?size=invisible",
+      "https://www.google.com/recaptcha/api2/anchor" +
+      "?size=invisible&size=invisible",
+    ]) {
+      page.document.selectors[
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+      ] = [node("IFRAME", "", { src: source })];
+      assert.equal(submitBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    }
   });
 });
 

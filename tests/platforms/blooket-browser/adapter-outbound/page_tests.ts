@@ -359,17 +359,22 @@ test(
     });
   });
 
-  document.selectors[
-    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
-  ] = [node("IFRAME", "", {
-    src: "https://www.google.com/recaptcha/api2/bframe?k=fixture",
-  })];
-  page(document, "https://id.blooket.com/login", () => {
-    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
-      ok: true,
-      value: "security-challenge",
+  for (const source of [
+    "https://www.google.com/recaptcha/api2/bframe?size=invisible",
+    "https://example.invalid/recaptcha/api2/anchor?size=invisible",
+    "https://www.google.com/recaptcha/api2/anchor" +
+      "?size=invisible&size=invisible",
+  ]) {
+    document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [node("IFRAME", "", { src: source })];
+    page(document, "https://id.blooket.com/login", () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true,
+        value: "security-challenge",
+      });
     });
-  });
+  }
   document.selectors[
     'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
   ] = [];
