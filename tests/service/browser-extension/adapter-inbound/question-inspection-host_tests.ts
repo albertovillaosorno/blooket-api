@@ -56,6 +56,7 @@ const validQuestion = {
 
 interface Scenario {
   readonly initial?: unknown;
+  readonly listReplies?: readonly unknown[];
   readonly after?: unknown;
   readonly inspected?: unknown;
   readonly opened?: unknown;
@@ -99,11 +100,13 @@ function synthetic(options: Scenario = {}) {
           if (enumerations === options.switchAtEnumeration)
             currentUrl = "https://dashboard.blooket.com/edit?id=other";
           return [{
-            result: enumerations === 1
-              ? ("initial" in options
-                  ? options.initial : { ok: true, value: [1] })
-              : ("after" in options
-                  ? options.after : { ok: true, value: [1] }),
+            result: options.listReplies
+              ? options.listReplies[enumerations - 1]
+              : enumerations === 1
+                ? ("initial" in options
+                    ? options.initial : { ok: true, value: [1] })
+                : ("after" in options
+                    ? options.after : { ok: true, value: [1] }),
           }];
         }
         if (name === "openBlooketQuestionPanel") {
@@ -357,3 +360,67 @@ test(
   assert.equal(tooLarge.enumerations(), 1);
   },
 );
+
+test("initial list retries bounded loading-state failures", async () => {
+  const unavailable = { ok: false, code: "blooket-browser-failed" };
+  const page = synthetic({ listReplies: [
+    unavailable, unavailable, { ok: true, value: [1] },
+    { ok: true, value: [1] },
+  ] });
+  assert.equal((await page.host.inspect(FIXTURE_SET, 1_000)).ok, true);
+  assert.equal(page.enumerations(), 4);
+  assert.equal(page.tick(), 200);
+  assert.equal(page.calls.filter(
+    (name) => name === "openBlooketQuestionPanel",
+  ).length, 1);
+});
+
+test("persistent missing question UI never opens an edit modal", async () => {
+  const page = synthetic({
+    listReplies: Array.from(
+      { length: 15 },
+      () => ({ ok: false, code: "blooket-browser-failed" }),
+    ),
+  });
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 8_000), failed);
+  assert.equal(page.enumerations(), 15);
+  assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
+});
+
+test("malformed enumeration envelopes do not get retried", async () => {
+  const page = synthetic({
+    listReplies: [
+      { ok: false, code: "blooket-browser-failed", secret: "unknown" },
+      { ok: true, value: [1] },
+    ],
+  });
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(page.enumerations(), 1);
+  assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
+});
+
+test(
+  "an empty list becoming nonempty during hydration is rejected",
+  async () => {
+  const page = synthetic({
+    listReplies: [
+      { ok: true, value: [] },
+      { ok: true, value: [1] },
+    ],
+  });
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(page.enumerations(), 2);
+  assert.equal(page.tick(), 100);
+  assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);
+
+test("question-list hydration respects the shared read deadline", async () => {
+  const unavailable = { ok: false, code: "blooket-browser-failed" };
+  const page = synthetic({
+    listReplies: [unavailable, unavailable, unavailable],
+  });
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 150), failed);
+  assert.equal(page.enumerations(), 2);
+  assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
+});

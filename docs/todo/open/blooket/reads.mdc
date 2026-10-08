@@ -305,6 +305,15 @@ The normalized collection also has a cumulative 750 KB UTF-8 JSON budget
 below the localhost bridge's 1 MB request-body cap. Large but individually
 valid questions therefore fail before an oversized bridge reply is emitted.
 
+The extension now tolerates client hydration after the tab's document reaches
+`complete`: it retries only the exact known page-level unavailable reply up to
+15 times at 100 ms intervals inside the shared eight-second read deadline.
+Malformed envelopes, duplicate numbers, and unexpected values still fail at
+once without starting an edit. After a visible empty list, it yields once to
+the event loop before re-enumerating the controls, rejecting any list drift.
+This reduces transient loading failures without proving atomic server state,
+remote list completeness, or a fully hydrated empty-account response.
+
 Synthetic tests verify the normal path, drift, exception cleanup, expiration,
 aggregate size admission, and legacy media URL normalization without submitting
 forms.
