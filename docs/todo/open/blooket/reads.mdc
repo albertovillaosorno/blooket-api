@@ -196,6 +196,16 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, the private set-detail extension worker added route-ownership
+checks before and after each separately injected Edit Info opener and metadata
+read. A same-tab navigation to another set between the opener's browser reply
+and its confirmation now aborts without starting the metadata script; failed
+or delayed reads likewise cannot continue on a user-selected route. The
+synthetic worker fixture reproduced the old extra script and verified the new
+failure. This is local tab-safety regression coverage, not authenticated
+Blooket read acceptance or a guarantee that a tab cannot navigate between two
+browser API calls.
+
 Portable question-read foundations were added on 2026-10-06. The original
 version-one contract normalizes question number/text, `mc`/`typing`,
 randomization, seconds, answers/correct answers, typing match modes, and only
