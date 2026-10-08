@@ -45,7 +45,13 @@ test(
   let creates = 0;
   let closed = false;
   let validStatus = true;
+  let unsafeReadSource = false;
   let detailOpenSucceeds = true;
+  let detailSidebarDrifts = false;
+  let detailSidebarReadCount = 0;
+  let detailSidebarMalformed = false;
+  let detailCancelSucceeds = true;
+  let detailClosedSucceeds = true;
   let detailMalformedReply = false;
   let detailDrifts = false;
   let detailReadCount = 0;
@@ -139,6 +145,32 @@ test(
         }
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
+        if (func.name === "canLeaveBlooketPageForRead")
+          return [{ result: !unsafeReadSource }];
+        if (func.name === "inspectBlooketDetailSidebar") {
+          assert.deepEqual(args, ["opaque id/with spaces"]);
+          detailSidebarReadCount++;
+          return [{ result: detailSidebarMalformed ? {
+            ok: true, extra: "not-admitted",
+            value: { title: "Synthetic", description: "" },
+          } : {
+            ok: true, value: {
+              title: detailSidebarDrifts && detailSidebarReadCount % 2 === 0
+                ? "Local unsaved title" : "Synthetic",
+              description: "",
+            },
+          } }];
+        }
+        if (func.name === "closeBlooketDetailPanel") {
+          assert.deepEqual(args, [
+            "opaque id/with spaces",
+            { title: "Synthetic", description: "" },
+            { title: "Synthetic", description: "", visibility: "private" },
+          ]);
+          return [{ result: detailCancelSucceeds }];
+        }
+        if (func.name === "isBlooketDetailPanelClosed")
+          return [{ result: detailClosedSucceeds }];
         if (func.name === "openBlooketDetailPanel") {
           assert.deepEqual(args, ["opaque id/with spaces"]);
           if (detailSwitchTabAfterOpen) {
@@ -483,6 +515,26 @@ test(
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
     assert.equal(setListReads, 2);
+    // Never leave an active teacher editor just to answer a set-list query.
+    unsafeReadSource = true;
+    tabUrl = "https://dashboard.blooket.com/edit?id=teacher-draft";
+    const beforeUnsafeRead = scripts.length;
+    for (const command of [
+      { kind: "sets.list" },
+      { kind: "sets.get", setId: "opaque id/with spaces" },
+      { kind: "questions.list", setId: "set-fixture" },
+    ]) {
+      assert.equal((await expectReply(command)).ok, false);
+      assert.equal(tabUrl,
+        "https://dashboard.blooket.com/edit?id=teacher-draft");
+    }
+    assert.deepEqual(scripts.slice(beforeUnsafeRead), [
+      "canLeaveBlooketPageForRead",
+      "canLeaveBlooketPageForRead",
+      "canLeaveBlooketPageForRead",
+    ]);
+    unsafeReadSource = false;
+    tabUrl = "https://dashboard.blooket.com/my-sets";
     listFailuresRemaining = 2;
     setListReads = 0;
     const delayedSets = await expectReply({ kind: "sets.list" });
@@ -530,6 +582,50 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    // A read-owned editor must be canceled and its closure independently
+    // observed before a metadata snapshot may escape the extension.
+    // No Edit Info click when the source sidebar is malformed or drifts.
+    detailSidebarMalformed = true;
+    const beforeMalformedSidebar = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeMalformedSidebar).includes(
+      "openBlooketDetailPanel",
+    ), false);
+    detailSidebarMalformed = false;
+    detailSidebarDrifts = true;
+    detailSidebarReadCount = 0;
+    const beforeDriftingSidebar = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(detailSidebarReadCount, 2);
+    assert.equal(scripts.slice(beforeDriftingSidebar).includes(
+      "openBlooketDetailPanel",
+    ), false);
+    detailSidebarDrifts = false;
+    detailCancelSucceeds = false;
+    const beforeCancelFailure = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeCancelFailure).includes(
+      "closeBlooketDetailPanel",
+    ), true);
+    assert.equal(scripts.slice(beforeCancelFailure).includes(
+      "isBlooketDetailPanelClosed",
+    ), false);
+    detailCancelSucceeds = true;
+    detailClosedSucceeds = false;
+    const beforeClosureFailure = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeClosureFailure).includes(
+      "isBlooketDetailPanelClosed",
+    ), true);
+    detailClosedSucceeds = true;
     detailOpenSucceeds = false;
     const beforeRejectedOpen = scripts.length;
     const rejectedDetail = await expectReply({
@@ -537,7 +633,8 @@ test(
     });
     assert.equal(rejectedDetail.ok, false);
     assert.equal(scripts.slice(beforeRejectedOpen).every(
-      (name) => name === "openBlooketDetailPanel",
+      (name) => name === "openBlooketDetailPanel" ||
+        name === "inspectBlooketDetailSidebar",
     ), true);
     detailOpenSucceeds = true;
     detailMalformedReply = true;
@@ -565,15 +662,22 @@ test(
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=another-set");
     assert.deepEqual(scripts.slice(beforeSwitchedOpen), [
+      "canLeaveBlooketPageForRead",
+      "inspectBlooketDetailSidebar",
+      "inspectBlooketDetailSidebar",
       "openBlooketDetailPanel",
     ]);
     detailDrifts = true;
+    const beforeDetailDrift = scripts.length;
     detailReadCount = 0;
     const driftedDetail = await expectReply({
       kind: "sets.get", setId: "opaque id/with spaces",
     });
     assert.equal(driftedDetail.ok, false);
     assert.equal(detailReadCount, 2);
+    assert.equal(scripts.slice(beforeDetailDrift).includes(
+      "closeBlooketDetailPanel",
+    ), false);
     detailDrifts = false;
     const questions = await expectReply({
       kind: "questions.list",

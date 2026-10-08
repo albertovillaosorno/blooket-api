@@ -38,6 +38,42 @@ export type BlooketCapabilityPageResult =
   | { readonly ok: true; readonly value: "supported" | "unsupported" }
   | { readonly ok: false; readonly code: "blooket-browser-failed" };
 
+// A capability probe may navigate the teacher's tab to My Sets. Refuse that
+// navigation when an existing editor, modal, or human stop may contain work.
+// This is a conservative navigation guard, not authentication evidence.
+export function canLeaveBlooketPageForRead(): boolean {
+  try {
+    if (location.origin !== "https://dashboard.blooket.com" ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]')) return false;
+    const path = location.pathname;
+    if (path !== "/my-sets" && path !== "/edit" &&
+        path !== "/create" && !path.startsWith("/set/")) return false;
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const dialogs = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"]',
+    ));
+    if (dialogs.some(visible)) return false;
+    if (document.querySelector('input#question[name="question"]') ||
+        document.querySelector('aside[data-drawer-open="true"]'))
+      return false;
+    const editorFields = Array.from(document.querySelectorAll(
+      'form#question-set-form input#title[name="title"], ' +
+      'form#question-set-form textarea#desc[name="desc"]',
+    ));
+    if (editorFields.some(visible)) return false;
+    const active = document.activeElement;
+    if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" ||
+        active?.getAttribute("contenteditable") === "true") return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
@@ -113,8 +149,47 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       });
     }
     if (buttons.length !== 1) return false;
-    (buttons[0] as HTMLButtonElement).click();
-    return true;
+    const control = buttons[0] as HTMLButtonElement;
+    const bounds = control.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+        control.getAttribute("aria-disabled") === "true") return false;
+    // Only this read may cancel the question form; any trusted human action
+    // relinquishes ownership, including interactions in its Audio drawer.
+    const world = globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document;
+        setId: string;
+        dirty: boolean;
+        dispose: () => void;
+      };
+    };
+    world.__blooketCapabilityEditWatch?.dispose();
+    const watch = {
+      document,
+      setId,
+      dirty: false,
+      dispose: () => {},
+    };
+    const onInteraction = (event: Event) => {
+      if (event.isTrusted) watch.dirty = true;
+    };
+    const types = ["pointerdown", "keydown", "input", "change"];
+    watch.dispose = () => {
+      for (const type of types)
+        document.removeEventListener(type, onInteraction, true);
+      if (world.__blooketCapabilityEditWatch === watch)
+        delete world.__blooketCapabilityEditWatch;
+    };
+    for (const type of types)
+      document.addEventListener(type, onInteraction, true);
+    world.__blooketCapabilityEditWatch = watch;
+    try {
+      control.click();
+      return true;
+    } catch {
+      watch.dispose();
+      return false;
+    }
   } catch {
     return false;
   }
@@ -164,6 +239,13 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return false;
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; setId: string; dirty: boolean
+      };
+    }).__blooketCapabilityEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -241,6 +323,13 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return false;
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; setId: string; dirty: boolean
+      };
+    }).__blooketCapabilityEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -275,7 +364,11 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       (button) => normalized(button) === "Audio",
     );
     if (buttons.length !== 1) return false;
-    (buttons[0] as HTMLButtonElement).click();
+    const control = buttons[0] as HTMLButtonElement;
+    const bounds = control.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+        control.getAttribute("aria-disabled") === "true") return false;
+    control.click();
     return true;
   } catch {
     return false;
@@ -332,6 +425,13 @@ export function inspectBlooketAudioCapabilityDrawer(
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return failed();
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; setId: string; dirty: boolean
+      };
+    }).__blooketCapabilityEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return failed();
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -439,6 +539,13 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return false;
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; setId: string; dirty: boolean
+      };
+    }).__blooketCapabilityEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -473,7 +580,11 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       drawers[0]!.querySelectorAll('button[aria-label="Cancel"]'),
     );
     if (cancels.length !== 1) return false;
-    (cancels[0] as HTMLButtonElement).click();
+    const control = cancels[0] as HTMLButtonElement;
+    const bounds = control.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+        control.getAttribute("aria-disabled") === "true") return false;
+    control.click();
     return true;
   } catch {
     return false;
@@ -601,6 +712,13 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return false;
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; setId: string; dirty: boolean
+      };
+    }).__blooketCapabilityEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -634,7 +752,15 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       form.querySelectorAll('button[type="button"]'),
     ).filter((button) => normalized(button) === "Cancel");
     if (cancels.length !== 1) return false;
-    (cancels[0] as HTMLButtonElement).click();
+    const control = cancels[0] as HTMLButtonElement;
+    const bounds = control.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+        control.getAttribute("aria-disabled") === "true") return false;
+    control.click();
+    const owned = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: { dispose: () => void };
+    }).__blooketCapabilityEditWatch;
+    owned?.dispose();
     return true;
   } catch {
     return false;
