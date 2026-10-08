@@ -180,6 +180,12 @@ export function runBlooketAddQuestionPageAction(
   };
 
   try {
+    if (
+      action !== "open" &&
+      action !== "is-ready" &&
+      action !== "prepare" &&
+      action !== "submit"
+    ) return failed();
     if (action === "open") {
       if (typeof value !== "string" || !editRoute(value)) return false;
       const buttons = Array.from(document.querySelectorAll("button")).filter(

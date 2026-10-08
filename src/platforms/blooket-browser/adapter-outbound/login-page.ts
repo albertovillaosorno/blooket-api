@@ -123,6 +123,11 @@ export function runBlooketLoginPageAction(
   };
 
   try {
+    if (
+      action !== "prepare" &&
+      action !== "is-prepared" &&
+      action !== "submit"
+    ) return failed();
     if (!validInput()) return action === "is-prepared" ? false : failed();
     const page = controls();
     if (page === null) return action === "is-prepared" ? false : failed();
