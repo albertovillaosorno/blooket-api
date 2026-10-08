@@ -319,6 +319,8 @@ async function pollTrue(
     const observed = await script(func, args);
     if (now() >= deadline) return false;
     if (observed === true) return true;
+    // A pending panel is exactly false, never a string or missing result.
+    if (observed !== false) return false;
     await pause(Math.min(POLL_MS, deadline - now()));
   }
   return false;
@@ -339,18 +341,18 @@ async function pollCapability(
       inspectBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
       [setId],
     );
-    if (
-      result &&
-      typeof result === "object" &&
-      Object.keys(result).sort().join() === "ok,value" &&
-      "ok" in result &&
-      result.ok === true &&
-      "value" in result &&
-      now() < deadline &&
-      (result.value === "supported" || result.value === "unsupported")
-    )
+    if (now() >= deadline || !result || typeof result !== "object" ||
+        Array.isArray(result)) return undefined;
+    const keys = Object.keys(result).sort().join();
+    if (keys === "ok,value" && "ok" in result && result.ok === true &&
+        "value" in result &&
+        (result.value === "supported" || result.value === "unsupported"))
       return result.value;
-    if (now() >= deadline) return undefined;
+    // A genuine page-unavailable state can mean drawer hydration. Invalid
+    // success or diagnostic envelopes must not become true after a later poll.
+    if (keys !== "code,ok" || !("ok" in result) ||
+        result.ok !== false || !("code" in result) ||
+        result.code !== "blooket-browser-failed") return undefined;
     await pause(Math.min(POLL_MS, deadline - now()));
   }
   return undefined;
@@ -371,6 +373,7 @@ async function closeDrawer(
     [setId],
   ).catch(() => false);
   if (alreadyClosed === true) return true;
+  if (alreadyClosed !== false) return false;
   const closed = await script(
     closeBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
     [setId],
@@ -401,6 +404,7 @@ async function closeQuestionPanel(
     [setId],
   ).catch(() => false);
   if (alreadyClosed === true) return true;
+  if (alreadyClosed !== false) return false;
   const closed = await script(
     closeBlooketCapabilityQuestionPanel as (...args: never[]) => unknown,
     [setId],

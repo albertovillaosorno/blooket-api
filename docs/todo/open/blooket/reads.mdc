@@ -735,6 +735,14 @@ Synthetic deadline tests cover stalled navigation, late results, refused opens,
 late acknowledged opens requiring cleanup, and unconfirmed restoration. The
 reader never submits a question or creates test content.
 
+Audio capability polling now retries only an exact known page-unavailable
+reply. Malformed successes, unexpected failure codes, and extra fields fail
+the inspection immediately rather than being replaced by later successful
+evidence. Boolean modal readiness and closure polls also accept only exact
+`true`/`false` replies; malformed closed-state evidence does not authorize a
+Cancel click. The existing bounded timing and cleanup/restoration policy still
+applies, without treating these portable tests as live account acceptance.
+
 An account with no sets is handled without creating probe content: static
 verified facts are returned while answer images and audio remain explicitly
 `account-dependent`. The canonical read command, CLI, and MCP tool all use

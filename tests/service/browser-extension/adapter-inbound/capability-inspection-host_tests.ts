@@ -51,11 +51,19 @@ function fixture(options: {
   readonly extraOuterField?: boolean;
   readonly restoreFails?: boolean;
   readonly cleanupPollThrows?: "drawer" | "question";
+  readonly audioProbeReplies?: readonly unknown[];
+  readonly panelReadyReplies?: readonly unknown[];
+  readonly audioClosedReplies?: readonly unknown[];
+  readonly questionClosedReplies?: readonly unknown[];
 } = {}) {
   const originalUrl = "https://dashboard.blooket.com/edit?id=original-set";
   let tabUrl = originalUrl;
   let panelOpen = false;
   let drawerOpen = false;
+  let audioProbeCount = 0;
+  let panelReadyCount = 0;
+  let audioClosedCount = 0;
+  let questionClosedCount = 0;
   const scripts: string[] = [];
   const navigations: string[] = [];
   const chrome = {
@@ -132,32 +140,41 @@ function fixture(options: {
             if (options.questionOpenRejected) return [{ result: false }];
             panelOpen = true;
             return [{ result: true }];
-          case "isBlooketCapabilityQuestionPanelReady":
-            return [{ result: panelOpen }];
+          case "isBlooketCapabilityQuestionPanelReady": {
+            const next = options.panelReadyReplies?.[panelReadyCount++];
+            return [{ result: next === undefined ? panelOpen : next }];
+          }
           case "openBlooketAudioCapabilityDrawer":
             assert.equal(panelOpen, true);
             if (options.drawerOpenRejected) return [{ result: false }];
             drawerOpen = true;
             return [{ result: true }];
-          case "inspectBlooketAudioCapabilityDrawer":
+          case "inspectBlooketAudioCapabilityDrawer": {
+            const reply = options.audioProbeReplies?.[audioProbeCount++];
             return [{
-              result: {
+              result: reply !== undefined ? reply : {
                 ok: true,
                 value: options.media ?? "supported",
               },
             }];
-          case "isBlooketAudioCapabilityDrawerClosed":
+          }
+          case "isBlooketAudioCapabilityDrawerClosed": {
             if (!drawerOpen && options.cleanupPollThrows === "drawer")
               throw new Error("synthetic drawer confirmation unavailable");
-            return [{ result: !drawerOpen }];
+            const next = options.audioClosedReplies?.[audioClosedCount++];
+            return [{ result: next === undefined ? !drawerOpen : next }];
+          }
           case "closeBlooketAudioCapabilityDrawer":
             if (options.cleanupFails) return [{ result: false }];
             drawerOpen = false;
             return [{ result: true }];
-          case "isBlooketCapabilityQuestionPanelClosed":
+          case "isBlooketCapabilityQuestionPanelClosed": {
             if (!panelOpen && options.cleanupPollThrows === "question")
               throw new Error("synthetic question confirmation unavailable");
-            return [{ result: !panelOpen && !drawerOpen }];
+            const next = options.questionClosedReplies?.[questionClosedCount++];
+            return [{ result: next === undefined ? !panelOpen && !drawerOpen :
+              next }];
+          }
           case "closeBlooketCapabilityQuestionPanel":
             if (drawerOpen || options.cleanupFails) return [{ result: false }];
             panelOpen = false;
@@ -575,3 +592,115 @@ test(
     false);
   },
 );
+
+test(
+  "malformed audio evidence is never retried into a successful snapshot",
+  async () => {
+  const invalid = [
+    { ok: true, value: "supported", unexpected: "private" },
+    { ok: true, value: "unverified" },
+    { ok: false, code: "private-provider-error" },
+    { ok: false, code: "blooket-browser-failed", secret: "private" },
+    null,
+    "supported",
+  ];
+  for (const first of invalid) {
+    const page = fixture({ audioProbeReplies: [
+      first,
+      { ok: true, value: "supported" },
+    ] });
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.scripts.filter(
+      (name) => name === "inspectBlooketAudioCapabilityDrawer",
+    ).length, 1);
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
+    assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+  }
+  },
+);
+
+test(
+  "exact transient Audio unavailability may recover by polling",
+  async () => {
+  const page = fixture({ audioProbeReplies: [
+    { ok: false, code: "blooket-browser-failed" },
+    { ok: false, code: "blooket-browser-failed" },
+    { ok: true, value: "unsupported" },
+  ] });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    const decoded = decodeBlooketCapabilitySnapshot(result.value);
+    assert.equal(decoded.ok, true);
+    if (decoded.ok) assert.equal(decoded.value.features.audio, "unsupported");
+  }
+  assert.equal(page.scripts.filter(
+    (name) => name === "inspectBlooketAudioCapabilityDrawer",
+  ).length, 3);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  },
+);
+
+test(
+  "malformed modal-readiness replies never become ready by polling",
+  async () => {
+  const page = fixture({ panelReadyReplies: ["true", true] });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.scripts.filter(
+    (name) => name === "isBlooketCapabilityQuestionPanelReady",
+  ).length, 1);
+  assert.equal(page.scripts.includes("openBlooketAudioCapabilityDrawer"),
+    false);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  },
+);
+
+test(
+  "malformed cleanup readiness cannot confirm success after a retry",
+  async () => {
+  for (const options of [
+    { audioClosedReplies: [false, "true", true] },
+    { questionClosedReplies: [false, "true", true] },
+  ]) {
+    const page = fixture(options);
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.currentUrl(), page.originalUrl);
+  }
+  },
+);
+
+test("malformed already-closed evidence never authorizes Cancel", async () => {
+  for (const options of [
+    { audioClosedReplies: ["false", true] },
+    { questionClosedReplies: ["false", true] },
+  ]) {
+    const page = fixture(options);
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.currentUrl(), page.originalUrl);
+    if ("audioClosedReplies" in options)
+      assert.equal(page.scripts.includes(
+        "closeBlooketAudioCapabilityDrawer",
+      ), false);
+    if ("questionClosedReplies" in options)
+      assert.equal(page.scripts.includes(
+        "closeBlooketCapabilityQuestionPanel",
+      ), false);
+  }
+});
