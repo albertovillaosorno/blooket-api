@@ -43,6 +43,8 @@ function fixture(options: {
   readonly empty?: boolean;
   readonly cleanupFails?: boolean;
   readonly malformedList?: boolean;
+  readonly unknownEmpty?: boolean;
+  readonly duplicateList?: boolean;
   readonly restoreFails?: boolean;
   readonly cleanupPollThrows?: "drawer" | "question";
 } = {}) {
@@ -103,13 +105,16 @@ function fixture(options: {
                 result: {
                   ok: true,
                   value: {
-                    items: options.empty
+                    items: options.empty || options.unknownEmpty
                       ? []
-                      : [{
-                          schemaVersion: 1,
-                          id: "set-fixture",
-                          title: "Synthetic fixture",
-                        }],
+                      : Array.from(
+                          { length: options.duplicateList ? 2 : 1 },
+                          () => ({
+                            schemaVersion: 1,
+                            id: "set-fixture",
+                            title: "Synthetic fixture",
+                          }),
+                        ),
                     completeness: options.empty ? "complete" : "unknown",
                   },
                 },
@@ -284,3 +289,25 @@ test("cleanup polling exceptions still restore the original tab", async () => {
     assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
   }
 });
+
+test(
+  "unproved empty lists and duplicate sets cannot yield a snapshot",
+  async () => {
+  for (const options of [
+    { unknownEmpty: true },
+    { duplicateList: true },
+  ]) {
+    const page = fixture(options);
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(
+      page.scripts.includes("openBlooketCapabilityQuestionPanel"), false,
+    );
+  }
+  },
+);

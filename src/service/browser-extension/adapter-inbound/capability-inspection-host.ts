@@ -340,10 +340,13 @@ function firstSetId(value: unknown): string | null | undefined {
     (value.value.completeness !== "complete" &&
       value.value.completeness !== "unknown") ||
     (value.value.completeness === "complete" &&
-      value.value.items.length !== 0)
+      value.value.items.length !== 0) ||
+    (value.value.items.length === 0 &&
+      value.value.completeness !== "complete")
   )
     return undefined;
   let first: string | null = null;
+  const seen = new Set<string>();
   for (const item of value.value.items) {
     if (!item || typeof item !== "object" || Array.isArray(item))
       return undefined;
@@ -355,11 +358,13 @@ function firstSetId(value: unknown): string | null | undefined {
       record["id"].length < 1 ||
       record["id"].length > 512 ||
       record["id"].includes("\0") ||
+      seen.has(record["id"]) ||
       typeof record["title"] !== "string" ||
-      record["title"].length < 1 ||
+      !record["title"].trim() ||
       record["title"].length > 1_000
     )
       return undefined;
+    seen.add(record["id"]);
     if (first === null) first = record["id"];
   }
   return first;
