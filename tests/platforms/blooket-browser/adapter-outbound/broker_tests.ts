@@ -53,12 +53,15 @@ test("identified legacy workers cannot take subsequent jobs", async () => {
     assert.deepEqual(await pending, { ok: true, value: [] });
     assert.equal(broker.compatible(legacy), false);
     assert.equal(broker.status().connected, false);
+    assert.equal(broker.status().incompatibleClients, 1);
     const write = broker.request({
       kind: "sets.create", title: "Synthetic", description: "", private: true,
     });
     assert.equal(broker.next(TOKEN, legacy), null);
     const fresh = broker.next(TOKEN, current);
     assert.ok(fresh);
+    assert.equal(broker.status().connected, true);
+    assert.equal(broker.status().incompatibleClients, 1);
     assert.equal(fresh.command.kind, "sets.create");
     assert.equal(broker.complete(TOKEN, {
       schemaVersion: 1, id: fresh.id, ok: false,
@@ -69,6 +72,7 @@ test("identified legacy workers cannot take subsequent jobs", async () => {
     });
     broker.resetPairing();
     assert.equal(broker.compatible(legacy), true);
+    assert.equal(broker.status().incompatibleClients, 0);
     assert.equal(broker.next(TOKEN, legacy), null);
   } finally {
     broker.close();

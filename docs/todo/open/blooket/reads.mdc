@@ -1083,6 +1083,20 @@ legacy exclusion, current-client dispatch, and explicit pairing reset. The
 owner was asked to leave only the current development copy enabled because
 browser control cannot safely perform extension management.
 
+With the corrected committed service, the first canonical list request still
+returned incompatible. The next bounded read returned browser-unavailable,
+consistent with excluding the only responding identified legacy client. No
+current-client data or publication receipt was produced.
+
+The local EN/ES Configuration page now exposes transport connection state and
+a separate warning when an identified legacy client has been excluded. A
+local Check connection button refreshes service state without contacting
+Blooket, submitting credentials, or changing extension permissions.
+
+The warning never treats polling as account readiness or remote publication.
+Only bounded counts are exposed; extension origins remain private process
+state. A pairing reset clears both the compatibility count and old credentials.
+
 Chrome's official [service-worker documentation][worker-doc] was checked on
 2026-10-08. Worker lifetime is distinct from current provider data; neither
 loading an extension nor successful polling proves authenticated read
