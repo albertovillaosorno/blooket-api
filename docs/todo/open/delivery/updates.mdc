@@ -26,6 +26,7 @@ scope:
   - src/platforms/update-signatures/
   - src/platforms/update-downloads/
   - src/platforms/update-extraction/
+  - src/platforms/bundle-exchange/
   - src/settings/teacher-preferences/
   - src/api/teacher-configuration/
   - src/service/
@@ -436,6 +437,42 @@ imports the actual parser/extraction closure and rejects a malformed fixture;
 transactional replacement, restart, recovery, and publisher provisioning remain
 pending.
 
+### Native atomic exchange and outcome ownership
+
+The clean committed `1c14f03` passed strict TypeScript, roadmap integrity,
+all 1,079 portable tests, Jig local validation, and actual Linux package
+assembly/extracted verification on 2026-10-08. The package verifier imported
+its delivered ZIP parser and rejected malformed bytes. Its session-owned
+416 MiB output was removed; existing packages and runtime caches were retained.
+
+A native bundle-exchange adapter now preserves both directory trees using one
+atomic exchange. Before invocation, it checks exact app/container locations,
+device/inode identities, private staging ownership, and a fixed silent helper.
+The helper rechecks directory identities through held no-follow parent
+file descriptors, then performs the exchange and syncs both parent directories.
+No rename-away/delete sequence or filesystem downgrade fallback is used.
+
+Apple's [swap-renaming capability][swap-support] and
+[Darwin syscall header][swap-header], checked on 2026-10-08, establish the
+`RENAME_SWAP` primitive. The shared C helper uses `renameat2` with
+`RENAME_EXCHANGE` only for Linux development checks; the product adapter
+continues to refuse Linux as an update target. Native ARM64 compilation and
+Darwin filesystem/permission assurance stay in task blooket-15.
+
+Portable tests compile the actual helper with warnings as errors and exercise
+real Linux exchanges, inverse rollback, refusal of blind repeat, lost
+acknowledgements, changed identities/permissions, symbolic paths, host stubs,
+and cancellation while an owned writer is still live. Cancellation waits for
+writer completion and reports the observed orientation; it cannot authorize a
+blind retry or deleting either retained app. An unknown outcome stays unknown.
+
+The helper is included in both developer and Mac runtime assembly, and package
+verification exercises the delivered mechanism on disposable app directories.
+This is an installation primitive, not an enabled updater. Application journals,
+writer quiescence, independent helper lifecycle, health-confirmed restart,
+rollback/recovery, production publisher provisioning, and UI integration remain
+required before functional completion.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,
@@ -457,3 +494,8 @@ native acceptance belong to task blooket-15.
 [mach-cpu]: https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/machine.h
 
 [zip-reader]: https://github.com/thejoshwolfe/yauzl/blob/master/README.md
+
+<!-- jig-ignore-next-line: Preserve the canonical Apple capability URL. -->
+[swap-support]: https://developer.apple.com/documentation/foundation/urlresourcekey/volumesupportsswaprenamingkey
+<!-- jig-ignore-next-line: Preserve the canonical Darwin syscall header URL. -->
+[swap-header]: https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/stdio.h

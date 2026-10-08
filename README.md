@@ -266,6 +266,8 @@ Linux x64 delivery is required for developer testing of the shared service.
 The bundled Node 24 runtime requires macOS 13.5 or later; confirm the OS before
 installation. No VM or Metal requirement is part of the initial plan.
 
+Package assembly uses the system C compiler for its small native update helper.
+
 ## Packages and releases
 
 Remote CI is deliberately opt-in so ordinary pushes and pull requests do not

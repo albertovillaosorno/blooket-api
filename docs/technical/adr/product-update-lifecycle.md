@@ -88,6 +88,13 @@ paths, and admitted internal links before syncing/freezing it for Apple
 assessment. Cancellation retains ownership until the native writer stops;
 staged results still require Apple trust and transactional installation.
 
+`src/platforms/bundle-exchange/` provides one native atomic directory exchange,
+retaining both application versions and returning their observed orientation.
+Held parent descriptors and exact expected identities guard the syscall;
+no delete/rename fallback is admitted. Application composition must hold the
+installation lock, quiesce writers, journal the operation, and manage health
+and recovery independently; the primitive cannot establish installation success.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
