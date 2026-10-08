@@ -37,6 +37,66 @@ import { createBlooketBrowserBridgeBroker } from
 
 const TOKEN = "synthetic-browser-bridge-token-32-bytes-minimum";
 
+test("identified legacy workers cannot take subsequent jobs", async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const legacy = "chrome-extension://legacy-fixture";
+    const current = "chrome-extension://current-fixture";
+    const pending = broker.request({ kind: "sets.list" });
+    const job = broker.next(TOKEN, legacy);
+    assert.ok(job);
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: 1, id: job.id, ok: true, value: [],
+    }, legacy), true);
+    // The caller still sees the exact legacy response and refuses it. The
+    // broker has not retried or manufactured a completeness assertion.
+    assert.deepEqual(await pending, { ok: true, value: [] });
+    assert.equal(broker.compatible(legacy), false);
+    assert.equal(broker.status().connected, false);
+    const write = broker.request({
+      kind: "sets.create", title: "Synthetic", description: "", private: true,
+    });
+    assert.equal(broker.next(TOKEN, legacy), null);
+    const fresh = broker.next(TOKEN, current);
+    assert.ok(fresh);
+    assert.equal(fresh.command.kind, "sets.create");
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: 1, id: fresh.id, ok: false,
+      code: "blooket-browser-failed",
+    }, current), true);
+    assert.deepEqual(await write, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    broker.resetPairing();
+    assert.equal(broker.compatible(legacy), true);
+    assert.equal(broker.next(TOKEN, legacy), null);
+  } finally {
+    broker.close();
+  }
+});
+
+test("another identified worker cannot settle an owned lease", async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const pending = broker.request({ kind: "sets.list" });
+    const job = broker.next(TOKEN, "chrome-extension://owner-fixture");
+    assert.ok(job);
+    const response = {
+      schemaVersion: 1, id: job.id, ok: true,
+      value: { items: [], completeness: "complete" },
+    };
+    assert.equal(broker.complete(TOKEN, response,
+      "chrome-extension://other-fixture"), false);
+    assert.equal(broker.complete(TOKEN, response), false);
+    assert.equal(broker.status().pending, 1);
+    assert.equal(broker.complete(TOKEN, response,
+      "chrome-extension://owner-fixture"), true);
+    assert.deepEqual(await pending, { ok: true, value: response.value });
+  } finally {
+    broker.close();
+  }
+});
+
 test("pairing reset revokes old access and settles pending jobs", async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
   const pending = broker.request({ kind: "sets.list" });

@@ -776,18 +776,24 @@ async function handleBrowserBridgeRequest(
     json(response, 401, { ok: false, code: "invalid-browser-bridge-token" });
     return;
   }
+  if (extensionOrigin !== undefined && !bridge.compatible(extensionOrigin)) {
+    json(response, 426, { ok: false, code: "blooket-browser-incompatible" });
+    return;
+  }
   const path = new URL(request.url ?? "/", "http://loopback.invalid").pathname;
   if (path === "/api/browser-bridge/status" && request.method === "GET") {
     json(response, 200, { ok: true, ...bridge.status() });
     return;
   }
   if (path === "/api/browser-bridge/next" && request.method === "GET") {
-    json(response, 200, { ok: true, job: bridge.next(token) });
+    json(response, 200, {
+      ok: true, job: bridge.next(token, extensionOrigin),
+    });
     return;
   }
   if (path === "/api/browser-bridge/result" && request.method === "POST") {
     const body = await readBody(request, 1_000_000);
-    if (!bridge.complete(token, body)) {
+    if (!bridge.complete(token, body, extensionOrigin)) {
       json(response, 400, {
         ok: false,
         code: "invalid-browser-bridge-result",

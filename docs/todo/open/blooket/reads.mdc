@@ -1061,6 +1061,33 @@ current live browser acceptance remains pending.
 
 ## Blockers
 
+On 2026-10-08, the owner reported loading the current development extension.
+A fresh workspace reload still produced a legacy bare-array response through
+the canonical CLI. Authentication observation succeeded, but capability
+inspection timed out; neither result establishes accepted current read data.
+Coexisting extension copies remain a possible cause, not an observed fact.
+
+The broker now associates an explicitly identified extension origin with its
+dispatched lease. Another identified client cannot settle that lease. A legacy
+set-list reply still reaches the read decoder as a failed compatibility check;
+the broker never retries it or asserts collection completeness.
+
+That identified client is excluded from later dispatch until pairing reset or
+service restart, with a bounded local compatibility record and HTTP 426. This
+allows a current extension to poll without the known incompatible origin taking
+its jobs. Native requests without an Origin header retain the original read
+gate; this change does not establish version identity for those clients.
+
+Broker and loopback HTTP regressions cover competing clients, lease ownership,
+legacy exclusion, current-client dispatch, and explicit pairing reset. The
+owner was asked to leave only the current development copy enabled because
+browser control cannot safely perform extension management.
+
+Chrome's official [service-worker documentation][worker-doc] was checked on
+2026-10-08. Worker lifetime is distinct from current provider data; neither
+loading an extension nor successful polling proves authenticated read
+acceptance.
+
 On 2026-10-08, a live canonical CLI list request confirmed that the connected
 development extension returns the legacy bare-array format. The current
 service requires explicit collection-completeness evidence, so it refuses
@@ -1077,3 +1104,6 @@ recognizing an old response is not successful account enumeration.
 `chrome://extensions/` and forbids bypassing it through another control surface.
 The human loaded the development extension manually. Future reloads during
 development also need that browser action. The real `.env` is unchanged.
+
+<!-- jig-ignore-next-line: Exact official documentation URL is indivisible. -->
+[worker-doc]: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers

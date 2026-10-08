@@ -61,6 +61,7 @@ interface PendingJob {
   readonly timer: ReturnType<typeof setTimeout>;
   readonly createdAt: number;
   dispatched: boolean;
+  client?: string;
 }
 
 export interface BlooketBrowserBridgeBroker
@@ -68,8 +69,9 @@ export interface BlooketBrowserBridgeBroker
   pairingToken(): string;
   resetPairing(): void;
   authenticated(token: string): boolean;
-  next(token: string): BlooketBrowserBridgeRequest | null;
-  complete(token: string, value: unknown): boolean;
+  compatible(client: string): boolean;
+  next(token: string, client?: string): BlooketBrowserBridgeRequest | null;
+  complete(token: string, value: unknown, client?: string): boolean;
   close(): void;
   status(): {
     readonly pending: number;
@@ -101,6 +103,7 @@ export function createBlooketBrowserBridgeBroker(
   const pending = new Map<string, PendingJob>();
   let closed = false;
   let lastPollAt = 0;
+  const incompatibleClients = new Set<string>();
 
   function authenticated(candidate: string): boolean {
     const left = Buffer.from(token, "utf8");
@@ -124,10 +127,12 @@ export function createBlooketBrowserBridgeBroker(
   return {
     pairingToken: () => token,
     authenticated,
+    compatible: (client) => !incompatibleClients.has(client),
     resetPairing: () => {
       if (closed) return;
       token = randomBytes(32).toString("base64url");
       lastPollAt = 0;
+      incompatibleClients.clear();
       for (const id of [...pending.keys()]) {
         settle(id, { ok: false, code: "blooket-browser-unavailable" });
       }
@@ -170,8 +175,9 @@ export function createBlooketBrowserBridgeBroker(
       );
     },
 
-    next: (candidate) => {
+    next: (candidate, client) => {
       if (closed || !authenticated(candidate)) return null;
+      if (client !== undefined && incompatibleClients.has(client)) return null;
       lastPollAt = now();
       // Polling can be concurrent after extension reconnection. Expire stale
       // leases first, then keep at most one job in the browser at a time.
@@ -208,12 +214,13 @@ export function createBlooketBrowserBridgeBroker(
           continue;
         }
         job.dispatched = true;
+        if (client !== undefined) job.client = client;
         return job.request;
       }
       return null;
     },
 
-    complete: (candidate, value) => {
+    complete: (candidate, value, client) => {
       if (closed || !authenticated(candidate)) return false;
       if (
         typeof value !== "object" ||
@@ -225,6 +232,7 @@ export function createBlooketBrowserBridgeBroker(
       }
       const job = pending.get(value.id);
       if (!job || !job.dispatched) return false;
+      if (job.client !== undefined && job.client !== client) return false;
       if (now() >= job.createdAt + timeoutMs) {
         settle(job.request.id, {
           ok: false,
@@ -239,6 +247,16 @@ export function createBlooketBrowserBridgeBroker(
           code: "blooket-browser-failed",
         });
         return false;
+      }
+      // A legacy list envelope has no collection evidence. Preserve the
+      // failed operation for its owning decoder; never replay it here. Stop
+      // this identified extension from winning later leases over an updated
+      // worker. Unidentified native clients retain ordinary fail-closed reads.
+      if (client !== undefined && job.request.command.kind === "sets.list" &&
+          decoded.value.ok && Array.isArray(decoded.value.value)) {
+        // Bound authenticated client observations as well as pending jobs.
+        if (incompatibleClients.size < 16) incompatibleClients.add(client);
+        lastPollAt = 0;
       }
       settle(
         job.request.id,
