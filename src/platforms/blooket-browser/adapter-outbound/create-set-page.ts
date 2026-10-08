@@ -279,8 +279,14 @@ export function submitBlooketCreateSetForm(
     const buttons = Array.from(form.querySelectorAll("button")).filter(
       (button) => button.textContent?.trim() === "Create Set",
     );
-    if (buttons.length !== 1) return failed();
-    (buttons[0] as HTMLButtonElement).click();
+    if (buttons.length !== 1 || buttons[0]?.tagName !== "BUTTON")
+      return failed();
+    const submit = buttons[0] as HTMLButtonElement;
+    const bounds = submit.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || submit.disabled ||
+        submit.getAttribute("aria-disabled") === "true")
+      return failed();
+    submit.click();
     return { ok: true };
   } catch {
     return failed();
