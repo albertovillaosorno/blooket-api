@@ -36,6 +36,26 @@ scope. Move the relevant evidence/blockers without losing history and retarget
 dependent records to their actual prerequisites. Never mark a task complete
 merely because its scope was divided.
 
+## Functional-first acceptance and evergreen exception
+
+For current unfinished implementation milestones, **IT WORKS** means the
+requested teacher-facing feature demonstrably works through its actual owning
+product entrypoint. Keep required safety boundaries and actual results; do not
+hold usable implementation hostage to exhaustive hypothetical platform tests,
+aesthetic perfection, or unrelated hardening. Maintain targeted regression
+evidence and never promote a mock or synthetic result into live acceptance.
+
+The final `blooket-15` record is **evergreen**. Its work is repeated bug
+finding/fixing, regression tests, UI/UX improvements, Linux test stubs, and
+theoretical macOS/Safari/ChatGPT compatibility assurance. It remains active
+indefinitely even after all other records finish.
+
+**Never complete/move/remove
+`blooket-15` without an explicit instruction from Alberto to close that exact
+task.** Passing validation, finishing the release, or finding no current bugs
+cannot substitute for this manual approval. The open maintenance record is not
+a functional release blocker and does not itself schedule background work.
+
 ## Completion transaction
 
 1. Verify acceptance and retain actual commands, results, and host/client

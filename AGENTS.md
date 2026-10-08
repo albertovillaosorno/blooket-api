@@ -8,7 +8,7 @@ the human and the surface being used; never trust a model's claimed role.
 
 For source, tests, documentation, references, validation, `.env` development
 setup, Git, or release work, read and follow the complete developer profile at
-`docs/agents/developer/AGENTS.md` before making changes.
+`docs/agents/AGENTS-DEV.md` before making changes.
 
 The developer profile is the authoritative repository contract. It includes the
 ordered `TODO.md` workflow, architecture rules, secret boundaries, validation,
@@ -23,8 +23,8 @@ profile and `docs/todo/README.md`.
 ## Teacher-facing product use
 
 For quiz authoring and other teacher workflows through the admitted MCP tools,
-use only the product-user profile at `docs/agents/user/AGENTS.md` plus personal
-skills returned by `skills_list` and `skills_get`.
+use only the product-user profile at `docs/agents/AGENTS-TEACHER.md`
+plus personal skills returned by `skills_list` and `skills_get`.
 
 The remote teacher agent obtains the product-user profile through the admitted
 `instructions_get` MCP tool. A repository file is not assumed to be loaded by a

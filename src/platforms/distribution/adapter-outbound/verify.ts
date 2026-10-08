@@ -160,7 +160,7 @@ export async function verifyDistribution(
     }
     const names = await readdir(app);
     assert.ok(!names.includes(".env") && !names.includes("reference"));
-    await assert.rejects(access(join(app, "docs/agents/developer")));
+    await assert.rejects(access(join(app, "docs/agents/AGENTS-DEV.md")));
     const browser = join(resources, "extensions/chrome");
     const browserManifest = JSON.parse(await readFile(
       join(browser, "manifest.json"), "utf8",

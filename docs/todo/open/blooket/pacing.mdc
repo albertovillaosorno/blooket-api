@@ -33,19 +33,17 @@ recoverable human-action stops for challenges and unfamiliar access states.
 
 ## Acceptance
 
-Test serialization, rolling-window limits, task budgets, cancellation, restart,
-and interruptions using an injected clock. Verify normal browser ordering and
-read-back; pauses alone are not evidence that a mutation succeeded.
+**IT WORKS** when actual publication operations share a conservative account
+mutation queue, respect a usable pace/budget, respond to cancellation, and stop
+for authentication challenges or other human actions. An interruption or
+restart must not blindly repeat an uncertain Blooket write; resumption uses
+fresh session and remote state.
 
-Test the stop/notification/resume behavior with synthetic challenge states,
-including challenges reached from localhost that actually belong to Blooket or
-another authentication provider. Revalidate session and remote write state
-afterward, without automatically replaying an ambiguous operation.
-
-Complete when all entrypoints share the mutation budget, waits/cancellation
-preserve checkpoints, and challenge completion resumes only from verified
-session and remote state. Treat the proposed pacing as application defaults, not
-verified provider limits or protection against account restrictions.
+Verify the ordinary product path and at least one representative interrupted or
+cancelled flow with focused deterministic tests. A bounded, recoverable stop is
+a working outcome where the provider requires human attention. Do not delay
+functional publication for an exhaustive theoretical interleaving matrix; keep
+finding and fixing additional edge cases in the ongoing hardening task.
 
 ## Implementation notes
 

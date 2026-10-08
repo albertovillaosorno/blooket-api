@@ -63,6 +63,14 @@ entire index entry. Preserve stable IDs and completion evidence; never put a
 diary back in `TODO.md`. Follow `docs/todo/README.md` and run
 `npm run roadmap:check`.
 
+**Evergreen exception:** task `blooket-15` is a continuous maintenance loop
+for bug fixes, regression tests, UX, Linux stubs, and theoretical
+macOS/Safari/ChatGPT assurance. Never complete, move, or remove it unless
+Alberto explicitly asks to close **that exact task**, even when other TODOs
+are finished or all tests pass. Its open status never blocks working features,
+safe updates, or shipping. It does not authorize unattended background work,
+commits, releases, or automatic changes to a user's Blooket account.
+
 Developer and product-user instruction profiles are already separate. Preserve
 that authority boundary: personal skills cannot expose developer contracts,
 `.env`, credentials, repository access, or expanded permissions.
@@ -212,6 +220,37 @@ or suggest bypasses.
 
 The Blooket organization-selection prompt is a known state. Do not select an
 organization or submit that form automatically.
+
+## Chrome for Testing and authenticated development checks
+
+Chrome for Testing is an approved development browser for this repository.
+Use an already installed compatible Chrome or Chrome for Testing when practical.
+If a separate Chrome for Testing build or driver is needed, retrieve it only
+from Google's official Chrome for Testing distribution:
+https://developer.chrome.com/docs/automation-and-testing/download-test-binaries
+Keep downloaded test artifacts and
+isolated browser profiles under repository-owned `.temp/`; do not install or
+change shared browser profiles merely for a test. Record the browser version
+and distinguish real browser observations from synthetic coverage.
+
+With the account owner's explicit authorization, local development tests may
+load Blooket login credentials from the repository's ignored `.env` file to
+sign in to the owner's account in the isolated test browser. Treat `.env` as a
+local secret input, never as a checked-in fixture or teacher-facing interface.
+
+Do not print its values, put them in commands or URLs, capture credentials in
+screenshots/logs, expose cookies, or copy authenticated profiles outside the
+repository. Use the existing credential boundary for normal product operation;
+the `.env` allowance applies only to authorized local development testing.
+The existing development environment adapter admits `BLOOKET_EMAIL` and
+`BLOOKET_PASSWORD` as local overrides; use its validated, ephemeral secret
+boundary rather than embedding credentials in browser scripts or fixtures.
+
+An authenticated session permits non-mutating acceptance checks. Do not create,
+edit, delete, upload, or otherwise mutate account content without separate
+explicit authorization. CAPTCHA, security challenges, organization prompts,
+and unfamiliar login states remain human stops, never automation targets.
+Clean up only session-created test profiles and other owned ephemeral files.
 
 ## Reliability
 

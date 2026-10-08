@@ -49,6 +49,34 @@ offline and preserve teacher data and current access boundaries.
 
 ## Acceptance
 
+**IT WORKS -- release-critical.** On a supported installed ARM64 Mac, an
+opted-in update workflow can find a newer trusted release, authenticate its
+publisher and bytes, stage it, apply it at a safe restart boundary, and return
+to a usable application with the teacher's data, secrets, settings, and drafts
+intact. Manual checking must work without enabling automatic updates; automatic
+checking/installing is opt-in, visible, and reversible.
+
+A network failure, corrupt/foreign package, denied OS permission, interrupted
+install, or failed startup must NEVER silently destroy the only usable app,
+reset user data, claim a false success, or repeatedly attempt the same broken
+installation. Keep/recover the previous usable version, report an actionable
+failure, and allow controlled retry or manual recovery. Avoid installation
+during active/ambiguous Blooket writes. The practical guarantee is **safe
+failure and recovery**, not an impossible promise that no update error can
+occur.
+
+Before handing the app to the teacher, demonstrate the real product updater
+through a trusted signed ARM64 release fixture covering install, restart,
+interrupted install/rollback, persistence, and the EN/ES user controls. Pin a
+real production publisher trust root and produce/release trustworthy artifacts;
+a mock signature alone does not make shipping updates safe. Broader Safari,
+Apple, and hardware-specific compatibility assurance continues in the final
+ongoing record, without weakening this functional update requirement.
+
+## Implementation notes
+
+### Detailed update reliability and security requirements
+
 ### Independent preferences and ownership
 
 Expose separate EN/ES controls: “Start Blooket API at login” / “Iniciar
@@ -157,7 +185,7 @@ after restart; show that authorization boundary without claiming token survival
 or resetting saved preferences. Required macOS replacement approval is a real
 human boundary, never a bypass target.
 
-### Acceptance matrix
+### Reliability test matrix
 
 Use deterministic fixtures/doubles without live GitHub polling for no releases,
 current/newer/older/future versions, numeric ordering, drafts/prereleases,
@@ -171,8 +199,9 @@ Preserve launch-at-login preference independently across updates, remove only
 owned persistence on uninstall, and recover visible registration/start/removal
 failures. Platform-only native acceptance belongs to task blooket-15.
 
-Before completion, exercise the production updater contract against a signed
-ARM64 release fixture through staging, bundle verification, replacement,
+Before functional completion, exercise the production updater contract
+against a signed ARM64 release fixture through staging, bundle verification,
+replacement,
 restart, rollback/data retention, and EN/ES states. Platform-only Apple trust
 acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
