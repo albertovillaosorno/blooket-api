@@ -64,6 +64,9 @@ export function runBlooketLoginPageAction(
     readonly password: HTMLInputElement;
     readonly submit: HTMLButtonElement;
   } | null => {
+    // A provider security interstitial can retain obsolete login controls
+    // during a navigation. No credentials may be filled or submitted then.
+    if (document.title === "Just a moment...") return null;
     const url = new URL(location.href);
     if (
       url.origin !== "https://id.blooket.com" ||

@@ -154,9 +154,11 @@ test("timeouts and close never replay pending browser jobs", async () => {
   });
   assert.equal(timed.status().pending, 0);
 
+  // This scenario verifies explicit close, not wall-clock expiration.
+  // Node's parallel test runners can delay dispatch well beyond 250 ms.
   const closing = createBlooketBrowserBridgeBroker({
     token: TOKEN,
-    timeoutMs: 250,
+    timeoutMs: 5_000,
   });
   const pending = closing.request({
     kind: "questions.list",
