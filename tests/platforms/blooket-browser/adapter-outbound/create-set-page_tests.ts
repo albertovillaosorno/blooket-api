@@ -225,6 +225,24 @@ test("privacy changes only through the observed switch", () => {
   });
 });
 
+test(
+  "disabled privacy switches cannot acknowledge Create Set preparation",
+  () => {
+  const input = { title: "Synthetic", description: "", private: true };
+  for (const reason of ["disabled", "aria", "hidden"] as const) {
+    const page = fixture(false);
+    if (reason === "disabled") page.privacy.disabled = true;
+    if (reason === "aria")
+      page.privacy.attributes["aria-disabled"] = "true";
+    if (reason === "hidden")
+      page.privacy.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.privacy.clicked, 0);
+    });
+  }
+});
+
 test("wrong routes ambiguous controls and visibility fail closed", () => {
   const page = fixture(true);
   withPage(page.document, "https://dashboard.blooket.com/edit?id=x", () => {
