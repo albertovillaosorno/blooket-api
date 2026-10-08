@@ -285,3 +285,47 @@ test("HTTP failures are download errors rather than no-update success",
       assert.deepEqual(await readdir(directory), []);
     });
   });
+
+test("rejected response headers cancel the unconsumed network body",
+  async () => {
+  await temporary(async directory => {
+    const { bytes, verification } = fixture();
+    let cancelled = false;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      cancel() { cancelled = true; },
+    }), { headers: { "Content-Length": String(bytes.length + 1) } });
+    assert.deepEqual(await downloadSignedUpdate({
+      directory, verification, fetch: async () => response,
+    }), { status: "verification-failed", reason: "size-mismatch" });
+    assert.equal(cancelled, true);
+    assert.deepEqual(await readdir(directory), []);
+  });
+});
+
+test("a response arriving after cancellation releases its network body",
+  { timeout: 1_000 }, async () => {
+    await temporary(async directory => {
+      const { verification } = fixture();
+      const controller = new AbortController();
+      let respond: (response: Response) => void = () => {};
+      let started: () => void = () => {};
+      const ready = new Promise<void>(resolve => { started = resolve; });
+      const pending = downloadSignedUpdate({
+        directory, verification, signal: controller.signal,
+        fetch: async () => {
+          started();
+          return new Promise<Response>(resolve => { respond = resolve; });
+        },
+      });
+      await ready;
+      controller.abort();
+      assert.deepEqual(await pending, {
+        status: "download-failed", reason: "cancelled",
+      });
+      let cancelled: () => void = () => {};
+      const released = new Promise<void>(resolve => { cancelled = resolve; });
+      respond(new Response(new ReadableStream({ cancel: cancelled })));
+      await released;
+      assert.deepEqual(await readdir(directory), []);
+    });
+  });

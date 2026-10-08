@@ -109,7 +109,10 @@ export async function downloadSignedUpdate(
       length !== null
       && (!/^[0-9]{1,12}$/u.test(length)
         || Number(length) !== verified.asset.size)
-    ) throw new Error("size-mismatch");
+    ) {
+      void response.body?.cancel().catch(() => undefined);
+      throw new Error("size-mismatch");
+    }
     if (!response.body) throw new Error("size-mismatch");
     await mkdir(options.directory, { recursive: true, mode: 0o700 });
     temporary = await mkdtemp(join(options.directory, "download-"));
@@ -188,7 +191,7 @@ async function downloadResponse(
 ): Promise<Response> {
   let url = initial;
   for (let redirects = 0; redirects <= 3; redirects++) {
-    const response = await abortable(fetcher(url, {
+    const pending = fetcher(url, {
       method: "GET",
       headers: { Accept: "application/octet-stream" },
       credentials: "omit",
@@ -196,7 +199,14 @@ async function downloadResponse(
       redirect: "manual",
       cache: "no-store",
       signal,
-    }), signal);
+    });
+    // A fetch implementation may ignore abort and resolve after our deadline.
+    // Its response still belongs to this operation and must release its body.
+    void pending.then(response => {
+      if (signal.aborted)
+        void response.body?.cancel().catch(() => undefined);
+    }, () => undefined);
+    const response = await abortable(pending, signal);
     if (response.redirected || (response.url && response.url !== url)) {
       void response.body?.cancel().catch(() => undefined);
       throw new Error("redirect");
