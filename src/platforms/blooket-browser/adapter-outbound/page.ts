@@ -172,23 +172,27 @@ export function inspectBlooketPage(
         heading.textContent?.trim() === "My Sets"
       )
         return { ok: true, value: "my-sets" };
-      if (
-        url.pathname === "/create" &&
-        document.querySelector("form#question-set-form")?.tagName === "FORM" &&
-        Array.from(
+      if (url.pathname === "/create") {
+        const forms = Array.from(
+          document.querySelectorAll("form#question-set-form"),
+        );
+        const submits = Array.from(
           document.querySelectorAll("form#question-set-form button"),
-        ).filter((button) => button.textContent?.trim() === "Create Set")
-          .length === 1
-      )
-        return { ok: true, value: "create" };
-      if (
-        url.pathname === "/edit" &&
-        main.querySelector("h1") &&
-        Array.from(main.querySelectorAll("button")).some(
-          (button) => button.textContent?.trim() === "Save Set",
-        )
-      )
-        return { ok: true, value: "edit" };
+        ).filter((button) => button.textContent?.trim() === "Create Set");
+        if (
+          forms.length === 1 && forms[0]?.tagName === "FORM" &&
+          visible(forms[0]) && submits.length === 1 && visible(submits[0]!)
+        ) return { ok: true, value: "create" };
+      }
+      if (url.pathname === "/edit") {
+        const heading = main.querySelector("h1");
+        const saves = Array.from(main.querySelectorAll("button"))
+          .filter((button) => button.textContent?.trim() === "Save Set");
+        if (
+          heading && visible(heading) && saves.length === 1 &&
+          visible(saves[0]!)
+        ) return { ok: true, value: "edit" };
+      }
       return { ok: true, value: "unexpected-page" };
     }
     if (

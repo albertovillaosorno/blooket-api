@@ -434,6 +434,21 @@ test("create page observation requires the exact observed form", () => {
       ok: true,
       value: "create",
     });
+    button.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    button.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    form.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    form.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    document.selectors["form#question-set-form"] = [form, form];
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    document.selectors["form#question-set-form"] = [form];
     document.selectors["form#question-set-form button"] = [
       button,
       node("BUTTON", "Create Set"),
@@ -441,6 +456,32 @@ test("create page observation requires the exact observed form", () => {
     assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
       ok: true,
       value: "unexpected-page",
+    });
+  });
+});
+
+test("edit readiness refuses hidden or duplicate Save Set controls", () => {
+  const { document, main } = base();
+  const save = node("BUTTON", "Save Set");
+  main.selectors["button"] = [save];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "edit",
+    });
+    save.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    save.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    main.selectors["button"] = [save, save];
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    main.selectors["button"] = [save];
+    const heading = main.selectors["h1"]![0]!;
+    heading.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
     });
   });
 });
