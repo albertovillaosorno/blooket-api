@@ -69,9 +69,12 @@ test("pairing reset revokes old access and settles pending jobs", async () => {
 test(
   "authenticated completion resolves only the dispatched request",
   async () => {
+  // Correlation is a synchronous contract; do not let parallel Node test
+  // scheduling turn this test into an incidental timeout assertion.
   const broker = createBlooketBrowserBridgeBroker({
     token: TOKEN,
-    timeoutMs: 250,
+    timeoutMs: 5_000,
+    now: () => 10_000,
   });
   const pending = broker.request({ kind: "sets.list" });
 
@@ -118,9 +121,12 @@ test(
 });
 
 test("malformed extension replies fail the owning request closed", async () => {
+  // Correlation is a synchronous contract; do not let parallel Node test
+  // scheduling turn this test into an incidental timeout assertion.
   const broker = createBlooketBrowserBridgeBroker({
     token: TOKEN,
-    timeoutMs: 250,
+    timeoutMs: 5_000,
+    now: () => 10_000,
   });
   const pending = broker.request({ kind: "session.observe" });
   const request = broker.next(TOKEN);
