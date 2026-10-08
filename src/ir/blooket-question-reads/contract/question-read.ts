@@ -476,6 +476,7 @@ function decodeAnswers(
       code: "too-many-answers",
       message: "Expected at most 100 answers.",
     });
+    return undefined;
   }
   const answers: BlooketAnswerRead[] = [];
   for (const [index, candidate] of value.entries()) {
@@ -629,6 +630,14 @@ function stringArray(
     });
     return undefined;
   }
+  if (value.length > 100) {
+    issues.push({
+      path,
+      code: "too-many-answers",
+      message: "Expected at most 100 answer values.",
+    });
+    return undefined;
+  }
   const result: string[] = [];
   for (const [index, candidate] of value.entries()) {
     const item = requiredString(
@@ -652,6 +661,14 @@ function decodeLegacyAnswerTypes(
       path,
       code: "expected-answer-types",
       message: "Expected null or an answer-type array.",
+    });
+    return undefined;
+  }
+  if (value.length > 100) {
+    issues.push({
+      path,
+      code: "too-many-answers",
+      message: "Expected at most 100 answer match modes.",
     });
     return undefined;
   }

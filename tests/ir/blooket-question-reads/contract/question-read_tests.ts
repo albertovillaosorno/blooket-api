@@ -374,3 +374,41 @@ test("question collections use the browser read safety cap", () => {
     assert.equal(oversized.issues[0]?.code, "too-many-questions");
   }
 });
+
+test("oversized answer and match arrays fail before normalization", () => {
+  const values = Array.from({ length: 101 }, (_, index) => "value-" + index);
+  const legacy = {
+    ...question,
+    answers: values,
+    correctAnswers: values,
+    answerTypes: values.map(() => "exactly"),
+  };
+  const normalized = {
+    schemaVersion: 3,
+    number: 1,
+    question: "Type sun.",
+    equation: null,
+    qType: "typing",
+    random: true,
+    timeLimit: 10,
+    answers: values.map((content) => ({
+      kind: "text", content, correct: true, match: "exactly",
+    })),
+    hasImage: false,
+    hasAudio: false,
+  };
+  for (const candidate of [
+    legacy,
+    { ...legacy, answers: ["sun"], correctAnswers: ["sun"] },
+    { ...legacy, answers: ["sun"], answerTypes: ["exactly"] },
+    normalized,
+  ]) {
+    const result = decodeBlooketQuestionRead(candidate);
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.issues.some(
+        (issue) => issue.code === "too-many-answers",
+      ), true);
+    }
+  }
+});
