@@ -488,8 +488,11 @@ async function relay(current: Connection, activeGeneration: number) {
             };
           }
         } catch {
+          if (generation !== activeGeneration) return;
           status = "blooket-attention-required";
         }
+        // An old relay cannot change the new connection's popup status.
+        if (generation !== activeGeneration) return;
         // Popup status tracks the last *confirmed* session observation.
         // Successful form submission never implies authenticated readiness.
         if (
@@ -510,7 +513,6 @@ async function relay(current: Connection, activeGeneration: number) {
             state === "create" || state === "edit"
           ) status = "connected";
         }
-        if (generation !== activeGeneration) return;
         await bridgeFetch(current, "/api/browser-bridge/result", {
           schemaVersion: job.schemaVersion,
           id: job.id,
