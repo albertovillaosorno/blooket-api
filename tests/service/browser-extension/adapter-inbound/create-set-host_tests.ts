@@ -302,3 +302,38 @@ test(
   assert.equal((await host.observeCreateSet()).ok, false);
   },
 );
+
+test(
+  "Create Set read-back must match the unique selected edit ID",
+  async () => {
+  for (const [url, response] of [
+    ["https://dashboard.blooket.com/edit?id=remote-set-1",
+      { ok: true, remoteSetId: "another-set" }],
+    ["https://dashboard.blooket.com/edit?id=remote-set-1",
+      { ok: true, remoteSetId: "remote-set-1", secret: "private" }],
+    ["https://dashboard.blooket.com/edit?id=remote-set-1&id=another-set",
+      { ok: true, remoteSetId: "remote-set-1" }],
+    ["https://dashboard.blooket.com/edit?id=remote-set-1",
+      { ok: true, remoteSetId: 7 }],
+  ] as const) {
+    const fake = fakeChrome({ scripts: [response] });
+    fake.setTab({ url, status: "complete" });
+    const host = createExtensionCreateSetHost(fake.chrome, 7, async () => {});
+    assert.deepEqual(await host.observeCreateSet(), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  }
+  },
+);
+
+test("Create Set receipts retain opaque encoded edit IDs", async () => {
+  const id = "opaque id/with spaces";
+  const fake = fakeChrome({ scripts: [{ ok: true, remoteSetId: id }] });
+  fake.setTab({
+    url: "https://dashboard.blooket.com/edit?id=" + encodeURIComponent(id),
+    status: "complete",
+  });
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => {},
+  ).observeCreateSet(), { ok: true, remoteSetId: id });
+});

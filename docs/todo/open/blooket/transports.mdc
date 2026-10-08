@@ -55,6 +55,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the Create Set Chrome host began requiring its observed
+response ID to match the unique decoded `id` query field on the confirmed
+Edit-page redirect. Extra reply fields, non-string IDs, ambiguous duplicate
+queries, and a response claiming another set now fail closed, while opaque
+identifiers with encoded spaces and slashes remain admitted. This hardens
+synthetic read-back evidence but does not verify remote persistence.
+
 On 2026-10-08, the Add Question read-back host began decoding complete
 question candidates through the versioned IR contract and requiring two
 matching observed values before confirming a submitted question. Malformed
