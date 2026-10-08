@@ -262,6 +262,28 @@ exact set edit route, bounds the visible Edit-question controls, opens each
 question, decodes the observed serialized question and normalized answer facts,
 and verifies panel cleanup.
 
+The Chrome question-read worker now runs a deadline-bounded, non-mutating
+inspection host. It checks each modal's parsed question through the canonical
+version-three decoder, cancels and confirms panel closure, and re-enumerates
+the exact visible question numbers before publishing the result. Any insertion,
+deletion, reorder, tab switch, malformed script result, or deadline exhaustion
+fails the entire read instead of returning a mixed visible collection. The
+eight-second scan budget includes edit-route navigation and leaves a margin
+before the bridge's ten-second request timeout.
+
+The normalized collection also has a cumulative 750 KB UTF-8 JSON budget
+below the localhost bridge's 1 MB request-body cap. Large but individually
+valid questions therefore fail before an oversized bridge reply is emitted.
+
+Synthetic tests verify the normal path, drift, exception cleanup, expiration,
+aggregate size admission, and legacy media URL normalization without submitting
+forms.
+
+This is only a structural consistency check of one rendered edit page. Two
+equal enumerations do not prove atomic remote content or server-side list
+completeness; publication-grade fresh read-back and actual-client acceptance
+remain pending.
+
 The question-list and Add Question read-back paths now require the same exact
 set ID at every modal step, including opening, inspection, cancel, and confirmed
 closure. A switched edit route or duplicate `id` query parameter fails closed

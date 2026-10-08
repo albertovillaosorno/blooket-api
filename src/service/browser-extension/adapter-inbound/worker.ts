@@ -37,14 +37,8 @@ import {
   blooketReadUrl,
   type PageReadOperation,
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
-import {
-  closeBlooketQuestionPanel,
-  inspectOpenedBlooketQuestion,
-  isBlooketQuestionPanelClosed,
-  listBlooketQuestionNumbers,
-  openBlooketQuestionPanel,
-} from
-  "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
+import { createExtensionQuestionInspectionHost } from
+  "./question-inspection-host.ts";
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
 import { createExtensionCapabilityInspectionHost } from
   "./capability-inspection-host.ts";
@@ -200,6 +194,8 @@ async function read(
     | PageReadOperation
     | { readonly kind: "questions.list"; readonly setId: string },
 ) {
+  // Leave room for the ten-second bridge deadline, including navigation.
+  const readDeadline = Date.now() + 8_000;
   const target =
     operation.kind === "questions.list"
       ? "https://dashboard.blooket.com/edit?id=" +
@@ -226,83 +222,10 @@ async function read(
   if (tab.status !== "complete" || (target && tab.url !== target))
     throw new Error("browser-navigation-timeout");
   if (operation.kind === "questions.list") {
-    const listed = await script(
-      current,
-      listBlooketQuestionNumbers as (...args: never[]) => unknown,
-      [operation.setId],
+    const host = createExtensionQuestionInspectionHost(
+      chrome, current.tabId, pause,
     );
-    if (
-      !listed ||
-      typeof listed !== "object" ||
-      !("ok" in listed) ||
-      listed.ok !== true ||
-      !("value" in listed) ||
-      !Array.isArray(listed.value) ||
-      listed.value.length > 200
-    )
-      throw new Error("browser-questions-unavailable");
-    const questions: unknown[] = [];
-    for (const number of listed.value) {
-      if (
-        typeof number !== "number" ||
-        !Number.isSafeInteger(number) ||
-        number < 1
-      )
-        throw new Error("browser-questions-unavailable");
-      const opened = await script(
-        current,
-        openBlooketQuestionPanel as (...args: never[]) => unknown,
-        [operation.setId, number],
-      );
-      if (opened !== true) throw new Error("browser-questions-unavailable");
-      let inspected: unknown;
-      let closed = false;
-      try {
-        for (let attempt = 0; attempt < 15; attempt++) {
-          inspected = await script(
-            current,
-            inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
-            [operation.setId, number],
-          );
-          if (
-            inspected &&
-            typeof inspected === "object" &&
-            "ok" in inspected &&
-            inspected.ok === true
-          )
-            break;
-          await pause(100);
-        }
-      } finally {
-        const cancel = await script(
-          current,
-          closeBlooketQuestionPanel,
-          [operation.setId],
-        ).catch(() => false);
-        if (cancel === true) {
-          for (let attempt = 0; attempt < 15; attempt++) {
-            closed = await script(
-              current,
-              isBlooketQuestionPanelClosed,
-              [operation.setId],
-            ).catch(() => false) === true;
-            if (closed) break;
-            await pause(50);
-          }
-        }
-      }
-      if (
-        !closed ||
-        !inspected ||
-        typeof inspected !== "object" ||
-        !("ok" in inspected) ||
-        inspected.ok !== true ||
-        !("value" in inspected)
-      )
-        throw new Error("browser-questions-unavailable");
-      questions.push(inspected.value);
-    }
-    return { ok: true, value: questions };
+    return await host.inspect(operation.setId, readDeadline);
   }
   if (operation.kind === "sets.get") {
     await script(
