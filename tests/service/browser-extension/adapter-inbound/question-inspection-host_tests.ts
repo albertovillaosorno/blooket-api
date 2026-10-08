@@ -59,6 +59,7 @@ interface Scenario {
   readonly listReplies?: readonly unknown[];
   readonly after?: unknown;
   readonly inspected?: unknown;
+  readonly inspectedReplies?: readonly unknown[];
   readonly opened?: unknown;
   readonly canceled?: unknown;
   readonly panelClosed?: unknown;
@@ -72,6 +73,7 @@ interface Scenario {
 function synthetic(options: Scenario = {}) {
   const calls: string[] = [];
   let enumerations = 0;
+  let inspections = 0;
   let tick = 0;
   let currentUrl = options.tabUrl ?? EDIT_URL;
   const port = {
@@ -116,9 +118,12 @@ function synthetic(options: Scenario = {}) {
         if (name === "inspectOpenedBlooketQuestion") {
           assert.ok([1, 2].includes(request.args?.[1] as number));
           if (options.inspectThrows) throw new Error("synthetic-script-failed");
+          inspections++;
           return [{
-            result: "inspected" in options
-              ? options.inspected : {
+            result: options.inspectedReplies
+              ? options.inspectedReplies[inspections - 1]
+              : "inspected" in options
+                ? options.inspected : {
                   ok: true,
                   value: { ...validQuestion, number: request.args?.[1] },
                 },
@@ -142,6 +147,7 @@ function synthetic(options: Scenario = {}) {
     host,
     calls,
     enumerations: () => enumerations,
+    inspections: () => inspections,
     tick: () => tick,
   };
 }
@@ -423,4 +429,38 @@ test("question-list hydration respects the shared read deadline", async () => {
   assert.deepEqual(await page.host.inspect(FIXTURE_SET, 150), failed);
   assert.equal(page.enumerations(), 2);
   assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
+});
+
+test("malformed successful modal data fails before any retry", async () => {
+  const malformed = [
+    { ok: true, value: { ...validQuestion, number: 2 } },
+    { ok: true, value: validQuestion, extra: "untrusted" },
+    { ok: true, value: { ...validQuestion, cookie: "private" } },
+    { ok: "true", value: validQuestion },
+  ];
+  for (const first of malformed) {
+    const fixture = synthetic({
+      inspectedReplies: [first, { ok: true, value: validQuestion }],
+    });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.inspections(), 1);
+    assert.ok(fixture.calls.includes("closeBlooketQuestionPanel"));
+    assert.equal(fixture.enumerations(), 1);
+  }
+});
+
+test("only a known page-unavailable modal reply can be retried", async () => {
+  const unavailable = { ok: false, code: "blooket-browser-failed" };
+  const fixture = synthetic({
+    inspectedReplies: [
+      unavailable, unavailable, { ok: true, value: validQuestion },
+    ],
+  });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
+    ok: true, value: [validQuestion],
+  });
+  assert.equal(fixture.inspections(), 3);
+  assert.equal(fixture.calls.filter(
+    (name) => name === "closeBlooketQuestionPanel",
+  ).length, 1);
 });

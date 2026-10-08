@@ -181,6 +181,7 @@ export function createExtensionQuestionInspectionHost(
           );
           if (opened !== true) return browserFailure();
           let decoded: BlooketQuestionRead | undefined;
+          let invalid = false;
           let closed = false;
           try {
             for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
@@ -189,14 +190,27 @@ export function createExtensionQuestionInspectionHost(
                 inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
                 [setId, number],
               );
+              // Only an exact page-unavailable reply can reflect hydration.
+              // Invalid successful data cannot be repaired by a later reply.
+              if (
+                inspected && typeof inspected === "object" &&
+                !Array.isArray(inspected) &&
+                Object.keys(inspected).sort().join() === "code,ok" &&
+                "ok" in inspected && inspected.ok === false &&
+                "code" in inspected &&
+                inspected.code === "blooket-browser-failed"
+              ) {
+                await pause(POLL_MS);
+                continue;
+              }
               decoded = decodeInspectedQuestion(inspected, number);
-              if (decoded) break;
-              await pause(POLL_MS);
+              if (!decoded) invalid = true;
+              break;
             }
           } finally {
             closed = await close(setId, url, deadline);
           }
-          if (!closed || !decoded) return browserFailure();
+          if (invalid || !closed || !decoded) return browserFailure();
           totalBytes += encoder.encode(JSON.stringify(decoded)).byteLength + 1;
           if (totalBytes > MAX_RESULT_BYTES) return browserFailure();
           questions.push(decoded);
