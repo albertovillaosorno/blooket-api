@@ -123,9 +123,11 @@ function fakeChrome(options: {
               },
             }];
           case "openBlooketQuestionPanel":
-            questionPanel = questionAdded && args?.[0] === 1;
+            questionPanel = questionAdded &&
+              args?.[0] === "set-fixture" && args?.[1] === 1;
             return [{ result: questionPanel }];
           case "inspectOpenedBlooketQuestion":
+            assert.deepEqual(args, ["set-fixture", 1]);
             return [{
               result: {
                 ok: true,
@@ -151,9 +153,11 @@ function fakeChrome(options: {
               },
             }];
           case "closeBlooketQuestionPanel":
+            assert.deepEqual(args, ["set-fixture"]);
             questionPanel = false;
             return [{ result: true }];
           case "isBlooketQuestionPanelClosed":
+            assert.deepEqual(args, ["set-fixture"]);
             return [{ result: !questionPanel }];
           default:
             throw new Error("unexpected-script:" + func.name);

@@ -252,7 +252,7 @@ async function read(
       const opened = await script(
         current,
         openBlooketQuestionPanel as (...args: never[]) => unknown,
-        [number],
+        [operation.setId, number],
       );
       if (opened !== true) throw new Error("browser-questions-unavailable");
       let inspected: unknown;
@@ -262,7 +262,7 @@ async function read(
           inspected = await script(
             current,
             inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
-            [number],
+            [operation.setId, number],
           );
           if (
             inspected &&
@@ -277,12 +277,14 @@ async function read(
         const cancel = await script(
           current,
           closeBlooketQuestionPanel,
+          [operation.setId],
         ).catch(() => false);
         if (cancel === true) {
           for (let attempt = 0; attempt < 15; attempt++) {
             closed = await script(
               current,
               isBlooketQuestionPanelClosed,
+              [operation.setId],
             ).catch(() => false) === true;
             if (closed) break;
             await pause(50);

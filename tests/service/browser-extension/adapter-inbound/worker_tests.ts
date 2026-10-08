@@ -107,8 +107,9 @@ test(
         if (func.name === "listBlooketQuestionNumbers")
           return [{ result: { ok: true, value: [1] } }];
         if (func.name === "openBlooketQuestionPanel")
-          return [{ result: args[0] === 1 }];
-        if (func.name === "inspectOpenedBlooketQuestion")
+          return [{ result: args[0] === "set-fixture" && args[1] === 1 }];
+        if (func.name === "inspectOpenedBlooketQuestion") {
+          assert.deepEqual(args, ["set-fixture", 1]);
           return [{
             result: {
               ok: true,
@@ -131,10 +132,15 @@ test(
               },
             },
           }];
-        if (func.name === "closeBlooketQuestionPanel")
+        }
+        if (func.name === "closeBlooketQuestionPanel") {
+          assert.deepEqual(args, ["set-fixture"]);
           return [{ result: questionPanelCloses }];
-        if (func.name === "isBlooketQuestionPanelClosed")
+        }
+        if (func.name === "isBlooketQuestionPanelClosed") {
+          assert.deepEqual(args, ["set-fixture"]);
           return [{ result: questionPanelCloses }];
+        }
         if (func.name === "runBlooketAddQuestionPageAction") {
           if (args[0] === "open") {
             assert.equal(args[1], "set-fixture");
