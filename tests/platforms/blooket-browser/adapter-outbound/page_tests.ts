@@ -411,6 +411,21 @@ test("set privacy comes from the recovered visible sibling paragraph", () => {
       kind: "sets.get", setId: "fixture",
     }).ok, false);
     toggleContainer.selectors[":scope > p"] = [state];
+    privacy.labels = [switchLabel, switchLabel];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    privacy.labels = [];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    privacy.labels = [switchLabel];
+    switchLabel.textContent = "Private (Only playable by you)";
+    toggleContainer.selectors[":scope > p"] = [];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    toggleContainer.selectors[":scope > p"] = [state];
     switchLabel.parentElement = undefined;
     assert.equal(inspectBlooketPage({
       kind: "sets.get", setId: "fixture",
