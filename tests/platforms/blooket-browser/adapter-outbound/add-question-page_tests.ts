@@ -421,6 +421,21 @@ test("ambiguous controls and invalid question semantics fail closed", () => {
 });
 
 
+test("hidden or disabled Add Question openers are not acknowledged", () => {
+  for (const reason of ["disabled", "aria", "hidden"] as const) {
+    const page = fixture();
+    if (reason === "disabled") page.add.disabled = true;
+    if (reason === "aria") page.add.attributes["aria-disabled"] = "true";
+    if (reason === "hidden")
+      page.add.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
+      assert.equal(page.add.clicked, 0);
+    });
+  }
+});
+
 test("two Add Question buttons resolve only the question-list toolbar", () => {
   const page = fixture();
   const toolbar = node("DIV");
