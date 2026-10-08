@@ -55,6 +55,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the synthetic Create Set Chrome host added a fresh tab-route
+check before navigation so an independently selected edit route is not
+overwritten. Exact Create-page checks now guard form preparation and submission;
+late preparation replies from another route fail rather than enabling a write.
+A claimed Edit-page redirect is also checked after its browser script completes
+before reporting its observed set ID. Three portable regressions reproduced the
+previous stale navigation, preparation, and redirect success paths. None of
+these tests performs a live Blooket mutation or verifies an HTTP action body.
+
 The current observed Blooket build is
 `4e10e84779aaa361fd4310c02366e37ebee7b60d`. Keep this evidence distinct from
 older captures in `reference/curated/`. Use the recovered references according

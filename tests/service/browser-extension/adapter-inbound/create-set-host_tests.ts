@@ -238,3 +238,67 @@ test("post-submit create page timeout never becomes success", async () => {
     code: "blooket-browser-failed",
   });
 });
+
+test(
+  "a page switch during prepare cannot authorize Create Set submission",
+  async () => {
+  const fake = fakeChrome({ afterUpdate: [{
+    url: "https://dashboard.blooket.com/create", status: "complete",
+  }], scripts: [createState, prepared] });
+  const host = createExtensionCreateSetHost(fake.chrome, 7, async () => {});
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async (request) => {
+    const result = await original(request);
+    fake.setTab({
+      url: "https://dashboard.blooket.com/my-sets", status: "complete",
+    });
+    return result;
+  };
+  const input = { title: "Synthetic", description: "", private: true };
+  assert.equal((await host.prepareCreateSet(input)).ok, false);
+  assert.equal((await host.submitCreateSet(input)).ok, false);
+  assert.equal(fake.calls.filter((call) => call === "script").length, 2);
+  },
+);
+
+test(
+  "an independently selected route is not overwritten by Create Set",
+  async () => {
+  const fake = fakeChrome({});
+  const get = fake.chrome.tabs.get;
+  let checks = 0;
+  fake.chrome.tabs.get = async (id) => {
+    if (++checks === 2) fake.setTab({
+      url: "https://dashboard.blooket.com/edit?id=user-selected",
+      status: "complete",
+    });
+    return await get(id);
+  };
+  const host = createExtensionCreateSetHost(fake.chrome, 7, async () => {});
+  assert.equal((await host.openCreateSet()).ok, false);
+  assert.equal(fake.calls.some((call) => call.startsWith("update:")), false);
+  },
+);
+
+test(
+  "a changed success tab cannot confirm Create Set publication",
+  async () => {
+  const fake = fakeChrome({ scripts: [observed] });
+  const host = createExtensionCreateSetHost(fake.chrome, 7, async () => {});
+  fake.setTab({
+    url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete",
+  });
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async (request) => {
+    const result = await original(request);
+    fake.setTab({
+      url: "https://dashboard.blooket.com/edit?id=user-selected",
+      status: "complete",
+    });
+    return result;
+  };
+  assert.equal((await host.observeCreateSet()).ok, false);
+  },
+);
