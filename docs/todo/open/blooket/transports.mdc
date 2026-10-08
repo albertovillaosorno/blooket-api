@@ -55,6 +55,17 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the Add Question read-back host began decoding complete
+question candidates through the versioned IR contract and requiring two
+matching observed values before confirming a submitted question. Malformed
+number lists and unexpected reply fields cannot authorize a read-back modal;
+uncertain or mismatched content triggers best-effort modal cancellation with
+no mutation replay.
+
+Synthetic tests confirm changing question contents, malformed envelopes, and
+cleanup after a mismatched read fail closed. These checks do not establish a
+live Blooket action response, authenticated persistence, or a remote receipt.
+
 On 2026-10-08, the Add Question Chrome host added exact edit-route ownership
 checks around its opener, readiness, preparation, one submit, and each later
 read-back script. A navigation between the initial tab check and requested
