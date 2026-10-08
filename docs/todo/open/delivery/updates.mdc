@@ -363,6 +363,42 @@ or a production trust root. A read-only repository configuration check returned
 no Actions secrets or variables; no signing credentials were provisioned or
 exposed.
 
+### Native Apple assessment adapter
+
+On 2026-10-08, a read-only native assessment adapter was added behind
+`update-signatures`. It admits the signed release context and a separately
+configured local Apple Team ID before invoking any native tool, and refuses
+unsupported hosts. Exact bundle identity, display/build version, minimum OS,
+the packaged ARM64 Node runtime, strict nested code verification, and a
+notarized Gatekeeper assessment are required.
+
+The codesign requirement binds the expected identifier, Apple trust chain,
+Developer ID Application certificate, and publisher Team ID. Ordinary Developer
+ID acceptance, a local Gatekeeper override, and ambiguous assessment sources
+cannot prove notarization. No quarantine removal, signing, extraction,
+installation, or launch occurs.
+
+The runtime architecture check reads only the fixed 32-byte thin ARM64 Mach-O
+header using Apple's [header layout][mach-header] and [CPU constants][mach-cpu].
+It rejects truncated, swapped-endian, universal, foreign-CPU, subtype, and
+non-executable headers without invoking an SDK tool or loading the runtime.
+Code signing and Gatekeeper remain separate mandatory assessments; this bounded
+header check is not a full Mach-O validator.
+
+Eight portable tests cover command order, foreign metadata/publishers,
+unsupported hosts, OS and architecture mismatches, symlinked staging, native
+failures, bounded diagnostics, timeout, and cancellation. They use ephemeral
+manifest keys, test-owned bundles, and command doubles; no real Apple command
+or signed Mac artifact was accepted on Linux.
+
+Apple's [code-signing guide][apple-signing] and
+[notarization diagnostics][apple-notarization], checked on 2026-10-08,
+support the native verification
+commands. Successful assessment still requires immutable authenticated staging
+and transactional installation. Production Apple Team ID/key provisioning,
+signed releases, safe extraction/replacement, and real Mac acceptance remain
+pending; this adapter is not exposed by UI or MCP.
+
 ## Blockers
 
 Lifecycle safety, production publisher keys/manifest publication, extraction,
@@ -374,3 +410,11 @@ native acceptance belong to task blooket-15.
 [api]: https://docs.github.com/en/rest/releases/releases
 [assets]: https://docs.github.com/en/rest/releases/assets
 [cdn]: https://docs.github.com/en/actions/reference/runners/larger-runners
+<!-- jig-ignore-next-line: Preserve the canonical Apple signing guide URL. -->
+[apple-signing]: https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html
+<!-- jig-ignore-next-line: Preserve the canonical Apple notarization URL. -->
+[apple-notarization]: https://developer.apple.com/documentation/security/resolving-common-notarization-issues
+<!-- jig-ignore-next-line: Preserve the canonical Apple Mach-O source URL. -->
+[mach-header]: https://github.com/apple-oss-distributions/xnu/blob/main/EXTERNAL_HEADERS/mach-o/loader.h
+<!-- jig-ignore-next-line: Preserve the canonical Apple CPU source URL. -->
+[mach-cpu]: https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/machine.h

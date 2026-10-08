@@ -73,6 +73,13 @@ size/hash, restricted redirects, cancellation, and partial cleanup. The product
 UI and MCP do not expose this adapter; real publisher-key provisioning, signed
 release metadata, Apple validation, and transactional installation are pending.
 
+The separate Apple assessment adapter admits the signed context and a local
+publisher Team ID, then checks bundle metadata, OS compatibility, the ARM64
+runtime, strict code signing, and notarized Gatekeeper acceptance. It runs
+read-only native tools with bounded output, cancellation, and a shared deadline.
+It neither extracts nor installs a bundle; portable command doubles do not
+establish native acceptance or a production publisher trust root.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and

@@ -131,6 +131,13 @@ archive with byte/hash
 checks. Both share anonymous restricted redirect transport and response cleanup.
 These primitives do not install, replace, restart, or establish Apple trust.
 
+The separate `update-signatures/adapter-outbound/apple.ts` adapter checks the
+signed release context, a local Apple publisher Team ID, exact bundle metadata,
+OS/runtime compatibility, strict code signing, and notarized Gatekeeper
+acceptance. Its portable command doubles pass; no real Mac artifact has been
+accepted. It requires private immutable staging and safe transactional
+installation, and is not connected to product installation controls.
+
 The update record owns extraction, native Apple verification, transactional
 replacement, restart, and rollback acceptance. Production publisher keys and
 signed manifest publication remain missing. The inspected repository Actions
