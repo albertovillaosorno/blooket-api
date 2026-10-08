@@ -60,6 +60,7 @@ interface FixtureNode {
   querySelector(selector: string): FixtureNode | null;
   querySelectorAll(selector: string): FixtureNode[];
   closest(selector: string): FixtureNode | null;
+  getBoundingClientRect(): { readonly width: number; readonly height: number };
   click(): void;
 }
 
@@ -84,6 +85,7 @@ function node(
     querySelectorAll(selector) {
       return this.selectors[selector] ?? [];
     },
+    getBoundingClientRect: () => ({ width: 24, height: 20 }),
     closest(selector) {
       let current: FixtureNode | undefined = this;
       while (current) {
@@ -148,6 +150,11 @@ function drawer(kind: "supported" | "unsupported") {
 }
 
 function withPage(document: FixtureNode, run: () => void): void {
+  document.selectors["main"] ??= [node("MAIN")];
+  document.selectors['nav a[href="/my-sets"]'] ??= [node("A", "My Sets")];
+  document.selectors['a[href="https://id.blooket.com/logout"]'] ??= [
+    node("A", "Logout"),
+  ];
   const priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   Object.defineProperty(globalThis, "document", {
@@ -344,3 +351,49 @@ test(
   });
   },
 );
+
+test("capability probes refuse a human prompt or missing session", () => {
+  for (const mode of [
+    "organization", "challenge", "password-overlay", "missing-shell",
+  ] as const) {
+    const page = fixture();
+    const activeDrawer = drawer("supported");
+    if (mode === "organization") {
+      page.document.selectors[
+        '[role="dialog"][aria-modal="true"] h3'
+      ] = [node("H3", "Select your organization")];
+    } else if (mode === "challenge") {
+      page.document.selectors[
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+      ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+    } else if (mode === "password-overlay") {
+      page.document.selectors['input[type="password"]'] = [node("INPUT")];
+    } else {
+      page.document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
+    }
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [
+        activeDrawer,
+      ];
+      assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+        false);
+      assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [];
+      assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      page.document.selectors['input#question[name="question"]'] = [];
+      assert.equal(isBlooketCapabilityQuestionPanelClosed(
+        "set-fixture",
+      ), false);
+      assert.equal(page.add.clicked, 0);
+      assert.equal(page.audio.clicked, 0);
+      assert.equal(page.cancel.clicked, 0);
+    });
+  }
+});

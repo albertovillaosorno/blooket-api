@@ -40,6 +40,30 @@ export type BlooketCapabilityPageResult =
 
 export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -67,6 +91,30 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
 
 export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -102,6 +150,30 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
 
 export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -151,6 +223,30 @@ export function inspectBlooketAudioCapabilityDrawer(
     code: "blooket-browser-failed",
   });
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return failed();
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -214,6 +310,30 @@ export function inspectBlooketAudioCapabilityDrawer(
 
 export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -257,6 +377,30 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
 
 export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const url = new URL(location.href);
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
@@ -292,6 +436,30 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
 
 export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -334,6 +502,30 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
 
 export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
   try {
+    // Independently enforce the session and human-stop boundary on this tab.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     const url = new URL(location.href);
     return (
       url.origin === "https://dashboard.blooket.com" &&
