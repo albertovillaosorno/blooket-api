@@ -254,7 +254,18 @@ The observed unchecked switch displays "Private (Only playable by you)".
 Recovered edit module 31017 establishes both exact visibility states: private
 renders with the inverted switch unchecked and "Private (Only playable by you)",
 while public renders with the switch checked and "Public (Playable by
-everyone)". The adapter requires the matching visible label and switch state.
+everyone)".
+
+The recovered toggle module 33069 nests its checkbox inside a `<label>`, while
+module 31017 renders the private/public description in the adjacent `<p>` of
+the toggle's wrapping `<div>`. The original portable fixture incorrectly put
+the description in `input.labels`, which need not contain that sibling text.
+
+The set-detail reader now requires one visible, direct sibling paragraph and
+matches its exact wording to the inverted `aria-checked` state. Ambiguous,
+hidden, missing, or contradictory state labels fail closed; no style class or
+provider media identity is inferred. Synthetic tests model the recovered DOM
+structure, but a verified authenticated edit-page read is still outstanding.
 
 Set-detail reads now also require the unique edit metadata form to contain one
 hidden `setId` input matching the exact requested opaque ID. Recovered build
