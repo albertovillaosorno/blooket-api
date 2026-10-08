@@ -336,6 +336,30 @@ export function blooketReadUrl(operation: PageReadOperation): string | null {
 
 // Opening an existing detail panel changes presentation without saving a set.
 export function openBlooketDetailPanel(setId: string): boolean {
+  // This opener executes separately from the guarded metadata read. A prior
+  // session observation cannot authorize a click behind a new human prompt.
+  const authenticated =
+    document.querySelector("main") !== null &&
+    document.querySelector('input[type="password"]') === null &&
+    document.querySelector('nav a[href="/my-sets"]') !== null &&
+    Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/logout"]',
+    )).filter((link) => link.textContent?.trim() === "Logout")
+      .length === 1;
+  const organizationPrompt = Array.from(document.querySelectorAll(
+    '[role="dialog"][aria-modal="true"] h3',
+  )).some((heading) => {
+    const bounds = heading.getBoundingClientRect();
+    return heading.textContent?.trim() === "Select your organization" &&
+      bounds.width > 0 && bounds.height > 0;
+  });
+  const securityChallenge = Array.from(document.querySelectorAll(
+    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+  )).some((frame) => {
+    const bounds = frame.getBoundingClientRect();
+    return bounds.width > 0 && bounds.height > 0;
+  });
+  if (!authenticated || organizationPrompt || securityChallenge) return false;
   if (
     location.origin !== "https://dashboard.blooket.com" ||
     location.pathname !== "/edit" ||
