@@ -296,6 +296,10 @@ Capability inspection cleanup now converts errors from post-close browser
 confirmation polls into stable failures, then continues the other cleanup
 and original-tab restoration. Synthetic Chrome exceptions verify that a
 failed capability probe cannot abandon the tab or return a snapshot.
+An empty My Sets probe can produce account-dependent capability evidence only
+when the source explicitly confirms a `complete` empty collection. An empty
+`unknown` list and duplicate set IDs are rejected before selecting a probe set
+or opening any Add Question controls.
 
 Portable capability inspection is now implemented behind the existing
 `capabilities.inspect` browser bridge command. The worker selects one already
