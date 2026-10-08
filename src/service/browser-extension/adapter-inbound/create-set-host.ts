@@ -191,9 +191,11 @@ export function createExtensionCreateSetHost(
           submitBlooketCreateSetForm as (...args: never[]) => unknown,
           [expected],
         );
-        // Submission may immediately redirect to /edit. A successful page
-        // click is only an acknowledgment; observeCreateSet owns confirmation.
-        return exactOk(result) ? { ok: true } : browserFailure();
+        // Submission may immediately redirect to /edit. An acknowledgment
+        // from an unrelated route cannot authorize subsequent read-back.
+        const after = await chrome.tabs.get(tabId);
+        return exactOk(result) && expectedSubmitRoute(after)
+          ? { ok: true } : browserFailure();
       } catch {
         return browserFailure();
       }
@@ -284,6 +286,16 @@ function dashboardTab(tab: BrowserTab): boolean {
   } catch {
     return false;
   }
+}
+
+function expectedSubmitRoute(tab: BrowserTab): boolean {
+  if (!tab.url || (tab.status !== "complete" && tab.status !== "loading"))
+    return false;
+  if (tab.url === CREATE_URL) return true;
+  const url = new URL(tab.url);
+  const ids = url.searchParams.getAll("id");
+  return url.origin === DASHBOARD_ORIGIN && url.pathname === "/edit" &&
+    ids.length === 1 && !!ids[0] && ids[0].length <= 512;
 }
 
 function exactRedirectReceipt(
