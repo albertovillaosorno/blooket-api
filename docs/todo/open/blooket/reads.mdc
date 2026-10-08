@@ -159,6 +159,25 @@ renders with the inverted switch unchecked and "Private (Only playable by you)",
 while public renders with the switch checked and "Public (Playable by
 everyone)". The adapter requires the matching visible label and switch state.
 
+Set-detail reads now also require the unique edit metadata form to contain one
+hidden `setId` input matching the exact requested opaque ID. Recovered build
+`86784c3d4c38fcd559c92f38fbadd7a160947de2` module 31017 renders this
+field inside `form#question-set-form`; dependency 89035 emits the hidden input.
+Both the primary create-page factory
+`e4c8222fbd38de2011af5d28071baeebbd3a4edbe1ffb4f328c42e4fae66c2ac`
+and edit-route variant
+`39d30f8edb4cb5d68177bb88384b9b96c33e51867925721bdf91f49d592b07bb`
+include the same `setId` field.
+
+The title and description inputs must be visibly open before the extractor
+returns set metadata. The read-only `Edit Info` opener checks hidden form
+identity even when the form has not become visible, then opens it only once.
+Worker retries respect that opener's boolean result and refuse to read after
+a rejected opener; no Save/submit action is invoked. Synthetic DOM and worker
+regressions cover wrong/duplicate form IDs and hidden metadata controls.
+
+This adds no claim of live provider acceptance or server-side atomicity.
+
 Recovered My Sets module 52644 and its captured route HTML establish the true
 empty-library state as "You'll need a question set to host!" plus the visible
 "Create a Set" action. The adapter returns an empty set list only with both

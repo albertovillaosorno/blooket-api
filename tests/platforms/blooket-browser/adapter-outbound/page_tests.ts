@@ -219,6 +219,11 @@ test(
   document.selectors['input#title[name="title"]'] = [title];
   document.selectors['textarea#desc[name="desc"]'] = [description];
   document.selectors['input#private[name="private"]'] = [privacy];
+  const form = node("FORM");
+  const identity = node("INPUT", "", { type: "hidden", name: "setId" });
+  identity.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  document.selectors['form#question-set-form'] = [form];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     const result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
     assert.equal(result.ok, true);
@@ -250,6 +255,23 @@ test(
       inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
       false,
     );
+    privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+    identity.value = "another";
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    identity.value = "fixture";
+    form.selectors['input[type="hidden"][name="setId"]'] = [
+      identity, node("INPUT"),
+    ];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+    title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
   });
 });
 
@@ -467,7 +489,22 @@ test("read routes encode IDs and panel opening never submits a form", () => {
     clicks++;
   };
   document.selectors["main button"] = [button];
+  const form = node("FORM");
+  const identity = node("INPUT", "", { type: "hidden", name: "setId" });
+  identity.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  document.selectors['form#question-set-form'] = [form];
+  const title = node("INPUT");
+  title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  document.selectors['input#title[name="title"]'] = [title];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(openBlooketDetailPanel("fixture"), true);
+    assert.equal(clicks, 1);
+    identity.value = "old-set";
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    assert.equal(clicks, 1);
+    identity.value = "fixture";
+    title.getBoundingClientRect = () => ({ width: 20, height: 20 });
     assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);
   });

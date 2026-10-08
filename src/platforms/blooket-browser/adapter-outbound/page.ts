@@ -237,6 +237,18 @@ export function inspectBlooketPage(
       url.searchParams.get("id") !== operation.setId
     )
       return failed();
+    const forms = Array.from(
+      document.querySelectorAll("form#question-set-form"),
+    );
+    if (forms.length !== 1) return failed();
+    const identities = Array.from(forms[0]!.querySelectorAll(
+      'input[type="hidden"][name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      (identities[0] as HTMLInputElement).value !== operation.setId
+    ) return failed();
     const title = document.querySelector('input#title[name="title"]');
     const description = document.querySelector('textarea#desc[name="desc"]');
     const privacy = document.querySelector('input#private[name="private"]');
@@ -245,7 +257,9 @@ export function inspectBlooketPage(
       description?.tagName !== "TEXTAREA" ||
       privacy?.tagName !== "INPUT" ||
       privacy.getAttribute("type") !== "checkbox" ||
-      privacy.getAttribute("role") !== "switch"
+      privacy.getAttribute("role") !== "switch" ||
+      !visible(title) ||
+      !visible(description)
     )
       return failed();
     const titleValue = (title as HTMLInputElement).value;
@@ -318,7 +332,23 @@ export function openBlooketDetailPanel(setId: string): boolean {
     new URL(location.href).searchParams.get("id") !== setId
   )
     return false;
-  if (document.querySelector('input#title[name="title"]')) return true;
+  const forms = Array.from(
+    document.querySelectorAll("form#question-set-form"),
+  );
+  if (forms.length !== 1) return false;
+  const identities = Array.from(forms[0]!.querySelectorAll(
+    'input[type="hidden"][name="setId"]',
+  ));
+  if (
+    identities.length !== 1 ||
+    identities[0]?.tagName !== "INPUT" ||
+    (identities[0] as HTMLInputElement).value !== setId
+  ) return false;
+  const title = document.querySelector('input#title[name="title"]');
+  if (title) {
+    const bounds = title.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0) return true;
+  }
   const buttons = Array.from(document.querySelectorAll("main button")).filter(
     (button) => button.textContent?.trim() === "Edit Info",
   );
