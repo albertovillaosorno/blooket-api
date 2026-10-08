@@ -286,3 +286,71 @@ test("exact payload and provider decoders guard canonical reads",
   const unavailable = await executeCommand(envelope("blooket.sets.list"));
   assert.equal(unavailable.ok, false);
 });
+
+test(
+  "canonical commands preserve human stops arising during browser probes",
+  async () => {
+    for (const command of [
+      "blooket.sets.list",
+      "blooket.sets.get",
+      "blooket.questions.list",
+      "blooket.capabilities.inspect",
+    ] as const) {
+      const fixture = dependencies("my-sets");
+      let observations = 0;
+      let probes = 0;
+      const stopped: BlooketReadDependencies = {
+        ...fixture.ports,
+        session: {
+          observe: async () => ({
+            ok: true as const,
+            state: (observations++ === 0
+              ? "my-sets" : "security-challenge") as const,
+          }),
+          authenticate: async () => {
+            throw new Error("unexpected-authentication");
+          },
+        },
+        sets: {
+          list: async () => {
+            probes++;
+            return { ok: false, code: "blooket-browser-failed" };
+          },
+          get: async () => {
+            probes++;
+            return { ok: false, code: "blooket-browser-failed" };
+          },
+        },
+        questions: {
+          list: async () => {
+            probes++;
+            return { ok: false, code: "blooket-browser-failed" };
+          },
+        },
+        capabilities: {
+          inspect: async () => {
+            probes++;
+            return { ok: false, code: "blooket-browser-failed" };
+          },
+        },
+      };
+      const payload = command.endsWith(".get") ||
+          command === "blooket.questions.list"
+        ? { setId: "fixture" }
+        : {};
+      const result = await executeCommand(
+        envelope(command, payload), undefined, stopped,
+      );
+      assert.equal(result.ok, true);
+      if (result.ok)
+        assert.deepEqual(result.value, {
+          ok: true,
+          kind: "human-action-required",
+          state: "security-challenge",
+        });
+      assert.equal(observations, 2);
+      assert.equal(probes, 1);
+      assert.equal(fixture.reads(), 0);
+    }
+  },
+);
