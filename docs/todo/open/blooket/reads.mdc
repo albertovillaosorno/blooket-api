@@ -293,12 +293,12 @@ Blooket's ordinary `/login` page mounts a visible reCAPTCHA anchor whose URL is
 explicitly `size=invisible`. Treating every visible reCAPTCHA iframe as an
 active challenge made the normal signed-out state unreachable.
 
-Session observation and credential-form admission now ignore only that exact
-invisible anchor while continuing to fail closed for malformed frames, hCaptcha,
-visible reCAPTCHA modes, and reCAPTCHA challenge frames. A second live run with
-the HEAD extension connected through the local broker classified the same real
-login page as `signed-out`. Credential submission and successful authenticated
-navigation remain separate acceptance work.
+Session observation and credential-form admission now ignore only the observed
+Google reCAPTCHA `/recaptcha/api2/anchor` with one `size=invisible` parameter.
+Malformed frames, foreign origins, duplicate parameters, hCaptcha, and challenge
+frames remain security stops. A second live run with the HEAD extension and
+local broker classified the real login page as `signed-out`. Credential
+submission and authenticated navigation remain separate acceptance work.
 
 A later synthetic acceptance harness mistakenly called
 `session.authenticate` with positional arguments instead of the required

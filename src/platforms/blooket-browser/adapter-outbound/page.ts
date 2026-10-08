@@ -63,7 +63,12 @@ export function inspectBlooketPage(
       if (source.includes("hcaptcha")) return true;
       try {
         const challengeUrl = new URL(source, location.href);
-        return challengeUrl.searchParams.get("size") !== "invisible";
+        return !(
+          challengeUrl.origin === "https://www.google.com" &&
+          challengeUrl.pathname === "/recaptcha/api2/anchor" &&
+          challengeUrl.searchParams.getAll("size").length === 1 &&
+          challengeUrl.searchParams.get("size") === "invisible"
+        );
       } catch {
         return true;
       }
