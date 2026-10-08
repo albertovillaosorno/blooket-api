@@ -55,6 +55,18 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, Create Set preparation and submission began requiring one
+unique form and one copy of each scoped title, description, and privacy
+control. Duplicate forms and values outside the intended form now fail
+before editing controls or clicking the submit button. The synthetic DOM
+fixture covers ambiguous forms and unscoped controls, not live creation.
+
+On 2026-10-08, Create Set redirect confirmation began requiring two
+identical decoded receipts from the same owned Edit URL, separated by a
+browser event-loop yield. Synthetic tests reject a missing second receipt,
+a changed payload, and a route change during confirmation without converting
+a one-off browser response into a publication receipt.
+
 On 2026-10-08, the local browser broker began reserving a write-dispatch
 margin for both Create Set and Add Question, matching the existing capability
 cleanup budget. Queued writes with less than 9.5 seconds left on the default
