@@ -138,6 +138,11 @@ export function prepareBlooketCreateSetForm(
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;
     const privacyInput = privacy as HTMLInputElement;
+    const privacyBounds = privacyInput.getBoundingClientRect();
+    if (privacyBounds.width <= 0 || privacyBounds.height <= 0 ||
+        privacyInput.disabled ||
+        privacyInput.getAttribute("aria-disabled") === "true")
+      return failed();
     const label = Array.from(privacyInput.labels ?? [])
       .map((item) => item.textContent ?? "")
       .join(" ");
@@ -256,6 +261,11 @@ export function submitBlooketCreateSetForm(
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;
     const privacyInput = privacy as HTMLInputElement;
+    const privacyBounds = privacyInput.getBoundingClientRect();
+    if (privacyBounds.width <= 0 || privacyBounds.height <= 0 ||
+        privacyInput.disabled ||
+        privacyInput.getAttribute("aria-disabled") === "true")
+      return failed();
     const label = Array.from(privacyInput.labels ?? [])
       .map((item) => item.textContent ?? "")
       .join(" ");
