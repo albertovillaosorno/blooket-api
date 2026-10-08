@@ -77,6 +77,7 @@ type SessionStop = Extract<
   }
 >;
 
+
 interface ReadySessionSummary {
   readonly state: "dashboard" | "my-sets" | "create" | "edit";
   readonly reused: boolean;
@@ -175,13 +176,7 @@ export async function listBlooketSets(
   }
 
   const probed = await safeListProbe(() => reads.list());
-  if (!probed.ok) {
-    return {
-      ok: false,
-      stage: "read",
-      code: probed.code,
-    };
-  }
+  if (!probed.ok) return await classifyFailedRead(browser, probed.code);
 
   if (
     probed.completeness !== "complete"
@@ -235,13 +230,7 @@ export async function getBlooketSet(
   }
 
   const probed = await safeProbe(() => reads.get(decodedId.value));
-  if (!probed.ok) {
-    return {
-      ok: false,
-      stage: "read",
-      code: probed.code,
-    };
-  }
+  if (!probed.ok) return await classifyFailedRead(browser, probed.code);
 
   const decoded = decodeBlooketSetDetail(probed.value);
   if (!decoded.ok) {
@@ -294,13 +283,7 @@ export async function listBlooketQuestions(
   }
 
   const probed = await safeQuestionProbe(() => reads.list(decodedId.value));
-  if (!probed.ok) {
-    return {
-      ok: false,
-      stage: "read",
-      code: probed.code,
-    };
-  }
+  if (!probed.ok) return await classifyFailedRead(browser, probed.code);
 
   const decoded = decodeBlooketQuestionReadList(probed.value);
   if (!decoded.ok) {
@@ -346,6 +329,27 @@ async function ensureReadySession(
     };
   }
   return session;
+}
+
+// An authenticated page can be replaced by a human prompt during a read.
+// Re-observe without credentials or login attempts only after a page failure.
+// Unknown follow-up state preserves the original transport failure.
+async function classifyFailedRead(
+  browser: BlooketBrowserSessionPort,
+  code: BlooketBrowserFailureCode,
+): Promise<SessionStop | Extract<
+  ReadFailure, { readonly stage: "session" | "read" }
+>> {
+  if (code === "blooket-browser-failed") {
+    const observed = await inspectReadyBlooketSession(browser);
+    if (observed.ok &&
+        (observed.kind === "wait" ||
+          observed.kind === "human-action-required"))
+      return observed;
+    if (!observed.ok && observed.code === "blooket-authentication-required")
+      return { ok: false, stage: "session", code: observed.code };
+  }
+  return { ok: false, stage: "read", code };
 }
 
 async function safeListProbe(
