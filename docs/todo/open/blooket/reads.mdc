@@ -421,6 +421,16 @@ and route-free session observation use the same admission helper. Synthetic
 clock tests cover loaded/loading tabs, stale routes, and browser-call latency;
 this does not promise a hung browser API will resolve before its own timeout.
 
+Before requesting a tab navigation, the read worker now obtains one fresh
+Chrome tab observation and compares its URL to the previous owned route. A
+manually selected different route is not overwritten, and an already reached
+target is not navigated again. If the preflight read exceeds the shared
+navigation deadline, the worker does not request an update.
+
+Synthetic tests cover same-origin manual routes, independently reached targets,
+and late preflight responses. This best-effort ownership check does not prove
+atomicity between separate Chrome API calls.
+
 Still pending: non-empty server-side set-list completeness; live browser
 acceptance of capability inspection, credential submission, and successful
 authenticated navigation; complete question-level media

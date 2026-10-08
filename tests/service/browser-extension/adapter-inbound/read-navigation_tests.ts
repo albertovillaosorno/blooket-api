@@ -89,14 +89,14 @@ test("an already loaded route needs no navigation", async () => {
 });
 
 test("an exact route is confirmed only after loading completes", async () => {
-  const page = fixture({ statuses: ["loading", "complete"] });
+  const page = fixture({ statuses: ["complete", "loading", "complete"] });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, EDIT, 8_000,
     page.pause, page.now,
   );
   assert.deepEqual(result, { url: EDIT, status: "complete" });
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 2);
+  assert.equal(page.gets(), 3);
   assert.equal(page.elapsed(), 100);
 });
 
@@ -109,7 +109,7 @@ test("a late Chrome update never gains a new five-second window", async () => {
   assert.equal(result, undefined);
   assert.equal(page.elapsed(), 7_900);
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 0);
+  assert.equal(page.gets(), 1);
 });
 
 test("the shared deadline wins over the local navigation window", async () => {
@@ -121,7 +121,7 @@ test("the shared deadline wins over the local navigation window", async () => {
   assert.equal(result, undefined);
   assert.equal(page.elapsed(), 250);
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 3);
+  assert.equal(page.gets(), 4);
 });
 
 test("a late completed tabs.get reply does not prove navigation", async () => {
@@ -154,6 +154,42 @@ test("session observation does not navigate when no route is required",
     page.pause, page.now,
   );
   assert.deepEqual(result, { url: SETS, status: "complete" });
+  assert.equal(page.updates(), 0);
+  },
+);
+
+test("a stale tab snapshot must not overwrite manual navigation", async () => {
+  const manuallySelected = "https://dashboard.blooket.com/create";
+  const page = fixture({ initialUrl: manuallySelected });
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, { url: SETS, status: "complete" }, EDIT, 8_000,
+    page.pause, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.updates(), 0);
+  assert.equal(page.gets(), 1);
+});
+
+test("an independently reached target needs no duplicate update", async () => {
+  const page = fixture({ initialUrl: EDIT });
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, { url: SETS, status: "complete" }, EDIT, 8_000,
+    page.pause, page.now,
+  );
+  assert.deepEqual(result, { url: EDIT, status: "complete" });
+  assert.equal(page.updates(), 0);
+});
+
+test(
+  "an overdue pre-navigation tab check cannot start navigation",
+  async () => {
+  const page = fixture({ readLatency: 500 });
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 250,
+    page.pause, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.elapsed(), 500);
   assert.equal(page.updates(), 0);
   },
 );

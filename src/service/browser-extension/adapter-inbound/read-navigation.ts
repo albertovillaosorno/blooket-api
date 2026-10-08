@@ -54,8 +54,16 @@ export async function confirmBlooketReadNavigation(
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (now() >= deadline) return undefined;
   if (target && previous.url !== target) {
-    await tabs.update(tabId, { url: target });
-    if (now() >= deadline) return undefined;
+    // The caller's previous tab snapshot may be obsolete if the user moved.
+    // Re-check its exact route before allowing a navigation request.
+    const current = await tabs.get(tabId);
+    if (now() >= deadline ||
+        (current.url !== previous.url && current.url !== target))
+      return undefined;
+    if (current.url !== target) {
+      await tabs.update(tabId, { url: target });
+      if (now() >= deadline) return undefined;
+    }
   }
   while (now() < deadline) {
     const tab = await tabs.get(tabId);
