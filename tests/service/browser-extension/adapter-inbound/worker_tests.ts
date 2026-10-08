@@ -39,7 +39,7 @@ test(
   async () => {
   const root = "chrome-extension://synthetic/";
   const origin = "http://127.0.0.1:4567";
-  const token = "a".repeat(43);
+  let token = "a".repeat(43);
   let listener;
   let tabUrl = "https://dashboard.blooket.com/my-sets";
   let creates = 0;
@@ -65,6 +65,24 @@ test(
   let addQuestionPanelReady = false;
   let capabilityPanelReady = false;
   let capabilityDrawerOpen = false;
+  let holdWriteOpen = false;
+  let holdReadScript = false;
+  let reportReadScript!: () => void;
+  let releaseReadScript!: () => void;
+  const readScriptStarted = new Promise<void>((resolve) => {
+    reportReadScript = resolve;
+  });
+  const readScriptRelease = new Promise<void>((resolve) => {
+    releaseReadScript = resolve;
+  });
+  let reportWriteOpen!: () => void;
+  let releaseWriteOpen!: () => void;
+  const writeOpenStarted = new Promise<void>((resolve) => {
+    reportWriteOpen = resolve;
+  });
+  const writeOpenRelease = new Promise<void>((resolve) => {
+    releaseWriteOpen = resolve;
+  });
   const jobs = [];
   const replies = [];
   const scripts = [];
@@ -168,6 +186,11 @@ test(
           if (args[0] === "open") {
             assert.equal(args[1], "set-fixture");
             addQuestionPanelReady = true;
+            if (holdWriteOpen) {
+              holdWriteOpen = false;
+              reportWriteOpen();
+              await writeOpenRelease;
+            }
             return [{ result: true }];
           }
           if (args[0] === "is-ready")
@@ -285,6 +308,11 @@ test(
         }
         if (operation.kind === "sets.list") {
           setListReads++;
+          if (holdReadScript) {
+            holdReadScript = false;
+            reportReadScript();
+            await readScriptRelease;
+          }
           if (listFailuresRemaining > 0) {
             listFailuresRemaining--;
             return [{ result: {
@@ -710,7 +738,51 @@ test(
       (await message({ kind: "status" })).status,
       "blooket-attention-required",
     );
+    // A workspace may reconnect while an older write host is awaiting a
+    // browser reply. That retired relay must not submit the rest of the form.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    holdWriteOpen = true;
+    const staleJob = job({
+      kind: "questions.create",
+      setId: "set-fixture",
+      number: 1,
+      question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing",
+      random: true,
+      answerTypes: ["exactly"],
+      timeLimit: 15,
+    });
+    const beforeRetiredWrite = scripts.length;
+    jobs.push(staleJob);
+    await writeOpenStarted;
+    const nextToken = "b".repeat(43);
+    token = nextToken;
+    assert.equal((await announce({ origin, token: nextToken })).ok, true);
+    releaseWriteOpen();
+    await pause(200);
+    assert.deepEqual(scripts.slice(beforeRetiredWrite).filter(
+      (name) => name === "runBlooketAddQuestionPageAction",
+    ), ["runBlooketAddQuestionPageAction"]);
+    assert.equal(replies.some((reply) => reply.id === staleJob.id), false);
+    tabUrl = "https://dashboard.blooket.com/my-sets";
+    holdReadScript = true;
+    const staleReadJob = job({ kind: "sets.list" });
+    const beforeRetiredRead = scripts.length;
+    jobs.push(staleReadJob);
+    await readScriptStarted;
+    const thirdToken = "c".repeat(43);
+    token = thirdToken;
+    assert.equal((await announce({ origin, token: thirdToken })).ok, true);
+    releaseReadScript();
+    await pause(200);
+    assert.deepEqual(scripts.slice(beforeRetiredRead).filter(
+      (name) => name === "inspectBlooketPage",
+    ), ["inspectBlooketPage"]);
+    assert.equal(replies.some((reply) => reply.id === staleReadJob.id), false);
   } finally {
+    releaseReadScript();
+    releaseWriteOpen();
     closed = true;
     await pause(1100);
     assert.deepEqual(stored, {});

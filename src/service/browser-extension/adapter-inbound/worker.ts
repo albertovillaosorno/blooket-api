@@ -180,17 +180,22 @@ async function script(
   func: (...args: never[]) => unknown,
   args: unknown[] = [],
 ) {
+  if (connection !== current)
+    throw new Error("retired-browser-connection");
   const replies = await chrome.scripting.executeScript({
     target: { tabId: current.tabId },
     func,
     args,
   });
+  if (connection !== current)
+    throw new Error("retired-browser-connection");
   if (replies.length !== 1 || replies[0]?.result === undefined)
     throw new Error("browser-read-unavailable");
   return replies[0].result;
 }
 async function read(
   current: Connection,
+  browser: ReturnType<typeof ownedBrowser>,
   operation:
     | PageReadOperation
     | { readonly kind: "questions.list"; readonly setId: string },
@@ -202,7 +207,7 @@ async function read(
       ? "https://dashboard.blooket.com/edit?id=" +
         encodeURIComponent(operation.setId)
       : blooketReadUrl(operation);
-  let tab = await chrome.tabs.get(current.tabId);
+  let tab = await browser.tabs.get(current.tabId);
   if (!tab.url) throw new Error("manual-blooket-sign-in-required");
   const origin = new URL(tab.url).origin;
   if (
@@ -213,13 +218,13 @@ async function read(
   )
     throw new Error("manual-blooket-sign-in-required");
   const confirmed = await confirmBlooketReadNavigation(
-    chrome.tabs, current.tabId, tab, target, readDeadline, pause,
+    browser.tabs, current.tabId, tab, target, readDeadline, pause,
   );
   if (!confirmed) throw new Error("browser-navigation-timeout");
   tab = confirmed;
   if (operation.kind === "questions.list") {
     const host = createExtensionQuestionInspectionHost(
-      chrome, current.tabId, pause,
+      browser, current.tabId, pause,
     );
     return await host.inspect(operation.setId, readDeadline);
   }
@@ -229,7 +234,7 @@ async function read(
     // React can hydrate after the document reaches the complete state.
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
       attempt++) {
-      const currentTab = await chrome.tabs.get(current.tabId);
+      const currentTab = await browser.tabs.get(current.tabId);
       if (currentTab.status !== "complete" || currentTab.url !== target)
         throw new Error("browser-set-list-unavailable");
       const result = await script(
@@ -274,7 +279,7 @@ async function read(
     await pause(100);
     if (Date.now() >= readDeadline)
       throw new Error("browser-set-list-unavailable");
-    const tabAfter = await chrome.tabs.get(current.tabId);
+    const tabAfter = await browser.tabs.get(current.tabId);
     if (tabAfter.status !== "complete" || tabAfter.url !== target)
       throw new Error("browser-set-list-unavailable");
     const after = await script(
@@ -286,7 +291,7 @@ async function read(
       Date.now() >= readDeadline ||
       JSON.stringify(initial) !== JSON.stringify(after)
     ) throw new Error("browser-set-list-unavailable");
-    const checkedTab = await chrome.tabs.get(current.tabId);
+    const checkedTab = await browser.tabs.get(current.tabId);
     if (checkedTab.status !== "complete" || checkedTab.url !== target)
       throw new Error("browser-set-list-unavailable");
     return initial;
@@ -295,7 +300,7 @@ async function read(
     // The Edit Info opener is a click, not a pure read. Do not continue
     // interacting with the tab after the teacher selects another route.
     const ownsDetailRoute = async () => {
-      const observed = await chrome.tabs.get(current.tabId);
+      const observed = await browser.tabs.get(current.tabId);
       return Date.now() < readDeadline &&
         observed.status === "complete" && observed.url === target;
     };
@@ -338,7 +343,7 @@ async function read(
       ) {
         if (Date.now() >= readDeadline)
           throw new Error("browser-details-unavailable");
-        const confirmed = await chrome.tabs.get(current.tabId);
+        const confirmed = await browser.tabs.get(current.tabId);
         if (confirmed.status !== "complete" || confirmed.url !== target)
           throw new Error("browser-details-unavailable");
         // A freshly opened metadata panel can still hydrate asynchronously.
@@ -352,7 +357,7 @@ async function read(
         );
         if (JSON.stringify(result) !== JSON.stringify(again))
           throw new Error("browser-details-unavailable");
-        const after = await chrome.tabs.get(current.tabId);
+        const after = await browser.tabs.get(current.tabId);
         if (
           Date.now() >= readDeadline || after.status !== "complete" ||
           after.url !== target
@@ -377,7 +382,7 @@ async function read(
   if (operation.kind === "session.observe") {
     // A result from a tab that navigated while the script ran cannot prove
     // the current authentication state, regardless of which state it claimed.
-    const currentTab = await chrome.tabs.get(current.tabId);
+    const currentTab = await browser.tabs.get(current.tabId);
     if (
       Date.now() >= readDeadline ||
       currentTab.status !== "complete" ||
@@ -388,7 +393,7 @@ async function read(
     await pause(100);
     if (Date.now() >= readDeadline)
       throw new Error("browser-session-changed");
-    const beforeAgain = await chrome.tabs.get(current.tabId);
+    const beforeAgain = await browser.tabs.get(current.tabId);
     if (beforeAgain.status !== "complete" || beforeAgain.url !== tab.url)
       throw new Error("browser-session-changed");
     const again = await script(
@@ -396,7 +401,7 @@ async function read(
       inspectBlooketPage as (...args: never[]) => unknown,
       [operation],
     );
-    const afterAgain = await chrome.tabs.get(current.tabId);
+    const afterAgain = await browser.tabs.get(current.tabId);
     if (
       Date.now() >= readDeadline ||
       afterAgain.status !== "complete" ||
@@ -406,18 +411,59 @@ async function read(
   }
   return observed;
 }
+function ownedBrowser(current: Connection, activeGeneration: number) {
+  const requireOwner = () => {
+    if (connection !== current || generation !== activeGeneration)
+      throw new Error("retired-browser-connection");
+  };
+  return {
+    tabs: {
+      get: async (id: number) => {
+        requireOwner();
+        const result = await chrome.tabs.get(id);
+        requireOwner();
+        return result;
+      },
+      update: async (
+        id: number,
+        options: { url?: string; active?: boolean },
+      ) => {
+        requireOwner();
+        const result = await chrome.tabs.update(id, options);
+        requireOwner();
+        return result;
+      },
+    },
+    scripting: {
+      executeScript: async (
+        options: Parameters<typeof chrome.scripting.executeScript>[0],
+      ) => {
+        requireOwner();
+        const result = await chrome.scripting.executeScript(options);
+        requireOwner();
+        return result;
+      },
+    },
+  };
+}
+
 async function relay(current: Connection, activeGeneration: number) {
-  while (connection === current && generation === activeGeneration) {
+  const browser = ownedBrowser(current, activeGeneration);
+  const isOwner = () => connection === current &&
+    generation === activeGeneration;
+  while (isOwner()) {
     try {
       // A browser API call also keeps an explicitly connected worker alive.
       try {
-        await chrome.tabs.get(current.tabId);
+        await browser.tabs.get(current.tabId);
       } catch {
+        if (!isOwner()) return;
         await disconnect();
         status = "waiting-for-workspace";
         return;
       }
       const next = await bridgeFetch(current, "/api/browser-bridge/next");
+      if (!isOwner()) return;
       if (!next || typeof next !== "object" || !("job" in next))
         throw new Error("invalid-bridge-poll");
       if (next.job !== null) {
@@ -432,10 +478,10 @@ async function relay(current: Connection, activeGeneration: number) {
             job.command.kind === "sets.get" ||
             job.command.kind === "questions.list"
           ) {
-            result = await read(current, job.command);
+            result = await read(current, browser, job.command);
           } else if (job.command.kind === "session.authenticate") {
             const host = createExtensionSessionAuthenticationHost(
-              chrome,
+              browser,
               current.tabId,
               pause,
             );
@@ -445,14 +491,14 @@ async function relay(current: Connection, activeGeneration: number) {
             });
           } else if (job.command.kind === "capabilities.inspect") {
             const host = createExtensionCapabilityInspectionHost(
-              chrome,
+              browser,
               current.tabId,
               pause,
             );
             result = await host.inspect();
           } else if (job.command.kind === "sets.create") {
             const host = createExtensionCreateSetHost(
-              chrome,
+              browser,
               current.tabId,
               pause,
             );
@@ -480,7 +526,7 @@ async function relay(current: Connection, activeGeneration: number) {
             }
           } else if (job.command.kind === "questions.create") {
             const host = createExtensionAddQuestionHost(
-              chrome,
+              browser,
               current.tabId,
               pause,
             );
@@ -499,11 +545,11 @@ async function relay(current: Connection, activeGeneration: number) {
             };
           }
         } catch {
-          if (generation !== activeGeneration) return;
+          if (!isOwner()) return;
           status = "blooket-attention-required";
         }
         // An old relay cannot change the new connection's popup status.
-        if (generation !== activeGeneration) return;
+        if (!isOwner()) return;
         // Popup status tracks the last *confirmed* session observation.
         // Successful form submission never implies authenticated readiness.
         if (
@@ -532,6 +578,7 @@ async function relay(current: Connection, activeGeneration: number) {
       }
       if (status === "connection-unavailable") status = "connected";
     } catch {
+      if (!isOwner()) return;
       status = "connection-unavailable";
     }
     await pause(1000);
