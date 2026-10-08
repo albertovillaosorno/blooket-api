@@ -304,13 +304,17 @@ export function createExtensionCapabilityInspectionHost(
         };
         if (!canClean && (panelOpened || drawerOpened))
           outcome = browserFailure();
+        let drawerCleaned = !drawerOpened;
         if (canClean && setId !== undefined && drawerOpened) {
-          const cleaned = await closeDrawer(
+          drawerCleaned = await closeDrawer(
             cleanupScript, setId, pause, finishDeadline, now,
           );
-          if (!cleaned) outcome = browserFailure();
+          if (!drawerCleaned) outcome = browserFailure();
         }
-        if (canClean && setId !== undefined && panelOpened) {
+        // A still-open Audio drawer may obscure the parent's Cancel button.
+        // Never interact with the underlying question form unless the child
+        // has been independently confirmed closed.
+        if (canClean && drawerCleaned && setId !== undefined && panelOpened) {
           const cleaned = await closeQuestionPanel(
             cleanupScript, setId, pause, finishDeadline, now,
           );

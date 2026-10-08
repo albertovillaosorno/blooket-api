@@ -276,6 +276,22 @@ test(
   },
 );
 
+test(
+  "failed Audio drawer cleanup never clicks the underlying question modal",
+  async () => {
+  const page = fixture({ cleanupFails: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
+  assert.equal(page.scripts.includes(
+    "closeBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
 test("restoration failure invalidates an otherwise clean probe", async () => {
   const page = fixture({ restoreFails: true });
   const result = await createExtensionCapabilityInspectionHost(
@@ -317,7 +333,11 @@ test("cleanup polling exceptions still restore the original tab", async () => {
       ok: false, code: "blooket-browser-failed",
     });
     assert.equal(page.currentUrl(), page.originalUrl);
-    assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+    // If Audio closure could not be verified, do not click through its
+    // overlay. A failure at the parent modal still permits its own cleanup.
+    assert.equal(page.scripts.includes(
+      "closeBlooketCapabilityQuestionPanel",
+    ), cleanupPollThrows === "question");
   }
 });
 
