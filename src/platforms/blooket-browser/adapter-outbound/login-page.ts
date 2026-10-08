@@ -123,6 +123,13 @@ export function runBlooketLoginPageAction(
       submits[0]?.tagName !== "BUTTON"
     )
       return null;
+    // A blocked or read-only identity field cannot admit a credential fill.
+    // The submit button can legitimately start disabled until values change.
+    for (const field of [identifiers[0]!, passwords[0]!]) {
+      const control = field as HTMLInputElement;
+      if (control.disabled || control.readOnly ||
+          control.getAttribute("aria-disabled") === "true") return null;
+    }
     return {
       identifier: identifiers[0] as HTMLInputElement,
       password: passwords[0] as HTMLInputElement,
@@ -156,7 +163,8 @@ export function runBlooketLoginPageAction(
     const prepared =
       page.identifier.value === input.loginIdentifier &&
       page.password.value === input.password &&
-      !page.submit.disabled;
+      !page.submit.disabled &&
+      page.submit.getAttribute("aria-disabled") !== "true";
     if (action === "is-prepared") return prepared;
     if (!prepared) return failed();
     page.submit.click();

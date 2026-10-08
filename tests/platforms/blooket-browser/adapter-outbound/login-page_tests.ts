@@ -205,6 +205,48 @@ test("login submit revalidates values and clicks exactly once", () => {
   });
 });
 
+test("blocked login inputs are never filled with credentials", () => {
+  for (const state of ["disabled", "readonly", "aria-disabled"] as const) {
+    for (const name of ["identifier", "password"] as const) {
+      const page = fixture();
+      const field = page[name];
+      if (state === "disabled") field.disabled = true;
+      if (state === "readonly")
+        (field as FixtureNode & { readOnly?: boolean }).readOnly = true;
+      if (state === "aria-disabled")
+        field.getAttribute = (key) =>
+          key === "aria-disabled" ? "true" : null;
+      withPage(page.document, "https://id.blooket.com/login", () => {
+        assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+        assert.equal(isBlooketLoginFormPrepared(credentials), false);
+        assert.equal(submitBlooketLoginForm(credentials).ok, false);
+        assert.equal(page.identifier.value, "");
+        assert.equal(page.password.value, "");
+        assert.equal(page.submit.clicked, 0);
+      });
+    }
+  }
+});
+
+test("disabled login submit does not claim successful authentication", () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.equal(prepareBlooketLoginForm(credentials).ok, true);
+    page.submit.disabled = true;
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    page.submit.disabled = false;
+    page.submit.getAttribute = (name) =>
+      name === "aria-disabled" ? "true" : null;
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+    page.submit.getAttribute = () => null;
+    assert.equal(submitBlooketLoginForm(credentials).ok, true);
+    assert.equal(page.submit.clicked, 1);
+  });
+});
+
 test("normal invisible reCAPTCHA does not block the login form", () => {
   const page = fixture();
   page.document.selectors[
