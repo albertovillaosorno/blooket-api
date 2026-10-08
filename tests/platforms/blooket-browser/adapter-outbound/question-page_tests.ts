@@ -454,10 +454,9 @@ test(
     document.selectors["button"] = [add, add];
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
     document.selectors["button"] = [add];
-    assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
-      ok: true,
-      value: [],
-    });
+    // Add Question is rendered even when cards exist. Its presence alone
+    // cannot distinguish a genuinely empty set from incomplete hydration.
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
   });
   },
 );

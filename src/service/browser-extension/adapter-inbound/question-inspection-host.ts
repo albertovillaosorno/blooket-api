@@ -125,6 +125,7 @@ export function createExtensionQuestionInspectionHost(
           Object.keys(result).sort().join() !== "ok,value" ||
           !("ok" in result) || result.ok !== true ||
           !("value" in result) || !Array.isArray(result.value) ||
+          result.value.length === 0 ||
           result.value.length > MAX_QUESTIONS)
         return undefined;
       const seen = new Set<number>();
@@ -235,9 +236,6 @@ export function createExtensionQuestionInspectionHost(
           if (totalBytes > MAX_RESULT_BYTES) return browserFailure();
           questions.push(decoded);
         }
-        // A transient zero can precede a hydrated question list. Compare only
-        // after another event-loop opportunity. Server completeness is unknown.
-        if (numbers.length === 0) await pause(POLL_MS);
         const after = await enumerate(setId, url, deadline);
         if (!after || after.length !== numbers.length ||
             after.some((number, index) => number !== numbers[index]))

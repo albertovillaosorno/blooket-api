@@ -80,14 +80,10 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     const selector =
       '[role="button"]' + '[aria-label^="Edit question "]';
     const controls = Array.from(document.querySelectorAll(selector));
-    if (controls.length > 200) return failed();
-    if (controls.length === 0) {
-      const addButtons = Array.from(document.querySelectorAll("button"))
-        .filter((button) => button.textContent?.trim() === "Add Question");
-      if (addButtons.length !== 1) return failed();
-      const bounds = addButtons[0]!.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0) return failed();
-    }
+    // The recovered edit page always renders Add Question, including when
+    // questions exist. Its presence is not proof of an empty collection.
+    // Without an independent empty-state marker a zero-row read is unknown.
+    if (controls.length === 0 || controls.length > 200) return failed();
     const numbers: number[] = [];
     const seen = new Set<number>();
     for (const control of controls) {
