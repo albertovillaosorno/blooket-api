@@ -324,3 +324,22 @@ test(
   }
   },
 );
+
+test("malformed capability probe envelopes never expose data", async () => {
+  for (const invalid of [
+    { ok: false, code: "private-code", raw: "private-data" },
+    { ok: false, code: "blooket-browser-failed", extra: "private-data" },
+    { ok: true, value: capabilities, extra: "private-data" },
+    { ok: "true", value: capabilities },
+    null,
+  ]) {
+    const result = await inspectBlooketCapabilities(
+      browser([{ ok: true, state: "dashboard" }], []),
+      secretStore([]),
+      capabilityProbe(invalid as BlooketCapabilityProbeResult, []),
+    );
+    assert.deepEqual(result, {
+      ok: false, stage: "inspection", code: "blooket-browser-failed",
+    });
+  }
+});

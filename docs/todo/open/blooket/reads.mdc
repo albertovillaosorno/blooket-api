@@ -228,6 +228,11 @@ task 08 and publication tasks 09-12. Portable doubles are not browser
 acceptance, and no live login, question read-back, or capability probe is
 claimed.
 
+The authenticated capability inspection application likewise checks the
+exact probe result envelope before decoding any account evidence. Unknown
+failure codes and unexpected fields become stable browser failures instead
+of a successful capability result or a leaked diagnostic.
+
 The local bridge adapter independently checks the exact transport response
 envelope before returning session, capability, set, question, or write data.
 Invalid runtime success and failure shapes become a stable browser failure;
