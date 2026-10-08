@@ -337,3 +337,87 @@ test(
   broker.close();
   },
 );
+
+test("concurrent polls cannot dispatch two browser jobs at once", async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  const first = broker.request({ kind: "session.observe" });
+  const second = broker.request({ kind: "sets.list" });
+  const active = broker.next(TOKEN);
+  assert.ok(active);
+  assert.equal(active.command.kind, "session.observe");
+  assert.equal(broker.next(TOKEN), null);
+  assert.equal(broker.status().pending, 2);
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: active.id,
+    ok: true, value: "my-sets",
+  }), true);
+  assert.deepEqual(await first, { ok: true, value: "my-sets" });
+  const next = broker.next(TOKEN);
+  assert.ok(next);
+  assert.equal(next.command.kind, "sets.list");
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: next.id,
+    ok: true, value: { completeness: "complete", items: [] },
+  }), true);
+  assert.deepEqual(await second, {
+    ok: true, value: { completeness: "complete", items: [] },
+  });
+  broker.close();
+});
+
+test(
+  "a timed-out active lease frees the next queued browser read",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN, now: () => tick,
+  });
+  const first = broker.request({ kind: "session.observe" });
+  const active = broker.next(TOKEN);
+  assert.ok(active);
+  tick += 8_000;
+  const second = broker.request({ kind: "sets.list" });
+  assert.equal(broker.next(TOKEN), null);
+  tick += 2_100;
+  const next = broker.next(TOKEN);
+  assert.ok(next);
+  assert.equal(next.command.kind, "sets.list");
+  assert.deepEqual(await first, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: active.id,
+    ok: true, value: "my-sets",
+  }), false);
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: next.id,
+    ok: true, value: { completeness: "complete", items: [] },
+  }), true);
+  assert.deepEqual(await second, {
+    ok: true, value: { completeness: "complete", items: [] },
+  });
+  broker.close();
+  },
+);
+
+test("pairing reset settles both active and queued jobs", async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  const active = broker.request({ kind: "session.observe" });
+  const waiting = broker.request({ kind: "sets.list" });
+  const first = broker.next(TOKEN);
+  assert.ok(first);
+  assert.equal(broker.next(TOKEN), null);
+  broker.resetPairing();
+  assert.deepEqual(await active, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.deepEqual(await waiting, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.equal(broker.next(TOKEN), null);
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: first.id, ok: true, value: "my-sets",
+  }), false);
+  assert.equal(broker.status().pending, 0);
+  broker.close();
+});
