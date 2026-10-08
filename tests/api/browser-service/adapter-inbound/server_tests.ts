@@ -602,6 +602,53 @@ test(
       ok: true,
       value: [{ schemaVersion: 1, id: "set-a", title: "Synthetic" }],
     });
+    const oldWorker = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      { headers: {
+        Authorization: "Bearer " + boot.browserBridge.token,
+        Origin: extensionOrigin,
+      } },
+    );
+    assert.equal(oldWorker.status, 426);
+    assert.deepEqual(await oldWorker.json(), {
+      ok: false, code: "blooket-browser-incompatible",
+    });
+    const freshPending = service.browserBridge.request({ kind: "sets.list" });
+    const currentOrigin = "chrome-extension://current-fixture";
+    const currentHeaders = {
+      Authorization: "Bearer " + boot.browserBridge.token,
+      "Content-Type": "application/json",
+      Origin: currentOrigin,
+    };
+    const freshPoll = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      { headers: currentHeaders },
+    );
+    const freshJob = (await freshPoll.json()).job;
+    assert.ok(freshJob);
+    const reply = {
+      schemaVersion: 1, id: freshJob.id, ok: true,
+      value: { items: [], completeness: "complete" },
+    };
+    const wrongWorker = await fetch(
+      service.origin + "/api/browser-bridge/result",
+      {
+        method: "POST",
+        headers: { ...currentHeaders, Origin: "chrome-extension://other" },
+        body: JSON.stringify(reply),
+      },
+    );
+    assert.equal(wrongWorker.status, 400);
+    assert.equal(service.browserBridge.status().pending, 1);
+    const freshResult = await fetch(
+      service.origin + "/api/browser-bridge/result",
+      {
+        method: "POST", headers: currentHeaders,
+        body: JSON.stringify(reply),
+      },
+    );
+    assert.equal(freshResult.status, 200);
+    assert.deepEqual(await freshPending, { ok: true, value: reply.value });
     const withoutCsrf = await fetch(
       service.origin + "/api/browser-pairing-reset",
       {
