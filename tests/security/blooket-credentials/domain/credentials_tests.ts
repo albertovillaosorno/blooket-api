@@ -133,3 +133,44 @@ test("host-secret failures propagate without later reads", async () => {
     code: "host-secret-store-unavailable",
   });
 });
+
+test(
+  "invalid supplied login identity fails without reading a password",
+  async () => {
+  for (const loginIdentifier of ["x".repeat(255), "bad\0identity"]) {
+    const reads: string[] = [];
+    const result = await readBlooketCredentials(
+      fakeStore({}, reads), loginIdentifier,
+    );
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-credentials-missing",
+    });
+    assert.deepEqual(reads, []);
+  }
+  },
+);
+
+test(
+  "invalid stored credentials fail before entering the browser boundary",
+  async () => {
+  for (const [identifier, password, expectedReads] of [
+    ["x".repeat(255), "fixture-password", 1],
+    ["teacher@example.test", "bad\0password", 2],
+    ["teacher@example.test", "x".repeat(2049), 2],
+  ] as const) {
+    const reads: string[] = [];
+    const store = fakeStore({
+      [BLOOKET_LOGIN_IDENTIFIER_SECRET]: {
+        ok: true, kind: "found", secret: identifier,
+      },
+      [BLOOKET_PASSWORD_SECRET]: {
+        ok: true, kind: "found", secret: password,
+      },
+    }, reads);
+    assert.deepEqual(await readBlooketCredentials(store), {
+      ok: false, code: "blooket-credentials-missing",
+    });
+    assert.equal(reads.length, expectedReads);
+  }
+  },
+);

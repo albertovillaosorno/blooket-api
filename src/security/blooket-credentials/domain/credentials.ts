@@ -65,7 +65,8 @@ export async function readBlooketCredentials(
   if (!identifier.ok) {
     return identifier;
   }
-  if (identifier.kind === "missing") {
+  if (identifier.kind === "missing" ||
+      !validLoginIdentifier(identifier.secret)) {
     return {
       ok: false,
       code: "blooket-credentials-missing",
@@ -76,7 +77,9 @@ export async function readBlooketCredentials(
   if (!password.ok) {
     return password;
   }
-  if (password.kind === "missing") {
+  if (password.kind === "missing" ||
+      password.secret.length < 1 || password.secret.length > 2048 ||
+      password.secret.includes("\0")) {
     return {
       ok: false,
       code: "blooket-credentials-missing",
@@ -90,4 +93,9 @@ export async function readBlooketCredentials(
       password: password.secret,
     },
   };
+}
+
+function validLoginIdentifier(value: string): boolean {
+  return value.length >= 1 && value.length <= 254 &&
+    !value.includes("\0");
 }

@@ -196,6 +196,13 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, credential retrieval began validating bounded login
+identifier and password fields before handing them to a browser host. An
+invalid supplied identifier causes no secret-store reads, while a malformed
+stored identifier prevents password retrieval. Synthetic secret-store tests
+verify the same secret-free missing-credential failure for invalid values;
+this does not claim successful authenticated login.
+
 On 2026-10-08, the extension worker began binding every browser-host tab and
 script action to the active connection identity and relay generation. When a
 workspace reconnects while an older write or My Sets read script is pending,
