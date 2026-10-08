@@ -112,6 +112,18 @@ export async function inspectBlooketCapabilities(
 
   const probed = await safeInspect(inspection);
   if (!probed.ok) {
+    // An authenticated tab may become challenged while the probe is running.
+    // Only re-observe; never replay the failed probe or initiate login here.
+    if (probed.code === "blooket-browser-failed") {
+      const observed = await inspectReadyBlooketSession(browser);
+      if (observed.ok &&
+          (observed.kind === "wait" ||
+            observed.kind === "human-action-required"))
+        return observed;
+      if (!observed.ok &&
+          observed.code === "blooket-authentication-required")
+        return { ok: false, stage: "session", code: observed.code };
+    }
     return {
       ok: false,
       stage: "inspection",

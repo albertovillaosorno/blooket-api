@@ -343,3 +343,95 @@ test("malformed capability probe envelopes never expose data", async () => {
     });
   }
 });
+
+test("a challenge during capability probing becomes a human stop", async () => {
+  for (const state of [
+    "security-challenge", "organization-prompt", "rate-limited",
+  ] as const) {
+    const browserCalls: string[] = [];
+    const secretReads: string[] = [];
+    const probeCalls: string[] = [];
+    const result = await inspectBlooketCapabilities(
+      browser([
+        { ok: true, state: "dashboard" },
+        { ok: true, state },
+      ], browserCalls),
+      secretStore(secretReads),
+      capabilityProbe({ ok: false, code: "blooket-browser-failed" },
+        probeCalls),
+      { readOnly: true },
+    );
+    assert.deepEqual(result, {
+      ok: true,
+      kind: state === "rate-limited" ? "wait" : "human-action-required",
+      state,
+    });
+    assert.deepEqual(browserCalls, ["observe", "observe"]);
+    assert.deepEqual(secretReads, []);
+    assert.deepEqual(probeCalls, ["inspect"]);
+  }
+});
+
+test(
+  "a signed-out capability failure requires credentials, not login",
+  async () => {
+  const browserCalls: string[] = [];
+  const secretReads: string[] = [];
+  const probeCalls: string[] = [];
+  const result = await inspectBlooketCapabilities(
+    browser([
+      { ok: true, state: "dashboard" },
+      { ok: true, state: "signed-out" },
+    ], browserCalls),
+    secretStore(secretReads),
+    capabilityProbe({ ok: false, code: "blooket-browser-failed" },
+      probeCalls),
+  );
+  assert.deepEqual(result, {
+    ok: false, stage: "session", code: "blooket-authentication-required",
+  });
+  assert.deepEqual(browserCalls, ["observe", "observe"]);
+  assert.deepEqual(secretReads, []);
+  assert.deepEqual(probeCalls, ["inspect"]);
+  },
+);
+
+test(
+  "unavailable capability transport skips additional session probing",
+  async () => {
+  const browserCalls: string[] = [];
+  const probeCalls: string[] = [];
+  const result = await inspectBlooketCapabilities(
+    browser([{ ok: true, state: "dashboard" }], browserCalls),
+    secretStore([]),
+    capabilityProbe({ ok: false, code: "blooket-browser-unavailable" },
+      probeCalls),
+    { readOnly: true },
+  );
+  assert.deepEqual(result, {
+    ok: false, stage: "inspection", code: "blooket-browser-unavailable",
+  });
+  assert.deepEqual(browserCalls, ["observe"]);
+  assert.deepEqual(probeCalls, ["inspect"]);
+  },
+);
+
+test(
+  "an unconfirmed capability follow-up preserves the original failure",
+  async () => {
+    const calls: string[] = [];
+    const result = await inspectBlooketCapabilities(
+      browser([
+        { ok: true, state: "dashboard" },
+        { ok: false, code: "blooket-browser-unavailable" },
+      ], calls),
+      secretStore([]),
+      capabilityProbe({ ok: false, code: "blooket-browser-failed" }, []),
+      { readOnly: true },
+    );
+    assert.deepEqual(result, {
+      ok: false, stage: "inspection", code: "blooket-browser-failed",
+    });
+    assert.deepEqual(calls, ["observe", "observe"]);
+  },
+);
