@@ -387,6 +387,23 @@ test(
   },
 );
 
+test("invisible anchors are never ignored on dashboard reads", () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  document.selectors[
+    'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+  ] = [node("IFRAME", "", {
+    src: "https://www.google.com/recaptcha/api2/anchor?size=invisible",
+  })];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true,
+      value: "security-challenge",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+});
+
 test(
   "challenge and unknown origin observations never proceed to set reads",
   () => {
