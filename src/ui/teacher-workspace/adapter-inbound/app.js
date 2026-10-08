@@ -8,6 +8,23 @@ import {
 
 const words = {
   es: {
+    launchAtLogin: "Iniciar Blooket API al iniciar sesión",
+    refreshLoginItem: "Comprobar inicio de sesión",
+    loginEnabled: "El inicio de sesión está activado.",
+    loginDisabled: "El inicio de sesión está desactivado.",
+    loginApproval:
+      "Aprueba Blooket API en Configuración del Sistema > General > " +
+      "Ítems de inicio.",
+    loginUnavailable:
+      "El control de inicio de sesión requiere la aplicación instalada " +
+      "en macOS.",
+    loginFailed:
+      "No se pudo cambiar el inicio de sesión. Comprueba su estado " +
+      "antes de intentarlo de nuevo.",
+    stopService: "Detener Blooket API",
+    serviceStopped:
+      "Blooket API se detuvo. Abre la aplicación para iniciarla otra " +
+      "vez.",
     browserExtensions: "Extensiones del navegador",
     safariExtensionHelp:
       "Safari viene incluida con Blooket API. Abre la instalación y " +
@@ -226,6 +243,20 @@ const words = {
     normalizationStale: "Análisis AI desactualizado",
   },
   en: {
+    launchAtLogin: "Start Blooket API at login",
+    refreshLoginItem: "Check login startup",
+    loginEnabled: "Login startup is enabled.",
+    loginDisabled: "Login startup is disabled.",
+    loginApproval:
+      "Approve Blooket API in System Settings > General > Login Items.",
+    loginUnavailable:
+      "Login startup control requires the installed macOS application.",
+    loginFailed:
+      "Login startup could not be changed. Check its status before " +
+      "trying again.",
+    stopService: "Stop Blooket API",
+    serviceStopped:
+      "Blooket API stopped. Open the application to start it again.",
     browserExtensions: "Browser extensions",
     safariExtensionHelp:
       "Safari is included with Blooket API. Open setup, then enable it " +
@@ -1456,6 +1487,16 @@ function renderUpdates() {
 }
 function renderSettingsState() {
   renderUpdates();
+  const login = bootstrap.service?.loginItem?.state;
+  const allowed = ["enabled", "not-registered", "requires-approval"];
+  $("#launchAtLogin").disabled = !allowed.includes(login);
+  $("#launchAtLogin").checked =
+    ["enabled", "requires-approval"].includes(login);
+  $("#loginItemState").textContent = t({
+    enabled: "loginEnabled", "not-registered": "loginDisabled",
+    "requires-approval": "loginApproval",
+  }[login] ?? "loginUnavailable");
+  $("#stopService").disabled = !bootstrap.service?.canStop;
   $("#safariExtensionPanel").hidden =
     bootstrap.safariExtension?.available !== true;
   $("#passwordState").textContent = t(
@@ -1491,6 +1532,31 @@ function renderSettingsState() {
     )
     .join(" · ");
 }
+$("#launchAtLogin").addEventListener("change", async event => {
+  const enabled = event.target.checked;
+  event.target.disabled = true;
+  try {
+    const result = await api("/api/login-item", { enabled });
+    bootstrap = await api("/api/bootstrap");
+    if (!result.ok) toast(t("loginFailed"));
+  } catch { toast(t("loginFailed")); }
+  finally { renderSettingsState(); }
+});
+$("#refreshLoginItem").addEventListener("click", async event => {
+  event.target.disabled = true;
+  try {
+    bootstrap = await api("/api/bootstrap");
+    renderSettingsState();
+  } catch (error) { report(error); }
+  finally { event.target.disabled = false; }
+});
+$("#stopService").addEventListener("click", async event => {
+  event.target.disabled = true;
+  try {
+    await api("/api/service-stop", {});
+    toast(t("serviceStopped"));
+  } catch (error) { event.target.disabled = false; report(error); }
+});
 field(settingsForm, "online").addEventListener("change", (event) => {
   $("#onlineFields").disabled = !event.target.checked;
 });

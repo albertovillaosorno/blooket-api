@@ -3,7 +3,8 @@
 ## Status
 
 Accepted policy with portable catalog checking and signed-archive staging.
-Automatic installation and native launch-at-login acceptance remain pending.
+Automatic installation remains pending. Explicit packaged login controls are
+implemented; native macOS/Safari assurance remains in ongoing task blooket-15.
 
 ## Decision ID
 
@@ -85,6 +86,12 @@ local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
 production-path acceptance. It depends on configuration, remote write recovery,
 lifecycle, and trusted packaging; it exposes no remote installation authority.
+
+The packaged native main executable invokes Service Management only for exact
+local login-control arguments. Ordinary app launch and MCP execution never open
+Terminal or register persistence implicitly. The local page displays actual OS
+authorization, including pending approval, and keeps removal independently
+available; ordinary settings saves cannot bypass this control.
 
 The updater stages at a safe boundary, preserves the private user-data root,
 never replaces a running application blindly, and never replays an ambiguous

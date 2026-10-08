@@ -490,3 +490,14 @@ summary {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
+
+/* Keep the opt-in control and its label in one accessible row. */
+.settings-grid .login-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.settings-grid .login-toggle input {
+  width: auto;
+  margin: 0;
+}

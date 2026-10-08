@@ -364,14 +364,13 @@ export async function buildDistribution(target: DistributionTarget) {
       await buildMacIcon(repo, join(resource, "Blooket API.icns"));
       const executable = join(bundle, "MacOS/Blooket API");
       await mkdir(dirname(executable), { recursive: true });
-      await writeFile(
-        executable,
-        "#!/bin/sh\n" +
-          'here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n' +
-          'exec "$here/../Resources/runtime/node" ' +
-          '"$here/../Resources/app/src/service/desktop-launcher/' +
-          'adapter-inbound/launcher.ts" "$@"\n',
-      );
+      await run("xcrun", [
+        "swiftc",
+        join(app,
+          "src/service/desktop-launcher/adapter-inbound/macos-launcher.swift"),
+        "-target", "arm64-apple-macos13.5",
+        "-o", executable,
+      ]);
       await chmod(executable, 0o755);
       const loginAgentSource = join(
         app,
