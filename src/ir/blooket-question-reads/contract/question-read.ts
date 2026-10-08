@@ -222,6 +222,10 @@ export function decodeBlooketQuestionReadList(
   if (!Array.isArray(value)) {
     return failure("$", "expected-array", "Expected a question array.");
   }
+  // Local adapter safety cap, not a provider question-count limit.
+  if (value.length > 200) {
+    return failure("$", "too-many-questions", "Expected at most 200 reads.");
+  }
   const questions: BlooketQuestionRead[] = [];
   const issues: ValidationIssue[] = [];
   const numbers = new Set<number>();
