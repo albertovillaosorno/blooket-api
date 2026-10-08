@@ -130,3 +130,28 @@ test("read arguments preserve opaque IDs and reject extra authority", () => {
   ])
     assert.equal(parseCliArguments(args).ok, false);
 });
+
+
+test("publication arguments require a saved revision and bounded draft ID",
+  () => {
+    const revision = "a".repeat(64);
+    assert.deepEqual(parseCliArguments([
+      "publication", "step", "lesson-fixture", revision, "--json",
+    ]), { ok: true, invocation: {
+      kind: "blooket-publication", command: "blooket.publication.step",
+      payload: { draftId: "lesson-fixture", expectedRevision: revision },
+      json: true,
+    } });
+    for (const action of ["status", "verify", "reconcile"])
+      assert.equal(parseCliArguments([
+        "publication", action, "lesson-fixture", "--json",
+      ]).ok, true);
+    for (const args of [
+      ["publication", "step", "lesson-fixture"],
+      ["publication", "step", "lesson-fixture", "bad-revision"],
+      ["publication", "step", "../draft", revision],
+      ["publication", "verify", "lesson-fixture", revision],
+      ["publication", "status", "lesson-fixture", "--override-retry"],
+      ["publication", "delete", "lesson-fixture"],
+    ]) assert.equal(parseCliArguments(args).ok, false);
+  });

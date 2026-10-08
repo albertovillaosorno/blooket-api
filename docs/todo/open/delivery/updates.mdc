@@ -49,8 +49,8 @@ offline and preserve teacher data and current access boundaries.
 
 ## Acceptance
 
-**IT WORKS -- release-critical.** On a supported installed ARM64 Mac, an
-opted-in update workflow can find a newer trusted release, authenticate its
+**IT WORKS -- release-critical.** The product update workflow targeting a
+supported ARM64 Mac can find a newer trusted release, authenticate its
 publisher and bytes, stage it, apply it at a safe restart boundary, and return
 to a usable application with the teacher's data, secrets, settings, and drafts
 intact. Manual checking must work without enabling automatic updates; automatic
@@ -65,13 +65,14 @@ during active/ambiguous Blooket writes. The practical guarantee is **safe
 failure and recovery**, not an impossible promise that no update error can
 occur.
 
-Before handing the app to the teacher, demonstrate the real product updater
-through a trusted signed ARM64 release fixture covering install, restart,
+Demonstrate the product updater through a trusted signed ARM64 release fixture
+covering install, restart,
 interrupted install/rollback, persistence, and the EN/ES user controls. Pin a
 real production publisher trust root and produce/release trustworthy artifacts;
-a mock signature alone does not make shipping updates safe. Broader Safari,
-Apple, and hardware-specific compatibility assurance continues in the final
-ongoing record, without weakening this functional update requirement.
+a mock signature alone does not make shipping updates safe. Native Mac/Safari
+execution and Apple/hardware-specific acceptance belong to the final ongoing
+record and lack of those hosts must not prevent functional completion here.
+The updater implementation, trust, safe failure, and recovery remain required.
 
 ## Implementation notes
 

@@ -36,12 +36,23 @@ import type {
 
 import { decodeBlooketReadCommand } from
   "../../../ir/blooket-read-commands/contract/commands.ts";
+import { isBlooketPublicationCommand, decodeBlooketPublicationCommand,
+  type BlooketPublicationCommandName } from
+  "../../../ir/blooket-publication-commands/contract/commands.ts";
 
 export type CliInvocation =
   | { readonly kind: "help" }
   | MediaSearchInvocation
   | ProjectValidateInvocation
-  | BlooketReadInvocation;
+  | BlooketReadInvocation
+  | BlooketPublicationInvocation;
+
+export interface BlooketPublicationInvocation {
+  readonly kind: "blooket-publication";
+  readonly command: BlooketPublicationCommandName;
+  readonly payload: Record<string, string>;
+  readonly json: boolean;
+}
 
 export interface BlooketReadInvocation {
   readonly kind: "blooket-read";
@@ -87,6 +98,28 @@ const FIELD_VALUES = new Set<MediaSearchField>([
 export function parseCliArguments(args: readonly string[]): CliParseResult {
   if (args.length === 0 || args[0] === "help" || args[0] === "--help") {
     return { ok: true, invocation: { kind: "help" } };
+  }
+
+  if (args[0] === "publication") {
+    const command = "blooket.publication." + args[1];
+    const json = args.at(-1) === "--json";
+    const values = args.slice(2, json ? -1 : undefined);
+    const step = command === "blooket.publication.step";
+    const payload = {
+      draftId: values[0]!,
+      ...(step ? { expectedRevision: values[1]! } : {}),
+    };
+    if (!isBlooketPublicationCommand(command) ||
+        values.length !== (step ? 2 : 1) ||
+        !decodeBlooketPublicationCommand(command, payload).ok)
+      return { ok: false,
+        message: "Usage: blooket publication " +
+          "step <draft-id> <revision> [--json], or " +
+          "status|verify|reconcile <draft-id> [--json]",
+      };
+    return { ok: true, invocation: {
+      kind: "blooket-publication", command, payload, json,
+    } };
   }
 
   if (args[0] === "session" && args[1] === "inspect")

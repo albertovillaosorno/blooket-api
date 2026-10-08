@@ -1,0 +1,9 @@
+identity:
+  id: function:blooket-publication-commands
+  name: blooket-publication-commands
+  path: src/ir/blooket-publication-commands
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

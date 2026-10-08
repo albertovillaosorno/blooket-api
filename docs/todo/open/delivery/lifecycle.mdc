@@ -79,7 +79,8 @@ owns update preference integration and must reuse this lifecycle instead of
 installing another startup agent. The existing `launchAtLogin` setting defaults
 to false and bootstrap still reports it as not implemented.
 
-Native acceptance must enable login startup, perform logout/login or restart,
+Native acceptance in task blooket-15 must enable login startup,
+perform logout/login or restart,
 observe exactly one owned service, disable it and confirm the next login does
 not start it, and remove only owned persistence on uninstall. Updates preserve
 the preference; registration, launch, and removal failures remain visible and
@@ -99,9 +100,11 @@ under `Contents/Library/LaunchAgents`. `BundleProgram` points at the helper
 inside `Contents/Resources/ServiceManagement`.
 
 The helper invokes the existing packaged launcher with `--no-open`; it does not
-register itself and the plist deliberately omits `KeepAlive`. Keep registration
-and signing explicitly pending until native CI and real login behavior establish
-those boundaries. This design follows Apple's
+register itself and the plist deliberately omits `KeepAlive`. Keep actual
+signing and native login evidence explicit in task blooket-15.
+The implementation of registration and reversible product controls remains
+owned by this functional record; lack of a local Mac is not a completion gate.
+This design follows Apple's
 <!-- jig-ignore-next-line: Preserve canonical Apple API URLs. -->
 [Service Management contract](https://developer.apple.com/documentation/servicemanagement/smappservice)
 and its

@@ -30,6 +30,10 @@
 //   - Unsupported or invalid requests fail closed.
 //
 import { createBlooketRuntimePorts } from "./blooket-runtime.ts";
+import { createBlooketMutationPacer } from
+  "../../blooket-write-execution/application/mutation-pacing.ts";
+import { isBlooketPublicationCommand } from
+  "../../../ir/blooket-publication-commands/contract/commands.ts";
 import {
   createApplicationUpdateChecker,
   type ApplicationUpdateChecker,
@@ -173,6 +177,7 @@ export async function startBrowserService(
     ...createBlooketRuntimePorts(browserBridge, root),
     secrets,
   };
+  const publicationPacer = createBlooketMutationPacer();
   let origin = "";
   let ownedPort: number | undefined;
   const staticRoot = new URL(
@@ -624,7 +629,25 @@ export async function startBrowserService(
           json(response, 400, decoded);
           return;
         }
-        json(response, 200, await executeCommand(decoded.value, root, blooket));
+        if (!isBlooketPublicationCommand(decoded.value.command)) {
+          json(response, 200,
+            await executeCommand(decoded.value, root, blooket));
+          return;
+        }
+        const controller = new AbortController();
+        const cancelled = () => controller.abort();
+        response.once("close", cancelled);
+        const timer = setTimeout(cancelled, 100_000);
+        try {
+          const result = await executeCommand(decoded.value, root, blooket, {
+            root, blooket, writes: blooket.writeExecution,
+            pacer: publicationPacer, signal: controller.signal,
+          });
+          if (!response.destroyed) json(response, 200, result);
+        } finally {
+          clearTimeout(timer);
+          response.removeListener("close", cancelled);
+        }
         return;
       }
       json(response, 404, { code: "not-found" });

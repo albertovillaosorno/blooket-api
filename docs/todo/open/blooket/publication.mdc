@@ -108,10 +108,9 @@ rather than success.
 
 The browser-service runtime composes that bridge surface through the existing
 canonical BlooketWriteExecutionPort and prepared-media port. The bridge
-command is internal only; no CLI, MCP, or public HTTP publication command is
-registered,
-so this new transport cannot bypass persisted write plans, task budgets, pacing,
-journals, or reconciliation.
+command is internal. Canonical publication commands now enter through the
+persisted executor, preserving task budgets, pacing, journals, and
+reconciliation.
 
 Synthetic persisted-runtime coverage now exercises the complete guarded
 Create Set path. It reobserves the browser session, durably reserves the task
@@ -121,11 +120,39 @@ journal. A challenge before mutation creates neither budget nor journal; a
 challenge during the bridge mutation consumes one budget start and preserves
 the attempting journal for reconciliation without replay.
 
+### Canonical text-only publication foundation
+
+On 2026-10-08, logical draft-ID commands were connected through the ordinary
+CLI and admitted MCP tools to the local service. The first step requires the
+exact saved revision, admits account capabilities, and durably freezes the
+project/capability snapshot before journaled execution. Each call performs at
+most one set/question write; caller paths and retry overrides are rejected.
+
+Progress remains separate from publication proof. Final verification requires
+completed checkpoints, no uncertain attempt, exact remote metadata/question
+state, and two matching fresh observations. Unsupported media is refused before
+snapshot creation or provider inspection; editing existing quizzes is not
+claimed by this creation-only command family.
+
+Targeted portable tests cover revision conflicts, concurrent duplicate steps,
+uncertain outcomes/reconciliation, cancellation after journal persistence,
+unsupported media, immutable bounded storage, and changed remote observations.
+An integration fixture crosses real MCP, CLI subprocess, HTTP, persistence, and
+browser-bridge boundaries with a simulated provider. Live canonical publication
+remains pending and this record stays active.
+
+Strict TypeScript, roadmap integrity, and all 1042 portable tests passed at this
+checkpoint with Node test concurrency limited to four. The unbounded full run
+exhausted process/browser timing windows; its failed result is not acceptance.
+Jig validation returned zero repository diagnostics, while its existing graph
+rule evaluation limitation remains explicit in the development handoff.
+
 ## Blockers
 
 Text-only Add Question browser mechanics now submit once and require exact
-post-submit read-back. Media upload and canonical publication entrypoints remain
-pending, including the MCP/CLI create/add-question/read-back path.
+post-submit read-back. Media upload, existing-quiz editing, and live canonical
+publication acceptance remain pending. The connected legacy extension must be
+replaced before the current bounded read contracts can verify a real result.
 
 Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
 and does not block this functional record.

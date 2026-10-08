@@ -211,7 +211,7 @@ async function verifyQuestion(
     : { ok: true, outcome: "inconclusive" };
 }
 
-function questionMatches(
+export function questionMatches(
   actual: BlooketQuestionRead,
   expected: Extract<
     ReturnType<typeof lowerBlooketWriteSubmission>,

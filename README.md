@@ -361,8 +361,9 @@ The connection follows the workspace's actual port and reconnects after a
 service restart; tokens stay in memory/session storage and never reach an AI.
 IPv6-only local service bindings are not supported by this extension yet.
 
-The connected service exposes three read-only MCP tools:
-`blooket_session_inspect`, `blooket_sets_list`, and `blooket_sets_get`.
+The connected service exposes five read-only MCP tools:
+`blooket_session_inspect`, `blooket_capabilities_inspect`, `blooket_sets_list`,
+`blooket_sets_get`, and `blooket_questions_list`.
 They run through the canonical CLI and the same local browser ports:
 
 ```sh
@@ -380,6 +381,17 @@ security challenges and organization prompts preserve the human-action stop.
 Listing returns observed summaries, not a non-empty collection completeness
 guarantee. The explicit empty-account state is bounded; pagination and remote
 completeness acceptance remain pending.
+
+Text-only new-quiz publication also has canonical `publication step`, `status`,
+`reconcile`, and `verify` CLI commands and matching `blooket_publication_*` MCP
+tools. Supply the saved draft ID and exact revision for each step; each call
+performs at most one journaled write. Final fresh verification alone reports
+`published: true`; local progress does not prove remote state.
+
+This path has portable integration coverage across actual MCP, CLI, and local
+service boundaries with a simulated provider. Live canonical publication,
+media upload, and existing-quiz editing remain pending. MCP runs the bundled
+runtime in the background without opening Terminal.
 
 Private details and bounded text-question reads have portable adapters, as does
 the account capability probe. Public details, complete media identity, live
