@@ -16,3 +16,6 @@ Existing MCP tools provide library search/read/enrichment, personal skill
 list/read/write, and recoverable draft list/read/write. Drafts are not published
 quizzes. Continue these implementations rather than recreating their already
 validated foundations.
+
+For dated browser evidence and work that can continue without browser access,
+read [the development handoff](blooket-development-handoff.md).

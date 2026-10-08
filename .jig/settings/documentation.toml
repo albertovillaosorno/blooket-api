@@ -31,7 +31,7 @@ sections = []
 
 [profile.planning-and-development]
 kind = "adr"
-paths = ["docs/technical/development-map.md", "docs/todo/"]
+paths = ["docs/technical/blooket-development-handoff.md", "docs/technical/development-map.md", "docs/todo/"]
 decision_id = "none"
 section_mode = "required"
 sections = []

@@ -316,6 +316,19 @@ Do not add dependencies for trivial parsing, validation, string matching,
 filesystem wrappers, or convenience utilities that the platform already provides
 adequately.
 
+## Current upstream documentation
+
+Use Web Search when available to verify current provider and platform behavior
+needed for a change. Prefer official Blooket, browser/MDN, Node, GitHub, and
+Apple documentation. Record the exact source and date; a search result or
+client capture does not prove a private API, account entitlement, or successful
+publication. Keep unknown facts unknown and preserve the owning runtime gates.
+
+For agents without browser access, read
+`docs/technical/blooket-development-handoff.md` for dated selector evidence,
+portable entrypoints, and remaining acceptance gaps. Continue tested code work
+without labeling synthetic tests as live Blooket or native Mac acceptance.
+
 ## Blooket reference evidence
 
 Use `reference/curated/` to inspect recovered Blooket client behavior for
