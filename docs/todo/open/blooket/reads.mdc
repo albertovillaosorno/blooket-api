@@ -168,6 +168,12 @@ The visible `Edit Info` opener now verifies the exact expected set ID before
 clicking or accepting an already-open panel. A switched edit route cannot
 trigger even this presentation-only action for another set.
 
+The canonical set-ID, summary, and detail decoders now enforce the same
+local 512-character opaque ID, 1,000-character nonblank title, and
+10,000-character description limits as the browser extractors.
+Oversized or NUL-bearing IDs fail before application session access. These
+are not provider contract limits.
+
 Because the page boundary can emit an empty array only for that exact recovered
 empty-account state, the browser bridge marks only `[]` as `complete`. Non-empty
 card lists remain `unknown`: curated module 52644 consumes `sets`, `allSets`,
