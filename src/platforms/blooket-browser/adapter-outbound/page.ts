@@ -168,7 +168,8 @@ export function inspectBlooketPage(
       const heading = main.querySelector("h1");
       if (
         url.pathname === "/my-sets" &&
-        heading?.textContent?.trim() === "My Sets"
+        heading !== null && visible(heading) &&
+        heading.textContent?.trim() === "My Sets"
       )
         return { ok: true, value: "my-sets" };
       if (
@@ -197,9 +198,11 @@ export function inspectBlooketPage(
     )
       return failed();
     if (operation.kind === "sets.list") {
+      const heading = main.querySelector("h1");
       if (
         url.pathname !== "/my-sets" ||
-        main.querySelector("h1")?.textContent?.trim() !== "My Sets"
+        !heading || !visible(heading) ||
+        heading.textContent?.trim() !== "My Sets"
       )
         return failed();
       const articles = Array.from(main.querySelectorAll("article"));
@@ -207,11 +210,15 @@ export function inspectBlooketPage(
       const result: { schemaVersion: 1; id: string; title: string }[] = [];
       const ids = new Set<string>();
       for (const article of articles) {
+        if (!visible(article)) return failed();
         const headings = article.querySelectorAll("h3");
         const links = Array.from(article.querySelectorAll("a[href]")).filter(
           (link) => link.textContent?.trim() === "Edit",
         );
-        if (headings.length !== 1 || links.length !== 1) return failed();
+        if (
+          headings.length !== 1 || links.length !== 1 ||
+          !visible(headings[0]!) || !visible(links[0]!)
+        ) return failed();
         const href = links[0]!.getAttribute("href");
         if (!href) return failed();
         const link = new URL(href, url.origin);
@@ -233,16 +240,19 @@ export function inspectBlooketPage(
         result.push({ schemaVersion: 1, id, title });
       }
       if (result.length === 0) {
-        const emptyAccount = Array.from(main.querySelectorAll("h2")).some(
-          (heading) =>
+        const emptyHeadings = Array.from(main.querySelectorAll("h2"))
+          .filter((heading) =>
             heading.textContent?.trim() ===
-            "You'll need a question set to host!",
-        );
-        const createSet = Array.from(main.querySelectorAll("button")).some(
-          (button) => button.textContent?.trim() === "Create a Set",
-        );
-        // Zero cards alone can be loading, search, or folder state.
-        if (!emptyAccount || !createSet) return failed();
+            "You'll need a question set to host!"
+          );
+        const createButtons = Array.from(main.querySelectorAll("button"))
+          .filter((button) => button.textContent?.trim() === "Create a Set");
+        // Zero cards alone can be loading, search, or folder state. The
+        // recovered empty-account banner and action must both be visible.
+        if (
+          emptyHeadings.length !== 1 || createButtons.length !== 1 ||
+          !visible(emptyHeadings[0]!) || !visible(createButtons[0]!)
+        ) return failed();
       }
       return {
         ok: true,

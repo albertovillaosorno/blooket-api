@@ -284,6 +284,17 @@ and
 `numSets`, but the server origin of those props is not present in the curated
 client chunks, so visible card count is not promoted to full-account truth.
 
+Recovered My Sets module 52644 renders each set as an article with a title and
+Edit link, and separately renders the exact no-sets heading and Create a Set
+action. The browser now requires on-screen geometry for the main My Sets
+heading, every listed article/title/Edit link, and both empty-account controls.
+Missing, hidden, or duplicate empty-account evidence fails instead of granting
+`complete`.
+
+Concealed article controls likewise cannot become observational
+set rows. These are DOM visibility bounds, not a nonempty server pagination
+contract or proof of an atomic page snapshot.
+
 Inspecting the existing synthetic typing question confirmed its visible text,
 answer, match mode, and seconds, but did not establish every required question
 field. No edits or Save actions were submitted during this inspection.
