@@ -58,6 +58,8 @@ test("browser requests admit only bounded exact commands", () => {
     { kind: "sets.get", setId: "" },
     { kind: "sets.get", setId: "x".repeat(513) },
     { kind: "sets.get", setId: "a\0b" },
+    { kind: "sets.get", setId: "a\nb" },
+    { kind: "questions.list", setId: "a\tb" },
     { kind: "sets.list", script: "arbitrary code" },
     { kind: "navigate", url: "https://untrusted.invalid" },
   ])
@@ -130,6 +132,7 @@ test("Add Question bridge commands admit exact text-only semantics", () => {
   );
   for (const command of [
     { ...valid, setId: "" },
+    { ...valid, setId: "a\nb" },
     { ...valid, number: 0 },
     { ...valid, question: "" },
     { ...valid, answers: [] },

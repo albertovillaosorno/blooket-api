@@ -364,17 +364,18 @@ test("question modal operations reject switched and duplicate set IDs", () => {
   cancel.click = () => { clicks++; };
   form.selectors['button[type="button"]'] = [cancel];
 
-  for (const href of [
-    "https://dashboard.blooket.com/edit?id=other",
-    "https://dashboard.blooket.com/edit?id=fixture&id=other",
-    "https://dashboard.blooket.com/edit?id=fixture&id=fixture",
-  ]) {
+  for (const [href, setId] of [
+    ["https://dashboard.blooket.com/edit?id=other", "fixture"],
+    ["https://dashboard.blooket.com/edit?id=fixture&id=other", "fixture"],
+    ["https://dashboard.blooket.com/edit?id=fixture&id=fixture", "fixture"],
+    ["https://dashboard.blooket.com/edit?id=x%0Ay", "x\ny"],
+  ] as const) {
     page(document, href, () => {
-      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
-      assert.equal(openBlooketQuestionPanel("fixture", 1), false);
-      assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
-      assert.equal(closeBlooketQuestionPanel("fixture"), false);
-      assert.equal(isBlooketQuestionPanelClosed("fixture"), false);
+      assert.equal(listBlooketQuestionNumbers(setId).ok, false);
+      assert.equal(openBlooketQuestionPanel(setId, 1), false);
+      assert.equal(inspectOpenedBlooketQuestion(setId, 1).ok, false);
+      assert.equal(closeBlooketQuestionPanel(setId), false);
+      assert.equal(isBlooketQuestionPanelClosed(setId), false);
     });
   }
   assert.equal(clicks, 0);

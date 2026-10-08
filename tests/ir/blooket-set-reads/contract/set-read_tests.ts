@@ -206,7 +206,9 @@ test("set lists use the browser local read safety cap", () => {
 
 test("set read fields preserve local browser safety bounds", () => {
   const nul = String.fromCharCode(0);
-  for (const id of ["x".repeat(513), "x" + nul + "y"]) {
+  for (const id of [
+    "x".repeat(513), "x" + nul + "y", "x\ny", "x\ty", "x\u007fy",
+  ]) {
     assert.equal(decodeBlooketSetId(id).ok, false);
     assert.equal(decodeBlooketSetList([{
       schemaVersion: 1, id, title: "Synthetic",

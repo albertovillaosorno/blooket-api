@@ -184,6 +184,7 @@ test(
     "/edit?id=",
     "/edit?id=fixture&id=other",
     "/edit?id=fixture&id=fixture",
+    "/edit?id=x%0Ay",
   ]) {
     const article = card();
     article.selectors["a[href]"] = [node("A", "Edit", { href })];
@@ -268,6 +269,7 @@ test("set detail refuses duplicate set IDs in the current route", () => {
   for (const href of [
     "https://dashboard.blooket.com/edit?id=fixture&id=other",
     "https://dashboard.blooket.com/edit?id=fixture&id=fixture",
+    "https://dashboard.blooket.com/edit?id=x%0Ay",
   ]) {
     page(document, href, () => {
       assert.equal(inspectBlooketPage({
@@ -457,6 +459,7 @@ test("read routes encode IDs and panel opening never submits a form", () => {
     "https://dashboard.blooket.com/edit?id=x%26redirect%3Dhttp%3A%2F%2Fbad",
   );
   assert.throws(() => blooketReadUrl({ kind: "sets.get", setId: "\0" }));
+  assert.throws(() => blooketReadUrl({ kind: "sets.get", setId: "x\ny" }));
   const document = node("DOCUMENT");
   const button = node("BUTTON", "Edit Info");
   let clicks = 0;
