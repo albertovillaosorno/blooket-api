@@ -203,3 +203,36 @@ test("set lists use the browser local read safety cap", () => {
     assert.equal(oversized.issues[0]?.code, "too-many-sets");
   }
 });
+
+test("set read fields preserve local browser safety bounds", () => {
+  const nul = String.fromCharCode(0);
+  for (const id of ["x".repeat(513), "x" + nul + "y"]) {
+    assert.equal(decodeBlooketSetId(id).ok, false);
+    assert.equal(decodeBlooketSetList([{
+      schemaVersion: 1, id, title: "Synthetic",
+    }]).ok, false);
+    assert.equal(decodeBlooketSetDetail({
+      schemaVersion: 1, id, title: "Synthetic",
+      description: "", visibility: "private",
+    }).ok, false);
+  }
+  assert.equal(decodeBlooketSetId("x".repeat(512)).ok, true);
+  for (const title of [" ", "x".repeat(1001)]) {
+    assert.equal(decodeBlooketSetList([{
+      schemaVersion: 1, id: "fixture", title,
+    }]).ok, false);
+    assert.equal(decodeBlooketSetDetail({
+      schemaVersion: 1, id: "fixture", title,
+      description: "", visibility: "private",
+    }).ok, false);
+  }
+  assert.equal(decodeBlooketSetDetail({
+    schemaVersion: 1, id: "fixture", title: "Synthetic",
+    description: "x".repeat(10_001), visibility: "private",
+  }).ok, false);
+  assert.equal(decodeBlooketSetDetail({
+    schemaVersion: 1, id: "x".repeat(512),
+    title: "x".repeat(1000),
+    description: "x".repeat(10_000), visibility: "private",
+  }).ok, true);
+});

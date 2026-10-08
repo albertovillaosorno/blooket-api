@@ -311,16 +311,15 @@ test("invalid set IDs fail before all side effects", async () => {
     { ok: true, value: [] },
     { ok: true, value: {} },
   );
-  const result = await getBlooketSet(
-    browser([], browserCalls),
-    secretStore(secretCalls),
-    reads.port,
-    "",
-  );
-
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.equal(result.stage, "request");
+  for (const setId of ["", "x".repeat(513), "x\0y"]) {
+    const result = await getBlooketSet(
+      browser([], browserCalls),
+      secretStore(secretCalls),
+      reads.port,
+      setId,
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "request");
   }
   assert.deepEqual(browserCalls, []);
   assert.deepEqual(secretCalls, []);
@@ -502,20 +501,21 @@ test(
   const browserCalls: string[] = [];
   const secretCalls: string[] = [];
   let read = false;
-  const result = await listBlooketQuestions(
-    browser([], browserCalls),
-    secretStore(secretCalls),
-    {
-      list: async () => {
-        read = true;
-        return { ok: true, value: [] };
+  for (const setId of ["", "x".repeat(513), "x\0y"]) {
+    const result = await listBlooketQuestions(
+      browser([], browserCalls),
+      secretStore(secretCalls),
+      {
+        list: async () => {
+          read = true;
+          return { ok: true, value: [] };
+        },
       },
-    },
-    "",
-  );
-
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.stage, "request");
+      setId,
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "request");
+  }
   assert.equal(read, false);
   assert.deepEqual(browserCalls, []);
   assert.deepEqual(secretCalls, []);

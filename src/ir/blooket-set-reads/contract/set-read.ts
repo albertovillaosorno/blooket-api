@@ -77,6 +77,13 @@ export function decodeBlooketSetId(
 ): DecodeResult<string> {
   const issues: ValidationIssue[] = [];
   const id = requiredString(value, path, issues);
+  if (id !== undefined && (id.length > 512 || id.includes("\0"))) {
+    issues.push({
+      path,
+      code: "invalid-set-id",
+      message: "Expected a bounded opaque set ID.",
+    });
+  }
   if (issues.length > 0 || id === undefined) {
     return { ok: false, issues };
   }
@@ -102,12 +109,10 @@ export function decodeBlooketSetSummary(
     ...unknownFieldIssues(value, SUMMARY_KEYS, path),
   ];
   validateVersion(value["schemaVersion"], path, issues);
-  const id = requiredString(value["id"], path + ".id", issues);
-  const title = requiredString(
-    value["title"],
-    path + ".title",
-    issues,
-  );
+  const decodedId = decodeBlooketSetId(value["id"], path + ".id");
+  if (!decodedId.ok) issues.push(...decodedId.issues);
+  const id = decodedId.ok ? decodedId.value : undefined;
+  const title = requiredTitle(value["title"], path + ".title", issues);
 
   if (issues.length > 0) {
     return { ok: false, issues };
@@ -195,13 +200,22 @@ export function decodeBlooketSetDetail(
     ...unknownFieldIssues(value, DETAIL_KEYS, "$"),
   ];
   validateVersion(value["schemaVersion"], "$", issues);
-  const id = requiredString(value["id"], "$.id", issues);
-  const title = requiredString(value["title"], "$.title", issues);
+  const decodedId = decodeBlooketSetId(value["id"], "$.id");
+  if (!decodedId.ok) issues.push(...decodedId.issues);
+  const id = decodedId.ok ? decodedId.value : undefined;
+  const title = requiredTitle(value["title"], "$.title", issues);
   const description = requiredStringValue(
     value["description"],
     "$.description",
     issues,
   );
+  if (description !== undefined && description.length > 10_000) {
+    issues.push({
+      path: "$.description",
+      code: "description-too-long",
+      message: "Description exceeds the local browser read bound.",
+    });
+  }
   const visibility = value["visibility"];
   if (visibility !== "public" && visibility !== "private") {
     issues.push({
@@ -233,6 +247,22 @@ export function decodeBlooketSetDetail(
       visibility,
     },
   };
+}
+
+function requiredTitle(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): string | undefined {
+  const title = requiredString(value, path, issues);
+  if (title !== undefined && (!title.trim() || title.length > 1_000)) {
+    issues.push({
+      path,
+      code: "invalid-set-title",
+      message: "Expected a bounded non-blank set title.",
+    });
+  }
+  return title;
 }
 
 function requiredStringValue(
