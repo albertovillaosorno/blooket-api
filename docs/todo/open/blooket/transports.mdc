@@ -55,6 +55,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the extension worker started passing a generation-scoped
+browser port to each write host. A synthetic reconnect during an Add Question
+modal opener now prevents all later form scripts, including submission, and
+blocks an obsolete response from reaching the new workspace. Browser API
+calls already in flight cannot be undone, so this is a continuation safeguard
+rather than atomic ownership or live acceptance.
+
 On 2026-10-08, the Create Set Chrome host began requiring its observed
 response ID to match the unique decoded `id` query field on the confirmed
 Edit-page redirect. Extra reply fields, non-string IDs, ambiguous duplicate

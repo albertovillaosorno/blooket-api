@@ -196,6 +196,13 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, the extension worker began binding every browser-host tab and
+script action to the active connection identity and relay generation. When a
+workspace reconnects while an older write or My Sets read script is pending,
+the retired relay cannot inject follow-up scripts or report its stale result.
+Synthetic worker regressions cover both pending browser calls; this does not
+verify the lifecycle of a live authenticated browser extension.
+
 On 2026-10-08, the extension login host gained a fresh exact login-route
 confirmation before and after every prepared-state poll, because each injected
 helper receives credentials. A synthetic transition to another identity-origin
