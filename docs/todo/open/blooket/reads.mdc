@@ -94,6 +94,23 @@ visible heading on the two admitted origins. The read surface still refuses
 to return set data and never attempts to solve the verification. This is live
 challenge-state acceptance only, not authenticated read acceptance.
 
+While the verification title "Just a moment..." persists, an unrecognized
+heading remains `unexpected-page` rather than promoting an old authenticated
+shell to ready. The question, capability, and Edit Info injected helpers also
+refuse to click or read behind that exact observed title. Synthetic fixtures
+cover retained dashboard controls during an interstitial transition.
+
+The worker now confirms session state twice on the same completed browser tab,
+with a short event-loop yield and URL rechecks, within the existing read budget.
+A ready state that changes to a challenge at the same URL is rejected instead
+of publishing the first observation. This is a bounded consistency check, not
+an atomic snapshot or an attempt to evade the provider's verification.
+
+The isolated live extension read also traversed the canonical set-list
+application with a secret store that rejects every access. It returned
+`human-action-required` with state `security-challenge` without reading any
+credentials or attempting a set probe. No authenticated set baseline resulted.
+
 Missing or stale local instances fail closed. Local requests use exact loopback
 discovery, bounded responses, correlation checks, CSRF admission, and no
 redirects.

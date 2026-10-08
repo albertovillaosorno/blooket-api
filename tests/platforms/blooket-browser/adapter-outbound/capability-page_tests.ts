@@ -355,6 +355,7 @@ test(
 test("capability probes refuse a human prompt or missing session", () => {
   for (const mode of [
     "organization", "challenge", "password-overlay", "missing-shell",
+    "interstitial",
   ] as const) {
     const page = fixture();
     const activeDrawer = drawer("supported");
@@ -368,6 +369,9 @@ test("capability probes refuse a human prompt or missing session", () => {
       ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
     } else if (mode === "password-overlay") {
       page.document.selectors['input[type="password"]'] = [node("INPUT")];
+    } else if (mode === "interstitial") {
+      (page.document as FixtureNode & { title: string }).title =
+        "Just a moment...";
     } else {
       page.document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
     }

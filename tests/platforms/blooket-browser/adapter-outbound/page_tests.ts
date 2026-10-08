@@ -570,6 +570,7 @@ test("read routes encode IDs and panel opening never submits a form", () => {
 test("Edit Info opener refuses human-action overlays and lost sessions", () => {
   for (const mode of [
     "organization", "challenge", "password-overlay", "missing-shell",
+    "interstitial",
   ] as const) {
     const { document } = base();
     const button = node("BUTTON", "Edit Info");
@@ -594,6 +595,9 @@ test("Edit Info opener refuses human-action overlays and lost sessions", () => {
       ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
     } else if (mode === "password-overlay") {
       document.selectors['input[type="password"]'] = [node("INPUT")];
+    } else if (mode === "interstitial") {
+      (document as FixtureNode & { title: string }).title =
+        "Just a moment...";
     } else {
       document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
     }
@@ -625,10 +629,31 @@ test(
       });
       assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     });
-    (document as FixtureNode & { title: string }).title = "Unknown page";
+    (document as FixtureNode & { title: string }).title = "Just a moment...";
+    document.selectors["h1, h2, h3"] = [node("H1", "Ordinary page")];
+    if (origin.includes("dashboard")) {
+      const main = node("MAIN");
+      main.selectors["h1"] = [node("H1", "My Sets")];
+      main.selectors["article"] = [card()];
+      document.selectors["main"] = [main];
+      document.selectors['nav a[href="/my-sets"]'] = [
+        node("A", "My Sets"),
+      ];
+      document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+        node("A", "Logout"),
+      ];
+    }
     page(document, origin, () => {
       assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
         ok: true, value: "unexpected-page",
+      });
+      assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    });
+    (document as FixtureNode & { title: string }).title = "Unknown page";
+    page(document, origin, () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true,
+        value: origin.includes("dashboard") ? "my-sets" : "unexpected-page",
       });
     });
   }

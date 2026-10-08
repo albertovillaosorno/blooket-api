@@ -42,6 +42,7 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -93,6 +94,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -152,6 +154,7 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -225,6 +228,7 @@ export function inspectBlooketAudioCapabilityDrawer(
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -312,6 +316,7 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -379,6 +384,7 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -438,6 +444,7 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -504,6 +511,7 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&

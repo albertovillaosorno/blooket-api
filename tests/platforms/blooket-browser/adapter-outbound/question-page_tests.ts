@@ -544,6 +544,7 @@ test("question reads and Cancel stop behind human-action overlays", () => {
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     for (const mode of [
       "organization", "challenge", "missing-shell", "password-overlay",
+      "interstitial",
     ] as const) {
       if (mode === "organization") {
         const heading = node("H3", "Select your organization");
@@ -563,6 +564,10 @@ test("question reads and Cancel stop behind human-action overlays", () => {
         ] = [];
         if (mode === "missing-shell") {
           document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
+        } else if (mode === "interstitial") {
+          (document as FixtureNode & { title: string }).title =
+            "Just a moment...";
+          document.selectors['input[type="password"]'] = [];
         } else {
           document.selectors['a[href="https://id.blooket.com/logout"]'] = [
             node("A", "Logout"),

@@ -51,6 +51,8 @@ test(
   let detailReadCount = 0;
   let detailSwitchTabAfterScript = false;
   let sessionSwitchAfterScript: string | null = null;
+  let driftSessionAtSameRoute = false;
+  let sessionObservations = 0;
   let listFailuresRemaining = 0;
   let listDrifts = false;
   let listEmpty = false;
@@ -237,6 +239,15 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "session.observe" &&
+            driftSessionAtSameRoute) {
+          sessionObservations++;
+          return [{ result: {
+            ok: true,
+            value: sessionObservations === 1
+              ? "my-sets" : "security-challenge",
+          } }];
+        }
         if (operation.kind === "session.observe" &&
             sessionSwitchAfterScript !== null) {
           const observed = tabUrl.startsWith("https://id.blooket.com/")
@@ -629,6 +640,13 @@ test(
     const ready = await expectReply({ kind: "session.observe" });
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
+    driftSessionAtSameRoute = true;
+    sessionObservations = 0;
+    const changingSession = await expectReply({ kind: "session.observe" });
+    assert.equal(changingSession.ok, false);
+    assert.equal(sessionObservations, 2);
+    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    driftSessionAtSameRoute = false;
     sessionSwitchAfterScript = "https://id.blooket.com/login";
     const switchedReady = await expectReply({ kind: "session.observe" });
     assert.equal(switchedReady.ok, false);
