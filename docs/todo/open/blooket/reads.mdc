@@ -535,6 +535,18 @@ A Chrome submit call already started before a deadline cannot be recalled;
 a late return does not report login success or authorize a replay. These are
 portable fail-closed protections, not new live credential-submit acceptance.
 
+The in-memory browser broker also checks remaining request lifetime at
+extension dispatch. A queued authentication job needs at least eight seconds
+of its default ten-second window remaining, leaving a transport margin around
+the seven-second Chrome login-host budget. Expired jobs are discarded before
+dispatch, and a late completion cannot revive an expired result even if its
+timer callback has not yet run.
+
+Broker tests cover stale credential queueing, a fresh read behind a rejected
+login job, late completion, and normal single dispatch. The check prevents a
+near-expiry queued login job from initiating a late submit; it cannot cancel a
+Chrome click that already began, or prove successful remote authentication.
+
 Recovered dashboard module 88289 bounds the organization prompt without making
 it automatable. Search results become a selected organization only after a human
 chooses one; the form then submits hidden `schoolId` with `action=school`. The
