@@ -373,6 +373,14 @@ The injected functions each enforce those facts independently: extension
 Synthetic page tests cover mismatched, missing, duplicated, and wrong-type
 controls; this adds identity protection, not authenticated media acceptance.
 
+The question read, open, inspect, Cancel, and closure checks also revalidate
+an authenticated dashboard shell directly in each injected function. They stop
+on the recovered organization-selection dialog, a visible captcha iframe,
+or a password overlay. This prevents a previously ready edit route from
+reading stale question controls or clicking Cancel behind a human-action
+prompt. The same authenticated-shell evidence used for My Sets is required;
+these checks do not solve challenges or claim live browser acceptance.
+
 The canonical question-list decoder also enforces the worker's 200-item local
 read safety cap before traversing results. This is a resource bound, not a
 claim about Blooket's account or question-count limits.
