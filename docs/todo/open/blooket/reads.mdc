@@ -97,6 +97,18 @@ not a second attempt at data extraction or evidence of remote completeness.
 Portable tests cover all three read applications and verify zero secret access
 and zero authentication calls during the follow-up check.
 
+Capability inspection now uses the same post-failure policy. When a ready
+session's capability probe fails with the exact stable browser-failed code, the
+application performs one read-only observation to classify a challenge, rate
+limit, organization prompt, or newly signed-out state. A confirmed human or
+wait stop supersedes the generic inspection failure; signed-out requires
+credentials without reading or submitting them. An unavailable transport or
+unconfirmed follow-up preserves the original failure.
+
+The failed capability probe is never replayed. Portable tests cover the
+transition, no secret access, single re-observation, and failure preservation;
+this does not create new live authenticated capability evidence.
+
 Positive dashboard session states now also require the route's observed
 controls to be uniquely identified and visible. Create needs one visible form
 and one visible Create Set button inside it. Edit needs a visible page heading
