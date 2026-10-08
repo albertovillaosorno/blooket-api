@@ -247,8 +247,13 @@ export function runBlooketAddQuestionPageAction(
               normalizedText(peer) === "Show all answers").length === 1;
         });
       }
-      if (buttons.length !== 1) return false;
-      (buttons[0] as HTMLButtonElement).click();
+      if (buttons.length !== 1 || buttons[0]?.tagName !== "BUTTON")
+        return false;
+      const opener = buttons[0] as HTMLButtonElement;
+      const bounds = opener.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0 || opener.disabled ||
+          opener.getAttribute("aria-disabled") === "true") return false;
+      opener.click();
       return true;
     }
     if (action === "is-ready")
