@@ -138,3 +138,75 @@ test("a cancelled queued lease never consumes a mutation start", async () => {
   assert.equal(next.lease.startedAtMs, 2_000);
   next.lease.release();
 });
+
+test(
+  "queued cancellation resolves while the incumbent still holds its lease",
+  async () => {
+  const clock = virtualRuntime();
+  const pacer = createBlooketMutationPacer(undefined, clock.runtime);
+  const first = await pacer.acquire();
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  try {
+    const controller = new AbortController();
+    let settled = false;
+    const pending = pacer.acquire(controller.signal).then((result) => {
+      settled = true;
+      return result;
+    });
+    controller.abort();
+    for (let tick = 0; tick < 10; tick++) await Promise.resolve();
+    assert.equal(settled, true);
+    assert.deepEqual(await pending, {
+      ok: false, code: "mutation-pacing-cancelled",
+    });
+  } finally {
+    first.lease.release();
+  }
+  const next = await pacer.acquire();
+  assert.equal(next.ok, true);
+  if (!next.ok) return;
+  assert.equal(next.lease.startedAtMs, 2_000);
+  next.lease.release();
+  },
+);
+
+test(
+  "two canceled reservations cannot bypass the active pacing lease",
+  async () => {
+  const clock = virtualRuntime();
+  const pacer = createBlooketMutationPacer(undefined, clock.runtime);
+  const first = await pacer.acquire();
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  try {
+    const a = new AbortController();
+    const b = new AbortController();
+    const cancelledA = pacer.acquire(a.signal);
+    const cancelledB = pacer.acquire(b.signal);
+    let active = false;
+    const next = pacer.acquire().then((result) => {
+      active = true;
+      return result;
+    });
+    a.abort();
+    b.abort();
+    assert.deepEqual(await cancelledA, {
+      ok: false, code: "mutation-pacing-cancelled",
+    });
+    assert.deepEqual(await cancelledB, {
+      ok: false, code: "mutation-pacing-cancelled",
+    });
+    for (let tick = 0; tick < 10; tick++) await Promise.resolve();
+    assert.equal(active, false);
+    first.lease.release();
+    const acquired = await next;
+    assert.equal(acquired.ok, true);
+    if (!acquired.ok) return;
+    assert.equal(acquired.lease.startedAtMs, 2_000);
+    acquired.lease.release();
+  } finally {
+    first.lease.release();
+  }
+  },
+);
