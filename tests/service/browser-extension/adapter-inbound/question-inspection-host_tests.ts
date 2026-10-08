@@ -71,6 +71,9 @@ interface Scenario {
   readonly tabReadLatencyMs?: number;
   readonly switchAtEnumeration?: number;
   readonly switchOnSecondReadYield?: boolean;
+  readonly switchOnOpen?: boolean;
+  readonly switchOnCancel?: boolean;
+  readonly switchOnInspection?: boolean;
 }
 
 function synthetic(options: Scenario = {}) {
@@ -117,11 +120,15 @@ function synthetic(options: Scenario = {}) {
         }
         if (name === "openBlooketQuestionPanel") {
           assert.ok([1, 2].includes(request.args?.[1] as number));
+          if (options.switchOnOpen)
+            currentUrl = "https://dashboard.blooket.com/edit?id=other";
           return [{ result: options.opened ?? true }];
         }
         if (name === "inspectOpenedBlooketQuestion") {
           assert.ok([1, 2].includes(request.args?.[1] as number));
           inspections++;
+          if (options.switchOnInspection)
+            currentUrl = "https://dashboard.blooket.com/my-sets";
           if (options.inspectThrows ||
               inspections === options.throwAtInspection)
             throw new Error("synthetic-script-failed");
@@ -135,8 +142,11 @@ function synthetic(options: Scenario = {}) {
                 },
           }];
         }
-        if (name === "closeBlooketQuestionPanel")
+        if (name === "closeBlooketQuestionPanel") {
+          if (options.switchOnCancel)
+            currentUrl = "https://dashboard.blooket.com/create";
           return [{ result: options.canceled ?? true }];
+        }
         if (name === "isBlooketQuestionPanelClosed")
           return [{ result: options.panelClosed ?? true }];
         throw new Error("unexpected-script");
@@ -551,5 +561,40 @@ test(
   assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), false);
   assert.equal(fixture.calls.includes("isBlooketQuestionPanelClosed"), false);
   assert.equal(fixture.enumerations(), 1);
+  },
+);
+
+test(
+  "a tab switched during modal open is never inspected or canceled",
+  async () => {
+  const fixture = synthetic({ switchOnOpen: true });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.deepEqual(fixture.calls, [
+    "listBlooketQuestionNumbers", "openBlooketQuestionPanel",
+  ]);
+  },
+);
+
+test(
+  "a tab switched during cancellation is never polled for closure",
+  async () => {
+  const fixture = synthetic({ switchOnCancel: true });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.calls.filter(
+    (name) => name === "closeBlooketQuestionPanel",
+  ).length, 1);
+  assert.equal(fixture.calls.includes("isBlooketQuestionPanelClosed"), false);
+  assert.equal(fixture.enumerations(), 1);
+  },
+);
+
+test(
+  "a tab switched during modal inspection is not read again or canceled",
+  async () => {
+  const fixture = synthetic({ switchOnInspection: true });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.inspections(), 1);
+  assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), false);
+  assert.equal(fixture.calls.includes("isBlooketQuestionPanelClosed"), false);
   },
 );

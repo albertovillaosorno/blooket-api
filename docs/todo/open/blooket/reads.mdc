@@ -196,6 +196,14 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, question inspection added tab-ownership confirmations around
+each modal content script and before every post-Cancel closure poll. Synthetic
+route changes during open, read, and Cancel previously caused an additional
+script on a different user-selected route; the regressions now fail closed
+without that extra script. Cancellation remains best effort if the teacher has
+already navigated away, never evidence of successful cleanup. This is portable
+browser-host coverage only, not a live authenticated question-read test.
+
 On 2026-10-08, the private set-detail extension worker added route-ownership
 checks before and after each separately injected Edit Info opener and metadata
 read. A same-tab navigation to another set between the opener's browser reply
