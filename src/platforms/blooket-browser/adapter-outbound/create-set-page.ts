@@ -302,8 +302,22 @@ export function observeBlooketCreateSetSuccess():
   try {
     // A provider interstitial can retain the previous edit URL while the
     // authenticated controls are unavailable. Its URL is not a receipt.
+    const challenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    const organization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        heading.textContent?.trim() === "Select your organization";
+    });
     if (document.title === "Just a moment..." ||
-        document.querySelector('input[type="password"]') !== null)
+        document.querySelector('input[type="password"]') !== null ||
+        challenge || organization)
       return failed();
     const url = new URL(location.href);
     if (

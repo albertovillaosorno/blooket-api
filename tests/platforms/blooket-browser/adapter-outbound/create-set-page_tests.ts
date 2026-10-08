@@ -460,3 +460,23 @@ test("closed account menu permits the observed Create Set form", () => {
     }), { ok: true });
   });
 });
+
+test("Create Set redirects reject new organization and CAPTCHA prompts", () => {
+  for (const kind of ["organization", "captcha"] as const) {
+    const document = node("DOCUMENT");
+    if (kind === "organization")
+      document.selectors['[role="dialog"][aria-modal="true"] h3'] = [
+        node("H3", "Select your organization"),
+      ];
+    if (kind === "captcha")
+      document.selectors[
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+      ] = [node("IFRAME")];
+    withPage(document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.deepEqual(observeBlooketCreateSetSuccess(), {
+        ok: false, code: "blooket-browser-failed",
+      });
+    });
+  }
+});
