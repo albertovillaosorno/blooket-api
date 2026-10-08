@@ -444,3 +444,19 @@ test("canonical question fields keep browser safety bounds", () => {
     answers: [{...current.answers[0], content: "a".repeat(10_000)}],
   }).ok, true);
 });
+
+test("legacy answer values cannot ambiguously identify multiple rows", () => {
+  for (const candidate of [
+    { answers: ["sun", "sun"], correctAnswers: ["sun"],
+      answerTypes: ["exactly", "contains"], qType: "typing" },
+    { answers: ["red", "red"], correctAnswers: ["red"],
+      answerTypes: null, qType: "mc" },
+  ]) {
+    const result = decodeBlooketQuestionRead({
+      ...question, ...candidate,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues.some((issue) =>
+      issue.code === "duplicate-legacy-answer"), true);
+  }
+});

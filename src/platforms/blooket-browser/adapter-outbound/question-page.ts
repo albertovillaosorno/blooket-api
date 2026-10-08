@@ -307,6 +307,9 @@ export function inspectOpenedBlooketQuestion(
       (timeLimit as number) > 86_400 ||
       !Array.isArray(answers) ||
       answers.length > 100 ||
+      // The provider identifies correct rows by their string value. Duplicate
+      // values can fabricate correctness for more than one distinct answer.
+      new Set(answers).size !== answers.length ||
       !answers.every(
         (answer) =>
           typeof answer === "string" &&
