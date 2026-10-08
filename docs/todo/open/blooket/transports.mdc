@@ -62,6 +62,18 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, an authorized website check selected Upload by URL in the
+question-image drawer and submitted a public repository PNG. No native file
+picker opened. Save Question returned a third card, and a fresh Edit-page
+reload retained three questions and both question images, including the
+owner-selected photo in the second question.
+
+Reopening the third card confirmed the fictional typing prompt, its accepted
+answer, Is Exactly mode, 20-second limit, and rendered repository icon.
+Cancel closed the unchanged editor. This establishes the website path and
+persisted selector evidence only; the canonical media bridge and publication
+entrypoints remain unimplemented.
+
 On 2026-10-08, authorized Chrome creation of a private fictional development
 set confirmed two visible Add Question buttons on both empty and nonempty
 Edit pages. The lower button shares its immediate parent with the unique

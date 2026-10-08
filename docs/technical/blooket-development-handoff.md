@@ -54,6 +54,7 @@ capture belongs in this guide or a committed fixture.
 | Multiple choice | Two text answers and 15 seconds persisted. |
 | Typing | Contains, its text answer, and 10 seconds persisted. |
 | Question image | An owner-selected image persisted after save/reload. |
+| URL image | Public repository PNG persisted in a third question. |
 | Audio | This test account displayed the Plus upgrade drawer. |
 | Image drawer | Advertises < 2.5 MB and gallery/URL/file sources. |
 
@@ -62,11 +63,15 @@ Keep the exact privacy inversion and question match/timing semantics.
 UI persistence supports selector evidence; it does not prove canonical product
 CLI/MCP publication or media identity.
 
-A public repository image was inserted through Upload by URL into another
-fictional question editor without manual file selection. Saving that additional
-question was not confirmed before browser access became unavailable; it must
-not be counted as a published question. Inspect the current account state
-before retrying any mutation.
+A subsequent authorized Chrome check completed the public repository image
+test through Upload by URL without opening the operating-system file picker.
+Save Question returned a third card, and a fresh reload retained all three
+questions, both images, and the original owner-selected photo.
+
+Reopening the third card confirmed its fictional typing prompt, accepted
+answer, Is Exactly mode, 20-second limit, and rendered repository icon.
+The editor was canceled without changes. This verifies website persistence,
+not the product's pending media transport or CLI/MCP publication.
 
 Automatic local-file selection through the development browser tool was blocked
 by the browser extension's file-access permission. The account owner selected
