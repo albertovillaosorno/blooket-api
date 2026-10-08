@@ -292,14 +292,25 @@ async function read(
     return initial;
   }
   if (operation.kind === "sets.get") {
+    // The Edit Info opener is a click, not a pure read. Do not continue
+    // interacting with the tab after the teacher selects another route.
+    const ownsDetailRoute = async () => {
+      const observed = await chrome.tabs.get(current.tabId);
+      return Date.now() < readDeadline &&
+        observed.status === "complete" && observed.url === target;
+    };
     let opened = false;
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
       attempt++) {
+      if (!await ownsDetailRoute())
+        throw new Error("browser-details-unavailable");
       const result = await script(
         current,
         openBlooketDetailPanel as (...args: never[]) => unknown,
         [operation.setId],
       );
+      if (!await ownsDetailRoute())
+        throw new Error("browser-details-unavailable");
       if (result === true) {
         opened = true;
         break;
@@ -311,11 +322,15 @@ async function read(
     // Opening details is asynchronous; retry reads, never a form submission.
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
       attempt++) {
+      if (!await ownsDetailRoute())
+        throw new Error("browser-details-unavailable");
       const result = await script(
         current,
         inspectBlooketPage as (...args: never[]) => unknown,
         [operation],
       );
+      if (!await ownsDetailRoute())
+        throw new Error("browser-details-unavailable");
       if (
         result && typeof result === "object" && !Array.isArray(result) &&
         Object.keys(result).sort().join() === "ok,value" &&

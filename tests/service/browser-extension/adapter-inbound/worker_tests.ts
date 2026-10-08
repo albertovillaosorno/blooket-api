@@ -50,6 +50,7 @@ test(
   let detailDrifts = false;
   let detailReadCount = 0;
   let detailSwitchTabAfterScript = false;
+  let detailSwitchTabAfterOpen = false;
   let sessionSwitchAfterScript: string | null = null;
   let observedSessionOverride: string | null = null;
   let driftSessionAtSameRoute = false;
@@ -120,6 +121,10 @@ test(
         scripts.push(func.name);
         if (func.name === "openBlooketDetailPanel") {
           assert.deepEqual(args, ["opaque id/with spaces"]);
+          if (detailSwitchTabAfterOpen) {
+            detailSwitchTabAfterOpen = false;
+            tabUrl = "https://dashboard.blooket.com/edit?id=another-set";
+          }
           return [{ result: detailOpenSucceeds }];
         }
         if (func.name === "listBlooketQuestionNumbers")
@@ -517,6 +522,17 @@ test(
     assert.equal(switchedDetail.ok, false);
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=another-set");
+    detailSwitchTabAfterOpen = true;
+    const beforeSwitchedOpen = scripts.length;
+    const switchedOpen = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(switchedOpen.ok, false);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=another-set");
+    assert.deepEqual(scripts.slice(beforeSwitchedOpen), [
+      "openBlooketDetailPanel",
+    ]);
     detailDrifts = true;
     detailReadCount = 0;
     const driftedDetail = await expectReply({
