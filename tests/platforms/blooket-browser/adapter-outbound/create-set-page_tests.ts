@@ -162,6 +162,11 @@ function withPage(
 
 function fixture(privateSet: boolean) {
   const document = node("DOCUMENT");
+  document.selectors["main"] = [node("MAIN")];
+  document.selectors['nav a[href="/my-sets"]'] = [node("A", "My Sets")];
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+    node("A", "Logout"),
+  ];
   const form = node("FORM");
   const title = node("INPUT");
   const description = node("TEXTAREA");
@@ -400,4 +405,39 @@ test("human overlays block Create Set preparation and submission", () => {
       assert.equal(prepareBlooketCreateSetForm(input).ok, false);
     });
   }
+});
+
+
+test("stale Create Set controls cannot replace an authenticated shell", () => {
+  const input = { title: "Synthetic", description: "", private: true };
+  for (const missing of ["main", "navigation", "logout"] as const) {
+    const page = fixture(true);
+    const selector = missing === "main" ? "main" : missing === "navigation"
+      ? 'nav a[href="/my-sets"]'
+      : 'a[href="https://id.blooket.com/logout"]';
+    page.document.selectors[selector] = [];
+    page.title.value = input.title;
+    page.description.value = input.description;
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+      assert.equal(submitBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.form.selectors["button"]?.[0]?.clicked, 0);
+    });
+  }
+});
+
+test("closed account menu permits the observed Create Set form", () => {
+  const page = fixture(true);
+  const logout = page.document.selectors[
+    'a[href="https://id.blooket.com/logout"]'
+  ]![0]!;
+  logout.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  page.document.selectors['a[href="https://id.blooket.com/login"]'] = [
+    node("A", "Account"),
+  ];
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.deepEqual(prepareBlooketCreateSetForm({
+      title: "Synthetic", description: "", private: true,
+    }), { ok: true });
+  });
 });
