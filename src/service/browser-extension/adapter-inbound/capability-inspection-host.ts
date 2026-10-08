@@ -279,23 +279,40 @@ export function createExtensionCapabilityInspectionHost(
       } finally {
         // If the user navigated away, this probe no longer owns the editor
         // DOM and must not inject cleanup actions into their new page.
+        const cleanupUrl = setId === undefined ? undefined :
+          DASHBOARD_ORIGIN + "/edit?id=" + encodeURIComponent(setId);
         const tabBeforeCleanup = await chrome.tabs.get(tabId)
           .catch(() => undefined);
-        const canClean = setId !== undefined &&
+        const canClean = cleanupUrl !== undefined &&
           tabBeforeCleanup?.status === "complete" &&
-          tabBeforeCleanup.url === DASHBOARD_ORIGIN + "/edit?id=" +
-            encodeURIComponent(setId);
+          tabBeforeCleanup.url === cleanupUrl;
+        // Chrome serializes each cleanup helper independently. The initial
+        // route check does not own later scripts if the user navigates during
+        // Cancel or a closure poll, so recheck around every helper.
+        const cleanupScript = async (
+          func: (...args: never[]) => unknown,
+          args: unknown[] = [],
+        ): Promise<unknown> => {
+          const before = await chrome.tabs.get(tabId);
+          if (before.status !== "complete" || before.url !== cleanupUrl)
+            throw new Error("browser-capability-tab-changed");
+          const result = await script(func, args);
+          const after = await chrome.tabs.get(tabId);
+          if (after.status !== "complete" || after.url !== cleanupUrl)
+            throw new Error("browser-capability-tab-changed");
+          return result;
+        };
         if (!canClean && (panelOpened || drawerOpened))
           outcome = browserFailure();
         if (canClean && setId !== undefined && drawerOpened) {
           const cleaned = await closeDrawer(
-            script, setId, pause, finishDeadline, now,
+            cleanupScript, setId, pause, finishDeadline, now,
           );
           if (!cleaned) outcome = browserFailure();
         }
         if (canClean && setId !== undefined && panelOpened) {
           const cleaned = await closeQuestionPanel(
-            script, setId, pause, finishDeadline, now,
+            cleanupScript, setId, pause, finishDeadline, now,
           );
           if (!cleaned) outcome = browserFailure();
         }
