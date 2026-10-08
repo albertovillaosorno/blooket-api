@@ -91,6 +91,15 @@ export function inspectBlooketPage(
         ? { ok: true, value: "security-challenge" }
         : failed();
     }
+    // Interstitials can temporarily keep an old React shell mounted while
+    // its verification heading is replaced. Never use that shell as evidence.
+    if (document.title === "Just a moment...") {
+      return operation.kind === "session.observe" &&
+          (url.origin === "https://id.blooket.com" ||
+            url.origin === "https://dashboard.blooket.com")
+        ? { ok: true, value: "unexpected-page" }
+        : failed();
+    }
     if (
       operation.kind === "session.observe" &&
       url.origin === "https://id.blooket.com"
@@ -355,6 +364,7 @@ export function openBlooketDetailPanel(setId: string): boolean {
   // This opener executes separately from the guarded metadata read. A prior
   // session observation cannot authorize a click behind a new human prompt.
   const authenticated =
+    document.title !== "Just a moment..." &&
     document.querySelector("main") !== null &&
     document.querySelector('input[type="password"]') === null &&
     document.querySelector('nav a[href="/my-sets"]') !== null &&

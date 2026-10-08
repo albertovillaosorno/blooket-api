@@ -372,6 +372,26 @@ async function read(
       currentTab.status !== "complete" ||
       currentTab.url !== tab.url
     ) throw new Error("browser-session-changed");
+    // React or a verification interstitial can change without navigation.
+    // A single read cannot establish the current state in that transition.
+    await pause(100);
+    if (Date.now() >= readDeadline)
+      throw new Error("browser-session-changed");
+    const beforeAgain = await chrome.tabs.get(current.tabId);
+    if (beforeAgain.status !== "complete" || beforeAgain.url !== tab.url)
+      throw new Error("browser-session-changed");
+    const again = await script(
+      current,
+      inspectBlooketPage as (...args: never[]) => unknown,
+      [operation],
+    );
+    const afterAgain = await chrome.tabs.get(current.tabId);
+    if (
+      Date.now() >= readDeadline ||
+      afterAgain.status !== "complete" ||
+      afterAgain.url !== tab.url ||
+      JSON.stringify(observed) !== JSON.stringify(again)
+    ) throw new Error("browser-session-changed");
   }
   return observed;
 }

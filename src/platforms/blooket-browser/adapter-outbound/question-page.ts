@@ -42,6 +42,7 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -118,6 +119,7 @@ export function openBlooketQuestionPanel(
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -184,6 +186,7 @@ export function inspectOpenedBlooketQuestion(
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -407,6 +410,7 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
@@ -473,6 +477,7 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
     const authenticated =
+      document.title !== "Just a moment..." &&
       document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
       document.querySelector('nav a[href="/my-sets"]') !== null &&
