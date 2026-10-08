@@ -92,6 +92,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     return (
       setIds.length === 1 &&
       setIds[0]?.tagName === "INPUT" &&
+      setIds[0].getAttribute("type") === "hidden" &&
       (setIds[0] as HTMLInputElement).value === setId
     );
   } catch {
@@ -118,8 +119,19 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     );
     if (questions.length !== 1 || questions[0]?.tagName !== "INPUT")
       return false;
-    const form = questions[0]!.closest("form");
-    if (!form) return false;
+    const question = questions[0]!;
+    if (question.getAttribute("type") !== "hidden") return false;
+    const form = question.closest("form");
+    if (form?.tagName !== "FORM") return false;
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return false;
     const buttons = Array.from(form.querySelectorAll("button")).filter(
       (button) => normalized(button) === "Audio",
     );
@@ -150,6 +162,23 @@ export function inspectBlooketAudioCapabilityDrawer(
       url.searchParams.get("id") !== setId
     )
       return failed();
+    const questions = Array.from(
+      document.querySelectorAll('input#question[name="question"]'),
+    );
+    if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
+        questions[0].getAttribute("type") !== "hidden")
+      return failed();
+    const form = questions[0]!.closest("form");
+    if (form?.tagName !== "FORM") return failed();
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return failed();
     const drawers = Array.from(
       document.querySelectorAll('aside[data-drawer-open="true"]'),
     );
@@ -194,6 +223,23 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       url.searchParams.get("id") !== setId
     )
       return false;
+    const questions = Array.from(
+      document.querySelectorAll('input#question[name="question"]'),
+    );
+    if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
+        questions[0].getAttribute("type") !== "hidden")
+      return false;
+    const form = questions[0]!.closest("form");
+    if (form?.tagName !== "FORM") return false;
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return false;
     const drawers = Array.from(
       document.querySelectorAll('aside[data-drawer-open="true"]'),
     );
@@ -212,6 +258,23 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
 export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
   try {
     const url = new URL(location.href);
+    const questions = Array.from(
+      document.querySelectorAll('input#question[name="question"]'),
+    );
+    if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
+        questions[0].getAttribute("type") !== "hidden")
+      return false;
+    const form = questions[0]!.closest("form");
+    if (form?.tagName !== "FORM") return false;
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return false;
     return (
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
@@ -220,8 +283,7 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       url.searchParams.get("id") === setId &&
       document.querySelectorAll(
         'aside[data-drawer-open="true"]',
-      ).length === 0 &&
-      document.querySelector('input#question[name="question"]') !== null
+      ).length === 0
     );
   } catch {
     return false;
@@ -245,9 +307,20 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
-    if (questions.length !== 1) return false;
+    if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
+        questions[0].getAttribute("type") !== "hidden")
+      return false;
     const form = questions[0]!.closest("form");
-    if (!form) return false;
+    if (form?.tagName !== "FORM") return false;
+    const identities = Array.from(form.querySelectorAll(
+      'input#setId[name="setId"]',
+    ));
+    if (
+      identities.length !== 1 ||
+      identities[0]?.tagName !== "INPUT" ||
+      identities[0].getAttribute("type") !== "hidden" ||
+      (identities[0] as HTMLInputElement).value !== setId
+    ) return false;
     const cancels = Array.from(
       form.querySelectorAll('button[type="button"]'),
     ).filter((button) => normalized(button) === "Cancel");
