@@ -112,16 +112,33 @@ export function createExtensionCapabilityInspectionHost(
       const startedAt = now();
       const probeDeadline = startedAt + PROBE_BUDGET_MS;
       const finishDeadline = startedAt + TOTAL_BUDGET_MS;
+      let expectedReadUrl = MY_SETS_URL;
       const readScript = async (
         func: (...args: never[]) => unknown,
         args: unknown[] = [],
       ): Promise<unknown> => {
         if (now() >= probeDeadline)
           throw new Error("browser-capability-deadline");
+        const beforeScript = await chrome.tabs.get(tabId);
+        if (
+          now() >= probeDeadline || beforeScript.status !== "complete" ||
+          beforeScript.url !== expectedReadUrl
+        ) throw new Error("browser-capability-tab-changed");
         const result = await script(func, args);
         if (now() >= probeDeadline)
           throw new Error("browser-capability-deadline");
+        const afterScript = await chrome.tabs.get(tabId);
+        if (
+          now() >= probeDeadline || afterScript.status !== "complete" ||
+          afterScript.url !== expectedReadUrl
+        ) throw new Error("browser-capability-tab-changed");
         return result;
+      };
+      const editorReady = async (url: string): Promise<boolean> => {
+        if (now() >= probeDeadline) return false;
+        const tab = await chrome.tabs.get(tabId);
+        return now() < probeDeadline &&
+          tab.status === "complete" && tab.url === url;
       };
       let originalUrl: string | undefined;
       let setId: string | undefined;
@@ -149,6 +166,28 @@ export function createExtensionCapabilityInspectionHost(
         );
         const selected = firstSetId(listed);
         if (selected === undefined) return browserFailure();
+        // Compare two My Sets views before selecting a probe set or
+        // accepting the recovered empty-account state.
+        await pause(Math.min(POLL_MS, probeDeadline - now()));
+        if (now() >= probeDeadline) return browserFailure();
+        const beforeListConfirmation = await chrome.tabs.get(tabId);
+        if (
+          now() >= probeDeadline ||
+          beforeListConfirmation.status !== "complete" ||
+          beforeListConfirmation.url !== MY_SETS_URL
+        ) return browserFailure();
+        const listedAgain = await readScript(
+          inspectBlooketPage as (...args: never[]) => unknown,
+          [{ kind: "sets.list" }],
+        );
+        if (JSON.stringify(listed) !== JSON.stringify(listedAgain) ||
+            firstSetId(listedAgain) !== selected) return browserFailure();
+        const afterListConfirmation = await chrome.tabs.get(tabId);
+        if (
+          now() >= probeDeadline ||
+          afterListConfirmation.status !== "complete" ||
+          afterListConfirmation.url !== MY_SETS_URL
+        ) return browserFailure();
 
         let accountMedia: BlooketAccountMediaAvailability = "account-dependent";
         if (selected !== null) {
@@ -160,19 +199,20 @@ export function createExtensionCapabilityInspectionHost(
             probeDeadline, now,
           ))
             return browserFailure();
+          expectedReadUrl = editUrl;
           const editState = await readScript(
             inspectBlooketPage as (...args: never[]) => unknown,
             [{ kind: "session.observe" }],
           );
           if (!exactObservedState(editState, "edit")) return browserFailure();
 
-          if (now() >= probeDeadline) return browserFailure();
+          if (!await editorReady(editUrl)) return browserFailure();
           const opened = await script(
             openBlooketCapabilityQuestionPanel as (...args: never[]) => unknown,
             [setId],
           );
           panelOpened = opened === true;
-          if (!panelOpened || now() >= probeDeadline)
+          if (!panelOpened || !await editorReady(editUrl))
             return browserFailure();
           if (!await pollTrue(
             readScript,
@@ -184,18 +224,45 @@ export function createExtensionCapabilityInspectionHost(
           ))
             return browserFailure();
 
-          if (now() >= probeDeadline) return browserFailure();
+          if (!await editorReady(editUrl)) return browserFailure();
           const drawer = await script(
             openBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
             [setId],
           );
           drawerOpened = drawer === true;
-          if (!drawerOpened || now() >= probeDeadline)
+          if (!drawerOpened || !await editorReady(editUrl))
             return browserFailure();
           const inspected = await pollCapability(
             readScript, setId, pause, probeDeadline, now,
           );
           if (inspected === undefined) return browserFailure();
+          // A Plus gate can change while the Audio drawer is open. Require
+          // two exact observations, without retrying a contradictory reply.
+          await pause(Math.min(POLL_MS, probeDeadline - now()));
+          if (now() >= probeDeadline) return browserFailure();
+          const tabBeforeConfirmation = await chrome.tabs.get(tabId);
+          if (
+            now() >= probeDeadline ||
+            tabBeforeConfirmation.status !== "complete" ||
+            tabBeforeConfirmation.url !== editUrl
+          ) return browserFailure();
+          const again = await readScript(
+            inspectBlooketAudioCapabilityDrawer as
+              (...args: never[]) => unknown,
+            [setId],
+          );
+          if (
+            !again || typeof again !== "object" || Array.isArray(again) ||
+            Object.keys(again).sort().join() !== "ok,value" ||
+            !("ok" in again) || again.ok !== true ||
+            !("value" in again) || again.value !== inspected
+          ) return browserFailure();
+          const tabAfterConfirmation = await chrome.tabs.get(tabId);
+          if (
+            now() >= probeDeadline ||
+            tabAfterConfirmation.status !== "complete" ||
+            tabAfterConfirmation.url !== editUrl
+          ) return browserFailure();
           accountMedia = inspected;
         }
 

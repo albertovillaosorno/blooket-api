@@ -52,6 +52,7 @@ function fixture(options: {
   readonly restoreFails?: boolean;
   readonly cleanupPollThrows?: "drawer" | "question";
   readonly audioProbeReplies?: readonly unknown[];
+  readonly setListReplies?: readonly unknown[];
   readonly panelReadyReplies?: readonly unknown[];
   readonly audioClosedReplies?: readonly unknown[];
   readonly questionClosedReplies?: readonly unknown[];
@@ -61,6 +62,7 @@ function fixture(options: {
   let panelOpen = false;
   let drawerOpen = false;
   let audioProbeCount = 0;
+  let setListCount = 0;
   let panelReadyCount = 0;
   let audioClosedCount = 0;
   let questionClosedCount = 0;
@@ -103,6 +105,8 @@ function fixture(options: {
               }];
             }
             if (operation.kind === "sets.list") {
+              const supplied = options.setListReplies?.[setListCount++];
+              if (supplied !== undefined) return [{ result: supplied }];
               if (options.malformedList)
                 return [{
                   result: {
@@ -237,6 +241,9 @@ test(
   ).inspect();
   assert.equal(result.ok, true);
   assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.filter(
+    (name) => name === "inspectBlooketPage",
+  ).length, 3);
   assert.equal(
     page.scripts.includes("openBlooketCapabilityQuestionPanel"),
     false,
@@ -632,6 +639,7 @@ test(
     { ok: false, code: "blooket-browser-failed" },
     { ok: false, code: "blooket-browser-failed" },
     { ok: true, value: "unsupported" },
+    { ok: true, value: "unsupported" },
   ] });
   const result = await createExtensionCapabilityInspectionHost(
     page.chrome, 7, noPause,
@@ -644,7 +652,7 @@ test(
   }
   assert.equal(page.scripts.filter(
     (name) => name === "inspectBlooketAudioCapabilityDrawer",
-  ).length, 3);
+  ).length, 4);
   assert.equal(page.currentUrl(), page.originalUrl);
   },
 );
@@ -704,3 +712,301 @@ test("malformed already-closed evidence never authorizes Cancel", async () => {
       ), false);
   }
 });
+
+test(
+  "media availability must agree across two exact drawer observations",
+  async () => {
+  for (const audioProbeReplies of [
+    [
+      { ok: true, value: "supported" },
+      { ok: true, value: "unsupported" },
+    ],
+    [
+      { ok: true, value: "unsupported" },
+      { ok: true, value: "supported" },
+    ],
+    [
+      { ok: true, value: "supported" },
+      { ok: true, value: "supported", extra: "provider-secret" },
+    ],
+    [
+      { ok: true, value: "supported" },
+      { ok: false, code: "blooket-browser-failed" },
+    ],
+  ]) {
+    const page = fixture({ audioProbeReplies });
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.scripts.filter(
+      (name) => name === "inspectBlooketAudioCapabilityDrawer",
+    ).length, 2);
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
+    assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+    assert.equal(JSON.stringify(result).includes("provider-secret"), false);
+  }
+  },
+);
+
+
+test(
+  "expiring before capability confirmation invalidates the snapshot",
+  async () => {
+  const page = fixture();
+  let clock = 0;
+  const execute = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (request) => {
+    const result = await execute(request);
+    if (request.func.name === "inspectBlooketAudioCapabilityDrawer") {
+      clock = 5_950;
+    }
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, async (ms) => { clock += ms; }, () => clock,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.scripts.filter(
+    (name) => name === "inspectBlooketAudioCapabilityDrawer",
+  ).length, 1);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
+  assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+  },
+);
+
+
+test(
+  "capability inspection rejects a changing My Sets collection",
+  async () => {
+  const empty = { ok: true, value: {
+    completeness: "complete", items: [],
+  } };
+  const present = { ok: true, value: {
+    completeness: "unknown", items: [{
+      schemaVersion: 1, id: "set-fixture", title: "Synthetic fixture",
+    }],
+  } };
+  const changed = { ok: true, value: {
+    completeness: "unknown", items: [{
+      schemaVersion: 1, id: "set-fixture", title: "Changed title",
+    }],
+  } };
+  for (const setListReplies of [
+    [empty, present],
+    [present, empty],
+    [present, changed],
+    [present, { ok: true, value: present.value, private: "secret" }],
+  ]) {
+    const page = fixture({ setListReplies });
+    const outcome = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(outcome, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(page.scripts.filter(
+      (name) => name === "inspectBlooketPage",
+    ).length, 3);
+    assert.equal(page.scripts.includes(
+      "openBlooketCapabilityQuestionPanel",
+    ), false);
+  }
+  },
+);
+
+
+test(
+  "a user route change during My Sets confirmation aborts the probe",
+  async () => {
+  const page = fixture();
+  const manuallySelected = "https://dashboard.blooket.com/create";
+  let listReads = 0;
+  const script = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (input) => {
+    const result = await script(input);
+    if (input.func.name === "inspectBlooketPage" &&
+        (input.args?.[0] as { readonly kind?: string } | undefined)?.kind ===
+          "sets.list" && ++listReads === 2)
+      await page.chrome.tabs.update(7, { url: manuallySelected });
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(listReads, 2);
+  assert.equal(page.currentUrl(), manuallySelected);
+  assert.equal(page.navigations.at(-1), manuallySelected);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test(
+  "an overdue My Sets confirmation never begins an editor probe",
+  async () => {
+  const page = fixture({ empty: true });
+  let clock = 0;
+  let listReads = 0;
+  const script = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (input) => {
+    const result = await script(input);
+    if (input.func.name === "inspectBlooketPage" &&
+        (input.args?.[0] as { readonly kind?: string } | undefined)?.kind ===
+          "sets.list" && ++listReads === 2)
+      clock = 6_100;
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause, () => clock,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(listReads, 2);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test(
+  "an edit-page navigation during observation cannot open Add Question",
+  async () => {
+  const page = fixture();
+  const manualRoute = "https://dashboard.blooket.com/create";
+  const script = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (input) => {
+    const result = await script(input);
+    if (input.func.name === "inspectBlooketPage" &&
+        (input.args?.[0] as { kind?: string } | undefined)?.kind ===
+          "session.observe" && page.currentUrl().includes("/edit?id="))
+      await page.chrome.tabs.update(7, { url: manualRoute });
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.currentUrl(), manualRoute);
+  assert.equal(page.navigations.at(-1), manualRoute);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test(
+  "a switched tab during question readiness never opens Audio",
+  async () => {
+  const page = fixture();
+  const manualRoute = "https://dashboard.blooket.com/create";
+  const script = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (input) => {
+    const result = await script(input);
+    if (input.func.name === "isBlooketCapabilityQuestionPanelReady")
+      await page.chrome.tabs.update(7, { url: manualRoute });
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.currentUrl(), manualRoute);
+  assert.equal(page.scripts.includes(
+    "openBlooketAudioCapabilityDrawer",
+  ), false);
+  assert.equal(page.scripts.includes(
+    "closeBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test(
+  "a user route change before the modal opener skips the click script",
+  async () => {
+  const page = fixture();
+  const manualRoute = "https://dashboard.blooket.com/create";
+  let afterEditObservation = false;
+  let editTabReads = 0;
+  const script = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (input) => {
+    const result = await script(input);
+    if (input.func.name === "inspectBlooketPage" &&
+        (input.args?.[0] as { kind?: string } | undefined)?.kind ===
+          "session.observe" && page.currentUrl().includes("/edit?id="))
+      afterEditObservation = true;
+    return result;
+  };
+  const get = page.chrome.tabs.get;
+  page.chrome.tabs.get = async (id: number) => {
+    const tab = await get(id);
+    if (afterEditObservation && ++editTabReads === 2) {
+      await page.chrome.tabs.update(id, { url: manualRoute });
+      return { status: "complete", url: manualRoute };
+    }
+    return tab;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.currentUrl(), manualRoute);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test(
+  "a user route change before the Audio opener skips its click script",
+  async () => {
+  const page = fixture();
+  const manualRoute = "https://dashboard.blooket.com/create";
+  let afterQuestionReady = false;
+  let postReadyTabReads = 0;
+  const script = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (input) => {
+    const result = await script(input);
+    if (input.func.name === "isBlooketCapabilityQuestionPanelReady")
+      afterQuestionReady = true;
+    return result;
+  };
+  const get = page.chrome.tabs.get;
+  page.chrome.tabs.get = async (id: number) => {
+    const tab = await get(id);
+    if (afterQuestionReady && ++postReadyTabReads === 2) {
+      await page.chrome.tabs.update(id, { url: manualRoute });
+      return { status: "complete", url: manualRoute };
+    }
+    return tab;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.currentUrl(), manualRoute);
+  assert.equal(page.scripts.includes(
+    "openBlooketAudioCapabilityDrawer",
+  ), false);
+  assert.equal(page.scripts.includes(
+    "closeBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);

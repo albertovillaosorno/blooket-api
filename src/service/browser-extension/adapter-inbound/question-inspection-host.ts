@@ -144,6 +144,8 @@ export function createExtensionQuestionInspectionHost(
   ): Promise<boolean> => {
     // Cleanup is attempted even after a deadline; it cannot confirm success
     // unless the exact tab and panel closure are actually observed.
+    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+    if (tab?.status !== "complete" || tab.url !== url) return false;
     const canceled = await script(
       closeBlooketQuestionPanel as (...args: never[]) => unknown,
       [setId],
@@ -215,7 +217,8 @@ export function createExtensionQuestionInspectionHost(
               // A question may change while the modal remains open even when
               // its row number is unchanged. Compare canonical facts twice.
               await pause(0);
-              if (now() >= deadline) invalid = true;
+              if (now() >= deadline || !await ready(url, deadline))
+                invalid = true;
               else {
                 const again = await script(
                   inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
