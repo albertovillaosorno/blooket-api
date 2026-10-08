@@ -228,6 +228,11 @@ task 08 and publication tasks 09-12. Portable doubles are not browser
 acceptance, and no live login, question read-back, or capability probe is
 claimed.
 
+Canonical set and question read applications also admit only exact browser
+probe envelopes. Malformed failure codes, extra fields on success or failure,
+and invalid runtime shapes become stable secret-free read failures before
+reaching the public command layer; decoded content remains independently gated.
+
 Session observation and one-shot authentication now validate the browser port's
 exact runtime result shape, not merely its TypeScript declaration. Unexpected
 fields, synthetic success flags, and unknown failure codes become a stable
