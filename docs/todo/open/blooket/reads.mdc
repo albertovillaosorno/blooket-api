@@ -109,6 +109,13 @@ The failed capability probe is never replayed. Portable tests cover the
 transition, no secret access, single re-observation, and failure preservation;
 this does not create new live authenticated capability evidence.
 
+The canonical command entrypoint also preserves a newly discovered security
+challenge for all four read-only operations: set list, set details, questions,
+and capability inspection. It returns the typed human-action stop rather than
+a generic CLI failure. Regression fixtures ensure exactly one failed probe and
+one follow-up session observation, with no automatic login, secret access, or
+read replay. This verifies command composition, not live account acceptance.
+
 Positive dashboard session states now also require the route's observed
 controls to be uniquely identified and visible. Create needs one visible form
 and one visible Create Set button inside it. Edit needs a visible page heading
