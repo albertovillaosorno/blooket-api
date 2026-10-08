@@ -346,6 +346,23 @@ and resolved afterward. Both responses now cancel their owned bodies without
 waiting for an uncooperative stream. The focused download suite passes nine
 tests; strict TypeScript also passes. No installation or Apple trust is implied.
 
+### Signed manifest retrieval
+
+On 2026-10-08, the update-download adapter gained bounded retrieval of the
+fixed `update-manifest.json` release asset. It validates the selected ARM64
+release context and local publisher-key availability before network access,
+uses the same anonymous restricted GitHub/CDN transport as archive staging,
+and admits at most one megabyte within ten seconds. HTTP failures, invalid
+UTF-8/JSON, timeout, cancellation, and signature failure remain explicit.
+
+Nine deterministic tests cover retrieval-to-archive staging with an ephemeral
+publisher, tampering, unknown keys, foreign release context/redirects, response
+limits, hangs, and cancellation between redirects. This connects portable
+authentication and staging; it does not enable startup traffic, installations,
+or a production trust root. A read-only repository configuration check returned
+no Actions secrets or variables; no signing credentials were provisioned or
+exposed.
+
 ## Blockers
 
 Lifecycle safety, production publisher keys/manifest publication, extraction,
