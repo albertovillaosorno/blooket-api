@@ -50,6 +50,10 @@ const MIN_AUTH_DISPATCH_MS = 8_000;
 // command must retain those budgets plus transport margin when dispatched.
 const MIN_READ_DISPATCH_MS = 8_500;
 const MIN_CAPABILITY_DISPATCH_MS = 9_500;
+// Browser Create Set and Add Question combine navigation, a single click,
+// and independent read-back. Never dispatch close to broker expiry; a form
+// can still mutate after the caller has stopped waiting for its reply.
+const MIN_WRITE_DISPATCH_MS = 9_500;
 
 interface PendingJob {
   readonly request: BlooketBrowserBridgeRequest;
@@ -187,7 +191,9 @@ export function createBlooketBrowserBridgeBroker(
           ? MIN_AUTH_DISPATCH_MS
           : kind === "capabilities.inspect"
             ? MIN_CAPABILITY_DISPATCH_MS
-            : kind === "session.observe" || kind === "sets.list" ||
+            : kind === "sets.create" || kind === "questions.create"
+              ? MIN_WRITE_DISPATCH_MS
+              : kind === "session.observe" || kind === "sets.list" ||
                 kind === "sets.get" || kind === "questions.list"
               ? MIN_READ_DISPATCH_MS
               : 0;

@@ -497,3 +497,62 @@ test("pairing reset settles both active and queued jobs", async () => {
   assert.equal(broker.status().pending, 0);
   broker.close();
 });
+
+test(
+  "near-expired browser writes are refused before form actions",
+  async () => {
+  const commands = [
+    {
+      kind: "sets.create" as const,
+      title: "Synthetic", description: "", private: true,
+    },
+    {
+      kind: "questions.create" as const,
+      setId: "synthetic-set", number: 1, question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing" as const,
+      random: true, answerTypes: ["exactly" as const], timeLimit: 15,
+    },
+  ];
+  for (const command of commands) {
+    let tick = 10_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    const pending = broker.request(command);
+    tick += 501;
+    assert.equal(broker.next(TOKEN), null);
+    assert.deepEqual(await pending, {
+      ok: false, code: "blooket-browser-unavailable",
+    });
+    assert.equal(broker.status().pending, 0);
+    broker.close();
+  }
+  },
+);
+
+test(
+  "fresh browser write jobs remain singly dispatchable",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN, now: () => tick,
+  });
+  const pending = broker.request({
+    kind: "sets.create", title: "Synthetic", description: "", private: true,
+  });
+  tick += 500;
+  const job = broker.next(TOKEN);
+  assert.ok(job);
+  assert.equal(job.command.kind, "sets.create");
+  assert.equal(broker.next(TOKEN), null);
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: job.id,
+    ok: true, value: { ok: true, remoteSetId: "synthetic-set" },
+  }), true);
+  assert.deepEqual(await pending, {
+    ok: true, value: { ok: true, remoteSetId: "synthetic-set" },
+  });
+  broker.close();
+  },
+);
