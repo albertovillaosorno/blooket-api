@@ -305,7 +305,11 @@ async function read(
     return { ok: true, value: questions };
   }
   if (operation.kind === "sets.get") {
-    await script(current, openBlooketDetailPanel);
+    await script(
+      current,
+      openBlooketDetailPanel as (...args: never[]) => unknown,
+      [operation.setId],
+    );
     // Opening details is asynchronous; retry reads, never a form submission.
     for (let attempt = 0; attempt < 15; attempt++) {
       const result = await script(

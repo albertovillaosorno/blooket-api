@@ -103,7 +103,10 @@ test(
         }
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
-        if (func.name === "openBlooketDetailPanel") return [{ result: true }];
+        if (func.name === "openBlooketDetailPanel") {
+          assert.deepEqual(args, ["opaque id/with spaces"]);
+          return [{ result: true }];
+        }
         if (func.name === "listBlooketQuestionNumbers")
           return [{ result: { ok: true, value: [1] } }];
         if (func.name === "openBlooketQuestionPanel")

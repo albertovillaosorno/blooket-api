@@ -119,6 +119,11 @@ test(
       output,
       "src/platforms/blooket-browser/adapter-outbound/question-page.js",
     ));
+    const readPage = compiled(join(
+      output,
+      "src/platforms/blooket-browser/adapter-outbound/page.js",
+    ));
+    assert.equal(readPage.openBlooketDetailPanel.length, 1);
     assert.equal(questionPage.openBlooketQuestionPanel.length, 2);
     assert.equal(questionPage.inspectOpenedBlooketQuestion.length, 2);
     assert.equal(questionPage.closeBlooketQuestionPanel.length, 1);
