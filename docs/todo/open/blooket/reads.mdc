@@ -204,6 +204,20 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, authorized Chrome inspection of the live dashboard revealed
+that the account menu keeps its unique Logout link mounted but hidden while
+closed. The visible account link points to the identity login route and has
+nonempty account text. Requiring Logout itself to be visible incorrectly
+classified the signed-in My Sets, Create, and Edit pages as unexpected.
+
+The readers now admit that closed-menu shape only with one visible nonempty
+account link, the exact unique Logout marker, and the existing visible main,
+navigation, route, and operation controls. Missing/duplicate markers, password
+overlays, challenges, and organization stops still fail closed. Synthetic
+regressions cover list, question, and capability entrypoints. Account text is
+never returned or copied into fixtures; this live observation does not prove
+product-extension or collection-completeness acceptance.
+
 On 2026-10-08, the Audio drawer observer began refusing a disabled file
 input as proof of account support. The synthetic regression demonstrates
 that a disabled picker previously produced a supported result; it now fails

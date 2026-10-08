@@ -708,3 +708,26 @@ test("all injected question actions work without imported closures", () => {
     assert.equal(closed, 1);
   });
 });
+
+
+test("question reads accept the observed closed account menu", () => {
+  const document = node("DOCUMENT");
+  const logout = node("A", "Logout");
+  logout.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  document.selectors['a[href="https://id.blooket.com/logout"]'] = [logout];
+  const profile = node("A", "Synthetic account");
+  document.selectors['a[href="https://id.blooket.com/login"]'] = [profile];
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [node("DIV", "", { "aria-label": "Edit question 1" })];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
+      ok: true, value: [1],
+    });
+    profile.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    profile.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    document.selectors['input[type="password"]'] = [node("INPUT")];
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+  });
+});

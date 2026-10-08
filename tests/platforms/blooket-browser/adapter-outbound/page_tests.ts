@@ -960,3 +960,29 @@ test("injected page readers work without module lexical scope", () => {
     assert.equal(open("fixture"), false);
   });
 });
+
+
+test("closed account menu retains a visible authenticated profile", () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  const logout = document.selectors[
+    'a[href="https://id.blooket.com/logout"]'
+  ]![0]!;
+  logout.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  const account = node("A", "Synthetic account");
+  document.selectors['a[href="https://id.blooket.com/login"]'] = [account];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "my-sets",
+    });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, true);
+    account.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    account.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    account.textContent = "";
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    account.textContent = "Synthetic account";
+    document.selectors['a[href="https://id.blooket.com/login"]']!.push(account);
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+});
