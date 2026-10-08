@@ -209,6 +209,10 @@ export function createExtensionCreateSetHost(
               url.origin === DASHBOARD_ORIGIN &&
               url.pathname === "/edit"
             ) {
+              const ids = url.searchParams.getAll("id");
+              if (ids.length !== 1 || !ids[0] || ids[0].length > 512 ||
+                  /[\x00-\x1f\x7f]/u.test(ids[0]))
+                return browserFailure();
               const result = await script(
                 observeBlooketCreateSetSuccess as
                   (...args: never[]) => unknown,
@@ -217,16 +221,14 @@ export function createExtensionCreateSetHost(
               if (after.status !== "complete" || after.url !== tab.url)
                 return browserFailure();
               if (
-                result &&
-                typeof result === "object" &&
-                "ok" in result &&
-                result.ok === true &&
-                "remoteSetId" in result
-              )
-                return {
-                  ok: true,
-                  remoteSetId: result.remoteSetId,
-                };
+                result && typeof result === "object" &&
+                !Array.isArray(result) &&
+                Object.keys(result).sort().join() === "ok,remoteSetId" &&
+                "ok" in result && result.ok === true &&
+                "remoteSetId" in result &&
+                typeof result.remoteSetId === "string" &&
+                result.remoteSetId === ids[0]
+              ) return { ok: true, remoteSetId: result.remoteSetId };
               return browserFailure();
             }
             const observed = await observe(script);
