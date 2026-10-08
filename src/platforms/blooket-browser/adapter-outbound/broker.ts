@@ -46,6 +46,10 @@ import type {
 // The Chrome login host needs seven seconds after receipt. Preserve a separate
 // transport margin instead of dispatching stale credential-bearing jobs.
 const MIN_AUTH_DISPATCH_MS = 8_000;
+// Read hosts can use eight seconds (nine for capability cleanup). A queued
+// command must retain those budgets plus transport margin when dispatched.
+const MIN_READ_DISPATCH_MS = 8_500;
+const MIN_CAPABILITY_DISPATCH_MS = 9_500;
 
 interface PendingJob {
   readonly request: BlooketBrowserBridgeRequest;
@@ -178,10 +182,18 @@ export function createBlooketBrowserBridgeBroker(
       if ([...pending.values()].some((job) => job.dispatched)) return null;
       for (const job of pending.values()) {
         const remainingMs = job.createdAt + timeoutMs - lastPollAt;
+        const kind = job.request.command.kind;
+        const minimumMs = kind === "session.authenticate"
+          ? MIN_AUTH_DISPATCH_MS
+          : kind === "capabilities.inspect"
+            ? MIN_CAPABILITY_DISPATCH_MS
+            : kind === "session.observe" || kind === "sets.list" ||
+                kind === "sets.get" || kind === "questions.list"
+              ? MIN_READ_DISPATCH_MS
+              : 0;
         if (
           remainingMs <= 0 ||
-          (job.request.command.kind === "session.authenticate" &&
-            remainingMs < MIN_AUTH_DISPATCH_MS)
+          remainingMs < Math.min(minimumMs, timeoutMs)
         ) {
           settle(job.request.id, {
             ok: false,
