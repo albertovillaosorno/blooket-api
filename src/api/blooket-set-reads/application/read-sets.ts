@@ -403,6 +403,7 @@ function validateReadFailure(
 ): Extract<BlooketSetProbeResult, { readonly ok: false }> {
   if (Object.keys(result).sort().join() === "code,ok" &&
       (result.code === "blooket-browser-failed" ||
+        result.code === "blooket-browser-incompatible" ||
         result.code === "blooket-browser-unavailable"))
     return { ok: false, code: result.code };
   return browserReadFailure();

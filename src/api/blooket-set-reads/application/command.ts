@@ -112,6 +112,10 @@ function fail(operationId: string, code: string) {
       message:
         code === "blooket-authentication-required"
           ? "Sign in to Blooket in your local browser, then retry the read."
+          : code === "blooket-browser-incompatible"
+            ? "The Blooket extension and workspace use incompatible read " +
+              "formats. Update or reload the Blooket API extension, " +
+              "then retry the read."
           : "The Blooket read could not be confirmed. Check the local browser.",
     },
   ]);

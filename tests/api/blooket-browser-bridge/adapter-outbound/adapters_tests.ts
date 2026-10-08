@@ -128,7 +128,6 @@ test("explicit empty-account set lists are complete", async () => {
 
 test("set-list completeness evidence fails closed when malformed", async () => {
   for (const value of [
-    [],
     { items: [], completeness: "unknown", extra: true },
     { items: [{ remote: "set" }], completeness: "complete" },
     { items: [], completeness: "partial" },
@@ -142,6 +141,24 @@ test("set-list completeness evidence fails closed when malformed", async () => {
     });
   }
 });
+
+test("legacy set arrays require an updated extension without admitting rows",
+  async () => {
+    for (const value of [
+      [],
+      [{ schemaVersion: 1, id: "fixture", title: "Synthetic set" }],
+      [{ malformed: true }],
+    ]) {
+      const commands: BlooketBrowserBridgeCommand[] = [];
+      const adapters = createBlooketBrowserBridgeAdapters(transport([
+        { ok: true, value },
+      ], commands));
+      assert.deepEqual(await adapters.sets.list(), {
+        ok: false, code: "blooket-browser-incompatible",
+      });
+      assert.deepEqual(commands, [{ kind: "sets.list" }]);
+    }
+  });
 
 test("bridge write adapter admits only text Create Set", async () => {
   const commands: BlooketBrowserBridgeCommand[] = [];

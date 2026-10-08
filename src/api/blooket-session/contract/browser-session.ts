@@ -36,6 +36,7 @@ import type { BlooketCredentials } from
 
 export type BlooketBrowserFailureCode =
   | "blooket-browser-unavailable"
+  | "blooket-browser-incompatible"
   | "blooket-browser-failed";
 
 export type BlooketBrowserObservationResult =
