@@ -44,14 +44,18 @@ API.app`. Native Mac acceptance, signing/notarization, launch-at-login, and safe
 application replacement remain roadmap work.
 
 The Chrome extension can be assembled locally. It reads observed set summaries
-and private set details in a dedicated Blooket tab; it cannot publish quizzes.
-Question/capability reads, empty accounts, pagination, public set details, and
-native browser acceptance remain pending. Unsupported pages stop the read.
+and private set details in a dedicated Blooket tab. Bounded question reads and a
+capability probe have portable implementations, but verified automatic quiz
+publication is not ready.
+
+Non-empty collection completeness, pagination, public set details, complete
+question media, and live capability/login acceptance remain open. A
+Chrome-for-Testing check confirmed the real signed-out login page only.
 
 See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
 cannot establish Keychain or native macOS compatibility. Chrome is the initial
-directly testable browser and extension target. Safari is packaged on a
-GitHub Actions macOS runner once its integration is implemented.
+directly testable browser and extension target. The ARM64 macOS CI stage
+builds and embeds the Safari companion; native acceptance remains pending.
 
 ## Run the development workspace
 
@@ -343,8 +347,8 @@ Native packages include the same directory under `extensions/chrome/` in their
 resources. This is a manual development installation, not a store installer.
 
 The extension requests scripting/storage and access only to the Blooket
-dashboard and the two admitted IPv4 loopback addresses. No cookie permission
-or general web access is requested.
+dashboard, Blooket identity login, and the two admitted IPv4 loopback addresses.
+No cookie permission or general web access is requested.
 
 Open Blooket API normally. Its local workspace announces the connection
 inside the extension's isolated page context; the extension discovers already
@@ -373,11 +377,14 @@ These commands reuse the confirmed browser session and never load `.env`, read
 credentials, or submit a login. A closed session requires signing in locally;
 security challenges and organization prompts preserve the human-action stop.
 
-Listing returns observed summaries, not a completeness guarantee. Empty-account
-and pagination acceptance are pending. Detail supports the observed private-set
-controls; public details, question/media reads, capability discovery, and
-publication remain pending. Unsupported page shapes fail validation rather than
-inventing fields.
+Listing returns observed summaries, not a non-empty collection completeness
+guarantee. The explicit empty-account state is bounded; pagination and remote
+completeness acceptance remain pending.
+
+Private details and bounded text-question reads have portable adapters, as does
+the account capability probe. Public details, complete media identity, live
+capability acceptance, and publication remain open. Unsupported page shapes
+fail validation rather than inventing facts.
 
 Keep the local workspace open for automatic discovery and restart recovery.
 The normal launcher opens it. If the service runs without a browser page, the
