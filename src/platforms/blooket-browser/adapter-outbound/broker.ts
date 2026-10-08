@@ -43,10 +43,15 @@ import type {
   BlooketBrowserBridgeTransportResult,
 } from "../contract/bridge-transport.ts";
 
+// The Chrome login host needs seven seconds after receipt. Preserve a separate
+// transport margin instead of dispatching stale credential-bearing jobs.
+const MIN_AUTH_DISPATCH_MS = 8_000;
+
 interface PendingJob {
   readonly request: BlooketBrowserBridgeRequest;
   readonly resolve: (result: BlooketBrowserBridgeTransportResult) => void;
   readonly timer: ReturnType<typeof setTimeout>;
+  readonly createdAt: number;
   dispatched: boolean;
 }
 
@@ -150,6 +155,7 @@ export function createBlooketBrowserBridgeBroker(
             request,
             resolve,
             timer,
+            createdAt: now(),
             dispatched: false,
           });
         },
@@ -161,6 +167,18 @@ export function createBlooketBrowserBridgeBroker(
       lastPollAt = now();
       for (const job of pending.values()) {
         if (job.dispatched) continue;
+        const remainingMs = job.createdAt + timeoutMs - now();
+        if (
+          remainingMs <= 0 ||
+          (job.request.command.kind === "session.authenticate" &&
+            remainingMs < MIN_AUTH_DISPATCH_MS)
+        ) {
+          settle(job.request.id, {
+            ok: false,
+            code: "blooket-browser-unavailable",
+          });
+          continue;
+        }
         job.dispatched = true;
         return job.request;
       }
@@ -179,6 +197,13 @@ export function createBlooketBrowserBridgeBroker(
       }
       const job = pending.get(value.id);
       if (!job || !job.dispatched) return false;
+      if (now() >= job.createdAt + timeoutMs) {
+        settle(job.request.id, {
+          ok: false,
+          code: "blooket-browser-unavailable",
+        });
+        return false;
+      }
       const decoded = decodeBlooketBrowserBridgeResponse(value, job.request.id);
       if (!decoded.ok) {
         settle(job.request.id, {

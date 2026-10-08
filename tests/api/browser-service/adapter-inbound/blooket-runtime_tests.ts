@@ -89,9 +89,11 @@ test(
   "runtime session authenticates only through the bounded broker",
   async () => {
   const token = "synthetic-runtime-browser-token-at-least-32-bytes";
+  // A real credential-bearing dispatch needs the production ten-second
+  // window; the earlier 500 ms fixture is correctly refused by the broker.
   const bridge = createBlooketBrowserBridgeBroker({
     token,
-    timeoutMs: 500,
+    timeoutMs: 10_000,
   });
   const runtime = createBlooketRuntimePorts(bridge, "/synthetic-unused-root");
   const commands: BlooketBrowserBridgeCommand[] = [];

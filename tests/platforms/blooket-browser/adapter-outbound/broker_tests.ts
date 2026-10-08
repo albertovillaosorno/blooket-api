@@ -215,3 +215,125 @@ test(
     broker.close();
   },
 );
+
+test(
+  "stale credential jobs fail before dispatch after a queued delay",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN,
+    now: () => tick,
+  });
+  const pending = broker.request({
+    kind: "session.authenticate",
+    loginIdentifier: "synthetic@example.invalid",
+    password: "test-only-no-account",
+  });
+  tick += 3_000;
+  assert.equal(broker.next(TOKEN), null);
+  assert.deepEqual(await pending, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.equal(broker.status().pending, 0);
+  broker.close();
+  },
+);
+
+test(
+  "stale authentication is skipped but a fresh read remains dispatchable",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN,
+    now: () => tick,
+  });
+  const stale = broker.request({
+    kind: "session.authenticate",
+    loginIdentifier: "synthetic@example.invalid",
+    password: "test-only-no-account",
+  });
+  tick += 3_000;
+  const fresh = broker.request({ kind: "sets.list" });
+  const job = broker.next(TOKEN);
+  assert.ok(job);
+  assert.equal(job.command.kind, "sets.list");
+  assert.deepEqual(await stale, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: job.id, ok: true,
+    value: { completeness: "complete", items: [] },
+  }), true);
+  assert.deepEqual(await fresh, {
+    ok: true, value: { completeness: "complete", items: [] },
+  });
+  broker.close();
+  },
+);
+
+test(
+  "expired jobs never dispatch despite a delayed timeout callback",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN,
+    now: () => tick,
+  });
+  const pending = broker.request({ kind: "sets.list" });
+  tick += 10_001;
+  assert.equal(broker.next(TOKEN), null);
+  assert.deepEqual(await pending, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  broker.close();
+  },
+);
+
+test(
+  "an expired dispatched browser reply never establishes success",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN, now: () => tick,
+  });
+  const pending = broker.request({ kind: "session.observe" });
+  const request = broker.next(TOKEN);
+  assert.ok(request);
+  tick += 10_001;
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: request.id,
+    ok: true, value: "my-sets",
+  }), false);
+  assert.deepEqual(await pending, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.equal(broker.status().pending, 0);
+  broker.close();
+  },
+);
+
+test(
+  "fresh authentication retains exactly one broker dispatch",
+  async () => {
+  let tick = 10_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN, now: () => tick,
+  });
+  const pending = broker.request({
+    kind: "session.authenticate",
+    loginIdentifier: "synthetic@example.invalid",
+    password: "test-only-no-account",
+  });
+  tick += 2_000;
+  const job = broker.next(TOKEN);
+  assert.ok(job);
+  assert.equal(job.command.kind, "session.authenticate");
+  assert.equal(broker.next(TOKEN), null);
+  assert.equal(broker.complete(TOKEN, {
+    schemaVersion: 1, id: job.id,
+    ok: true, value: null,
+  }), true);
+  assert.deepEqual(await pending, { ok: true, value: null });
+  broker.close();
+  },
+);
