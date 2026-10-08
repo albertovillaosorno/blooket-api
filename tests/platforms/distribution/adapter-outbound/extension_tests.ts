@@ -100,6 +100,29 @@ test(
       if (before) Object.defineProperty(globalThis, "chrome", before);
       else Reflect.deleteProperty(globalThis, "chrome");
     }
+    const compiled = createRequire(import.meta.url);
+    const login = compiled(join(
+      output, "src/platforms/blooket-browser/adapter-outbound/login-page.js",
+    )).runBlooketLoginPageAction as Function;
+    const question = compiled(join(
+      output,
+      "src/platforms/blooket-browser/adapter-outbound/add-question-page.js",
+    )).runBlooketAddQuestionPageAction as Function;
+    for (const runner of [login, question]) {
+      const serialized = Function("return (" + runner.toString() + ")")();
+      assert.deepEqual(serialized("unknown", {}), {
+        ok: false,
+        code: "blooket-browser-failed",
+      });
+    }
+    const questionPage = compiled(join(
+      output,
+      "src/platforms/blooket-browser/adapter-outbound/question-page.js",
+    ));
+    assert.equal(questionPage.openBlooketQuestionPanel.length, 2);
+    assert.equal(questionPage.inspectOpenedBlooketQuestion.length, 2);
+    assert.equal(questionPage.closeBlooketQuestionPanel.length, 1);
+    assert.equal(questionPage.isBlooketQuestionPanelClosed.length, 1);
     assert.ok(scripts.length > 1);
     assert.equal(
       files.some(
