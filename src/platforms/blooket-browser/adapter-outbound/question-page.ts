@@ -41,15 +41,20 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
   try {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
+    // Chrome serializes this function without shared module helpers.
+    const visibleUnique = (selector: string, text?: string): boolean => {
+      const elements = Array.from(document.querySelectorAll(selector));
+      if (elements.length !== 1) return false;
+      const bounds = elements[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        (text === undefined || elements[0]!.textContent?.trim() === text);
+    };
     const authenticated =
       document.title !== "Just a moment..." &&
-      document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
-      document.querySelector('nav a[href="/my-sets"]') !== null &&
-      Array.from(document.querySelectorAll(
-        'a[href="https://id.blooket.com/logout"]',
-      )).filter((link) => link.textContent?.trim() === "Logout")
-        .length === 1;
+      visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -116,15 +121,20 @@ export function openBlooketQuestionPanel(
   try {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
+    // Chrome serializes this function without shared module helpers.
+    const visibleUnique = (selector: string, text?: string): boolean => {
+      const elements = Array.from(document.querySelectorAll(selector));
+      if (elements.length !== 1) return false;
+      const bounds = elements[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        (text === undefined || elements[0]!.textContent?.trim() === text);
+    };
     const authenticated =
       document.title !== "Just a moment..." &&
-      document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
-      document.querySelector('nav a[href="/my-sets"]') !== null &&
-      Array.from(document.querySelectorAll(
-        'a[href="https://id.blooket.com/logout"]',
-      )).filter((link) => link.textContent?.trim() === "Logout")
-        .length === 1;
+      visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -187,15 +197,20 @@ export function inspectOpenedBlooketQuestion(
   try {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
+    // Chrome serializes this function without shared module helpers.
+    const visibleUnique = (selector: string, text?: string): boolean => {
+      const elements = Array.from(document.querySelectorAll(selector));
+      if (elements.length !== 1) return false;
+      const bounds = elements[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        (text === undefined || elements[0]!.textContent?.trim() === text);
+    };
     const authenticated =
       document.title !== "Just a moment..." &&
-      document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
-      document.querySelector('nav a[href="/my-sets"]') !== null &&
-      Array.from(document.querySelectorAll(
-        'a[href="https://id.blooket.com/logout"]',
-      )).filter((link) => link.textContent?.trim() === "Logout")
-        .length === 1;
+      visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -414,15 +429,20 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
   try {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
+    // Chrome serializes this function without shared module helpers.
+    const visibleUnique = (selector: string, text?: string): boolean => {
+      const elements = Array.from(document.querySelectorAll(selector));
+      if (elements.length !== 1) return false;
+      const bounds = elements[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        (text === undefined || elements[0]!.textContent?.trim() === text);
+    };
     const authenticated =
       document.title !== "Just a moment..." &&
-      document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
-      document.querySelector('nav a[href="/my-sets"]') !== null &&
-      Array.from(document.querySelectorAll(
-        'a[href="https://id.blooket.com/logout"]',
-      )).filter((link) => link.textContent?.trim() === "Logout")
-        .length === 1;
+      visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -481,15 +501,20 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
   try {
     // Every function is serialized independently by Chrome scripting.
     // Do not interact with a stale authenticated shell or a human prompt.
+    // Chrome serializes this function without shared module helpers.
+    const visibleUnique = (selector: string, text?: string): boolean => {
+      const elements = Array.from(document.querySelectorAll(selector));
+      if (elements.length !== 1) return false;
+      const bounds = elements[0]!.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        (text === undefined || elements[0]!.textContent?.trim() === text);
+    };
     const authenticated =
       document.title !== "Just a moment..." &&
-      document.querySelector("main") !== null &&
       document.querySelector('input[type="password"]') === null &&
-      document.querySelector('nav a[href="/my-sets"]') !== null &&
-      Array.from(document.querySelectorAll(
-        'a[href="https://id.blooket.com/logout"]',
-      )).filter((link) => link.textContent?.trim() === "Logout")
-        .length === 1;
+      visibleUnique("main") &&
+      visibleUnique('nav a[href="/my-sets"]') &&
+      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
