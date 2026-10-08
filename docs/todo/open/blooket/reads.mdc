@@ -196,6 +196,13 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, the extension login host gained a fresh exact login-route
+confirmation before and after every prepared-state poll, because each injected
+helper receives credentials. A synthetic transition to another identity-origin
+page after an inconclusive poll previously caused a second credential-bearing
+script; it now stops without retry or submit. This is a local browser-host
+safety improvement, not proof of accepted credentials or a live login flow.
+
 On 2026-10-08, the capability host began rechecking its exact owned Edit
 tab around each cleanup script, including the post-Cancel closed-state polls
 and the subsequent modal level. A manual same-tab route change during Audio or

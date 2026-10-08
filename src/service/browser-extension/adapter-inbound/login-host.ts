@@ -110,11 +110,15 @@ export function createExtensionSessionAuthenticationHost(
         let ready = false;
         for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
           attempt++) {
+          // Each poll forwards credentials to an injected function. A prior
+          // login-tab check cannot authorize a later poll after navigation.
+          if (!await readyTab()) return browserFailure();
           const observed = await script(
             runBlooketLoginPageAction as (...args: never[]) => unknown,
             ["is-prepared", input],
           );
-          if (now() >= deadline || typeof observed !== "boolean")
+          if (now() >= deadline || typeof observed !== "boolean" ||
+              !await readyTab())
             return browserFailure();
           ready = observed;
           if (ready) break;
