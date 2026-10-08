@@ -547,6 +547,13 @@ login job, late completion, and normal single dispatch. The check prevents a
 near-expiry queued login job from initiating a late submit; it cannot cancel a
 Chrome click that already began, or prove successful remote authentication.
 
+The broker also maintains one active extension lease at a time. Concurrent
+polls during workspace reconnection cannot dispatch overlapping browser reads
+or a login alongside another operation. The broker expires old active leases
+before admitting the next queued job and pairing reset settles both active and
+waiting requests without replay. This is a broker scheduling guarantee only:
+a Chrome script that outlives its expired lease cannot be forcibly recalled.
+
 Recovered dashboard module 88289 bounds the organization prompt without making
 it automatable. Search results become a selected organization only after a human
 chooses one; the form then submits hidden `schoolId` with `action=school`. The

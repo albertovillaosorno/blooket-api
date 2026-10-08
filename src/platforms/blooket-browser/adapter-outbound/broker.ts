@@ -165,9 +165,19 @@ export function createBlooketBrowserBridgeBroker(
     next: (candidate) => {
       if (closed || !authenticated(candidate)) return null;
       lastPollAt = now();
+      // Polling can be concurrent after extension reconnection. Expire stale
+      // leases first, then keep at most one job in the browser at a time.
       for (const job of pending.values()) {
-        if (job.dispatched) continue;
-        const remainingMs = job.createdAt + timeoutMs - now();
+        if (job.createdAt + timeoutMs <= lastPollAt) {
+          settle(job.request.id, {
+            ok: false,
+            code: "blooket-browser-unavailable",
+          });
+        }
+      }
+      if ([...pending.values()].some((job) => job.dispatched)) return null;
+      for (const job of pending.values()) {
+        const remainingMs = job.createdAt + timeoutMs - lastPollAt;
         if (
           remainingMs <= 0 ||
           (job.request.command.kind === "session.authenticate" &&
