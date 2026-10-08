@@ -42,6 +42,8 @@ function fixture(options: {
   readonly media?: "supported" | "unsupported";
   readonly empty?: boolean;
   readonly cleanupFails?: boolean;
+  readonly questionOpenRejected?: boolean;
+  readonly drawerOpenRejected?: boolean;
   readonly malformedList?: boolean;
   readonly unknownEmpty?: boolean;
   readonly duplicateList?: boolean;
@@ -127,12 +129,14 @@ function fixture(options: {
           }
           case "openBlooketCapabilityQuestionPanel":
             assert.equal(args[0], "set-fixture");
+            if (options.questionOpenRejected) return [{ result: false }];
             panelOpen = true;
             return [{ result: true }];
           case "isBlooketCapabilityQuestionPanelReady":
             return [{ result: panelOpen }];
           case "openBlooketAudioCapabilityDrawer":
             assert.equal(panelOpen, true);
+            if (options.drawerOpenRejected) return [{ result: false }];
             drawerOpen = true;
             return [{ result: true }];
           case "inspectBlooketAudioCapabilityDrawer":
@@ -350,3 +354,148 @@ test("unexpected outer list fields fail before edit navigation", async () => {
     "openBlooketCapabilityQuestionPanel",
   ), false);
 });
+
+test(
+  "a slow page aborts before the bridge deadline and restores the tab",
+  async () => {
+  const page = fixture();
+  let clock = 0;
+  const get = page.chrome.tabs.get;
+  page.chrome.tabs.get = async (id: number) => {
+    const tab = await get(id);
+    return tab.url?.endsWith("/my-sets")
+      ? { ...tab, status: "loading" }
+      : tab;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome,
+    7,
+    async (ms) => { clock += ms * 10; },
+    () => clock,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.ok(clock <= 9_000);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test(
+  "expiration during a Blooket list script never opens Add Question",
+  async () => {
+  const page = fixture();
+  let clock = 0;
+  const execute = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (request) => {
+    const result = await execute(request);
+    if (request.func.name === "inspectBlooketPage" &&
+        (request.args?.[0] as { kind?: string } | undefined)?.kind ===
+          "sets.list") clock = 6_500;
+    return result;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, async () => {}, () => clock,
+  ).inspect();
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+  },
+);
+
+test("rejected UI opens are never mistaken for owned open modals", async () => {
+  for (const options of [
+    { questionOpenRejected: true },
+    { drawerOpenRejected: true },
+  ]) {
+    const page = fixture(options);
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(page.scripts.includes("closeBlooketAudioCapabilityDrawer"),
+      false);
+    assert.equal(page.scripts.includes("closeBlooketCapabilityQuestionPanel"),
+      !!options.drawerOpenRejected);
+  }
+});
+
+test(
+  "a late successful open must still be canceled before restoring",
+  async () => {
+  const page = fixture();
+  let clock = 0;
+  const execute = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (request) => {
+    const result = await execute(request);
+    if (request.func.name === "openBlooketCapabilityQuestionPanel")
+      clock = 6_100;
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, async () => {}, () => clock,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.includes(
+    "openBlooketAudioCapabilityDrawer",
+  ), false);
+  },
+);
+
+test("restoration polling cannot overrun the final bridge budget", async () => {
+  const page = fixture();
+  let clock = 0;
+  const get = page.chrome.tabs.get;
+  page.chrome.tabs.get = async (id: number) => {
+    const tab = await get(id);
+    return page.navigations.length > 1 &&
+        tab.url === page.originalUrl
+      ? { ...tab, status: "loading" }
+      : tab;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, async (ms) => { clock += ms * 10; },
+    () => clock,
+  ).inspect();
+  assert.deepEqual(result, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.ok(clock <= 9_000);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
+  assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+});
+
+test(
+  "a late audio-drawer open still closes both owned modal levels",
+  async () => {
+  const page = fixture();
+  let clock = 0;
+  const execute = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async (request) => {
+    const result = await execute(request);
+    if (request.func.name === "openBlooketAudioCapabilityDrawer")
+      clock = 6_100;
+    return result;
+  };
+  const outcome = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, async () => {}, () => clock,
+  ).inspect();
+  assert.deepEqual(outcome, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
+  assert.ok(page.scripts.includes("closeBlooketCapabilityQuestionPanel"));
+  assert.equal(page.currentUrl(), page.originalUrl);
+  },
+);

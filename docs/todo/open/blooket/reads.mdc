@@ -420,6 +420,19 @@ failure invalidates the whole snapshot. The account-specific observation is
 recorded as capability evidence without retaining a set ID or provider media
 identity.
 
+Capability inspection now shares a six-second observation budget between
+My Sets navigation, edit navigation, page-state checks, and Plus-gate probing.
+The remaining three seconds of the local bridge's ten-second response window
+are reserved for closing any acknowledged modal and restoring the original
+dashboard tab. A timed-out browser script, page, or cleanup poll cannot produce
+a successful snapshot; best-effort restoration still runs if that window is
+exceeded. These are local polling budgets, not guarantees about Chrome API
+latency or evidence of Blooket-specific rate limits.
+
+Synthetic deadline tests cover stalled navigation, late results, refused opens,
+late acknowledged opens requiring cleanup, and unconfirmed restoration. The
+reader never submits a question or creates test content.
+
 An account with no sets is handled without creating probe content: static
 verified facts are returned while answer images and audio remain explicitly
 `account-dependent`. The canonical read command, CLI, and MCP tool all use
