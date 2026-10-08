@@ -62,6 +62,20 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, authorized Chrome creation of a private fictional development
+set confirmed two visible Add Question buttons on both empty and nonempty
+Edit pages. The lower button shares its immediate parent with the unique
+Show all answers control; the header button does not. The previous global
+uniqueness assumption prevented both question writes and capability probing.
+
+The page runners now resolve only that observed list toolbar when exactly two
+Add Question buttons exist. Unknown duplicate layouts still fail rather than
+choosing the first button. Synthetic regressions reproduce the old refusal,
+confirm one toolbar click, and reject duplicate Add Question controls within
+the toolbar. The browser-created fictional multiple-choice question retained
+its text, answers, and 15-second limit after reload; this is UI observation,
+not canonical product CLI/MCP publication acceptance.
+
 On 2026-10-08, the Create Set browser host added a post-submit route
 check to reject acknowledgments from an unrelated tab destination. It still
 permits a legitimate in-progress Edit redirect, but requires separate stable

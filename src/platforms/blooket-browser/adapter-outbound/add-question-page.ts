@@ -192,9 +192,22 @@ export function runBlooketAddQuestionPageAction(
     ) return failed();
     if (action === "open") {
       if (typeof value !== "string" || !editRoute(value)) return false;
-      const buttons = Array.from(document.querySelectorAll("button")).filter(
+      let buttons = Array.from(document.querySelectorAll("button")).filter(
         (button) => normalizedText(button) === "Add Question",
       );
+      // The live Edit page repeats Add Question in its header and list.
+      // Resolve the observed list toolbar instead of choosing by DOM order.
+      if (buttons.length === 2) {
+        buttons = buttons.filter(button => {
+          const peers = Array.from(
+            button.parentElement?.querySelectorAll("button") ?? [],
+          );
+          return peers.filter(peer =>
+            normalizedText(peer) === "Add Question").length === 1 &&
+            peers.filter(peer =>
+              normalizedText(peer) === "Show all answers").length === 1;
+        });
+      }
       if (buttons.length !== 1) return false;
       (buttons[0] as HTMLButtonElement).click();
       return true;
