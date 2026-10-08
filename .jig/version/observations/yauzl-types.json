@@ -1,0 +1,10 @@
+{
+  "authority": "yauzl-types",
+  "integrity_kind": "provider-response-sha256",
+  "integrity_sha256": "3d0f02e85fd6f6be39a82f92c9debe6ed9800a96f11b2abf3f7f717205ecc5b1",
+  "observed_on": "2026-10-08",
+  "provider": "npm-registry",
+  "schema_version": 1,
+  "source": "https://registry.npmjs.org/@types%2fyauzl/latest",
+  "stable": "3.4.0"
+}

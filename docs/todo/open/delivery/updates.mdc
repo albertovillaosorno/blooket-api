@@ -25,6 +25,7 @@ scope:
   - src/platforms/github-updates/
   - src/platforms/update-signatures/
   - src/platforms/update-downloads/
+  - src/platforms/update-extraction/
   - src/settings/teacher-preferences/
   - src/api/teacher-configuration/
   - src/service/
@@ -402,9 +403,42 @@ and transactional installation. Production Apple Team ID/key provisioning,
 signed releases, safe extraction/replacement, and real Mac acceptance remain
 pending; this adapter is not exposed by UI or MCP.
 
+### Authenticated immutable extraction
+
+On 2026-10-08, `update-extraction` gained a private staging adapter that
+re-verifies the signed manifest, copies and authenticates an immutable ZIP
+snapshot, inventories bounded paths/payloads/links, and invokes the fixed native
+`ditto` executable silently. Extraction never grants installation authority.
+The actual tree must match admitted regular files, hashes, executable bits, and
+internal symlinks before syncing/freezing it for independent Apple assessment.
+
+The pinned MIT `yauzl` parser replaces a handwritten production ZIP reader;
+its [upstream contract][zip-reader], checked on 2026-10-08, documents lazy entry
+reading, local-header access, and the separate CRC responsibility. The adapter
+checks redundant headers, streamed CRC/SHA-256, entry/expanded-byte limits,
+case/path collisions, component-order link resolution, and AppleDouble sidecar
+counterparts. Only ASCII paths and timestamp/UID extra fields are admitted;
+unsupported archive variants fail safely rather than broadening extraction.
+
+Portable regressions use ephemeral publisher keys and actual Linux ZIP
+extraction behind an explicitly injected native-command double. They cover
+stored/deflated payloads, framework-style symlinks, traversal, foreign roots,
+cycles, redundant-header differences, special files, CRC corruption, metadata,
+space refusal, native output changes, cancellation, and writer ownership.
+These tests do not establish Apple attributes, a signed Mac release, or native
+`ditto` execution.
+
+An ignoring native writer retains the operation's directory and lock until it
+actually stops; cancellation returns an opaque recovery ID rather than deleting
+under that writer. Ordinary failure cleans only exclusively created staging,
+leaving the source archive and prior data intact. The packaged runtime verifier
+imports the actual parser/extraction closure and rejects a malformed fixture;
+transactional replacement, restart, recovery, and publisher provisioning remain
+pending.
+
 ## Blockers
 
-Lifecycle safety, production publisher keys/manifest publication, extraction,
+Production publisher keys/manifest publication, product staging integration,
 `Blooket API.app` identity verification, atomic replacement, restart, rollback,
 and recovery remain functional work. Platform-only signing/notarization and
 native acceptance belong to task blooket-15.
@@ -421,3 +455,5 @@ native acceptance belong to task blooket-15.
 [mach-header]: https://github.com/apple-oss-distributions/xnu/blob/main/EXTERNAL_HEADERS/mach-o/loader.h
 <!-- jig-ignore-next-line: Preserve the canonical Apple CPU source URL. -->
 [mach-cpu]: https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/machine.h
+
+[zip-reader]: https://github.com/thejoshwolfe/yauzl/blob/master/README.md

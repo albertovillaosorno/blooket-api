@@ -164,7 +164,7 @@ async function copyRuntimePackages(repo: string, modules: string) {
       await copyPackage(sibling);
     }
   }
-  for (const name of ["sharp", "yaml"])
+  for (const name of ["sharp", "yaml", "yauzl"])
     await copyPackage(join(repo, ".dependencies/pnpm/node_modules", name));
   return records;
 }

@@ -180,8 +180,16 @@ acceptance. Its portable command doubles pass; no real Mac artifact has been
 accepted. It requires private immutable staging and safe transactional
 installation, and is not connected to product installation controls.
 
-The update record owns extraction, native Apple verification, transactional
-replacement, restart, and rollback acceptance. Production publisher keys and
+The extraction adapter in `src/platforms/update-extraction/` authenticates a
+private ZIP snapshot, inventories paths/links/payloads, performs silent native
+extraction, and validates/freezes the result. Portable tests inject Linux
+decompression;
+unsupported extra fields, foreign paths, corrupt bytes, and late writers fail
+safely. This is staging evidence only, with no installation or Apple trust.
+
+The update record owns product staging integration, Apple verification,
+transactional replacement, restart, and rollback acceptance. Production
+publisher keys and
 signed manifest publication remain missing. The inspected repository Actions
 secrets/variables were empty; do not fabricate release credentials. Current
 Safari CI uses unsigned development compilation, not distribution signing.
