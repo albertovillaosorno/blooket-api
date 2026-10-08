@@ -408,6 +408,12 @@ test("question modal operations reject switched and duplicate set IDs", () => {
   }
   assert.equal(clicks, 0);
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    group.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    group.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    edit.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    edit.getBoundingClientRect = () => ({ width: 24, height: 20 });
     assert.equal(openBlooketQuestionPanel("fixture", 1), true);
     assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, true);
     assert.equal(closeBlooketQuestionPanel("fixture"), true);
@@ -432,9 +438,22 @@ test(
 
     document.selectors[
       '[role="button"][aria-label^="Edit question "]'
+    ] = [first];
+    first.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    first.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    document.selectors[
+      '[role="button"][aria-label^="Edit question "]'
     ] = [];
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
-    document.selectors["button"] = [node("BUTTON", "Add Question")];
+    const add = node("BUTTON", "Add Question");
+    add.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    document.selectors["button"] = [add];
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    add.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    document.selectors["button"] = [add, add];
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    document.selectors["button"] = [add];
     assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
       ok: true,
       value: [],
