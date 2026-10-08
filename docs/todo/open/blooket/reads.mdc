@@ -408,6 +408,12 @@ The injected functions each enforce those facts independently: extension
 Synthetic page tests cover mismatched, missing, duplicated, and wrong-type
 controls; this adds identity protection, not authenticated media acceptance.
 
+Read-only set, question, and capability functions are also reconstructed from
+their serialized JavaScript source and exercised with synthetic DOM fixtures.
+Those tests catch future references to module-local helpers that would work
+under direct Node imports but fail in Chrome `executeScript`. They verify local
+script independence, not live authenticated provider data.
+
 The question read, open, inspect, Cancel, and closure checks also revalidate
 an authenticated dashboard shell directly in each injected function. They stop
 on the recovered organization-selection dialog, a visible captcha iframe,

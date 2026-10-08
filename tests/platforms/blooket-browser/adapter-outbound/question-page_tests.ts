@@ -586,3 +586,54 @@ test("question reads and Cancel stop behind human-action overlays", () => {
     assert.equal(clicks, 0);
   });
 });
+
+test("all injected question actions work without imported closures", () => {
+  const injected = <T extends (...args: never[]) => unknown>(fn: T): T =>
+    Function("return (" + fn.toString() + ")")() as T;
+  const list = injected(listBlooketQuestionNumbers);
+  const open = injected(openBlooketQuestionPanel);
+  const inspect = injected(inspectOpenedBlooketQuestion);
+  const close = injected(closeBlooketQuestionPanel);
+  const isClosed = injected(isBlooketQuestionPanelClosed);
+  const document = node("DOCUMENT");
+  const group = node("DIV", "", { "aria-label": "Edit question 1" });
+  const edit = node("BUTTON", "Edit");
+  let opened = 0;
+  edit.click = () => { opened++; };
+  group.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [group];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [group];
+  const form = node("FORM");
+  const hidden = node("INPUT", "", { type: "hidden" });
+  hidden.parent = form;
+  hidden.value = JSON.stringify({
+    number: 1, question: "Type sun.", qType: "typing",
+    random: true, timeLimit: 15, answers: ["sun"],
+    correctAnswers: ["sun"], answerTypes: ["exactly"],
+    image: "", audio: "",
+  });
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input#setId[name="setId"]'] = [identity];
+  const cancel = node("BUTTON", "Cancel", { type: "button" });
+  let closed = 0;
+  cancel.click = () => {
+    closed++;
+    document.selectors['input#question[name="question"]'] = [];
+  };
+  form.selectors['button[type="button"]'] = [cancel];
+  document.selectors['input#question[name="question"]'] = [hidden];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(list("fixture"), { ok: true, value: [1] });
+    assert.equal(open("fixture", 1), true);
+    assert.equal(inspect("fixture", 1).ok, true);
+    assert.equal(close("fixture"), true);
+    assert.equal(isClosed("fixture"), true);
+    assert.equal(opened, 1);
+    assert.equal(closed, 1);
+  });
+});

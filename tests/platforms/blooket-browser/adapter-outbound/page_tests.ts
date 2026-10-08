@@ -659,3 +659,26 @@ test(
   }
   },
 );
+
+test("injected page readers work without module lexical scope", () => {
+  const inspect = Function(
+    "return (" + inspectBlooketPage.toString() + ")",
+  )() as typeof inspectBlooketPage;
+  const open = Function(
+    "return (" + openBlooketDetailPanel.toString() + ")",
+  )() as typeof openBlooketDetailPanel;
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.equal(inspect({ kind: "sets.list" }).ok, true);
+    assert.equal(open("fixture"), false);
+  });
+  (document as FixtureNode & { title: string }).title = "Just a moment...";
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.deepEqual(inspect({ kind: "session.observe" }), {
+      ok: true, value: "unexpected-page",
+    });
+    assert.equal(inspect({ kind: "sets.list" }).ok, false);
+    assert.equal(open("fixture"), false);
+  });
+});
