@@ -554,6 +554,14 @@ before admitting the next queued job and pairing reset settles both active and
 waiting requests without replay. This is a broker scheduling guarantee only:
 a Chrome script that outlives its expired lease cannot be forcibly recalled.
 
+An isolated Linux Chrome for Testing 151 smoke run on 2026-10-08 compiled the
+current unpacked extension and connected it to a disposable local service and
+broker. Two concurrent read-only `session.observe` requests both returned the
+provider's `security-challenge` stop, with no pending broker jobs afterward.
+The disposable browser profile was not an authenticated teacher session. No
+credentials were supplied, login submitted, or sets modified; this verifies
+extension loading and concurrent human-stop delivery, not account read-back.
+
 Recovered dashboard module 88289 bounds the organization prompt without making
 it automatable. Search results become a selected organization only after a human
 chooses one; the form then submits hidden `schoolId` with `action=school`. The
