@@ -465,11 +465,21 @@ test("read routes encode IDs and panel opening never submits a form", () => {
   };
   document.selectors["main button"] = [button];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
-    assert.equal(openBlooketDetailPanel(), true);
+    assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);
   });
   page(document, "https://example.invalid/edit?id=fixture", () => {
-    assert.equal(openBlooketDetailPanel(), false);
+    assert.equal(openBlooketDetailPanel("fixture"), false);
     assert.equal(clicks, 1);
   });
+  for (const href of [
+    "https://dashboard.blooket.com/edit?id=other",
+    "https://dashboard.blooket.com/edit?id=fixture&id=other",
+    "https://dashboard.blooket.com/edit?id=fixture&id=fixture",
+  ]) {
+    page(document, href, () => {
+      assert.equal(openBlooketDetailPanel("fixture"), false);
+      assert.equal(clicks, 1);
+    });
+  }
 });

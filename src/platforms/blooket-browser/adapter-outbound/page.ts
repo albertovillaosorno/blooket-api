@@ -305,10 +305,15 @@ export function blooketReadUrl(operation: PageReadOperation): string | null {
 }
 
 // Opening an existing detail panel changes presentation without saving a set.
-export function openBlooketDetailPanel(): boolean {
+export function openBlooketDetailPanel(setId: string): boolean {
   if (
     location.origin !== "https://dashboard.blooket.com" ||
-    location.pathname !== "/edit"
+    location.pathname !== "/edit" ||
+    !setId ||
+    setId.length > 512 ||
+    setId.includes("\0") ||
+    new URL(location.href).searchParams.getAll("id").length !== 1 ||
+    new URL(location.href).searchParams.get("id") !== setId
   )
     return false;
   if (document.querySelector('input#title[name="title"]')) return true;
