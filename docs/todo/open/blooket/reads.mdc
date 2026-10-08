@@ -525,6 +525,16 @@ mean login succeeded: `ensureBlooketSession` performs the required fresh
 observation and only then reports ready, wait, human-action, or authentication
 failure. No challenge or organization choice is automated.
 
+The login host now applies a seven-second local budget within the bridge's
+ten-second response window. It checks the deadline after asynchronous tab and
+script calls and revalidates the exact completed `/login` tab after preparation
+and immediately before submit. Non-boolean prepared replies are rejected
+without retries, and overdue preparation cannot lead to a later login click.
+
+A Chrome submit call already started before a deadline cannot be recalled;
+a late return does not report login success or authorize a replay. These are
+portable fail-closed protections, not new live credential-submit acceptance.
+
 Recovered dashboard module 88289 bounds the organization prompt without making
 it automatable. Search results become a selected organization only after a human
 chooses one; the form then submits hidden `schoolId` with `action=school`. The
