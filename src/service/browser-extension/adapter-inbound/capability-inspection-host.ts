@@ -82,12 +82,16 @@ const DASHBOARD_ORIGIN = "https://dashboard.blooket.com";
 const MY_SETS_URL = DASHBOARD_ORIGIN + "/my-sets";
 const MAX_POLLS = 50;
 const POLL_MS = 100;
+// Reserve three seconds for modal cleanup and navigation restoration.
+const PROBE_BUDGET_MS = 6_000;
+const TOTAL_BUDGET_MS = 9_000;
 
 export function createExtensionCapabilityInspectionHost(
   chrome: CapabilityInspectionChromePort,
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => number = Date.now,
 ) {
   const script = async (
     func: (...args: never[]) => unknown,
@@ -105,6 +109,20 @@ export function createExtensionCapabilityInspectionHost(
 
   return {
     inspect: async (): Promise<ExtensionCapabilityInspectionResult> => {
+      const startedAt = now();
+      const probeDeadline = startedAt + PROBE_BUDGET_MS;
+      const finishDeadline = startedAt + TOTAL_BUDGET_MS;
+      const readScript = async (
+        func: (...args: never[]) => unknown,
+        args: unknown[] = [],
+      ): Promise<unknown> => {
+        if (now() >= probeDeadline)
+          throw new Error("browser-capability-deadline");
+        const result = await script(func, args);
+        if (now() >= probeDeadline)
+          throw new Error("browser-capability-deadline");
+        return result;
+      };
       let originalUrl: string | undefined;
       let setId: string | undefined;
       let panelOpened = false;
@@ -115,14 +133,16 @@ export function createExtensionCapabilityInspectionHost(
         if (!dashboardTab(before)) return browserFailure();
         originalUrl = before.url;
 
-        if (!await navigate(chrome, tabId, MY_SETS_URL, pause))
+        if (!await navigate(
+          chrome, tabId, MY_SETS_URL, pause, probeDeadline, now,
+        ))
           return browserFailure();
-        const observed = await script(
+        const observed = await readScript(
           inspectBlooketPage as (...args: never[]) => unknown,
           [{ kind: "session.observe" }],
         );
         if (!exactObservedState(observed, "my-sets")) return browserFailure();
-        const listed = await script(
+        const listed = await readScript(
           inspectBlooketPage as (...args: never[]) => unknown,
           [{ kind: "sets.list" }],
         );
@@ -134,39 +154,50 @@ export function createExtensionCapabilityInspectionHost(
           setId = selected;
           const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
             encodeURIComponent(setId);
-          if (!await navigate(chrome, tabId, editUrl, pause))
+          if (!await navigate(
+            chrome, tabId, editUrl, pause, probeDeadline, now,
+          ))
             return browserFailure();
-          const editState = await script(
+          const editState = await readScript(
             inspectBlooketPage as (...args: never[]) => unknown,
             [{ kind: "session.observe" }],
           );
           if (!exactObservedState(editState, "edit")) return browserFailure();
 
+          if (now() >= probeDeadline) return browserFailure();
           const opened = await script(
             openBlooketCapabilityQuestionPanel as (...args: never[]) => unknown,
             [setId],
           );
-          if (opened !== true) return browserFailure();
-          panelOpened = true;
+          panelOpened = opened === true;
+          if (!panelOpened || now() >= probeDeadline)
+            return browserFailure();
           if (!await pollTrue(
-            script,
+            readScript,
             isBlooketCapabilityQuestionPanelReady,
             [setId],
             pause,
+            probeDeadline,
+            now,
           ))
             return browserFailure();
 
+          if (now() >= probeDeadline) return browserFailure();
           const drawer = await script(
             openBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
             [setId],
           );
-          if (drawer !== true) return browserFailure();
-          drawerOpened = true;
-          const inspected = await pollCapability(script, setId, pause);
+          drawerOpened = drawer === true;
+          if (!drawerOpened || now() >= probeDeadline)
+            return browserFailure();
+          const inspected = await pollCapability(
+            readScript, setId, pause, probeDeadline, now,
+          );
           if (inspected === undefined) return browserFailure();
           accountMedia = inspected;
         }
 
+        if (now() >= probeDeadline) return browserFailure();
         outcome = {
           ok: true,
           value: blooketCapabilitySnapshotCandidate(
@@ -178,11 +209,15 @@ export function createExtensionCapabilityInspectionHost(
         outcome = browserFailure();
       } finally {
         if (setId !== undefined && drawerOpened) {
-          const cleaned = await closeDrawer(script, setId, pause);
+          const cleaned = await closeDrawer(
+            script, setId, pause, finishDeadline, now,
+          );
           if (!cleaned) outcome = browserFailure();
         }
         if (setId !== undefined && panelOpened) {
-          const cleaned = await closeQuestionPanel(script, setId, pause);
+          const cleaned = await closeQuestionPanel(
+            script, setId, pause, finishDeadline, now,
+          );
           if (!cleaned) outcome = browserFailure();
         }
         if (originalUrl !== undefined) {
@@ -191,9 +226,12 @@ export function createExtensionCapabilityInspectionHost(
             tabId,
             originalUrl,
             pause,
+            finishDeadline,
+            now,
           ).catch(() => false);
           if (!restored) outcome = browserFailure();
         }
+        if (now() >= finishDeadline) outcome = browserFailure();
       }
       return outcome;
     },
@@ -205,13 +243,19 @@ async function navigate(
   tabId: number,
   url: string,
   pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
 ): Promise<boolean> {
+  if (now() >= deadline) return false;
   const current = await chrome.tabs.get(tabId);
+  if (now() >= deadline) return false;
   if (current.url !== url) await chrome.tabs.update(tabId, { url });
-  for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+  for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
+    attempt++) {
     const tab = await chrome.tabs.get(tabId);
+    if (now() >= deadline) return false;
     if (tab.status === "complete" && tab.url === url) return true;
-    await pause(POLL_MS);
+    await pause(Math.min(POLL_MS, deadline - now()));
   }
   return false;
 }
@@ -221,9 +265,18 @@ async function restore(
   tabId: number,
   url: string,
   pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
 ): Promise<boolean> {
   if (new URL(url).origin !== DASHBOARD_ORIGIN) return false;
-  return await navigate(chrome, tabId, url, pause);
+  if (now() >= deadline) {
+    // Even after timeout, attempt to put the user's tab back. Without a
+    // confirmed completed navigation this may only produce a failed result.
+    const current = await chrome.tabs.get(tabId);
+    if (current.url !== url) await chrome.tabs.update(tabId, { url });
+    return false;
+  }
+  return await navigate(chrome, tabId, url, pause, deadline, now);
 }
 
 async function pollTrue(
@@ -234,10 +287,14 @@ async function pollTrue(
   func: (...args: never[]) => unknown,
   args: unknown[],
   pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
 ): Promise<boolean> {
-  for (let attempt = 0; attempt < 15; attempt++) {
-    if (await script(func, args) === true) return true;
-    await pause(POLL_MS);
+  for (let attempt = 0; attempt < 15 && now() < deadline; attempt++) {
+    const observed = await script(func, args);
+    if (now() >= deadline) return false;
+    if (observed === true) return true;
+    await pause(Math.min(POLL_MS, deadline - now()));
   }
   return false;
 }
@@ -249,8 +306,10 @@ async function pollCapability(
   ) => Promise<unknown>,
   setId: string,
   pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
 ): Promise<"supported" | "unsupported" | undefined> {
-  for (let attempt = 0; attempt < 15; attempt++) {
+  for (let attempt = 0; attempt < 15 && now() < deadline; attempt++) {
     const result = await script(
       inspectBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
       [setId],
@@ -262,10 +321,12 @@ async function pollCapability(
       "ok" in result &&
       result.ok === true &&
       "value" in result &&
+      now() < deadline &&
       (result.value === "supported" || result.value === "unsupported")
     )
       return result.value;
-    await pause(POLL_MS);
+    if (now() >= deadline) return undefined;
+    await pause(Math.min(POLL_MS, deadline - now()));
   }
   return undefined;
 }
@@ -277,6 +338,8 @@ async function closeDrawer(
   ) => Promise<unknown>,
   setId: string,
   pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
 ): Promise<boolean> {
   const alreadyClosed = await script(
     isBlooketAudioCapabilityDrawerClosed as (...args: never[]) => unknown,
@@ -293,6 +356,8 @@ async function closeDrawer(
     isBlooketAudioCapabilityDrawerClosed,
     [setId],
     pause,
+    deadline,
+    now,
   ).catch(() => false);
 }
 
@@ -303,6 +368,8 @@ async function closeQuestionPanel(
   ) => Promise<unknown>,
   setId: string,
   pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
 ): Promise<boolean> {
   const alreadyClosed = await script(
     isBlooketCapabilityQuestionPanelClosed as (...args: never[]) => unknown,
@@ -319,6 +386,8 @@ async function closeQuestionPanel(
     isBlooketCapabilityQuestionPanelClosed,
     [setId],
     pause,
+    deadline,
+    now,
   ).catch(() => false);
 }
 
