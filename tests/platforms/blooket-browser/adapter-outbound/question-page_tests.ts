@@ -343,6 +343,21 @@ test("question panels expose normalized read facts without saving", () => {
       audio: "",
     });
     assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    for (const duplicate of [
+      { qType: "mc", answers: ["red", "red"],
+        correctAnswers: ["red"], answerTypes: [] },
+      { qType: "typing", answers: ["sun", "sun"],
+        correctAnswers: ["sun"], answerTypes: ["exactly", "contains"] },
+      { qType: "mc", answers: ["`~`image-1", "`~`image-1"],
+        correctAnswers: ["`~`image-1"], answerTypes: [] },
+    ]) {
+      hidden.value = JSON.stringify({
+        number: 1, question: "Duplicate test", qType: duplicate.qType,
+        random: false, timeLimit: 15, ...duplicate,
+        image: "", audio: "",
+      });
+      assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    }
     hidden.value = "{bad";
     assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
   });

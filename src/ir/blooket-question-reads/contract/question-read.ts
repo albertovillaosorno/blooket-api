@@ -348,6 +348,13 @@ function decodeLegacyAnswers(
   if (answers === undefined || correctAnswers === undefined) return undefined;
 
   const available = new Set(answers);
+  if (available.size !== answers.length) {
+    issues.push({
+      path: path + ".answers",
+      code: "duplicate-legacy-answer",
+      message: "Legacy correctness by value cannot identify duplicate rows.",
+    });
+  }
   const seen = new Set<string>();
   for (const [index, answer] of correctAnswers.entries()) {
     if (!available.has(answer)) {

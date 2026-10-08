@@ -442,6 +442,14 @@ Answer-image, answer-math, and question-equation encodings now have bounded
 reference-backed normalization, but question image/audio identity and broader
 media behavior remain intentionally unclaimed.
 
+The recovered question form stores correct answers as a list of answer *values*,
+not stable row identities. Duplicate serialized answer strings therefore make
+row-level correctness ambiguous, even if the visible rows differ by position
+or typing match mode. The concrete browser reader and legacy v1 decoder now
+reject those inputs rather than marking multiple rows correct. This does not
+reject duplicates in already-normalized v2/v3 facts, which contain explicit
+per-row correctness and no such provider-value lookup.
+
 The public Blooket identity login page observed on 2026-10-07 exposes the
 visible heading `Log in`, inputs labeled by the placeholders `Username or email`
 and `Password`, and one `Let's go!` button on `https://id.blooket.com/login`.
