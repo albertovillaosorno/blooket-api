@@ -265,3 +265,23 @@ test(
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("ordinary settings save cannot bypass explicit login registration",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "settings-login-boundary-"));
+    try {
+      const preferences = await loadPreferences(root);
+      let writes = 0;
+      const result = await saveConfiguration(root, {
+        preferences: { ...preferences, service: {
+          ...preferences.service, launchAtLogin: true,
+        } }, password: "fixture", tunnelToken: "",
+      }, store(async () => { writes++; return { ok: true }; }));
+      assert.equal(result.ok, false);
+      assert.equal("code" in result && result.code,
+        "login-item-control-required");
+      assert.equal(writes, 0);
+      assert.deepEqual(await loadPreferences(root), preferences);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });

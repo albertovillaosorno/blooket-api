@@ -146,6 +146,10 @@ async function saveValidatedConfiguration(
   request: Record<string, unknown>,
   secrets: HostSecretStore,
 ) {
+  const current = await loadPreferences(root);
+  if (current.service.launchAtLogin !== preferences.service.launchAtLogin)
+    return { ok: false, code: "login-item-control-required",
+      secretsSaved: [], settingsSaved: false };
   try {
     await initializeLibrary(preferences.mediaRoot);
   } catch {

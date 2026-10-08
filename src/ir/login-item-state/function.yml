@@ -1,0 +1,9 @@
+identity:
+  id: function:login-item-state
+  name: login-item-state
+  path: src/ir/login-item-state
+classification:
+  repository: blooket-api
+  domain: ir
+architecture:
+  kind: contract

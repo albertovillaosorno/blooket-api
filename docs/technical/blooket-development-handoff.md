@@ -149,10 +149,20 @@ MCP invokes the bundled Node runtime directly with piped input/output and
 the native login helper also uses null streams and `--no-open`. Neither path
 opens Terminal or grants a remote shell tool.
 
+The main Mac executable is a compiled Swift wrapper rather than a shell script.
+It queries/registers/removes its bundled agent through `SMAppService` only for
+exact local login commands. The local Settings page shows actual approval and
+supports removal; its portable tests inject native status explicitly and do not
+claim a native Mac execution. Ordinary preference saves cannot register agents.
+
 The [Node child-process contract][child-process], checked on 2026-10-08,
 distinguishes direct process creation from shell invocation. Preserve this
 background behavior when adding updater restart and lifecycle controls.
 Native macOS/Safari visual assurance belongs to the final ongoing record.
+
+`npm test` bounds independent test-process concurrency to four. The unbounded
+run exhausted host capacity and produced deadline failures; bounding parallel
+processes keeps the same tests, process isolation, and production deadlines.
 
 ## Updates and delivery
 

@@ -209,7 +209,9 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 ## Evidence
 
 The launcher already owns service startup and duplicate-instance protection.
-`launchAtLogin` defaults false, but native registration remains unimplemented.
+`launchAtLogin` defaults false. The owning lifecycle record implements explicit
+local registration/removal and actual OS approval state; updates must reuse that
+controller instead of installing a second agent.
 Manual public catalog checking is implemented; automatic installation and its
 preference remain pending.
 

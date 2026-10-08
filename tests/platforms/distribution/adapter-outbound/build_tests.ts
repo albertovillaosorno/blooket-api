@@ -88,6 +88,18 @@ test("Mac package defines a bounded non-keepalive login agent", async () => {
   assert.ok(helper.includes('[launcher.path, "--no-open"]'));
   assert.ok(!helper.includes("SMAppService"));
   assert.ok(!helper.includes("http"));
+  const native = await readFile(new URL(
+    "../../../../src/service/desktop-launcher/adapter-inbound/" +
+      "macos-launcher.swift", import.meta.url,
+  ), "utf8");
+  assert.ok(native.includes("SMAppService.agent("));
+  assert.ok(native.includes('"--login-status"'));
+  assert.ok(native.includes('"--login-enable"'));
+  assert.ok(native.includes('"--login-disable"'));
+  assert.ok(native.includes("try service.unregister()"));
+  assert.ok(native.includes("case .requiresApproval:"));
+  assert.ok(native.includes("FileHandle.nullDevice"));
+  assert.ok(!native.includes("osascript"));
 });
 
 test("CI validates before ARM Safari and release only publishes", async () => {

@@ -29,6 +29,10 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
+import { createPackagedLoginItemControl, type LoginItemControl } from
+  "../../../platforms/service-lifecycle/adapter-outbound/login-item.ts";
+import { inspectLoginItem, setLoginItemPreference } from
+  "../../teacher-configuration/application/login-item.ts";
 import { createBlooketRuntimePorts } from "./blooket-runtime.ts";
 import { createBlooketMutationPacer } from
   "../../blooket-write-execution/application/mutation-pacing.ts";
@@ -142,6 +146,7 @@ export async function startBrowserService(
     stop?: () => Promise<void>;
     browserBridge?: BlooketBrowserBridgeBroker;
     updates?: ApplicationUpdateChecker;
+    loginItem?: LoginItemControl;
     safariExtension?: {
       available: () => Promise<boolean>;
       open: () => Promise<
@@ -157,6 +162,7 @@ export async function startBrowserService(
     available: safariExtensionAvailable,
     open: openPackagedSafariExtension,
   };
+  const loginItem = options.loginItem ?? createPackagedLoginItemControl();
   const preferences = await loadPreferences(root);
   let selectedPort = options.port;
   if (selectedPort === undefined) {
@@ -276,9 +282,8 @@ export async function startBrowserService(
           service: {
             origin,
             lifecycle: "explicit-background-process",
-            launchAtLogin: preferences.service.launchAtLogin
-              ? "not-implemented"
-              : "disabled",
+            canStop: typeof options.stop === "function",
+            loginItem: await inspectLoginItem(loginItem),
           },
           onlineStatus: options.online?.status() ?? {
             state: "disabled",
@@ -294,6 +299,10 @@ export async function startBrowserService(
             available: await safariExtension.available(),
           },
         });
+        return;
+      }
+      if (url.pathname === "/api/login-item") {
+        json(response, 200, await inspectLoginItem(loginItem));
         return;
       }
       if (url.pathname === "/api/update-status") {
@@ -425,6 +434,11 @@ export async function startBrowserService(
           ? 36_000_000
           : 1_000_000,
       );
+      if (url.pathname === "/api/login-item") {
+        json(response, 200,
+          await setLoginItemPreference(root, body, loginItem));
+        return;
+      }
       if (url.pathname === "/api/update-check") {
         if (
           !body ||

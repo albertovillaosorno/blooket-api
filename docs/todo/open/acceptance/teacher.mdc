@@ -139,6 +139,14 @@ also confirm that MCP commands, service startup, and updater restart do not
 open Terminal windows. Functional implementation and portable safety/recovery
 evidence remain required in their owning records.
 
+The completed lifecycle record supplies a compiled native main-app wrapper,
+owned `SMAppService` login agent, and explicit local controls with actual OS
+approval status. P4 retains Swift compilation, signed bundle execution, login /
+reboot single-instance behavior, Keychain, owned unregister/uninstall cleanup,
+and visual confirmation that no Terminal opens. Portable fixtures prove the
+controller and product composition only; they never stand in for these native
+observations or reopen the completed functional milestone.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto

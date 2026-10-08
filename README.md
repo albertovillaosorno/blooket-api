@@ -32,6 +32,8 @@ endorsed by the platform.
   Approval requires the owner password; connections can be rejected or revoked.
   Its tools execute the canonical CLI rather than a separate implementation.
 - A lightweight first-use diagnostic, saved locally, with a manual rerun.
+- Explicit local service stop and reversible packaged Mac login startup,
+  showing the OS authorization state instead of inferring it from a preference.
 
 Current MCP tools retrieve teacher instructions, search/read/enrich media, and
 list/read/write skills and drafts. Media search returns bounded pages and a
@@ -40,8 +42,8 @@ continuation cursor. **Saving a draft does not publish a quiz.**
 The Linux package has passed local startup, native media preparation, the
 packaged CLI, repeated launch, and shutdown. The macOS product target is ARM64;
 CI is configured to build its Safari WebExtension companion into `Blooket
-API.app`. Native Mac acceptance, signing/notarization, launch-at-login, and safe
-application replacement remain roadmap work.
+API.app`. Native Mac acceptance and signing/notarization remain in ongoing
+platform hardening; safe application replacement remains unfinished.
 
 The Chrome extension can be assembled locally. It reads observed set summaries
 and private set details in a dedicated Blooket tab. Bounded question reads and a
@@ -487,8 +489,11 @@ automatic update installer.
 [Automatic updates](docs/todo/open/delivery/updates.mdc) are planned, not
 implemented. They will use final public GitHub Releases without a teacher GitHub
 account, with independent opt-in update and launch-at-login preferences, trusted
-artifacts, safe restart, and retained data. Both preferences default off; native
-login registration and real Mac/update acceptance remain pending.
+artifacts, safe restart, and retained data. Both preferences default off.
+
+Configuration controls packaged Mac login registration through Service
+Management, including pending approval and explicit removal. Linux reports an
+unsupported login control; native Mac/Safari assurance belongs to P4.
 
 The [release/update decision](docs/technical/adr/product-update-lifecycle.md)
 defines one version authority and required package projections. An unavailable

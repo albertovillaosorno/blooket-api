@@ -114,6 +114,16 @@
           </article>
           <article>
             <h2 data-i18n="localService"></h2>
+            <label class="login-toggle">
+              <input id="launchAtLogin" type="checkbox" />
+              <span data-i18n="launchAtLogin"></span>
+            </label>
+            <p id="loginItemState" class="hint" role="status"></p>
+            <button id="refreshLoginItem" type="button"
+              data-i18n="refreshLoginItem"></button>
+            <button id="stopService" type="button"
+              data-i18n="stopService"></button>
+
             <label
               ><span data-i18n="port"></span
               ><input

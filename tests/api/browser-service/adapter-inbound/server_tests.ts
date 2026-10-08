@@ -691,3 +691,69 @@ test("Safari extension setup is same-origin and package-owned", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("local login controls require CSRF and preserve actual approval status",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "login-service-"));
+    const changes: boolean[] = [];
+    let stopped = false;
+    let state: "requires-approval" | "not-registered" = "not-registered";
+    const service = await startBrowserService({ root, port: 0,
+      stop: async () => { stopped = true; },
+      loginItem: {
+        inspect: async () => ({ schemaVersion: 1, state }),
+        setEnabled: async enabled => {
+          changes.push(enabled);
+          state = enabled ? "requires-approval" : "not-registered";
+          return { schemaVersion: 1, state };
+        },
+      },
+    });
+    try {
+      const bootstrap = await (await fetch(service.origin +
+        "/api/bootstrap")).json();
+      assert.equal(bootstrap.service.loginItem.state, "not-registered");
+      assert.equal(bootstrap.service.canStop, true);
+      const post = (body: unknown, csrf = bootstrap.csrf) => fetch(
+        service.origin + "/api/login-item", {
+          method: "POST", headers: { Origin: service.origin,
+            "Content-Type": "application/json", "X-CSRF-Token": csrf },
+          body: JSON.stringify(body),
+        },
+      );
+      assert.equal((await post({ enabled: true }, "foreign")).status, 403);
+      assert.equal((await post({ enabled: true, path: "/tmp" })).status, 400);
+      assert.deepEqual(changes, []);
+      const enabled = await (await post({ enabled: true })).json();
+      assert.equal(enabled.ok, true);
+      assert.equal(enabled.loginItem.state, "requires-approval");
+      const fresh = await (await fetch(service.origin +
+        "/api/bootstrap")).json();
+      assert.equal(fresh.preferences.service.launchAtLogin, true);
+      assert.equal(fresh.service.loginItem.state, "requires-approval");
+      const disabled = await (await post({ enabled: false })).json();
+      assert.equal(disabled.ok, true);
+      assert.equal(disabled.loginItem.state, "not-registered");
+      assert.deepEqual(changes, [true, false]);
+      const page = await (await fetch(service.origin)).text();
+      assert.ok(page.includes('id="launchAtLogin"'));
+      assert.ok(page.includes('id="stopService"'));
+      const stop = (csrf: string) => fetch(service.origin +
+        "/api/service-stop", { method: "POST",
+          headers: { Origin: service.origin,
+            "Content-Type": "application/json", "X-CSRF-Token": csrf },
+          body: "{}" });
+      assert.equal((await stop("foreign")).status, 403);
+      assert.equal(stopped, false);
+      const accepted = await stop(bootstrap.csrf);
+      assert.equal(accepted.status, 202);
+      await accepted.text();
+      await new Promise<void>(resolve => setImmediate(resolve));
+      assert.equal(stopped, true);
+    } finally {
+      service.server.close();
+      service.server.closeAllConnections();
+      await rm(root, { recursive: true, force: true });
+    }
+  });

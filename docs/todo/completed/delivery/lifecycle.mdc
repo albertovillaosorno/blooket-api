@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-13"
-status: "active"
+status: "completed"
 priority: "p2"
 horizon: "delivery"
 order: 130
@@ -72,12 +72,15 @@ and connection-timeout status survive process close. Shutdown still closes the
 gateway, local server, runtime record, and service lock when a connector stop
 fails. Linux child processes keep only required host-session hints instead of
 inheriting development credentials, including when opening the browser.
-Launch-at-login and the recipient's native-host lifecycle remain pending.
+
+Explicit login startup is implemented below. Recipient-native assurance remains
+in the final ongoing task, as requested by the owner.
 
 This record alone owns host launch-at-login implementation. Task `blooket-17`
 owns update preference integration and must reuse this lifecycle instead of
 installing another startup agent. The existing `launchAtLogin` setting defaults
-to false and bootstrap still reports it as not implemented.
+to false; bootstrap reports actual Service Management authorization separately
+from this saved preference.
 
 Native acceptance in task blooket-15 must enable login startup,
 perform logout/login or restart,
@@ -102,8 +105,8 @@ inside `Contents/Resources/ServiceManagement`.
 The helper invokes the existing packaged launcher with `--no-open`; it does not
 register itself and the plist deliberately omits `KeepAlive`. Keep actual
 signing and native login evidence explicit in task blooket-15.
-The implementation of registration and reversible product controls remains
-owned by this functional record; lack of a local Mac is not a completion gate.
+Registration and reversible product controls are implemented by this functional
+record; lack of a local Mac is not a completion gate.
 This design follows Apple's
 <!-- jig-ignore-next-line: Preserve canonical Apple API URLs. -->
 [Service Management contract](https://developer.apple.com/documentation/servicemanagement/smappservice)
@@ -174,7 +177,39 @@ clean early exit as offline, exclude the token from argv, and kill a child that
 resists graceful shutdown. The production connection deadline remains 30
 seconds; tests inject only a shorter deadline.
 
-## Blockers
+On 2026-10-08, the packaged main executable became a Swift wrapper using the
+calling app's `SMAppService.agent(plistName:)`. Exact local commands inspect,
+register, and unregister the owned bundled agent; ordinary launch never
+registers persistence. Finder launch, the background helper, and canonical MCP
+commands use direct processes and silent/piped streams without opening Terminal.
 
-Acceptance remains open until the checks above run through the actual owning
-product surfaces; portable foundations alone do not complete this record.
+The owning local service exposes CSRF-protected login controls and stop.
+Settings displays actual enabled, disabled, pending-approval, unavailable, or
+unsupported status in English and Spanish. Registration and removal preserve
+independent settings under the configuration lock, compensate failed preference
+saves against observed OS state, and expose failed compensation for recovery.
+
+The ordinary configuration endpoint refuses changed login preferences before
+secret replacement or media operations. Registration is an explicit local
+action; remote MCP has no installation or login-registration authority.
+Startup and login helper reuse the existing service lock, so registration never
+authorizes duplicate services or replays journaled Blooket writes.
+
+Chrome exercised the actual local Settings controls against an explicitly
+injected native adapter: enabling showed pending approval in both languages,
+disabling showed disabled, and reloading retained the saved disabled preference.
+This verifies the product UI and HTTP composition, not native registration.
+The fixture used its own disposable data root and no account credentials.
+
+Twenty-five targeted checks passed for login control, configuration, local HTTP,
+packaging definition, and recovery. All 1,053 portable tests passed with four
+isolated test processes, along with strict TypeScript and zero local Jig
+diagnostics. Test concurrency is bounded because an unrestricted run exhausted
+host capacity; no test or production deadline was removed or increased.
+
+Apple's Service Management contract and registration/removal semantics were
+checked through official documentation on 2026-10-08. Native Swift compilation,
+Apple trust, Keychain, login/reboot, uninstall, and absence of visible Terminal
+on an actual Mac remain explicitly unverified in task blooket-15. The owner's
+instruction assigns these platform checks to P4; they do not keep this
+implemented functional record open.

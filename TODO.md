@@ -49,13 +49,6 @@ including supported media, progress, and recoverable human stops.
 
 ## P3 - Delivery
 
-### TODO - Diagnostics and launch at login
-
-Make first run, start/stop, opt-in launch at login, and the online MCP tunnel
-work as a usable and reversible teacher-facing workflow.
-
-[Record](docs/todo/open/delivery/lifecycle.mdc)
-
 ### TODO - Safe automatic application updates
 
 **Release-critical:** safely install trusted updates and restart without losing
