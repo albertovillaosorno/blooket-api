@@ -374,6 +374,14 @@ fails the entire read instead of returning a mixed visible collection. The
 eight-second scan budget includes edit-route navigation and leaves a margin
 before the bridge's ten-second request timeout.
 
+The modal inspection host now distinguishes one exact page-unavailable reply
+from malformed success data. Only the former can be retried while React
+hydrates.
+A mismatched question number, unexpected field, or invalid success envelope
+fails the whole read on the first such observation, even if a later observation
+would be valid. Cancellation and closed-panel confirmation still run once after
+the malformed read; they are not skipped to preserve a partial collection.
+
 The normalized collection also has a cumulative 750 KB UTF-8 JSON budget
 below the localhost bridge's 1 MB request-body cap. Large but individually
 valid questions therefore fail before an oversized bridge reply is emitted.
