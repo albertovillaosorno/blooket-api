@@ -300,6 +300,16 @@ the HEAD extension connected through the local broker classified the same real
 login page as `signed-out`. Credential submission and successful authenticated
 navigation remain separate acceptance work.
 
+A later synthetic acceptance harness mistakenly called
+`session.authenticate` with positional arguments instead of the required
+single credential object.
+
+That malformed command could not pass the version-one bridge request decoder,
+so its broker timeout did not establish a login-host failure. The
+broker now validates every request before queueing and rejects malformed jobs
+with a stable browser failure, without dispatch or retry. Actual credential
+submission and subsequent authenticated navigation remain unverified.
+
 Recovered module 89770 further bounds the remaining question-media gap. The
 question editor initializes separate image and audio strings plus an optional
 math suffix embedded in `question` with the established math marker. Its media
