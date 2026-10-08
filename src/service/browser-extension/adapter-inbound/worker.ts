@@ -358,11 +358,22 @@ async function read(
     }
     throw new Error("browser-details-unavailable");
   }
-  return await script(
+  const observed = await script(
     current,
     inspectBlooketPage as (...args: never[]) => unknown,
     [operation],
   );
+  if (operation.kind === "session.observe") {
+    // A result from a tab that navigated while the script ran cannot prove
+    // the current authentication state, regardless of which state it claimed.
+    const currentTab = await chrome.tabs.get(current.tabId);
+    if (
+      Date.now() >= readDeadline ||
+      currentTab.status !== "complete" ||
+      currentTab.url !== tab.url
+    ) throw new Error("browser-session-changed");
+  }
+  return observed;
 }
 async function relay(current: Connection, activeGeneration: number) {
   while (connection === current && generation === activeGeneration) {

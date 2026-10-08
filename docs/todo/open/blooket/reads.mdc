@@ -76,6 +76,12 @@ submit configured credentials only after an explicit signed-out/expired
 observation, and it still requires a fresh post-submit observation before
 reporting readiness.
 
+The extension now also confirms the same exact completed tab URL after each
+`session.observe` page script. If a tab navigates during the observation, the
+worker discards the result instead of asserting a stale ready, signed-out, or
+challenge state. Synthetic tests cover identity-origin transitions and a
+same-origin dashboard page switch; no credentials are read by this operation.
+
 Missing or stale local instances fail closed. Local requests use exact loopback
 discovery, bounded responses, correlation checks, CSRF admission, and no
 redirects.

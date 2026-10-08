@@ -50,6 +50,7 @@ test(
   let detailDrifts = false;
   let detailReadCount = 0;
   let detailSwitchTabAfterScript = false;
+  let sessionSwitchAfterScript: string | null = null;
   let listFailuresRemaining = 0;
   let listDrifts = false;
   let listEmpty = false;
@@ -236,6 +237,14 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "session.observe" &&
+            sessionSwitchAfterScript !== null) {
+          const observed = tabUrl.startsWith("https://id.blooket.com/")
+            ? "signed-out" : "my-sets";
+          tabUrl = sessionSwitchAfterScript;
+          sessionSwitchAfterScript = null;
+          return [{ result: { ok: true, value: observed } }];
+        }
         if (operation.kind === "sets.get") {
           detailReadCount++;
           if (detailMalformedReply) {
@@ -620,6 +629,22 @@ test(
     const ready = await expectReply({ kind: "session.observe" });
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
+    sessionSwitchAfterScript = "https://id.blooket.com/login";
+    const switchedReady = await expectReply({ kind: "session.observe" });
+    assert.equal(switchedReady.ok, false);
+    assert.equal(tabUrl, "https://id.blooket.com/login");
+    sessionSwitchAfterScript = "https://dashboard.blooket.com/my-sets";
+    const switchedSignedOut = await expectReply({ kind: "session.observe" });
+    assert.equal(switchedSignedOut.ok, false);
+    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    sessionSwitchAfterScript =
+      "https://dashboard.blooket.com/edit?id=another-set";
+    const switchedDashboardPage = await expectReply({
+      kind: "session.observe",
+    });
+    assert.equal(switchedDashboardPage.ok, false);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=another-set");
 
     tabUrl = "https://id.blooket.com/login";
     const before = scripts.length;
