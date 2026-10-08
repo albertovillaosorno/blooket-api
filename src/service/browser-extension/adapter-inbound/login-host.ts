@@ -65,12 +65,15 @@ export type ExtensionSessionAuthenticationResult =
 const LOGIN_ORIGIN = "https://id.blooket.com";
 const MAX_POLLS = 15;
 const POLL_MS = 50;
+// Leave room for the broker's ten-second window and result delivery.
+const LOGIN_BUDGET_MS = 7_000;
 
 export function createExtensionSessionAuthenticationHost(
   chrome: SessionAuthenticationChromePort,
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => number = Date.now,
 ) {
   const script = async (
     func: (...args: never[]) => unknown,
@@ -91,28 +94,38 @@ export function createExtensionSessionAuthenticationHost(
       input: BlooketLoginPageInput,
     ): Promise<ExtensionSessionAuthenticationResult> => {
       try {
-        const tab = await chrome.tabs.get(tabId);
-        if (!exactLoginTab(tab)) return browserFailure();
+        const deadline = now() + LOGIN_BUDGET_MS;
+        const readyTab = async () => {
+          if (now() >= deadline) return false;
+          const tab = await chrome.tabs.get(tabId);
+          return now() < deadline && exactLoginTab(tab);
+        };
+        if (!await readyTab()) return browserFailure();
         const prepared = await script(
           runBlooketLoginPageAction as (...args: never[]) => unknown,
           ["prepare", input],
         );
-        if (!exactOk(prepared)) return browserFailure();
+        if (now() >= deadline || !exactOk(prepared) || !await readyTab())
+          return browserFailure();
         let ready = false;
-        for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-          ready = await script(
+        for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
+          attempt++) {
+          const observed = await script(
             runBlooketLoginPageAction as (...args: never[]) => unknown,
             ["is-prepared", input],
-          ) === true;
+          );
+          if (now() >= deadline || typeof observed !== "boolean")
+            return browserFailure();
+          ready = observed;
           if (ready) break;
-          await pause(POLL_MS);
+          await pause(Math.min(POLL_MS, deadline - now()));
         }
-        if (!ready) return browserFailure();
+        if (!ready || !await readyTab()) return browserFailure();
         const submitted = await script(
           runBlooketLoginPageAction as (...args: never[]) => unknown,
           ["submit", input],
         );
-        return exactOk(submitted)
+        return now() < deadline && exactOk(submitted)
           ? { ok: true, value: null }
           : browserFailure();
       } catch {

@@ -42,19 +42,25 @@ const credentials = {
 
 function fixture(options: {
   readonly url?: string;
-  readonly preparedPolls?: readonly boolean[];
+  readonly preparedPolls?: readonly unknown[];
+  readonly nextUrlAfterPoll?: string;
   readonly prepareReply?: unknown;
   readonly submitReply?: unknown;
+  readonly readLatencyMs?: number;
+  readonly scriptLatencyMs?: number;
+  readonly nextUrlAfterPrepare?: string;
 }) {
   const calls: string[] = [];
   const argumentsSeen: unknown[] = [];
   const polls = [...(options.preparedPolls ?? [true])];
+  let tick = 0;
+  let url = options.url ?? "https://id.blooket.com/login";
   const chrome = {
     tabs: {
-      get: async () => ({
-        url: options.url ?? "https://id.blooket.com/login",
-        status: "complete",
-      }),
+      get: async () => {
+        tick += options.readLatencyMs ?? 0;
+        return { url, status: "complete" };
+      },
     },
     scripting: {
       executeScript: async (request: {
@@ -65,11 +71,18 @@ function fixture(options: {
         const action = args[0];
         calls.push(String(action));
         argumentsSeen.push(...args);
+        tick += options.scriptLatencyMs ?? 0;
         switch (action) {
           case "prepare":
+            if (options.nextUrlAfterPrepare)
+              url = options.nextUrlAfterPrepare;
             return [{ result: options.prepareReply ?? { ok: true } }];
-          case "is-prepared":
-            return [{ result: polls.shift() ?? false }];
+          case "is-prepared": {
+            if (options.nextUrlAfterPoll)
+              url = options.nextUrlAfterPoll;
+            const observed = polls.shift();
+            return [{ result: observed === undefined ? false : observed }];
+          }
           case "submit":
             return [{ result: options.submitReply ?? { ok: true } }];
           default:
@@ -78,7 +91,7 @@ function fixture(options: {
       },
     },
   };
-  return { chrome, calls, argumentsSeen };
+  return { chrome, calls, argumentsSeen, now: () => tick };
 }
 
 test("host prepares verifies and submits exactly once", async () => {
@@ -130,5 +143,80 @@ test(
     assert.equal(result.ok, false);
     assert.equal(page.calls.includes("submit"), false);
   }
+  },
+);
+
+test(
+  "slow initial tab inspection never passes credentials to page scripts",
+  async () => {
+  const page = fixture({ readLatencyMs: 7_100 });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => {}, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.deepEqual(page.calls, []);
+  assert.deepEqual(page.argumentsSeen, []);
+  },
+);
+
+test("overdue login preparation never polls or submits", async () => {
+  const page = fixture({ scriptLatencyMs: 7_100 });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => {}, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.deepEqual(page.calls, ["prepare"]);
+});
+
+test("a changed tab after preparation is never submitted", async () => {
+  const page = fixture({
+    nextUrlAfterPrepare: "https://id.blooket.com/something-else",
+  });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => {}, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.calls.includes("submit"), false);
+});
+
+test("polling consumes the shared login deadline", async () => {
+  const page = fixture({
+    scriptLatencyMs: 600,
+    preparedPolls: Array.from({ length: 15 }, () => false),
+  });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async (ms) => {
+      // The clock moves through page scripts; pauses need not contribute.
+      void ms;
+    }, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.calls.includes("submit"), false);
+  assert.ok(page.calls.length < 16);
+});
+
+test(
+  "login polling rejects non-boolean observations without a retry",
+  async () => {
+  const page = fixture({ preparedPolls: ["true", true] });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => {}, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.deepEqual(page.calls, ["prepare", "is-prepared"]);
+  },
+);
+
+test(
+  "a tab switch after prepared-state observation never submits",
+  async () => {
+  const page = fixture({
+    nextUrlAfterPoll: "https://id.blooket.com/security-verification",
+  });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => {}, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.calls.includes("submit"), false);
   },
 );
