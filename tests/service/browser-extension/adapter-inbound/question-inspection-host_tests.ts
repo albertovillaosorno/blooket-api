@@ -70,6 +70,7 @@ interface Scenario {
   readonly scriptLatencyMs?: number;
   readonly tabReadLatencyMs?: number;
   readonly switchAtEnumeration?: number;
+  readonly switchOnSecondReadYield?: boolean;
 }
 
 function synthetic(options: Scenario = {}) {
@@ -145,7 +146,11 @@ function synthetic(options: Scenario = {}) {
   const host = createExtensionQuestionInspectionHost(
     port,
     7,
-    async (ms) => { tick += ms; },
+    async (ms) => {
+      tick += ms;
+      if (ms === 0 && options.switchOnSecondReadYield)
+        currentUrl = "https://dashboard.blooket.com/create";
+    },
     () => tick,
   );
   return {
@@ -531,6 +536,20 @@ test(
   assert.equal(fixture.calls.filter(
     (name) => name === "closeBlooketQuestionPanel",
   ).length, 1);
+  assert.equal(fixture.enumerations(), 1);
+  },
+);
+
+
+test(
+  "a tab switched before confirmation is never scripted or canceled",
+  async () => {
+  const fixture = synthetic({ switchOnSecondReadYield: true });
+  const outcome = await fixture.host.inspect(FIXTURE_SET, 1_000);
+  assert.deepEqual(outcome, failed);
+  assert.equal(fixture.inspections(), 1);
+  assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), false);
+  assert.equal(fixture.calls.includes("isBlooketQuestionPanelClosed"), false);
   assert.equal(fixture.enumerations(), 1);
   },
 );

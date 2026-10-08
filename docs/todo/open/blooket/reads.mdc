@@ -470,6 +470,12 @@ owned-modal cancellation. These checks observe normalized text/flags only:
 question image/audio content identity remains unverified and no remote atomic
 snapshot is claimed.
 
+The question inspector now confirms the exact completed edit tab after its
+event-loop yield and before the second modal read. If the user navigates
+elsewhere, it skips that script. Modal cancellation independently rechecks the
+owned edit route before acting, even after a timeout; another route is left
+untouched instead of receiving an old question's Cancel action.
+
 Any insertion, deletion, reorder, tab switch, malformed script result, or
 deadline exhaustion fails the entire read instead of returning a mixed visible
 collection. The
@@ -711,6 +717,34 @@ Any ambiguous control, malformed set row, cleanup failure, or restoration
 failure invalidates the whole snapshot. The account-specific observation is
 recorded as capability evidence without retaining a set ID or provider media
 identity.
+
+The account media gate now requires two matching, exact Audio-drawer replies
+separated by one bounded poll. It also rechecks that the tab still shows the
+exact selected edit route before and after the confirmation. A gate that flips
+between `supported` and `unsupported`, becomes unavailable, or carries extra
+fields invalidates the entire snapshot even if the first reply was valid.
+
+The extension still attempts owned modal cleanup and tab restoration on a
+mismatch or expired probe window; it never submits or creates question content.
+
+Synthetic regressions cover all mismatch directions, malformed second replies,
+normal hydration, and expiration before confirmation. Two local UI reads do
+not guarantee an atomic provider account state or live capability acceptance.
+
+Capability set selection also requires two matching My Sets snapshots before
+opening an existing set or declaring the recovered account-empty state. The
+second observation and surrounding tab checks share the existing probe
+budget; changing rows, incomplete state, or manual navigation aborts the read.
+
+Every capability read script verifies its owned route before and after Chrome
+scripting returns. Add Question and Audio openers also confirm tab ownership
+around their acknowledged actions. User navigation to an unrelated route is
+preserved rather than overwritten by cleanup or restoration.
+
+Synthetic tests cover changing collections, expired second observations,
+manual tab switches between page reads, and both modal openers. These checks
+protect local UI evidence without proving an atomic provider snapshot or live
+authenticated capability acceptance.
 
 The recovered Add Question module 89770 writes both serialized question and
 set ID as hidden inputs through module 89035. The capability probe now requires
