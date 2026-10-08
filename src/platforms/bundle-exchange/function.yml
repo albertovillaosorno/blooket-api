@@ -1,0 +1,9 @@
+identity:
+  id: function:bundle-exchange
+  name: bundle-exchange
+  path: src/platforms/bundle-exchange
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

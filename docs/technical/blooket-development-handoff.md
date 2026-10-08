@@ -187,6 +187,14 @@ decompression;
 unsupported extra fields, foreign paths, corrupt bytes, and late writers fail
 safely. This is staging evidence only, with no installation or Apple trust.
 
+The `bundle-exchange` adapter and delivered C helper retain both app directories
+through one atomic exchange. Its portable tests compile and execute Linux's
+native exchange mechanism; Darwin uses `renameatx_np` and remains theoretical
+until native assurance in P4. Lost acknowledgement and cancellation return the
+observed orientation after the writer stops, never permission for blind replay.
+Package assembly now requires the system C compiler (`cc` on Linux,
+`xcrun clang` on macOS); no compiler/toolchain is downloaded or duplicated.
+
 The update record owns product staging integration, Apple verification,
 transactional replacement, restart, and rollback acceptance. Production
 publisher keys and

@@ -47,6 +47,8 @@ import { fileURLToPath } from "node:url";
 import { join, dirname, resolve, basename } from "node:path";
 import { buildBrowserExtension } from "./extension.ts";
 import { buildMacIcon } from "./icons.ts";
+import { EXCHANGE_HELPER_NAME } from
+  "../../bundle-exchange/adapter-outbound/identity.ts";
 
 import {
   PRODUCT_VERSION,
@@ -333,6 +335,16 @@ export async function buildDistribution(
     ]);
     await cp(join(extracted, "bin/node"), join(runtime, "node"));
     await cp(join(extracted, "LICENSE"), join(runtime, "NODE-LICENSE"));
+    const helper = join(runtime, EXCHANGE_HELPER_NAME);
+    const compiler = mac ? "xcrun" : "cc";
+    await run(compiler, [
+      ...(mac ? ["clang", "-target", "arm64-apple-macos13.5",
+        "-D_DARWIN_C_SOURCE=1"] : []),
+      "-std=c17", "-Wall", "-Wextra", "-Werror", "-O2",
+      join(app, "src/platforms/bundle-exchange/adapter-outbound/native.c"),
+      "-o", helper,
+    ]);
+    await chmod(helper, 0o755);
     artifacts.push({
       name: "node",
       version: NODE_VERSION,

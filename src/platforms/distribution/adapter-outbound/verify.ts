@@ -328,6 +328,48 @@ export async function verifyDistribution(
       await assert.rejects(reader.inspectUpdateArchive(process.argv[2],
         new AbortController().signal));
     `, app, invalidZip], { env, timeout: 10_000, maxBuffer: 4_096 });
+    const exchangeHelper = join(resources, "runtime/bundle-exchange");
+    await access(exchangeHelper);
+    // Exercise the packaged native mechanism on disposable directories only.
+    // Linux's renameat2 branch does not establish Darwin syscall acceptance.
+    await execute(node, ["--input-type=module", "-e", `
+      import assert from "node:assert/strict";
+      import { mkdir, readFile, writeFile } from "node:fs/promises";
+      import { randomUUID } from "node:crypto";
+      import { join } from "node:path";
+      import { pathToFileURL } from "node:url";
+      const base = pathToFileURL(process.argv[1] + "/");
+      const adapter = await import(new URL(
+        "src/platforms/bundle-exchange/adapter-outbound/exchange.ts", base));
+      const facts = await import(new URL(
+        "src/platforms/bundle-exchange/adapter-outbound/identity.ts", base));
+      const installed = join(process.argv[2], "Blooket API.app");
+      const parent = join(process.argv[2],
+        ".blooket-api.update-" + randomUUID());
+      const candidate = join(parent, "Blooket API.app");
+      await mkdir(installed, { mode: 0o700 });
+      await mkdir(parent, { mode: 0o700 });
+      await mkdir(candidate, { mode: 0o700 });
+      await writeFile(join(installed, "marker"), "old version");
+      await writeFile(join(candidate, "marker"), "new version");
+      const options = { installedPath: installed, candidatePath: candidate,
+        installedIdentity: await facts.directoryIdentity(installed),
+        candidateIdentity: await facts.directoryIdentity(candidate),
+        helperPath: process.argv[3],
+        host: { platform: "darwin", architecture: "arm64" } };
+      assert.equal((await adapter.exchangeBundles(options)).status,
+        "exchanged");
+      assert.equal(await readFile(join(installed, "marker"), "utf8"),
+        "new version");
+      assert.equal(await readFile(join(candidate, "marker"), "utf8"),
+        "old version");
+      assert.equal((await adapter.exchangeBundles(options)).orientation,
+        "exchanged");
+      assert.equal(await readFile(join(installed, "marker"), "utf8"),
+        "new version");
+    `, app, data, exchangeHelper], {
+      env, timeout: 10_000, maxBuffer: 4_096,
+    });
     // Exercise the real JSON CLI subprocess, including the bundled profile.
     const cli = execFile(
       node,
