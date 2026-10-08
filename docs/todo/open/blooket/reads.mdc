@@ -330,6 +330,14 @@ remain `unknown`; neither snapshot establishes nonempty server completeness.
 Synthetic bridge tests cover slow hydration, stable empty accounts, transient
 empty-to-nonempty drift, changed cards, and malformed success envelopes.
 
+The worker's initial read-navigation polling now shares its eight-second
+request budget with the local five-second navigation limit. The deadline is
+captured before `tabs.update`; a late update or delayed `tabs.get` cannot reset
+the window or be accepted as a timely completed tab. Both the exact set routes
+and route-free session observation use the same admission helper. Synthetic
+clock tests cover loaded/loading tabs, stale routes, and browser-call latency;
+this does not promise a hung browser API will resolve before its own timeout.
+
 Still pending: non-empty server-side set-list completeness; live browser
 acceptance of capability inspection, credential submission, and successful
 authenticated navigation; complete question-level media
