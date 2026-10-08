@@ -223,6 +223,9 @@ read safety cap before traversing results. This is a resource bound, not a
 claim about Blooket's account or question-count limits.
 Oversized answer, correct-answer, and match-mode arrays likewise fail
 before normalization, consistently with the existing 100-answer adapter guard.
+Question number, time limit, prompt length, and answer text length also use
+existing browser read bounds at the canonical decoder; these are local resource
+limits rather than observations of provider account limits.
 
 Answer-image, answer-math, and question-equation encodings now have bounded
 reference-backed normalization, but question image/audio identity and broader
