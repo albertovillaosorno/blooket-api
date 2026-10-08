@@ -274,8 +274,14 @@ export function runBlooketAddQuestionPageAction(
     const submits = Array.from(
       resolved.form.querySelectorAll('button[type="submit"]'),
     ).filter((button) => normalizedText(button) === "Save Question");
-    if (submits.length !== 1) return failed();
-    (submits[0] as HTMLButtonElement).click();
+    if (submits.length !== 1 || submits[0]?.tagName !== "BUTTON")
+      return failed();
+    const submit = submits[0] as HTMLButtonElement;
+    const bounds = submit.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || submit.disabled ||
+        submit.getAttribute("aria-disabled") === "true")
+      return failed();
+    submit.click();
     return { ok: true };
   } catch {
     return action === "open" || action === "is-ready" ? false : failed();
