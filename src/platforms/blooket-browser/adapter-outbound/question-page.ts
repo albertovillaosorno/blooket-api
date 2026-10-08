@@ -97,10 +97,34 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     const selector =
       '[role="button"]' + '[aria-label^="Edit question "]';
     const controls = Array.from(document.querySelectorAll(selector));
-    // The recovered edit page always renders Add Question, including when
-    // questions exist. Its presence is not proof of an empty collection.
-    // Without an independent empty-state marker a zero-row read is unknown.
-    if (controls.length === 0 || controls.length > 200) return failed();
+    // Modules 34719/80409 render the set counter beside its title,
+    // independently of question cards. Live Edit confirms 0 and 2 Questions.
+    // Add Question alone cannot establish emptiness or complete hydration.
+    const headings = Array.from(document.querySelectorAll("main h1"));
+    if (headings.length !== 1) return failed();
+    const headingBounds = headings[0]!.getBoundingClientRect();
+    const header = headings[0]!.parentElement?.parentElement;
+    if (!header || headingBounds.width <= 0 || headingBounds.height <= 0)
+      return failed();
+    const headerButtons = Array.from(header.querySelectorAll("button"));
+    for (const label of ["Save Set", "Edit Info"]) {
+      const matches = headerButtons.filter(button =>
+        button.textContent?.replace(/\u00a0/gu, " ").trim() === label);
+      if (matches.length !== 1) return failed();
+      const bounds = matches[0]!.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return failed();
+    }
+    const counters = Array.from(header.querySelectorAll("div")).filter(node =>
+      node.querySelectorAll("*").length === 0 &&
+      /^(0|[1-9][0-9]*) Questions?$/u
+        .test(node.textContent?.trim() ?? ""));
+    if (counters.length !== 1) return failed();
+    const counter = counters[0]!;
+    const counterBounds = counter.getBoundingClientRect();
+    const count = Number(counter.textContent!.trim().split(" ")[0]);
+    if (counterBounds.width <= 0 || counterBounds.height <= 0 ||
+        !Number.isSafeInteger(count) || count > 200 ||
+        controls.length !== count) return failed();
     const numbers: number[] = [];
     const seen = new Set<number>();
     for (const control of controls) {

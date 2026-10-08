@@ -1017,6 +1017,26 @@ facts, exercises ordinary CLI syntax, and rejects token leakage. This proves
 native package composition, not a packaged Chrome/Safari installation or live
 Blooket publication.
 
+### Confirmed empty question collections
+
+On 2026-10-08, authorized Chrome UI checks created a private empty development
+fixture and reloaded its Edit page. The header retained `0 Questions`; a
+separate two-question fixture showed `2 Questions` with two accessible Edit
+cards. Recovered build `86784c3d4c38fcd559c92f38fbadd7a160947de2`, modules
+34719 (`eY`) and 80409, render this count independently of the cards. Neither
+module has a recorded factory variant.
+
+Enumeration now scopes the counter to the unique visible title's header with
+visible Save Set and Edit Info controls. Missing, hidden, duplicate, malformed,
+or mismatched counts fail closed, including incomplete nonempty hydration.
+An explicit zero count may return an empty list; the extension host confirms
+it with a second independent enumeration without opening a question modal.
+A zero-to-nonzero change remains a failed read.
+
+Portable regressions cover the count boundary and host stability. These UI
+observations establish the selector, not a new canonical extension/CLI/MCP
+acceptance result. No account name, private identifier, or media URL is stored.
+
 ## Blockers
 
 **Installation blocker:** the browser-control URL policy rejects

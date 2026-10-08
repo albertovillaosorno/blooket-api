@@ -47,6 +47,7 @@ interface FixtureNode {
   textContent: string;
   value?: string;
   parent?: FixtureNode;
+  readonly parentElement?: FixtureNode;
   selectors: Record<string, FixtureNode[]>;
   getAttribute(name: string): string | null;
   querySelector(selector: string): FixtureNode | null;
@@ -65,6 +66,7 @@ function node(
     tagName,
     textContent,
     selectors: {},
+    get parentElement() { return this.parent; },
     getAttribute: (name) => attributes[name] ?? null,
     querySelector(selector) {
       return this.selectors[selector]?.[0] ?? null;
@@ -86,6 +88,22 @@ function node(
       throw new Error("unexpected-dom-mutation");
     },
   };
+}
+
+function questionHeader(document: FixtureNode, count: number): FixtureNode {
+  const header = node("DIV");
+  const heading = node("H1", "Synthetic set");
+  const wrapper = node("DIV");
+  heading.parent = wrapper;
+  wrapper.parent = header;
+  const counter = node("DIV",
+    count + (count === 1 ? " Question" : " Questions"));
+  header.selectors["div"] = [counter];
+  header.selectors["button"] = [
+    node("BUTTON", "Save Set"), node("BUTTON", "Edit Info"),
+  ];
+  document.selectors["main h1"] = [heading];
+  return counter;
 }
 
 function page(document: FixtureNode, href: string, run: () => void): void {
@@ -164,6 +182,7 @@ test("question panels expose normalized read facts without saving", () => {
   document.selectors['input#question[name="question"]'] = [hidden];
   document.selectors['form input#question[name="question"]'] = [hidden];
 
+  questionHeader(document, 1);
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
       ok: true,
@@ -698,6 +717,7 @@ test("all injected question actions work without imported closures", () => {
   };
   form.selectors['button[type="button"]'] = [cancel];
   document.selectors['input#question[name="question"]'] = [hidden];
+  questionHeader(document, 1);
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.deepEqual(list("fixture"), { ok: true, value: [1] });
     assert.equal(open("fixture", 1), true);
@@ -720,6 +740,7 @@ test("question reads accept the observed closed account menu", () => {
   document.selectors[
     '[role="button"][aria-label^="Edit question "]'
   ] = [node("DIV", "", { "aria-label": "Edit question 1" })];
+  questionHeader(document, 1);
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
       ok: true, value: [1],
@@ -728,6 +749,45 @@ test("question reads accept the observed closed account menu", () => {
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
     profile.getBoundingClientRect = () => ({ width: 24, height: 20 });
     document.selectors['input[type="password"]'] = [node("INPUT")];
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+  });
+});
+
+
+test("question enumeration requires the scoped displayed count", () => {
+  const document = node("DOCUMENT");
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [];
+  const counter = questionHeader(document, 0);
+  const heading = document.selectors["main h1"]![0]!;
+  const header = heading.parent!.parent!;
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
+      ok: true, value: [],
+    });
+    counter.textContent = "1 Question";
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    document.selectors[
+      '[role="button"][aria-label^="Edit question "]'
+    ] = [node("DIV", "", { "aria-label": "Edit question 1" })];
+    assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
+      ok: true, value: [1],
+    });
+    for (const text of ["0 Questions", "2 Questions", "01 Question"]) {
+      counter.textContent = text;
+      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    }
+    counter.textContent = "1 Question";
+    header.selectors["div"] = [counter, counter];
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    header.selectors["div"] = [counter];
+    counter.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    counter.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    header.selectors["button"] = [node("BUTTON", "Save Set")];
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    document.selectors["main h1"] = [];
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
   });
 });

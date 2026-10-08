@@ -125,7 +125,6 @@ export function createExtensionQuestionInspectionHost(
           Object.keys(result).sort().join() !== "ok,value" ||
           !("ok" in result) || result.ok !== true ||
           !("value" in result) || !Array.isArray(result.value) ||
-          result.value.length === 0 ||
           result.value.length > MAX_QUESTIONS)
         return undefined;
       const seen = new Set<number>();
@@ -252,6 +251,7 @@ export function createExtensionQuestionInspectionHost(
           if (totalBytes > MAX_RESULT_BYTES) return browserFailure();
           questions.push(decoded);
         }
+        if (numbers.length === 0) await pause(0);
         const after = await enumerate(setId, url, deadline);
         if (!after || after.length !== numbers.length ||
             after.some((number, index) => number !== numbers[index]))
