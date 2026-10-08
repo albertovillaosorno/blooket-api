@@ -181,7 +181,17 @@ async function safeRequest(
   command: Parameters<BlooketBrowserBridgeTransport["request"]>[0],
 ) {
   try {
-    return await transport.request(command);
+    const result = await transport.request(command);
+    if (!result || typeof result !== "object" || Array.isArray(result))
+      return browserFailure();
+    const keys = Object.keys(result).sort().join();
+    if (result.ok === true && keys === "ok,value")
+      return { ok: true as const, value: result.value };
+    if (result.ok === false && keys === "code,ok" &&
+        (result.code === "blooket-browser-failed" ||
+          result.code === "blooket-browser-unavailable"))
+      return { ok: false as const, code: result.code };
+    return browserFailure();
   } catch {
     return browserFailure();
   }

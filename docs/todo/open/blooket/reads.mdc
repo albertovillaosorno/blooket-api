@@ -228,6 +228,11 @@ task 08 and publication tasks 09-12. Portable doubles are not browser
 acceptance, and no live login, question read-back, or capability probe is
 claimed.
 
+The local bridge adapter independently checks the exact transport response
+envelope before returning session, capability, set, question, or write data.
+Invalid runtime success and failure shapes become a stable browser failure;
+no raw transport properties or diagnostic strings leave that boundary.
+
 Canonical set and question read applications also admit only exact browser
 probe envelopes. Malformed failure codes, extra fields on success or failure,
 and invalid runtime shapes become stable secret-free read failures before
