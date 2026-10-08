@@ -198,6 +198,7 @@ export function inspectBlooketPage(
           link.searchParams.getAll("id").length !== 1 ||
           !id ||
           id.length > 512 ||
+          /[\x00-\x1f\x7f]/u.test(id) ||
           !title ||
           title.length > 1000 ||
           ids.has(id)
@@ -231,6 +232,7 @@ export function inspectBlooketPage(
       url.pathname !== "/edit" ||
       !operation.setId ||
       operation.setId.length > 512 ||
+      /[\x00-\x1f\x7f]/u.test(operation.setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== operation.setId
     )
@@ -295,7 +297,7 @@ export function blooketReadUrl(operation: PageReadOperation): string | null {
   if (
     !operation.setId ||
     operation.setId.length > 512 ||
-    operation.setId.includes("\0")
+    /[\x00-\x1f\x7f]/u.test(operation.setId)
   )
     throw new Error("invalid-set-id");
   return (
@@ -311,7 +313,7 @@ export function openBlooketDetailPanel(setId: string): boolean {
     location.pathname !== "/edit" ||
     !setId ||
     setId.length > 512 ||
-    setId.includes("\0") ||
+    /[\x00-\x1f\x7f]/u.test(setId) ||
     new URL(location.href).searchParams.getAll("id").length !== 1 ||
     new URL(location.href).searchParams.get("id") !== setId
   )

@@ -211,6 +211,18 @@ test("audio drawer distinguishes the shared Plus gate and cancels", () => {
   }
 });
 
+test("capability controls refuse control-bearing set IDs", () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: new URL("https://dashboard.blooket.com/edit?id=x%0Ay"),
+    });
+    assert.equal(openBlooketCapabilityQuestionPanel("x\ny"), false);
+    assert.equal(page.add.clicked, 0);
+  });
+});
+
 test("ambiguous capability controls fail without clicking", () => {
   const page = fixture();
   page.document.selectors['input#question[name="question"]'] = [page.question];

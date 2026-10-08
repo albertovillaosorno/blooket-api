@@ -209,6 +209,19 @@ test("serialized Add Question runner preserves browser semantics", () => {
   );
 });
 
+test("Add Question refuses control-bearing set IDs before opening", () => {
+  const page = fixture();
+  const setId = "x\ny";
+  withPage(
+    page.document,
+    "https://dashboard.blooket.com/edit?id=x%0Ay",
+    () => {
+      assert.equal(runBlooketAddQuestionPageAction("open", setId), false);
+      assert.equal(page.add.clicked, 0);
+    },
+  );
+});
+
 test("unknown serialized Add Question actions never submit", () => {
   const page = fixture();
   const serialized = Function(

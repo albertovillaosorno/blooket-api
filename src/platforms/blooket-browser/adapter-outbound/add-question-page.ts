@@ -63,7 +63,11 @@ export function runBlooketAddQuestionPageAction(
     code: "blooket-browser-failed",
   });
   const editRoute = (setId: string): boolean => {
-    if (!setId || setId.length > 512 || setId.includes("\0")) return false;
+    if (
+      !setId ||
+      setId.length > 512 ||
+      /[\x00-\x1f\x7f]/u.test(setId)
+    ) return false;
     const url = new URL(location.href);
     return (
       url.origin === "https://dashboard.blooket.com" &&
@@ -111,7 +115,7 @@ export function runBlooketAddQuestionPageAction(
       typeof input.setId !== "string" ||
       input.setId.length < 1 ||
       input.setId.length > 512 ||
-      input.setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(input.setId) ||
       !Number.isSafeInteger(input.number) ||
       input.number < 1 ||
       input.number > 10_000 ||

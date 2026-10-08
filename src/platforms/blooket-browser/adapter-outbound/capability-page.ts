@@ -48,7 +48,7 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       url.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
-      setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -73,7 +73,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       url.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
-      setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -107,6 +107,7 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     if (
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId ||
       document.querySelectorAll('aside[data-drawer-open="true"]').length !== 0
@@ -144,6 +145,7 @@ export function inspectBlooketAudioCapabilityDrawer(
     if (
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -187,6 +189,7 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     if (
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -212,6 +215,7 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     return (
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
+      !/[\x00-\x1f\x7f]/u.test(setId) &&
       url.searchParams.getAll("id").length === 1 &&
       url.searchParams.get("id") === setId &&
       document.querySelectorAll(
@@ -232,6 +236,7 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     if (
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId ||
       document.querySelectorAll('aside[data-drawer-open="true"]').length !== 0
@@ -260,6 +265,7 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
     return (
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
+      !/[\x00-\x1f\x7f]/u.test(setId) &&
       url.searchParams.getAll("id").length === 1 &&
       url.searchParams.get("id") === setId &&
       document.querySelector('input#question[name="question"]') === null &&

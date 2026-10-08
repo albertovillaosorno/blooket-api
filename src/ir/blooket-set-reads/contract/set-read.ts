@@ -77,7 +77,7 @@ export function decodeBlooketSetId(
 ): DecodeResult<string> {
   const issues: ValidationIssue[] = [];
   const id = requiredString(value, path, issues);
-  if (id !== undefined && (id.length > 512 || id.includes("\0"))) {
+  if (id !== undefined && (id.length > 512 || /[\x00-\x1f\x7f]/u.test(id))) {
     issues.push({
       path,
       code: "invalid-set-id",

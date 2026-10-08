@@ -45,7 +45,7 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
       url.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
-      setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -95,7 +95,7 @@ export function openBlooketQuestionPanel(
       location.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
-      setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       new URL(location.href).searchParams.getAll("id").length !== 1 ||
       new URL(location.href).searchParams.get("id") !== setId ||
       !Number.isSafeInteger(questionNumber) ||
@@ -136,7 +136,7 @@ export function inspectOpenedBlooketQuestion(
       location.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
-      setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       new URL(location.href).searchParams.getAll("id").length !== 1 ||
       new URL(location.href).searchParams.get("id") !== setId ||
       !Number.isSafeInteger(expectedNumber) ||
@@ -316,7 +316,7 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
       location.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
-      setId.includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(setId) ||
       new URL(location.href).searchParams.getAll("id").length !== 1 ||
       new URL(location.href).searchParams.get("id") !== setId
     )
@@ -344,7 +344,7 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
       location.pathname === "/edit" &&
       !!setId &&
       setId.length <= 512 &&
-      !setId.includes("\0") &&
+      !/[\x00-\x1f\x7f]/u.test(setId) &&
       new URL(location.href).searchParams.getAll("id").length === 1 &&
       new URL(location.href).searchParams.get("id") === setId &&
       document.querySelector('input#question[name="question"]') === null
