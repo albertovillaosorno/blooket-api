@@ -30,6 +30,7 @@
 //   - Thrown browser errors become blooket-browser-failed.
 //
 import {
+  BLOOKET_NAVIGATION_STATE_KINDS,
   blooketNavigationDecision,
   type ObservedBlooketNavigationStateKind,
 } from "../../../ir/blooket-navigation/domain/navigation-state.ts";
@@ -60,9 +61,25 @@ export async function inspectBlooketSession(
 ): Promise<InspectBlooketSessionResult> {
   try {
     const observed = await browser.observe();
-    if (!observed.ok) {
-      return observed;
+    if (!observed || typeof observed !== "object" ||
+        Array.isArray(observed)) return browserFailure();
+    const keys = Object.keys(observed).sort().join();
+    if (observed.ok === false) {
+      if (keys !== "code,ok" ||
+          (observed.code !== "blooket-browser-unavailable" &&
+            observed.code !== "blooket-browser-failed"))
+        return browserFailure();
+      return { ok: false, code: observed.code };
     }
+    const state: unknown = observed.state;
+    if (observed.ok !== true || keys !== "ok,state" ||
+        !BLOOKET_NAVIGATION_STATE_KINDS.some(
+          (candidate) => candidate === state,
+        ) ||
+        state === "authenticating" ||
+        state === "authenticated" ||
+        state === "human-action-required")
+      return browserFailure();
     const decision = blooketNavigationDecision({
       kind: observed.state,
     });
@@ -78,9 +95,10 @@ export async function inspectBlooketSession(
       action: decision.action,
     };
   } catch {
-    return {
-      ok: false,
-      code: "blooket-browser-failed",
-    };
+    return browserFailure();
   }
+}
+
+function browserFailure(): Extract<InspectBlooketSessionResult, { ok: false }> {
+  return { ok: false, code: "blooket-browser-failed" };
 }

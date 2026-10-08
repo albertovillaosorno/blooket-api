@@ -114,3 +114,28 @@ test("thrown observation errors become stable failures", async () => {
   });
   assert.deepEqual(calls, ["observe"]);
 });
+
+test(
+  "malformed browser observations cannot cross the session boundary",
+  async () => {
+  for (const observed of [
+    { ok: false, code: "private-browser-secret", extra: "raw" },
+    { ok: false, code: "blooket-browser-unavailable", raw: "private" },
+    { ok: true, state: "dashboard", cookie: "private" },
+    { ok: true, state: "authenticating" },
+    { ok: true, state: "unexpected-state" },
+    { ok: "true", state: "dashboard" },
+    null,
+  ]) {
+    const calls: string[] = [];
+    const result = await inspectBlooketSession(browser(
+      observed as BlooketBrowserObservationResult, calls,
+    ));
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(calls, ["observe"]);
+    assert.equal(JSON.stringify(result).includes("private"), false);
+  }
+  },
+);
