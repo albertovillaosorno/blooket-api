@@ -125,16 +125,39 @@ export function createExtensionAddQuestionHost(
       input: BlooketTextQuestionPageInput,
     ): Promise<ExtensionAddQuestionResult> => {
       try {
+        const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
+          encodeURIComponent(input.setId);
         const before = await chrome.tabs.get(tabId);
-        if (!dashboardTab(before)) return browserFailure();
-        await chrome.tabs.update(tabId, {
-          url: DASHBOARD_ORIGIN + "/edit?id=" + encodeURIComponent(input.setId),
-        });
+        if (!dashboardTab(before) || before.status !== "complete")
+          return browserFailure();
+        // Do not replace a route the teacher selected after the first tab
+        // observation. Reaching the correct edit page needs no second update.
+        const current = await chrome.tabs.get(tabId);
+        if (current.status !== "complete" || current.url !== before.url)
+          return browserFailure();
+        if (current.url !== editUrl)
+          await chrome.tabs.update(tabId, { url: editUrl });
 
-        const ready = await waitForEdit(script, chrome, tabId, pause);
+        const ready = await waitForEdit(
+          script, chrome, tabId, editUrl, pause,
+        );
         if (!ready.ok) return ready;
 
-        const opened = await script(
+        // An acknowledged injected function may finish on a different route.
+        // Confirm ownership around *every* subsequent browser interaction.
+        const ownedScript: Script = async (func, args) => {
+          const beforeScript = await chrome.tabs.get(tabId);
+          if (beforeScript.status !== "complete" ||
+              beforeScript.url !== editUrl)
+            throw new Error("browser-write-tab-changed");
+          const result = await script(func, args);
+          const afterScript = await chrome.tabs.get(tabId);
+          if (afterScript.status !== "complete" ||
+              afterScript.url !== editUrl)
+            throw new Error("browser-write-tab-changed");
+          return result;
+        };
+        const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
           ["open", input.setId],
         );
@@ -142,7 +165,7 @@ export function createExtensionAddQuestionHost(
 
         let panelReady = false;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-          const result = await script(
+          const result = await ownedScript(
             runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
             ["is-ready", input.setId],
           );
@@ -154,20 +177,20 @@ export function createExtensionAddQuestionHost(
         }
         if (!panelReady) return browserFailure();
 
-        const prepared = await script(
+        const prepared = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
           ["prepare", input],
         );
         if (!exactOk(prepared)) return browserFailure();
 
-        const submittedResult = await script(
+        const submittedResult = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
           ["submit", input],
         );
         if (!exactOk(submittedResult)) return browserFailure();
         return await observeQuestion(
           input,
-          script,
+          ownedScript,
           chrome,
           tabId,
           pause,
@@ -183,12 +206,17 @@ async function waitForEdit(
   script: Script,
   chrome: AddQuestionChromePort,
   tabId: number,
+  editUrl: string,
   pause: (ms: number) => Promise<void>,
 ): Promise<ExtensionAddQuestionResult> {
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.status === "complete") {
+      if (tab.url !== editUrl) return browserFailure();
       const observed = await observe(script);
+      const after = await chrome.tabs.get(tabId);
+      if (after.status !== "complete" || after.url !== editUrl)
+        return browserFailure();
       if (observed === "edit") return { ok: true };
       if (observed !== undefined)
         return navigationFailure(normalizeUnexpected(observed));
@@ -205,8 +233,11 @@ async function observeQuestion(
   tabId: number,
   pause: (ms: number) => Promise<void>,
 ): Promise<ExtensionAddQuestionResult> {
+  const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
+    encodeURIComponent(input.setId);
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
+    if (tab.url !== editUrl) return browserFailure();
     if (tab.status !== "complete") {
       await pause(POLL_MS);
       continue;
