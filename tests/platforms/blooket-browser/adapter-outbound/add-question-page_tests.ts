@@ -417,3 +417,38 @@ test("two Add Question buttons resolve only the question-list toolbar", () => {
       assert.equal(bottom.clicked, 1);
     });
 });
+
+test(
+  "human and security overlays block every Add Question page action",
+  () => {
+  for (const blocked of ["verification", "password", "organization",
+    "captcha"] as const) {
+    const page = fixture();
+    if (blocked === "verification")
+      Object.assign(page.document, { title: "Just a moment..." });
+    if (blocked === "password")
+      page.document.selectors['input[type="password"]'] = [node("INPUT")];
+    if (blocked === "organization")
+      page.document.selectors['[role="dialog"][aria-modal="true"] h3'] = [
+        node("H3", "Select your organization"),
+      ];
+    if (blocked === "captcha")
+      page.document.selectors[
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+      ] = [node("IFRAME")];
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
+      assert.equal(isBlooketAddQuestionPanelReady("set-fixture"), false);
+      assert.deepEqual(prepareBlooketAddQuestionForm(typing), {
+        ok: false, code: "blooket-browser-failed",
+      });
+      assert.deepEqual(submitBlooketAddQuestionForm(typing), {
+        ok: false, code: "blooket-browser-failed",
+      });
+      assert.equal(page.add.clicked, 0);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+  },
+);

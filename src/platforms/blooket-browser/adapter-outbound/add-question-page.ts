@@ -184,6 +184,25 @@ export function runBlooketAddQuestionPageAction(
   };
 
   try {
+    // Independently reject human/security overlays on every injected step.
+    // The old Edit controls can remain mounted behind a new provider stop.
+    const challenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    const organizationPrompt = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        heading.textContent?.trim() === "Select your organization";
+    });
+    if (document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]') !== null ||
+        challenge || organizationPrompt)
+      return action === "open" || action === "is-ready" ? false : failed();
     if (
       action !== "open" &&
       action !== "is-ready" &&
