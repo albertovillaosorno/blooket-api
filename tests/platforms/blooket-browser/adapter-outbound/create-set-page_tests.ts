@@ -348,3 +348,27 @@ test(
   });
   },
 );
+
+
+test("an edit redirect behind a security interstitial is not a receipt", () => {
+  const document = Object.assign(node("DOCUMENT"), {
+    title: "Just a moment...",
+  });
+  withPage(document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.deepEqual(observeBlooketCreateSetSuccess(), {
+      ok: false, code: "blooket-browser-failed",
+    });
+  });
+});
+
+test("an edit redirect behind a password prompt is not a receipt", () => {
+  const document = node("DOCUMENT");
+  document.selectors['input[type="password"]'] = [node("INPUT")];
+  withPage(document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.deepEqual(observeBlooketCreateSetSuccess(), {
+      ok: false, code: "blooket-browser-failed",
+    });
+  });
+});
