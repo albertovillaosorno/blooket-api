@@ -77,7 +77,10 @@ export function createBlooketMutationPacer(
       });
       const previous = tail;
       tail = previous.then(() => slot);
-      await previous;
+      if (!await waitForTurn(previous, signal)) {
+        releaseSlot();
+        return cancelled();
+      }
       if (signal?.aborted) {
         releaseSlot();
         return cancelled();
@@ -110,6 +113,31 @@ export function createBlooketMutationPacer(
       };
     },
   };
+}
+
+async function waitForTurn(
+  previous: Promise<void>,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (signal?.aborted) return false;
+  if (!signal) {
+    await previous;
+    return true;
+  }
+  // Waiting for another lease must not hold a cancelled caller hostage.
+  // Its reserved queue slot is still chained to the incumbent, so an early
+  // cancellation cannot permit a later caller to overlap that lease.
+  return await new Promise<boolean>((resolve) => {
+    const aborted = () => {
+      signal.removeEventListener("abort", aborted);
+      resolve(false);
+    };
+    signal.addEventListener("abort", aborted, { once: true });
+    void previous.then(() => {
+      signal.removeEventListener("abort", aborted);
+      resolve(!signal.aborted);
+    });
+  });
 }
 
 async function waitForStart(

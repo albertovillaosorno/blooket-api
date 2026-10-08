@@ -103,6 +103,13 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-08, the in-process mutation pacer was hardened so an aborted
+reservation can complete while an earlier lease is still held. Its reserved
+queue slot still resolves only after the incumbent, preventing a later caller
+from overlapping the exclusive mutation window. Injected-clock regressions
+verify prompt cancellation, unchanged start counts, and serial execution with
+two independently canceled queued reservations.
+
 A portable in-process pacing foundation was added on 2026-10-06. It grants one
 exclusive mutation lease at a time, enforces the two-second and 20-per-minute
 defaults with an injected clock, permits only stricter configuration, and
