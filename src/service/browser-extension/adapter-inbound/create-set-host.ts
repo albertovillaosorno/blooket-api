@@ -218,18 +218,27 @@ export function createExtensionCreateSetHost(
                   (...args: never[]) => unknown,
               );
               const after = await chrome.tabs.get(tabId);
-              if (after.status !== "complete" || after.url !== tab.url)
+              if (after.status !== "complete" || after.url !== tab.url ||
+                  !exactRedirectReceipt(result, ids[0]))
                 return browserFailure();
-              if (
-                result && typeof result === "object" &&
-                !Array.isArray(result) &&
-                Object.keys(result).sort().join() === "ok,remoteSetId" &&
-                "ok" in result && result.ok === true &&
-                "remoteSetId" in result &&
-                typeof result.remoteSetId === "string" &&
-                result.remoteSetId === ids[0]
-              ) return { ok: true, remoteSetId: result.remoteSetId };
-              return browserFailure();
+              // An edit redirect can hydrate after the first complete page
+              // event. One claim is not a stable persisted read-back.
+              await pause(0);
+              const beforeAgain = await chrome.tabs.get(tabId);
+              if (beforeAgain.status !== "complete" ||
+                  beforeAgain.url !== tab.url)
+                return browserFailure();
+              const again = await script(
+                observeBlooketCreateSetSuccess as
+                  (...args: never[]) => unknown,
+              );
+              const afterAgain = await chrome.tabs.get(tabId);
+              if (afterAgain.status !== "complete" ||
+                  afterAgain.url !== tab.url ||
+                  !exactRedirectReceipt(again, ids[0]) ||
+                  JSON.stringify(result) !== JSON.stringify(again))
+                return browserFailure();
+              return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
             if (observed !== undefined && observed !== "create")
@@ -275,6 +284,17 @@ function dashboardTab(tab: BrowserTab): boolean {
   } catch {
     return false;
   }
+}
+
+function exactRedirectReceipt(
+  value: unknown,
+  id: string,
+): value is { readonly ok: true; readonly remoteSetId: string } {
+  return !!value && typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join() === "ok,remoteSetId" &&
+    "ok" in value && value.ok === true &&
+    "remoteSetId" in value && value.remoteSetId === id;
 }
 
 function exactOk(value: unknown): boolean {
