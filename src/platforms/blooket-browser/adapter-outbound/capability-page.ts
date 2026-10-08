@@ -324,7 +324,9 @@ export function inspectBlooketAudioCapabilityDrawer(
         ? { ok: true, value: "unsupported" }
         : failed();
     }
-    return audioInputs.length === 1
+    return audioInputs.length === 1 &&
+        audioInputs[0]?.tagName === "INPUT" &&
+        !(audioInputs[0] as HTMLInputElement).disabled
       ? { ok: true, value: "supported" }
       : failed();
   } catch {

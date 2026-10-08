@@ -457,3 +457,25 @@ test("every injected capability action works without module imports", () => {
     assert.equal(isQuestionClosed("set-fixture"), true);
   });
 });
+
+test(
+  "a disabled Audio file picker cannot establish Plus availability",
+  () => {
+  const page = fixture();
+  const activeDrawer = drawer("supported");
+  const input = activeDrawer.selectors[
+    'input[type="file"][accept="audio/*"]'
+  ]?.[0] as FixtureNode & { disabled?: boolean };
+  assert.ok(input);
+  input.disabled = true;
+  page.document.selectors['input#question[name="question"]'] = [
+    page.question,
+  ];
+  page.document.selectors['aside[data-drawer-open="true"]'] = [activeDrawer];
+  withPage(page.document, () => {
+    assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
+      ok: false, code: "blooket-browser-failed",
+    });
+  });
+  },
+);

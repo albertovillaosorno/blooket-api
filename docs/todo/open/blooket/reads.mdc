@@ -196,6 +196,11 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, the Audio drawer observer began refusing a disabled file
+input as proof of account support. The synthetic regression demonstrates
+that a disabled picker previously produced a supported result; it now fails
+without asserting whether any real Blooket account has Plus.
+
 On 2026-10-08, the extension relay began imposing operation-local browser
 budgets shorter than the ten-second bridge deadline, in addition to its
 connection-generation fence. An injected-clock Add Question regression proves
