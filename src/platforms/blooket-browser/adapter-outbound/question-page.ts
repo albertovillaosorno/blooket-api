@@ -45,6 +45,8 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
       url.pathname !== "/edit" ||
       !setId ||
       setId.length > 512 ||
+      setId.includes("\0") ||
+      url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
       return failed();
@@ -83,11 +85,19 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
   }
 }
 
-export function openBlooketQuestionPanel(questionNumber: number): boolean {
+export function openBlooketQuestionPanel(
+  setId: string,
+  questionNumber: number,
+): boolean {
   try {
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/edit" ||
+      !setId ||
+      setId.length > 512 ||
+      setId.includes("\0") ||
+      new URL(location.href).searchParams.getAll("id").length !== 1 ||
+      new URL(location.href).searchParams.get("id") !== setId ||
       !Number.isSafeInteger(questionNumber) ||
       questionNumber < 1
     )
@@ -113,6 +123,7 @@ export function openBlooketQuestionPanel(questionNumber: number): boolean {
 }
 
 export function inspectOpenedBlooketQuestion(
+  setId: string,
   expectedNumber: number,
 ): QuestionPanelResult {
   const failed = (): QuestionPanelResult => ({
@@ -123,6 +134,11 @@ export function inspectOpenedBlooketQuestion(
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/edit" ||
+      !setId ||
+      setId.length > 512 ||
+      setId.includes("\0") ||
+      new URL(location.href).searchParams.getAll("id").length !== 1 ||
+      new URL(location.href).searchParams.get("id") !== setId ||
       !Number.isSafeInteger(expectedNumber) ||
       expectedNumber < 1
     )
@@ -293,11 +309,16 @@ export function inspectOpenedBlooketQuestion(
   }
 }
 
-export function closeBlooketQuestionPanel(): boolean {
+export function closeBlooketQuestionPanel(setId: string): boolean {
   try {
     if (
       location.origin !== "https://dashboard.blooket.com" ||
-      location.pathname !== "/edit"
+      location.pathname !== "/edit" ||
+      !setId ||
+      setId.length > 512 ||
+      setId.includes("\0") ||
+      new URL(location.href).searchParams.getAll("id").length !== 1 ||
+      new URL(location.href).searchParams.get("id") !== setId
     )
       return false;
     const forms = Array.from(
@@ -314,11 +335,18 @@ export function closeBlooketQuestionPanel(): boolean {
   } catch {
     return false;
   }
-}export function isBlooketQuestionPanelClosed(): boolean {
+}
+
+export function isBlooketQuestionPanelClosed(setId: string): boolean {
   try {
     return (
       location.origin === "https://dashboard.blooket.com" &&
       location.pathname === "/edit" &&
+      !!setId &&
+      setId.length <= 512 &&
+      !setId.includes("\0") &&
+      new URL(location.href).searchParams.getAll("id").length === 1 &&
+      new URL(location.href).searchParams.get("id") === setId &&
       document.querySelector('input#question[name="question"]') === null
     );
   } catch {

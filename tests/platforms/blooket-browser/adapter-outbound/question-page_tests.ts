@@ -159,9 +159,9 @@ test("question panels expose normalized read facts without saving", () => {
       ok: true,
       value: [1],
     });
-    assert.equal(openBlooketQuestionPanel(1), true);
+    assert.equal(openBlooketQuestionPanel("fixture", 1), true);
     assert.equal(opened, 1);
-    const result = inspectOpenedBlooketQuestion(1);
+    const result = inspectOpenedBlooketQuestion("fixture", 1);
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.deepEqual(result.value, {
@@ -191,9 +191,9 @@ test("question panels expose normalized read facts without saving", () => {
       });
       assert.equal(decodeBlooketQuestionRead(result.value).ok, true);
     }
-    assert.equal(closeBlooketQuestionPanel(), true);
+    assert.equal(closeBlooketQuestionPanel("fixture"), true);
     assert.equal(closed, 1);
-    assert.equal(isBlooketQuestionPanelClosed(), true);
+    assert.equal(isBlooketQuestionPanelClosed("fixture"), true);
     document.selectors['input#question[name="question"]'] = [hidden];
 
     const providerUrl = "https://provider.invalid/media";
@@ -209,7 +209,7 @@ test("question panels expose normalized read facts without saving", () => {
       image: "",
       audio: "",
     });
-    const imageAnswer = inspectOpenedBlooketQuestion(1);
+    const imageAnswer = inspectOpenedBlooketQuestion("fixture", 1);
     assert.equal(imageAnswer.ok, true);
     if (imageAnswer.ok) {
       assert.deepEqual(imageAnswer.value, {
@@ -245,7 +245,7 @@ test("question panels expose normalized read facts without saving", () => {
       image: "",
       audio: "",
     });
-    const mathAnswer = inspectOpenedBlooketQuestion(1);
+    const mathAnswer = inspectOpenedBlooketQuestion("fixture", 1);
     assert.equal(mathAnswer.ok, true);
     if (mathAnswer.ok) {
       const value = mathAnswer.value as { answers?: unknown };
@@ -269,7 +269,7 @@ test("question panels expose normalized read facts without saving", () => {
       image: "",
       audio: "",
     });
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
     hidden.value = JSON.stringify({
       number: 1,
       question: "Solve this`*`x^2`*`",
@@ -282,7 +282,7 @@ test("question panels expose normalized read facts without saving", () => {
       image: "",
       audio: "",
     });
-    const equationQuestion = inspectOpenedBlooketQuestion(1);
+    const equationQuestion = inspectOpenedBlooketQuestion("fixture", 1);
     assert.equal(equationQuestion.ok, true);
     if (equationQuestion.ok) {
       const value = equationQuestion.value as {
@@ -306,7 +306,7 @@ test("question panels expose normalized read facts without saving", () => {
       image: "opaque-image",
       audio: "",
     });
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
     hidden.value = JSON.stringify({
       number: 1,
       question: "Solve this`*`x^2",
@@ -319,7 +319,7 @@ test("question panels expose normalized read facts without saving", () => {
       image: "",
       audio: "",
     });
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
     hidden.value = JSON.stringify({
       number: 1,
       question: "Malformed image answer",
@@ -332,10 +332,58 @@ test("question panels expose normalized read facts without saving", () => {
       image: "",
       audio: "",
     });
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
     hidden.value = "{bad";
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
   });
+});
+
+test("question modal operations reject switched and duplicate set IDs", () => {
+  const document = node("DOCUMENT");
+  const group = node("DIV");
+  const edit = node("BUTTON", "Edit");
+  let clicks = 0;
+  edit.click = () => { clicks++; };
+  group.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [group];
+
+  const form = node("FORM");
+  const hidden = node("INPUT");
+  hidden.parent = form;
+  hidden.value = JSON.stringify({
+    number: 1, question: "Type sun.", qType: "typing",
+    random: true, timeLimit: 15, answers: ["sun"],
+    correctAnswers: ["sun"], answerTypes: ["exactly"],
+    image: "", audio: "",
+  });
+  document.selectors['input#question[name="question"]'] = [hidden];
+  document.selectors['form input#question[name="question"]'] = [hidden];
+  const cancel = node("BUTTON", "Cancel");
+  cancel.click = () => { clicks++; };
+  form.selectors['button[type="button"]'] = [cancel];
+
+  for (const href of [
+    "https://dashboard.blooket.com/edit?id=other",
+    "https://dashboard.blooket.com/edit?id=fixture&id=other",
+    "https://dashboard.blooket.com/edit?id=fixture&id=fixture",
+  ]) {
+    page(document, href, () => {
+      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+      assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+      assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+      assert.equal(closeBlooketQuestionPanel("fixture"), false);
+      assert.equal(isBlooketQuestionPanelClosed("fixture"), false);
+    });
+  }
+  assert.equal(clicks, 0);
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(openBlooketQuestionPanel("fixture", 1), true);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, true);
+    assert.equal(closeBlooketQuestionPanel("fixture"), true);
+  });
+  assert.equal(clicks, 2);
 });
 
 test(
@@ -351,7 +399,7 @@ test(
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
     assert.equal(listBlooketQuestionNumbers("other").ok, false);
-    assert.equal(openBlooketQuestionPanel(0), false);
+    assert.equal(openBlooketQuestionPanel("fixture", 0), false);
 
     document.selectors[
       '[role="button"][aria-label^="Edit question "]'
@@ -386,9 +434,9 @@ test(
   document.selectors['input#question[name="question"]'] = [hidden];
 
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
     hidden.value = "x".repeat(100_001);
-    assert.equal(inspectOpenedBlooketQuestion(1).ok, false);
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
   });
   },
 );

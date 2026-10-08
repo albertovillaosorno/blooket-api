@@ -239,7 +239,7 @@ async function observeQuestion(
 
     const opened = await script(
       openBlooketQuestionPanel as (...args: never[]) => unknown,
-      [input.number],
+      [input.setId, input.number],
     );
     if (opened !== true) return browserFailure();
 
@@ -247,7 +247,7 @@ async function observeQuestion(
     for (let readAttempt = 0; readAttempt < 15; readAttempt++) {
       inspected = await script(
         inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
-        [input.number],
+        [input.setId, input.number],
       );
       if (matchesQuestion(inspected, input)) break;
       await pause(POLL_MS);
@@ -256,11 +256,13 @@ async function observeQuestion(
 
     const closed = await script(
       closeBlooketQuestionPanel as (...args: never[]) => unknown,
+      [input.setId],
     );
     if (closed !== true) return browserFailure();
     for (let closeAttempt = 0; closeAttempt < 15; closeAttempt++) {
       const isClosed = await script(
         isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
+        [input.setId],
       );
       if (isClosed === true) return { ok: true };
       await pause(POLL_MS);

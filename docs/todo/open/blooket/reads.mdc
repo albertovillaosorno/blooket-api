@@ -211,6 +211,13 @@ listing remains a supported observational read: the worker navigates to the
 exact set edit route, bounds the visible Edit-question controls, opens each
 question, decodes the observed serialized question and normalized answer facts,
 and verifies panel cleanup.
+
+The question-list and Add Question read-back paths now require the same exact
+set ID at every modal step, including opening, inspection, cancel, and confirmed
+closure. A switched edit route or duplicate `id` query parameter fails closed
+rather than accepting another set's question as the requested result. Portable
+regressions cover the identity checks; no new live question-read claim follows.
+
 Answer-image, answer-math, and question-equation encodings now have bounded
 reference-backed normalization, but question image/audio identity and broader
 media behavior remain intentionally unclaimed.
