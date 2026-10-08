@@ -55,6 +55,19 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the local browser broker began reserving a write-dispatch
+margin for both Create Set and Add Question, matching the existing capability
+cleanup budget. Queued writes with less than 9.5 seconds left on the default
+ten-second deadline are settled without dispatch, rather than beginning a
+form action whose caller may already have timed out. Injected-clock tests
+cover refusal and a fresh singly dispatched write.
+
+On 2026-10-08, Create Set redirect confirmation began requiring two matching,
+strictly decoded Edit-page results separated by an event-loop yield. A route
+change, malformed second reply, or contradictory remote ID now refuses success
+rather than treating the first browser observation as a durable receipt. These
+are synthetic browser-host checks, not live evidence of remote persistence.
+
 On 2026-10-08, the extension worker started passing a generation-scoped
 browser port to each write host. A synthetic reconnect during an Add Question
 modal opener now prevents all later form scripts, including submission, and
