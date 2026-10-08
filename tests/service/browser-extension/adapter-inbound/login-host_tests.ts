@@ -220,3 +220,19 @@ test(
   assert.equal(page.calls.includes("submit"), false);
   },
 );
+
+test(
+  "a tab switched after a pending login poll receives no more credentials",
+  async () => {
+  const page = fixture({
+    preparedPolls: [false, true],
+    nextUrlAfterPoll: "https://id.blooket.com/security-verification",
+  });
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => {}, page.now,
+  ).authenticate(credentials);
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.deepEqual(page.calls, ["prepare", "is-prepared"]);
+  assert.equal(page.calls.includes("submit"), false);
+  },
+);
