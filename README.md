@@ -414,6 +414,12 @@ node --check src/ui/teacher-workspace/adapter-inbound/app.js
 jig validate --root .
 ```
 
+Jig's `scalability.repository-graph` rule currently records an evidenced
+`not-evaluated` outcome while Jig's own schema/migration contract matures.
+Successful Jig validation has zero policy diagnostics but does not imply this
+particular graph rule has been fully evaluated. The supporting schema source
+files are part of Jig's validator build, not this product checkout.
+
 Source, documentation, diagnostics, and commits use English. Product UI
 language, quiz language, and original-media language are independent.
 
