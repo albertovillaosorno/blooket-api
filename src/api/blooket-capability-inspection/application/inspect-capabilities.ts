@@ -144,11 +144,24 @@ async function safeInspect(
   inspection: BlooketCapabilityInspectionPort,
 ): Promise<BlooketCapabilityProbeResult> {
   try {
-    return await inspection.inspect();
+    const result = await inspection.inspect();
+    if (!result || typeof result !== "object" || Array.isArray(result))
+      return capabilityFailure();
+    const keys = Object.keys(result).sort().join();
+    if (result.ok === true && keys === "ok,value")
+      return { ok: true, value: result.value };
+    if (result.ok === false && keys === "code,ok" &&
+        (result.code === "blooket-browser-unavailable" ||
+          result.code === "blooket-browser-failed"))
+      return { ok: false, code: result.code };
+    return capabilityFailure();
   } catch {
-    return {
-      ok: false,
-      code: "blooket-browser-failed",
-    };
+    return capabilityFailure();
   }
+}
+
+function capabilityFailure(): Extract<
+  BlooketCapabilityProbeResult, { readonly ok: false }
+> {
+  return { ok: false, code: "blooket-browser-failed" };
 }
