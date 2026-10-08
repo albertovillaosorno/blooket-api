@@ -677,6 +677,20 @@ Capability inspection cleanup now converts errors from post-close browser
 confirmation polls into stable failures, then continues the other cleanup
 and original-tab restoration. Synthetic Chrome exceptions verify that a
 failed capability probe cannot abandon the tab or return a snapshot.
+
+Capability inspection also tracks the exact routes it navigated. It refuses
+to launch a subsequent navigation when the tab has moved off the expected
+previous route, and it restores the original dashboard URL only while the tab
+remains on a probe-owned route. A user-chosen different dashboard page or a
+foreign-origin destination is preserved instead of overwritten; the capability
+snapshot is invalidated. Before cleanup, the host checks the exact probe-owned
+edit URL again and refuses to inject Cancel commands into the new route.
+
+This is a best-effort Chrome tab ownership check,
+not an atomic protection against navigation between two browser API calls.
+Synthetic tests cover interruption during set-list inspection and while an
+Audio drawer is open, including a same-origin manual route.
+
 An empty My Sets probe can produce account-dependent capability evidence only
 when the source explicitly confirms a `complete` empty collection. An empty
 `unknown` list and duplicate set IDs are rejected before selecting a probe set

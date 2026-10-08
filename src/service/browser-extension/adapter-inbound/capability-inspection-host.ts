@@ -130,11 +130,12 @@ export function createExtensionCapabilityInspectionHost(
       let outcome: ExtensionCapabilityInspectionResult = browserFailure();
       try {
         const before = await chrome.tabs.get(tabId);
-        if (!dashboardTab(before)) return browserFailure();
+        if (!before.url || !dashboardTab(before)) return browserFailure();
         originalUrl = before.url;
 
         if (!await navigate(
-          chrome, tabId, MY_SETS_URL, pause, probeDeadline, now,
+          chrome, tabId, MY_SETS_URL, originalUrl, pause,
+          probeDeadline, now,
         ))
           return browserFailure();
         const observed = await readScript(
@@ -155,7 +156,8 @@ export function createExtensionCapabilityInspectionHost(
           const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
             encodeURIComponent(setId);
           if (!await navigate(
-            chrome, tabId, editUrl, pause, probeDeadline, now,
+            chrome, tabId, editUrl, MY_SETS_URL, pause,
+            probeDeadline, now,
           ))
             return browserFailure();
           const editState = await readScript(
@@ -208,13 +210,23 @@ export function createExtensionCapabilityInspectionHost(
       } catch {
         outcome = browserFailure();
       } finally {
-        if (setId !== undefined && drawerOpened) {
+        // If the user navigated away, this probe no longer owns the editor
+        // DOM and must not inject cleanup actions into their new page.
+        const tabBeforeCleanup = await chrome.tabs.get(tabId)
+          .catch(() => undefined);
+        const canClean = setId !== undefined &&
+          tabBeforeCleanup?.status === "complete" &&
+          tabBeforeCleanup.url === DASHBOARD_ORIGIN + "/edit?id=" +
+            encodeURIComponent(setId);
+        if (!canClean && (panelOpened || drawerOpened))
+          outcome = browserFailure();
+        if (canClean && setId !== undefined && drawerOpened) {
           const cleaned = await closeDrawer(
             script, setId, pause, finishDeadline, now,
           );
           if (!cleaned) outcome = browserFailure();
         }
-        if (setId !== undefined && panelOpened) {
+        if (canClean && setId !== undefined && panelOpened) {
           const cleaned = await closeQuestionPanel(
             script, setId, pause, finishDeadline, now,
           );
@@ -225,6 +237,9 @@ export function createExtensionCapabilityInspectionHost(
             chrome,
             tabId,
             originalUrl,
+            [MY_SETS_URL, ...(setId === undefined ? [] : [
+              DASHBOARD_ORIGIN + "/edit?id=" + encodeURIComponent(setId),
+            ])],
             pause,
             finishDeadline,
             now,
@@ -242,13 +257,16 @@ async function navigate(
   chrome: CapabilityInspectionChromePort,
   tabId: number,
   url: string,
+  allowedPreviousUrl: string,
   pause: (ms: number) => Promise<void>,
   deadline: number,
   now: () => number,
 ): Promise<boolean> {
   if (now() >= deadline) return false;
   const current = await chrome.tabs.get(tabId);
-  if (now() >= deadline) return false;
+  if (now() >= deadline ||
+      (current.url !== url && current.url !== allowedPreviousUrl))
+    return false;
   if (current.url !== url) await chrome.tabs.update(tabId, { url });
   for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
     attempt++) {
@@ -264,19 +282,26 @@ async function restore(
   chrome: CapabilityInspectionChromePort,
   tabId: number,
   url: string,
+  ownedRoutes: readonly string[],
   pause: (ms: number) => Promise<void>,
   deadline: number,
   now: () => number,
 ): Promise<boolean> {
   if (new URL(url).origin !== DASHBOARD_ORIGIN) return false;
+  // The user may have navigated the tab independently. An unfamiliar route,
+  // even on the same provider origin, is no longer ours to overwrite.
+  const current = await chrome.tabs.get(tabId);
+  if (current.url !== url && !ownedRoutes.includes(current.url ?? ""))
+    return false;
   if (now() >= deadline) {
-    // Even after timeout, attempt to put the user's tab back. Without a
-    // confirmed completed navigation this may only produce a failed result.
-    const current = await chrome.tabs.get(tabId);
+    // Best-effort restoration after timeout is permitted only on a route the
+    // probe navigated itself; it cannot be confirmed as a successful result.
     if (current.url !== url) await chrome.tabs.update(tabId, { url });
     return false;
   }
-  return await navigate(chrome, tabId, url, pause, deadline, now);
+  return await navigate(
+    chrome, tabId, url, current.url ?? url, pause, deadline, now,
+  );
 }
 
 async function pollTrue(
