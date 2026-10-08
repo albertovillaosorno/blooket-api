@@ -187,6 +187,12 @@ unique form, rejecting missing or duplicate controls. Unrelated title,
 description, or privacy controls elsewhere in the document cannot be returned
 as evidence for the requested set.
 
+The read-only Edit Info opener now independently checks the same authenticated
+shell and visible human-action blockers as the detail extractor. Organization
+selection, a visible CAPTCHA, a password overlay, or a missing logout control
+stops the opener without clicking Edit Info. This protects the interval between
+session observation and opening metadata controls, not remote atomicity.
+
 The extension's set-detail worker now retries only an exact page-unavailable
 reply while the Edit Info panel hydrates. A malformed success envelope or
 unexpected opener result is rejected immediately rather than accepted after

@@ -518,7 +518,7 @@ test("read routes encode IDs and panel opening never submits a form", () => {
   );
   assert.throws(() => blooketReadUrl({ kind: "sets.get", setId: "\0" }));
   assert.throws(() => blooketReadUrl({ kind: "sets.get", setId: "x\ny" }));
-  const document = node("DOCUMENT");
+  const { document } = base();
   const button = node("BUTTON", "Edit Info");
   let clicks = 0;
   button.click = () => {
@@ -563,6 +563,43 @@ test("read routes encode IDs and panel opening never submits a form", () => {
     page(document, href, () => {
       assert.equal(openBlooketDetailPanel("fixture"), false);
       assert.equal(clicks, 1);
+    });
+  }
+});
+
+test("Edit Info opener refuses human-action overlays and lost sessions", () => {
+  for (const mode of [
+    "organization", "challenge", "password-overlay", "missing-shell",
+  ] as const) {
+    const { document } = base();
+    const button = node("BUTTON", "Edit Info");
+    let clicks = 0;
+    button.click = () => { clicks++; };
+    document.selectors["main button"] = [button];
+    const form = node("FORM");
+    const identity = node("INPUT", "", { type: "hidden" });
+    identity.value = "fixture";
+    form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+    const title = node("INPUT");
+    title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    form.selectors['input#title[name="title"]'] = [title];
+    document.selectors['form#question-set-form'] = [form];
+    if (mode === "organization") {
+      document.selectors[
+        '[role="dialog"][aria-modal="true"] h3'
+      ] = [node("H3", "Select your organization")];
+    } else if (mode === "challenge") {
+      document.selectors[
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+      ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+    } else if (mode === "password-overlay") {
+      document.selectors['input[type="password"]'] = [node("INPUT")];
+    } else {
+      document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
+    }
+    page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+      assert.equal(openBlooketDetailPanel("fixture"), false);
+      assert.equal(clicks, 0);
     });
   }
 });
