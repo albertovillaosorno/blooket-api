@@ -65,23 +65,33 @@ export function prepareBlooketCreateSetForm(
     )
       return failed();
 
-    const form = document.querySelector("form#question-set-form");
-    const title = document.querySelector('input#title[name="title"]');
-    const description = document.querySelector(
+    const forms = Array.from(document.querySelectorAll(
+      "form#question-set-form",
+    ));
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM")
+      return failed();
+    const form = forms[0];
+    const titles = Array.from(form.querySelectorAll(
+      'input#title[name="title"]',
+    ));
+    const descriptions = Array.from(form.querySelectorAll(
       'textarea#desc[name="desc"]',
-    );
-    const privacy = document.querySelector(
+    ));
+    const switches = Array.from(form.querySelectorAll(
       'input#private[name="private"]',
-    );
+    ));
+    const title = titles[0];
+    const description = descriptions[0];
+    const privacy = switches[0];
     if (
-      form?.tagName !== "FORM" ||
+      titles.length !== 1 || descriptions.length !== 1 ||
+      switches.length !== 1 ||
       title?.tagName !== "INPUT" ||
       description?.tagName !== "TEXTAREA" ||
       privacy?.tagName !== "INPUT" ||
       privacy.getAttribute("type") !== "checkbox" ||
       privacy.getAttribute("role") !== "switch"
-    )
-      return failed();
+    ) return failed();
 
     const buttons = Array.from(form.querySelectorAll("button")).filter(
       (button) => button.textContent?.trim() === "Create Set",
@@ -142,21 +152,32 @@ export function submitBlooketCreateSetForm(
       location.pathname !== "/create"
     )
       return failed();
-    const form = document.querySelector("form#question-set-form");
-    const title = document.querySelector('input#title[name="title"]');
-    const description = document.querySelector(
-      'textarea#desc[name="desc"]',
-    );
-    const privacy = document.querySelector(
-      'input#private[name="private"]',
-    );
-    if (
-      form?.tagName !== "FORM" ||
-      title?.tagName !== "INPUT" ||
-      description?.tagName !== "TEXTAREA" ||
-      privacy?.tagName !== "INPUT"
-    )
+    const forms = Array.from(document.querySelectorAll(
+      "form#question-set-form",
+    ));
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM")
       return failed();
+    const form = forms[0];
+    const titles = Array.from(form.querySelectorAll(
+      'input#title[name="title"]',
+    ));
+    const descriptions = Array.from(form.querySelectorAll(
+      'textarea#desc[name="desc"]',
+    ));
+    const switches = Array.from(form.querySelectorAll(
+      'input#private[name="private"]',
+    ));
+    const title = titles[0];
+    const description = descriptions[0];
+    const privacy = switches[0];
+    if (
+      titles.length !== 1 || descriptions.length !== 1 ||
+      switches.length !== 1 || title?.tagName !== "INPUT" ||
+      description?.tagName !== "TEXTAREA" ||
+      privacy?.tagName !== "INPUT" ||
+      privacy.getAttribute("type") !== "checkbox" ||
+      privacy.getAttribute("role") !== "switch"
+    ) return failed();
 
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;

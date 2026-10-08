@@ -177,6 +177,9 @@ function fixture(privateSet: boolean) {
     ),
   ];
   form.selectors["button"] = [node("BUTTON", "Create Set")];
+  form.selectors['input#title[name="title"]'] = [title];
+  form.selectors['textarea#desc[name="desc"]'] = [description];
+  form.selectors['input#private[name="private"]'] = [privacy];
   document.selectors["form#question-set-form"] = [form];
   document.selectors['input#title[name="title"]'] = [title];
   document.selectors['textarea#desc[name="desc"]'] = [description];
@@ -320,3 +323,28 @@ test("success observation accepts only one exact edit ID", () => {
     });
   }
 });
+
+test(
+  "Create Set rejects ambiguous form and unscoped form controls",
+  () => {
+  const page = fixture(true);
+  const expected = { title: "Synthetic set", description: "", private: true };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    page.document.selectors["form#question-set-form"] = [
+      page.form, node("FORM"),
+    ];
+    assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    page.document.selectors["form#question-set-form"] = [page.form];
+    // The global input may be from an obsolete or unrelated form.
+    page.form.selectors['input#title[name="title"]'] = [];
+    assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    page.form.selectors['input#title[name="title"]'] = [
+      page.title, node("INPUT"),
+    ];
+    assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+  });
+  },
+);
