@@ -52,6 +52,7 @@ interface FixtureNode {
   querySelector(selector: string): FixtureNode | null;
   querySelectorAll(selector: string): FixtureNode[];
   closest(selector: string): FixtureNode | null;
+  getBoundingClientRect(): { readonly width: number; readonly height: number };
   click(): void;
 }
 
@@ -71,6 +72,7 @@ function node(
     querySelectorAll(selector) {
       return this.selectors[selector] ?? [];
     },
+    getBoundingClientRect: () => ({ width: 24, height: 20 }),
     closest(selector) {
       let current: FixtureNode | undefined = this;
       while (current) {
@@ -87,6 +89,11 @@ function node(
 }
 
 function page(document: FixtureNode, href: string, run: () => void): void {
+  document.selectors["main"] ??= [node("MAIN")];
+  document.selectors['nav a[href="/my-sets"]'] ??= [node("A", "My Sets")];
+  document.selectors['a[href="https://id.blooket.com/logout"]'] ??= [
+    node("A", "Logout"),
+  ];
   const priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   Object.defineProperty(globalThis, "document", {
@@ -501,5 +508,76 @@ test("question reads require one modal tied to the requested set ID", () => {
     assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
     assert.equal(closeBlooketQuestionPanel("fixture"), false);
     assert.equal(cancels, 0);
+  });
+});
+
+test("question reads and Cancel stop behind human-action overlays", () => {
+  const document = node("DOCUMENT");
+  const group = node("DIV", "", { "aria-label": "Edit question 1" });
+  const edit = node("BUTTON", "Edit");
+  const cancel = node("BUTTON", "Cancel");
+  let clicks = 0;
+  edit.click = () => { clicks++; };
+  cancel.click = () => { clicks++; };
+  group.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [group];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [group];
+  const form = node("FORM");
+  const question = node("INPUT", "", { type: "hidden" });
+  question.parent = form;
+  question.value = JSON.stringify({
+    number: 1, question: "Type sun.", qType: "typing",
+    random: true, timeLimit: 15,
+    answers: ["sun"], correctAnswers: ["sun"],
+    answerTypes: ["exactly"], image: "", audio: "",
+  });
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input#setId[name="setId"]'] = [identity];
+  form.selectors['button[type="button"]'] = [cancel];
+  document.selectors['input#question[name="question"]'] = [question];
+  document.selectors['form input#question[name="question"]'] = [question];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    for (const mode of [
+      "organization", "challenge", "missing-shell", "password-overlay",
+    ] as const) {
+      if (mode === "organization") {
+        const heading = node("H3", "Select your organization");
+        document.selectors[
+          '[role="dialog"][aria-modal="true"] h3'
+        ] = [heading];
+      } else if (mode === "challenge") {
+        document.selectors[
+          '[role="dialog"][aria-modal="true"] h3'
+        ] = [];
+        document.selectors[
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+      } else {
+        document.selectors[
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        ] = [];
+        if (mode === "missing-shell") {
+          document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
+        } else {
+          document.selectors['a[href="https://id.blooket.com/logout"]'] = [
+            node("A", "Logout"),
+          ];
+          document.selectors['input[type="password"]'] = [node("INPUT")];
+        }
+      }
+      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+      assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+      assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+      assert.equal(closeBlooketQuestionPanel("fixture"), false);
+      document.selectors['input#question[name="question"]'] = [];
+      assert.equal(isBlooketQuestionPanelClosed("fixture"), false);
+      document.selectors['input#question[name="question"]'] = [question];
+    }
+    assert.equal(clicks, 0);
   });
 });

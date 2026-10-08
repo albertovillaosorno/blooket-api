@@ -39,6 +39,31 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     code: "blooket-browser-failed",
   });
   try {
+    // Every function is serialized independently by Chrome scripting.
+    // Do not interact with a stale authenticated shell or a human prompt.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return failed();
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -90,6 +115,31 @@ export function openBlooketQuestionPanel(
   questionNumber: number,
 ): boolean {
   try {
+    // Every function is serialized independently by Chrome scripting.
+    // Do not interact with a stale authenticated shell or a human prompt.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/edit" ||
@@ -131,6 +181,31 @@ export function inspectOpenedBlooketQuestion(
     code: "blooket-browser-failed",
   });
   try {
+    // Every function is serialized independently by Chrome scripting.
+    // Do not interact with a stale authenticated shell or a human prompt.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/edit" ||
@@ -329,6 +404,31 @@ export function inspectOpenedBlooketQuestion(
 
 export function closeBlooketQuestionPanel(setId: string): boolean {
   try {
+    // Every function is serialized independently by Chrome scripting.
+    // Do not interact with a stale authenticated shell or a human prompt.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/edit" ||
@@ -370,6 +470,31 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
 
 export function isBlooketQuestionPanelClosed(setId: string): boolean {
   try {
+    // Every function is serialized independently by Chrome scripting.
+    // Do not interact with a stale authenticated shell or a human prompt.
+    const authenticated =
+      document.querySelector("main") !== null &&
+      document.querySelector('input[type="password"]') === null &&
+      document.querySelector('nav a[href="/my-sets"]') !== null &&
+      Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      )).filter((link) => link.textContent?.trim() === "Logout")
+        .length === 1;
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return heading.textContent?.trim() === "Select your organization" &&
+        bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge)
+      return false;
     return (
       location.origin === "https://dashboard.blooket.com" &&
       location.pathname === "/edit" &&
