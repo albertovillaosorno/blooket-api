@@ -82,6 +82,9 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return failed();
+    // A teacher-owned edit modal must not be mistaken for an unoccupied page.
+    if (document.querySelector('input#question[name="question"]'))
+      return failed();
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -198,6 +201,9 @@ export function openBlooketQuestionPanel(
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return false;
+    // Do not click another question while the teacher is editing a modal.
+    if (document.querySelector('input#question[name="question"]'))
+      return false;
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/edit" ||
@@ -226,9 +232,49 @@ export function openBlooketQuestionPanel(
     );
     if (buttons.length !== 1) return false;
     const editBounds = buttons[0]!.getBoundingClientRect();
-    if (editBounds.width <= 0 || editBounds.height <= 0) return false;
-    (buttons[0] as HTMLButtonElement).click();
-    return true;
+    if (editBounds.width <= 0 || editBounds.height <= 0 ||
+        (buttons[0] as HTMLButtonElement).disabled ||
+        buttons[0]!.getAttribute("aria-disabled") === "true") return false;
+    // A question reader owns this modal only until the teacher interacts.
+    // Injected helpers use the same isolated browser world, not a page-global
+    // DOM attribute that a provider script could forge.
+    const world = globalThis as typeof globalThis & {
+      __blooketQuestionEditWatch?: {
+        document: Document;
+        setId: string;
+        number: number;
+        dirty: boolean;
+        dispose: () => void;
+      };
+    };
+    world.__blooketQuestionEditWatch?.dispose();
+    const watch = {
+      document,
+      setId,
+      number: questionNumber,
+      dirty: false,
+      dispose: () => {},
+    };
+    const onInteraction = (event: Event) => {
+      if (event.isTrusted) watch.dirty = true;
+    };
+    const eventTypes = ["pointerdown", "keydown", "input", "change"];
+    watch.dispose = () => {
+      for (const type of eventTypes)
+        document.removeEventListener(type, onInteraction, true);
+      if (world.__blooketQuestionEditWatch === watch)
+        delete world.__blooketQuestionEditWatch;
+    };
+    for (const type of eventTypes)
+      document.addEventListener(type, onInteraction, true);
+    world.__blooketQuestionEditWatch = watch;
+    try {
+      (buttons[0] as HTMLButtonElement).click();
+      return true;
+    } catch {
+      watch.dispose();
+      return false;
+    }
   } catch {
     return false;
   }
@@ -319,6 +365,22 @@ export function inspectOpenedBlooketQuestion(
       identities[0].getAttribute("type") !== "hidden" ||
       (identities[0] as HTMLInputElement).value !== setId
     ) return failed();
+    // The serialized hidden field alone can survive an obsolete/closed modal.
+    // The recovered edit form displays both controls only when loaded and
+    // interactive; a pending Save loader also hides these controls.
+    const saves = Array.from(form.querySelectorAll('button[type="submit"]'))
+      .filter(button => button.textContent?.replace(/\s+/gu, " ").trim() ===
+        "Save Question");
+    const cancels = Array.from(form.querySelectorAll('button[type="button"]'))
+      .filter(button => button.textContent?.replace(/\s+/gu, " ").trim() ===
+        "Cancel");
+    if (saves.length !== 1 || cancels.length !== 1) return failed();
+    for (const button of [...saves, ...cancels]) {
+      const bounds = button.getBoundingClientRect();
+      if (button.tagName !== "BUTTON" || bounds.width <= 0 ||
+          bounds.height <= 0 || (button as HTMLButtonElement).disabled ||
+          button.getAttribute("aria-disabled") === "true") return failed();
+    }
     const raw = hidden.value;
     if (typeof raw !== "string" || raw.length < 2 || raw.length > 100_000)
       return failed();
@@ -562,7 +624,34 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
     const buttons = Array.from(form.querySelectorAll('button[type="button"]'))
       .filter((button) => button.textContent?.trim() === "Cancel");
     if (buttons.length !== 1) return false;
-    (buttons[0] as HTMLButtonElement).click();
+    const cancel = buttons[0] as HTMLButtonElement;
+    const bounds = cancel.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0 || cancel.disabled ||
+        cancel.getAttribute("aria-disabled") === "true") return false;
+    const world = globalThis as typeof globalThis & {
+      __blooketQuestionEditWatch?: {
+        document: Document;
+        setId: string;
+        number: number;
+        dirty: boolean;
+        dispose: () => void;
+      };
+    };
+    const watch = world.__blooketQuestionEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
+    // A different question modal is not ours, even when the set ID is equal.
+    // Only its ordinal is inspected here; the untrusted draft is never sent
+    // back to the extension during cancellation.
+    const raw = (fields[0] as HTMLInputElement).value;
+    if (typeof raw !== "string" || raw.length < 2 || raw.length > 100_000)
+      return false;
+    const question = JSON.parse(raw) as unknown;
+    if (!question || typeof question !== "object" ||
+        Array.isArray(question) || !("number" in question) ||
+        question.number !== watch.number) return false;
+    cancel.click();
+    watch.dispose();
     return true;
   } catch {
     return false;

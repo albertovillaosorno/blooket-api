@@ -55,6 +55,11 @@ interface FixtureNode {
   closest(selector: string): FixtureNode | null;
   getBoundingClientRect(): { readonly width: number; readonly height: number };
   click(): void;
+  addEventListener(type: string, listener: (event: { isTrusted: boolean }) =>
+    void): void;
+  removeEventListener(type: string, listener: (event: { isTrusted: boolean })
+    => void): void;
+  dispatchTrusted(type: string): void;
 }
 
 function node(
@@ -62,10 +67,23 @@ function node(
   textContent = "",
   attributes: Record<string, string> = {},
 ): FixtureNode {
+  const listeners = new Map<string,
+    Set<(event: { isTrusted: boolean }) => void>>();
   return {
     tagName,
     textContent,
     selectors: {},
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    dispatchTrusted(type) {
+      for (const listener of listeners.get(type) ?? [])
+        listener({ isTrusted: true });
+    },
     get parentElement() { return this.parent; },
     getAttribute: (name) => attributes[name] ?? null,
     querySelector(selector) {
@@ -125,6 +143,13 @@ function page(document: FixtureNode, href: string, run: () => void): void {
   try {
     run();
   } finally {
+    const world = globalThis as typeof globalThis & {
+      __blooketQuestionEditWatch?: {
+        document: Document; dispose: () => void
+      };
+    };
+    if (world.__blooketQuestionEditWatch?.document === document)
+      world.__blooketQuestionEditWatch.dispose();
     if (priorDocument)
       Object.defineProperty(globalThis, "document", priorDocument);
     else Reflect.deleteProperty(globalThis, "document");
@@ -144,6 +169,7 @@ test("question panels expose normalized read facts without saving", () => {
   let opened = 0;
   edit.click = () => {
     opened++;
+    document.selectors['input#question[name="question"]'] = [hidden];
   };
   group.selectors["button"] = [edit];
   document.selectors[
@@ -179,7 +205,9 @@ test("question panels expose normalized read facts without saving", () => {
     document.selectors['input#question[name="question"]'] = [];
   };
   form.selectors['button[type="button"]'] = [cancel];
-  document.selectors['input#question[name="question"]'] = [hidden];
+  form.selectors['button[type="submit"]'] = [
+    node("BUTTON", " Save  Question ", { type: "submit" }),
+  ];
   document.selectors['form input#question[name="question"]'] = [hidden];
 
   questionHeader(document, 1);
@@ -220,6 +248,17 @@ test("question panels expose normalized read facts without saving", () => {
       });
       assert.equal(decodeBlooketQuestionRead(result.value).ok, true);
     }
+    const save = form.selectors['button[type="submit"]']![0]!;
+    save.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    save.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    (save as FixtureNode & { disabled?: boolean }).disabled = true;
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    (save as FixtureNode & { disabled?: boolean }).disabled = false;
+    form.selectors['button[type="submit"]'] = [];
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+    form.selectors['button[type="submit"]'] = [save];
+    assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, true);
     // The form is readable, but stale or ambiguous dashboard shell markers
     // must invalidate every page action before it can click Cancel.
     const main = document.selectors["main"]![0]!;
@@ -425,7 +464,10 @@ test("question modal operations reject switched and duplicate set IDs", () => {
   const group = node("DIV");
   const edit = node("BUTTON", "Edit");
   let clicks = 0;
-  edit.click = () => { clicks++; };
+  edit.click = () => {
+    clicks++;
+    document.selectors['input#question[name="question"]'] = [hidden];
+  };
   group.selectors["button"] = [edit];
   document.selectors[
     '[role="button"][aria-label="Edit question 1"]'
@@ -448,6 +490,9 @@ test("question modal operations reject switched and duplicate set IDs", () => {
   const cancel = node("BUTTON", "Cancel");
   cancel.click = () => { clicks++; };
   form.selectors['button[type="button"]'] = [cancel];
+  form.selectors['button[type="submit"]'] = [
+    node("BUTTON", " Save  Question ", { type: "submit" }),
+  ];
 
   for (const [href, setId] of [
     ["https://dashboard.blooket.com/edit?id=other", "fixture"],
@@ -465,6 +510,7 @@ test("question modal operations reject switched and duplicate set IDs", () => {
   }
   assert.equal(clicks, 0);
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    document.selectors['input#question[name="question"]'] = [];
     group.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(openBlooketQuestionPanel("fixture", 1), false);
     group.getBoundingClientRect = () => ({ width: 24, height: 20 });
@@ -563,6 +609,9 @@ test("question reads require one modal tied to the requested set ID", () => {
   let cancels = 0;
   cancel.click = () => { cancels++; };
   form.selectors['button[type="button"]'] = [cancel];
+  form.selectors['button[type="submit"]'] = [
+    node("BUTTON", " Save  Question ", { type: "submit" }),
+  ];
   document.selectors['input#question[name="question"]'] = [question];
   document.selectors['form input#question[name="question"]'] = [question];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
@@ -629,6 +678,9 @@ test("question reads and Cancel stop behind human-action overlays", () => {
   identity.value = "fixture";
   form.selectors['input#setId[name="setId"]'] = [identity];
   form.selectors['button[type="button"]'] = [cancel];
+  form.selectors['button[type="submit"]'] = [
+    node("BUTTON", " Save  Question ", { type: "submit" }),
+  ];
   document.selectors['input#question[name="question"]'] = [question];
   document.selectors['form input#question[name="question"]'] = [question];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
@@ -689,7 +741,10 @@ test("all injected question actions work without imported closures", () => {
   const group = node("DIV", "", { "aria-label": "Edit question 1" });
   const edit = node("BUTTON", "Edit");
   let opened = 0;
-  edit.click = () => { opened++; };
+  edit.click = () => {
+    opened++;
+    document.selectors['input#question[name="question"]'] = [hidden];
+  };
   group.selectors["button"] = [edit];
   document.selectors[
     '[role="button"][aria-label^="Edit question "]'
@@ -716,7 +771,9 @@ test("all injected question actions work without imported closures", () => {
     document.selectors['input#question[name="question"]'] = [];
   };
   form.selectors['button[type="button"]'] = [cancel];
-  document.selectors['input#question[name="question"]'] = [hidden];
+  form.selectors['button[type="submit"]'] = [
+    node("BUTTON", " Save  Question ", { type: "submit" }),
+  ];
   questionHeader(document, 1);
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.deepEqual(list("fixture"), { ok: true, value: [1] });
@@ -726,6 +783,25 @@ test("all injected question actions work without imported closures", () => {
     assert.equal(isClosed("fixture"), true);
     assert.equal(opened, 1);
     assert.equal(closed, 1);
+    assert.equal(open("fixture", 1), true);
+    hidden.value = JSON.stringify({ number: 2 });
+    assert.equal(close("fixture"), false);
+    assert.equal(closed, 1);
+    hidden.value = JSON.stringify({
+      number: 1, question: "Type sun.", qType: "typing",
+      random: true, timeLimit: 15, answers: ["sun"],
+      correctAnswers: ["sun"], answerTypes: ["exactly"],
+      image: "", audio: "",
+    });
+    // A real pointer or form event in the isolated world transfers ownership
+    // to the teacher, even if the serialized question JSON is unchanged.
+    document.dispatchTrusted("pointerdown");
+    assert.equal(close("fixture"), false);
+    assert.equal(closed, 1);
+    document.dispatchTrusted("change");
+    assert.equal(close("fixture"), false);
+    assert.equal(closed, 1);
+    assert.equal(opened, 2);
   });
 });
 
@@ -789,5 +865,87 @@ test("question enumeration requires the scoped displayed count", () => {
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
     document.selectors["main h1"] = [];
     assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+  });
+});
+
+test("question modal actions refuse disabled and hidden controls", () => {
+  const document = node("DOCUMENT");
+  const card = node("DIV");
+  const edit = node("BUTTON", "Edit");
+  let editClicks = 0;
+  edit.click = () => {
+    editClicks++;
+    document.selectors['input#question[name="question"]'] = [hidden];
+  };
+  card.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [card];
+  const form = node("FORM");
+  const hidden = node("INPUT", "", { type: "hidden" });
+  hidden.value = JSON.stringify({ number: 1 });
+  hidden.parent = form;
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input#setId[name="setId"]'] = [identity];
+  const cancel = node("BUTTON", "Cancel", { type: "button" });
+  let cancelClicks = 0;
+  cancel.click = () => { cancelClicks++; };
+  form.selectors['button[type="button"]'] = [cancel];
+  form.selectors['button[type="submit"]'] = [
+    node("BUTTON", " Save  Question ", { type: "submit" }),
+  ];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    (edit as FixtureNode & { disabled?: boolean }).disabled = true;
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    (edit as FixtureNode & { disabled?: boolean }).disabled = false;
+    edit.getAttribute = (key) => key === "aria-disabled" ? "true" : null;
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    edit.getAttribute = () => null;
+    assert.equal(openBlooketQuestionPanel("fixture", 1), true);
+    (cancel as FixtureNode & { disabled?: boolean }).disabled = true;
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    (cancel as FixtureNode & { disabled?: boolean }).disabled = false;
+    cancel.getAttribute = (key) => key === "aria-disabled" ? "true" : null;
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    cancel.getAttribute = () => null;
+    cancel.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    cancel.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    assert.equal(closeBlooketQuestionPanel("fixture"), true);
+  });
+  assert.equal(editClicks, 1);
+  assert.equal(cancelClicks, 1);
+});
+
+test("a teacher-owned question modal is not opened or replaced", () => {
+  const document = node("DOCUMENT");
+  const card = node("DIV");
+  const edit = node("BUTTON", "Edit");
+  let clicks = 0;
+  edit.click = () => { clicks++; };
+  card.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [card];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [card];
+  card.getAttribute = (name) =>
+    name === "aria-label" ? "Edit question 1" : null;
+  questionHeader(document, 1);
+  const existing = node("INPUT", "", { type: "hidden" });
+  document.selectors['input#question[name="question"]'] = [existing];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    assert.equal(clicks, 0);
+    // Clearing the user's modal allows the next read to begin normally.
+    document.selectors['input#question[name="question"]'] = [];
+    assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
+      ok: true, value: [1],
+    });
+    assert.equal(openBlooketQuestionPanel("fixture", 1), true);
+    assert.equal(clicks, 1);
   });
 });

@@ -34,6 +34,9 @@
 import {
   inspectBlooketPage,
   openBlooketDetailPanel,
+  inspectBlooketDetailSidebar,
+  closeBlooketDetailPanel,
+  isBlooketDetailPanelClosed,
   blooketReadUrl,
   type PageReadOperation,
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
@@ -42,6 +45,8 @@ import { createExtensionQuestionInspectionHost } from
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
 import { createExtensionCapabilityInspectionHost } from
   "./capability-inspection-host.ts";
+import { canLeaveBlooketPageForRead } from
+  "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
@@ -214,6 +219,20 @@ async function read(
       : origin !== "https://dashboard.blooket.com"
   )
     throw new Error("manual-blooket-sign-in-required");
+  if (target !== null && tab.url !== target) {
+    // The teacher may be editing a question, metadata, or a fresh set in
+    // the current tab. Refuse the navigation before changing its route.
+    if (tab.status !== "complete")
+      throw new Error("browser-navigation-unsafe");
+    const safe = await script(
+      current, browser,
+      canLeaveBlooketPageForRead as (...args: never[]) => unknown,
+    );
+    const checked = await browser.tabs.get(current.tabId);
+    if (safe !== true || checked.status !== "complete" ||
+        checked.url !== tab.url || Date.now() >= readDeadline)
+      throw new Error("browser-navigation-unsafe");
+  }
   const confirmed = await confirmBlooketReadNavigation(
     browser.tabs, current.tabId, tab, target, readDeadline, pause,
   );
@@ -303,6 +322,38 @@ async function read(
       return Date.now() < readDeadline &&
         observed.status === "complete" && observed.url === target;
     };
+    // Module 12048 unmounts the original title/description sidebar once
+    // Edit Info opens. Capture two identical independent sidebar readings
+    // before interacting with the editor; never infer saved state from a
+    // mutable editor field by itself.
+    const sidebarValue = async () => {
+      if (!await ownsDetailRoute())
+        throw new Error("browser-details-unavailable");
+      const reply = await script(
+        current, browser,
+        inspectBlooketDetailSidebar as (...args: never[]) => unknown,
+        [operation.setId],
+      );
+      if (!await ownsDetailRoute() || !reply ||
+          typeof reply !== "object" || Array.isArray(reply) ||
+          Object.keys(reply).sort().join() !== "ok,value" ||
+          !("ok" in reply) || reply.ok !== true ||
+          !("value" in reply) || !reply.value ||
+          typeof reply.value !== "object" ||
+          Array.isArray(reply.value) ||
+          Object.keys(reply.value).sort().join() !== "description,title" ||
+          !("title" in reply.value) ||
+          typeof reply.value.title !== "string" ||
+          !("description" in reply.value) ||
+          typeof reply.value.description !== "string")
+        throw new Error("browser-details-unavailable");
+      return reply.value as { title: string; description: string };
+    };
+    const baseline = await sidebarValue();
+    await pause(0);
+    const baselineAgain = await sidebarValue();
+    if (JSON.stringify(baseline) !== JSON.stringify(baselineAgain))
+      throw new Error("browser-details-unavailable");
     let opened = false;
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
       attempt++) {
@@ -324,57 +375,116 @@ async function read(
       await pause(100);
     }
     if (!opened) throw new Error("browser-details-unavailable");
-    // Opening details is asynchronous; retry reads, never a form submission.
-    for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
-      attempt++) {
-      if (!await ownsDetailRoute())
-        throw new Error("browser-details-unavailable");
-      const result = await script(
-        current,
-        browser,
-        inspectBlooketPage as (...args: never[]) => unknown,
-        [operation],
-      );
-      if (!await ownsDetailRoute())
-        throw new Error("browser-details-unavailable");
-      if (
-        result && typeof result === "object" && !Array.isArray(result) &&
-        Object.keys(result).sort().join() === "ok,value" &&
-        "ok" in result && result.ok === true
-      ) {
-        if (Date.now() >= readDeadline)
+    let cancellationEvidence: {
+      readonly title: string;
+      readonly description: string;
+      readonly visibility: "private" | "public";
+    } | undefined;
+    try {
+      // Opening details is asynchronous; retry only reads.
+      // Never submit a Save Set mutation.
+      for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
+        attempt++) {
+        if (!await ownsDetailRoute())
           throw new Error("browser-details-unavailable");
-        const confirmed = await browser.tabs.get(current.tabId);
-        if (confirmed.status !== "complete" || confirmed.url !== target)
-          throw new Error("browser-details-unavailable");
-        // A freshly opened metadata panel can still hydrate asynchronously.
-        await pause(100);
-        if (Date.now() >= readDeadline)
-          throw new Error("browser-details-unavailable");
-        const again = await script(
+        const result = await script(
           current,
           browser,
           inspectBlooketPage as (...args: never[]) => unknown,
           [operation],
         );
-        if (JSON.stringify(result) !== JSON.stringify(again))
+        if (!await ownsDetailRoute())
           throw new Error("browser-details-unavailable");
-        const after = await browser.tabs.get(current.tabId);
         if (
-          Date.now() >= readDeadline || after.status !== "complete" ||
-          after.url !== target
+          result && typeof result === "object" && !Array.isArray(result) &&
+          Object.keys(result).sort().join() === "ok,value" &&
+          "ok" in result && result.ok === true && "value" in result
+        ) {
+          if (Date.now() >= readDeadline)
+            throw new Error("browser-details-unavailable");
+          const confirmed = await browser.tabs.get(current.tabId);
+          if (confirmed.status !== "complete" || confirmed.url !== target)
+            throw new Error("browser-details-unavailable");
+          // A freshly opened metadata panel can still hydrate asynchronously.
+          await pause(100);
+          if (Date.now() >= readDeadline)
+            throw new Error("browser-details-unavailable");
+          const again = await script(
+            current,
+            browser,
+            inspectBlooketPage as (...args: never[]) => unknown,
+            [operation],
+          );
+          if (JSON.stringify(result) !== JSON.stringify(again))
+            throw new Error("browser-details-unavailable");
+          const candidate = result.value;
+          if (!candidate || typeof candidate !== "object" ||
+              Array.isArray(candidate) ||
+              !("title" in candidate) ||
+              !("description" in candidate) ||
+              !("visibility" in candidate) ||
+              candidate.title !== baseline.title ||
+              candidate.description !== baseline.description ||
+              (candidate.visibility !== "private" &&
+                candidate.visibility !== "public"))
+            throw new Error("browser-details-unavailable");
+          const after = await browser.tabs.get(current.tabId);
+          if (
+            Date.now() >= readDeadline || after.status !== "complete" ||
+            after.url !== target
+          ) throw new Error("browser-details-unavailable");
+          cancellationEvidence = {
+            title: candidate.title,
+            description: candidate.description,
+            visibility: candidate.visibility,
+          };
+          return result;
+        }
+        if (
+          !result || typeof result !== "object" || Array.isArray(result) ||
+          Object.keys(result).sort().join() !== "code,ok" ||
+          !("ok" in result) || result.ok !== false ||
+          !("code" in result) || result.code !== "blooket-browser-failed"
         ) throw new Error("browser-details-unavailable");
-        return result;
+        await pause(100);
       }
-      if (
-        !result || typeof result !== "object" || Array.isArray(result) ||
-        Object.keys(result).sort().join() !== "code,ok" ||
-        !("ok" in result) || result.ok !== false ||
-        !("code" in result) || result.code !== "blooket-browser-failed"
-      ) throw new Error("browser-details-unavailable");
-      await pause(100);
+      throw new Error("browser-details-unavailable");
+    } finally {
+      // Recovered edit module 12048 exposes a Cancel button. A read-owned
+      // sidebar editor must not remain available for the next request to
+      // confuse local unsaved edits with independently fetched remote state.
+      // Never inject cleanup into a tab the teacher has navigated away from.
+      let closed = false;
+      if (!cancellationEvidence)
+        throw new Error("browser-details-unconfirmed");
+      if (await ownsDetailRoute().catch(() => false)) {
+        const canceled = await script(
+          current, browser,
+          closeBlooketDetailPanel as (...args: never[]) => unknown,
+          [operation.setId, baseline, cancellationEvidence],
+        ).catch(() => false);
+        if (canceled === true) {
+          for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
+            attempt++) {
+            if (!await ownsDetailRoute().catch(() => false)) break;
+            const result = await script(
+              current, browser,
+              isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+              [operation.setId],
+            ).catch(() => false);
+            if (result === true && await ownsDetailRoute().catch(
+              () => false,
+            )) {
+              closed = true;
+              break;
+            }
+            if (result !== false) break;
+            await pause(100);
+          }
+        }
+      }
+      if (!closed) throw new Error("browser-details-cleanup-failed");
     }
-    throw new Error("browser-details-unavailable");
   }
   const observed = await script(
     current,

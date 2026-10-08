@@ -1037,6 +1037,28 @@ Portable regressions cover the count boundary and host stability. These UI
 observations establish the selector, not a new canonical extension/CLI/MCP
 acceptance result. No account name, private identifier, or media URL is stored.
 
+### Reader ownership and preservation of unsaved work
+
+On 2026-10-08, portable browser regressions exposed that navigation and cleanup
+could abandon an existing teacher editor, and that Edit Info reads relied on
+metadata from an editable form. Recovered modules 12048 and 34719 in build
+`86784c3d4c38fcd559c92f38fbadd7a160947de2` show the original sidebar unmounting
+when Edit Info opens; neither has a recorded factory variant.
+
+Set-detail reads now capture two independent identical sidebar values before
+opening Edit Info, preserve the exact title text, compare the loaded editor,
+and cancel only an unchanged read-owned panel. Its explicit Cancel control is
+separate from the Done submit. Questions and capability probes likewise refuse
+existing modals and unusable controls. Isolated-world interaction watches
+relinquish cancellation ownership on trusted human input.
+
+Read navigation refuses an existing form, drawer, focused editor, or modal.
+Capability restoration requires independently confirmed child and parent
+closure. A script error or malformed acknowledgement after an opener leaves
+that route intact instead of guessing whether the click happened. These are
+portable safeguards with emitted-worker and serialized-function coverage;
+current live browser acceptance remains pending.
+
 ## Blockers
 
 **Installation blocker:** the browser-control URL policy rejects

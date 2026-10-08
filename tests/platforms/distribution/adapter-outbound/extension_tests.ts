@@ -124,9 +124,28 @@ test(
       "src/platforms/blooket-browser/adapter-outbound/page.js",
     ));
     assert.equal(readPage.openBlooketDetailPanel.length, 1);
+    assert.equal(readPage.inspectBlooketDetailSidebar.length, 1);
+    assert.equal(readPage.closeBlooketDetailPanel.length, 3);
+    assert.equal(readPage.isBlooketDetailPanelClosed.length, 1);
+    const injected = (fn: Function) => Function(
+      "return (" + fn.toString() + ")",
+    )() as (...args: unknown[]) => unknown;
+    assert.deepEqual(injected(readPage.inspectBlooketDetailSidebar)(
+      "fixture",
+    ), { ok: false, code: "blooket-browser-failed" });
+    assert.equal(injected(readPage.closeBlooketDetailPanel)(
+      "fixture", { title: "Synthetic", description: "" },
+      { title: "Synthetic", description: "", visibility: "private" },
+    ), false);
+    assert.equal(injected(readPage.isBlooketDetailPanelClosed)(
+      "fixture",
+    ), false);
     assert.equal(questionPage.openBlooketQuestionPanel.length, 2);
     assert.equal(questionPage.inspectOpenedBlooketQuestion.length, 2);
     assert.equal(questionPage.closeBlooketQuestionPanel.length, 1);
+    assert.equal(injected(questionPage.closeBlooketQuestionPanel)(
+      "fixture",
+    ), false);
     assert.equal(questionPage.isBlooketQuestionPanelClosed.length, 1);
     assert.ok(scripts.length > 1);
     assert.equal(

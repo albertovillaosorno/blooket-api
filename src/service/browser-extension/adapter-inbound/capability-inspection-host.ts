@@ -33,6 +33,7 @@
 //
 import {
   blooketCapabilitySnapshotCandidate,
+  canLeaveBlooketPageForRead,
   closeBlooketAudioCapabilityDrawer,
   closeBlooketCapabilityQuestionPanel,
   inspectBlooketAudioCapabilityDrawer,
@@ -144,11 +145,26 @@ export function createExtensionCapabilityInspectionHost(
       let setId: string | undefined;
       let panelOpened = false;
       let drawerOpened = false;
+      // A browser-script failure can occur after the page was clicked but
+      // before Chrome delivered its acknowledgement. Without that receipt,
+      // never navigate away or click through an unconfirmed overlay.
+      let questionOpenUnconfirmed = false;
+      let audioOpenUnconfirmed = false;
       let outcome: ExtensionCapabilityInspectionResult = browserFailure();
       try {
         const before = await chrome.tabs.get(tabId);
         if (!before.url || !dashboardTab(before)) return browserFailure();
         originalUrl = before.url;
+        // Before navigating to My Sets, reject a teacher-owned editor or
+        // modal on the current tab. The guard runs in the page itself.
+        if (before.status !== "complete") return browserFailure();
+        const safe = await script(
+          canLeaveBlooketPageForRead as
+            (...args: never[]) => unknown,
+        );
+        const checked = await chrome.tabs.get(tabId);
+        if (safe !== true || checked.status !== "complete" ||
+            checked.url !== originalUrl) return browserFailure();
 
         if (!await navigate(
           chrome, tabId, MY_SETS_URL, originalUrl, pause,
@@ -207,10 +223,13 @@ export function createExtensionCapabilityInspectionHost(
           if (!exactObservedState(editState, "edit")) return browserFailure();
 
           if (!await editorReady(editUrl)) return browserFailure();
+          questionOpenUnconfirmed = true;
           const opened = await script(
             openBlooketCapabilityQuestionPanel as (...args: never[]) => unknown,
             [setId],
           );
+          if (opened === true || opened === false)
+            questionOpenUnconfirmed = false;
           panelOpened = opened === true;
           if (!panelOpened || !await editorReady(editUrl))
             return browserFailure();
@@ -225,10 +244,13 @@ export function createExtensionCapabilityInspectionHost(
             return browserFailure();
 
           if (!await editorReady(editUrl)) return browserFailure();
+          audioOpenUnconfirmed = true;
           const drawer = await script(
             openBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
             [setId],
           );
+          if (drawer === true || drawer === false)
+            audioOpenUnconfirmed = false;
           drawerOpened = drawer === true;
           if (!drawerOpened || !await editorReady(editUrl))
             return browserFailure();
@@ -304,8 +326,11 @@ export function createExtensionCapabilityInspectionHost(
         };
         if (!canClean && (panelOpened || drawerOpened))
           outcome = browserFailure();
-        let drawerCleaned = !drawerOpened;
-        if (canClean && setId !== undefined && drawerOpened) {
+        if (questionOpenUnconfirmed || audioOpenUnconfirmed)
+          outcome = browserFailure();
+        let drawerCleaned = !drawerOpened && !audioOpenUnconfirmed;
+        if (canClean && !questionOpenUnconfirmed &&
+            !audioOpenUnconfirmed && setId !== undefined && drawerOpened) {
           drawerCleaned = await closeDrawer(
             cleanupScript, setId, pause, finishDeadline, now,
           );
@@ -314,13 +339,20 @@ export function createExtensionCapabilityInspectionHost(
         // A still-open Audio drawer may obscure the parent's Cancel button.
         // Never interact with the underlying question form unless the child
         // has been independently confirmed closed.
-        if (canClean && drawerCleaned && setId !== undefined && panelOpened) {
-          const cleaned = await closeQuestionPanel(
+        let questionCleaned = !panelOpened && !questionOpenUnconfirmed;
+        if (canClean && drawerCleaned && !audioOpenUnconfirmed &&
+            setId !== undefined && panelOpened) {
+          questionCleaned = await closeQuestionPanel(
             cleanupScript, setId, pause, finishDeadline, now,
           );
-          if (!cleaned) outcome = browserFailure();
+          if (!questionCleaned) outcome = browserFailure();
         }
-        if (originalUrl !== undefined) {
+        // A failed Cancel or unconfirmed closure can mean that a teacher
+        // started editing the modal. Never navigate away and discard it.
+        // Only fully closed owned UI allows restoration of the old route.
+        if (!drawerCleaned || !questionCleaned)
+          outcome = browserFailure();
+        if (originalUrl !== undefined && drawerCleaned && questionCleaned) {
           const restored = await restore(
             chrome,
             tabId,

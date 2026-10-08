@@ -35,6 +35,9 @@ import {
   inspectBlooketPage,
   blooketReadUrl,
   openBlooketDetailPanel,
+  inspectBlooketDetailSidebar,
+  closeBlooketDetailPanel,
+  isBlooketDetailPanelClosed,
 } from "../../../../src/platforms/blooket-browser/adapter-outbound/page.ts";
 import {
   decodeBlooketSetList,
@@ -53,16 +56,34 @@ interface FixtureNode {
   querySelectorAll(selector: string): FixtureNode[];
   getBoundingClientRect(): { width: number; height: number };
   click(): void;
+  addEventListener(type: string, listener: (event: { isTrusted: boolean }) =>
+    void): void;
+  removeEventListener(type: string, listener: (event: { isTrusted: boolean })
+    => void): void;
+  dispatchTrusted(type: string): void;
 }
 function node(
   tagName: string,
   textContent = "",
   attributes: Record<string, string> = {},
 ): FixtureNode {
+  const listeners = new Map<string,
+    Set<(event: { isTrusted: boolean }) => void>>();
   return {
     tagName,
     textContent,
     selectors: {},
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    dispatchTrusted(type) {
+      for (const listener of listeners.get(type) ?? [])
+        listener({ isTrusted: true });
+    },
     getAttribute: (name) => attributes[name] ?? null,
     querySelector(selector) {
       return this.selectors[selector]?.[0] ?? null;
@@ -90,6 +111,13 @@ function page(document: FixtureNode, href: string, run: () => void): void {
   try {
     run();
   } finally {
+    const world = globalThis as typeof globalThis & {
+      __blooketDetailEditWatch?: {
+        document: Document; dispose: () => void
+      };
+    };
+    if (world.__blooketDetailEditWatch?.document === document)
+      world.__blooketDetailEditWatch.dispose();
     if (priorDocument)
       Object.defineProperty(globalThis, "document", priorDocument);
     else Reflect.deleteProperty(globalThis, "document");
@@ -246,7 +274,8 @@ test(
 test(
   "detail requires the observed private label and exact requested set",
   () => {
-  const { document } = base();
+  const { document, main } = base();
+  main.selectors["h1"] = [node("H1", "Synthetic fixture")];
   const title = node("INPUT");
   title.value = "Synthetic fixture";
   const description = node("TEXTAREA");
@@ -270,6 +299,8 @@ test(
   form.selectors['input#private[name="private"]'] = [privacy];
   document.selectors['form#question-set-form'] = [form];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    // The worker compares these mutable editor values with its separate
+    // pre-open sidebar baseline; this page helper only decodes the form.
     const result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(decodeBlooketSetDetail(result.value).ok, true);
@@ -354,7 +385,8 @@ test(
 });
 
 test("set privacy comes from the recovered visible sibling paragraph", () => {
-  const { document } = base();
+  const { document, main } = base();
+  main.selectors["h1"] = [node("H1", "Synthetic fixture")];
   const form = node("FORM");
   const identity = node("INPUT", "", { type: "hidden" });
   identity.value = "fixture";
@@ -798,6 +830,16 @@ test("read routes encode IDs and panel opening never submits a form", () => {
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);
+    (button as FixtureNode & { disabled?: boolean }).disabled = true;
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    (button as FixtureNode & { disabled?: boolean }).disabled = false;
+    button.getAttribute = (key) => key === "aria-disabled" ? "true" : null;
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    button.getAttribute = () => null;
+    button.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    button.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    assert.equal(clicks, 1);
     identity.value = "old-set";
     assert.equal(openBlooketDetailPanel("fixture"), false);
     assert.equal(clicks, 1);
@@ -807,7 +849,8 @@ test("read routes encode IDs and panel opening never submits a form", () => {
     assert.equal(clicks, 1);
     form.selectors['input#title[name="title"]'] = [title];
     title.getBoundingClientRect = () => ({ width: 20, height: 20 });
-    assert.equal(openBlooketDetailPanel("fixture"), true);
+    // Never reuse an unowned editor with potentially unsaved changes.
+    assert.equal(openBlooketDetailPanel("fixture"), false);
     assert.equal(clicks, 1);
   });
   page(document, "https://example.invalid/edit?id=fixture", () => {
@@ -984,5 +1027,269 @@ test("closed account menu retains a visible authenticated profile", () => {
     account.textContent = "Synthetic account";
     document.selectors['a[href="https://id.blooket.com/login"]']!.push(account);
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+  });
+});
+
+test("owned Edit Info cancellation closes the read-only metadata panel", () => {
+  const { document, main } = base();
+  const form = node("FORM");
+  const identity = node("INPUT", "", { type: "hidden" });
+  identity.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  const title = node("INPUT");
+  title.value = "Synthetic fixture";
+  form.selectors['input#title[name="title"]'] = [title];
+  const description = node("TEXTAREA");
+  description.value = "Original text";
+  form.selectors['textarea#desc[name="desc"]'] = [description];
+  const privacy = node("INPUT", "", {
+    type: "checkbox", role: "switch", "aria-checked": "false",
+  });
+  privacy.labels = [privacyLabel("Private (Only playable by you)")];
+  form.selectors['input#private[name="private"]'] = [privacy];
+  document.selectors['form#question-set-form'] = [form];
+  const heading = node("P", "EDITING SET DETAILS");
+  const header = node("DIV");
+  heading.parentElement = header;
+  main.selectors["p"] = [heading];
+  main.selectors["h1"] = []; // Original sidebar unmounts while editing.
+  document.selectors["main p"] = [heading];
+  const cancel = node("BUTTON", "", { type: "button" });
+  const edit = node("BUTTON", "Edit Info");
+  document.selectors["main button"] = [edit];
+  header.selectors['button[type="button"]'] = [cancel];
+  let clicks = 0;
+  cancel.click = () => {
+    clicks++;
+    title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    heading.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  };
+  const baseline = { title: "Synthetic fixture", description: "Original text" };
+  const observed = { ...baseline, visibility: "private" as const };
+  const close = () => closeBlooketDetailPanel("fixture", baseline, observed);
+  const world = globalThis as typeof globalThis & {
+    __blooketDetailEditWatch?: {
+      document: Document; setId: string; dirty: boolean; dispose: () => void
+    };
+  };
+  world.__blooketDetailEditWatch = {
+    document: document as unknown as Document,
+    setId: "fixture",
+    dirty: false,
+    dispose: () => { delete world.__blooketDetailEditWatch; },
+  };
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(isBlooketDetailPanelClosed("fixture"), false);
+    (cancel as FixtureNode & { disabled?: boolean }).disabled = true;
+    assert.equal(close(), false);
+    (cancel as FixtureNode & { disabled?: boolean }).disabled = false;
+    cancel.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(close(), false);
+    cancel.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    header.selectors['button[type="button"]'] = [cancel, cancel];
+    assert.equal(close(), false);
+    header.selectors['button[type="button"]'] = [cancel];
+    identity.value = "another-set";
+    assert.equal(close(), false);
+    identity.value = "fixture";
+    document.selectors[
+      '[role="dialog"][aria-modal="true"] h3'
+    ] = [node("H3", "Select your organization")];
+    assert.equal(close(), false);
+    document.selectors[
+      '[role="dialog"][aria-modal="true"] h3'
+    ] = [];
+    assert.equal(clicks, 0);
+    title.value = "Unsaved teacher title";
+    assert.equal(close(), false);
+    assert.equal(clicks, 0);
+    title.value = "Synthetic fixture";
+    description.value = "Teacher draft";
+    assert.equal(close(), false);
+    description.value = "Original text";
+    privacy.getAttribute = (name) =>
+      name === "aria-checked" ? "true" :
+        name === "type" ? "checkbox" :
+          name === "role" ? "switch" : null;
+    assert.equal(close(), false); // A changed privacy toggle is teacher-owned.
+    privacy.getAttribute = (name) =>
+      name === "aria-checked" ? "false" :
+        name === "type" ? "checkbox" :
+          name === "role" ? "switch" : null;
+    assert.equal(close(), true);
+    assert.equal(clicks, 1);
+    assert.equal(isBlooketDetailPanelClosed("fixture"), true);
+    document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [node("IFRAME")];
+    assert.equal(isBlooketDetailPanelClosed("fixture"), false);
+    document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [];
+    assert.equal(isBlooketDetailPanelClosed("wrong"), false);
+    assert.equal(close(), false);
+  });
+  const serializedClose = Function(
+    "return (" + closeBlooketDetailPanel.toString() + ")",
+  )() as typeof closeBlooketDetailPanel;
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(serializedClose("fixture", baseline, observed), false);
+    assert.equal(clicks, 1);
+  });
+});
+
+test("detail baseline requires the original visible unedited sidebar", () => {
+  const { document, main } = base();
+  const title = node("H1", "Synthetic fixture");
+  const titleBox = node("DIV");
+  const sidebar = node("DIV");
+  title.parentElement = titleBox;
+  titleBox.parentElement = sidebar;
+  const description = node("P", "Original text");
+  sidebar.selectors[":scope > p"] = [description];
+  main.selectors["h1"] = [title];
+  main.selectors["button"] = [node("BUTTON", "Edit Info")];
+  const baseline = { ok: true, value: {
+    title: "Synthetic fixture", description: "Original text",
+  } };
+  const serialized = Function(
+    "return (" + inspectBlooketDetailSidebar.toString() + ")",
+  )() as typeof inspectBlooketDetailSidebar;
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(inspectBlooketDetailSidebar("fixture"), baseline);
+    assert.deepEqual(serialized("fixture"), baseline);
+    title.textContent = "  Synthetic fixture  ";
+    assert.deepEqual(serialized("fixture"), {
+      ok: true, value: {
+        title: "  Synthetic fixture  ", description: "Original text",
+      },
+    });
+    title.textContent = "Synthetic fixture";
+    description.textContent = "Changed visible description";
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, true);
+    description.textContent = "Original text";
+    main.selectors["h1"] = [];
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, false);
+    main.selectors["h1"] = [title];
+    sidebar.selectors[":scope > p"] = [description, description];
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, false);
+    sidebar.selectors[":scope > p"] = [];
+    assert.deepEqual(inspectBlooketDetailSidebar("fixture"), {
+      ok: true, value: { title: "Synthetic fixture", description: "" },
+    });
+    title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, false);
+    title.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    document.selectors[
+      '[role="dialog"][aria-modal="true"] h3'
+    ] = [node("H3", "Select your organization")];
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, false);
+  });
+  page(document, "https://dashboard.blooket.com/edit?id=other", () => {
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, false);
+  });
+});
+
+test("Edit Info read survives the recovered sidebar mount transition", () => {
+  const { document, main } = base();
+  const heading = node("H1", "Synthetic fixture");
+  const headingBox = node("DIV");
+  const sidebar = node("DIV");
+  heading.parentElement = headingBox;
+  headingBox.parentElement = sidebar;
+  sidebar.selectors[":scope > p"] = [node("P", "Original text")];
+  main.selectors["h1"] = [heading];
+  const edit = node("BUTTON", "Edit Info");
+  main.selectors["button"] = [edit];
+  document.selectors["main button"] = [edit];
+  const form = node("FORM");
+  const id = node("INPUT", "", { type: "hidden" });
+  id.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [id];
+  const title = node("INPUT");
+  title.value = "Synthetic fixture";
+  const desc = node("TEXTAREA");
+  desc.value = "Original text";
+  const privacy = node("INPUT", "", {
+    type: "checkbox", role: "switch", "aria-checked": "false",
+  });
+  privacy.labels = [privacyLabel("Private (Only playable by you)")];
+  form.selectors['input#title[name="title"]'] = [title];
+  form.selectors['textarea#desc[name="desc"]'] = [desc];
+  form.selectors['input#private[name="private"]'] = [privacy];
+  document.selectors['form#question-set-form'] = [form];
+  const editing = node("P", "EDITING SET DETAILS");
+  const editHeader = node("DIV");
+  editing.parentElement = editHeader;
+  const cancel = node("BUTTON", "", { type: "button" });
+  editHeader.selectors['button[type="button"]'] = [cancel];
+  let opened = 0;
+  let closed = 0;
+  const visible = () => ({ width: 20, height: 20 });
+  const hidden = () => ({ width: 0, height: 0 });
+  title.getBoundingClientRect = hidden;
+  edit.click = () => {
+    opened++;
+    title.getBoundingClientRect = visible;
+    main.selectors["h1"] = []; // The recovered sidebar unmounts.
+    main.selectors["p"] = [editing];
+    document.selectors["main p"] = [editing];
+    document.selectors["main button"] = [];
+  };
+  cancel.click = () => {
+    closed++;
+    title.getBoundingClientRect = hidden;
+    main.selectors["h1"] = [heading];
+    main.selectors["p"] = [];
+    document.selectors["main p"] = [];
+    document.selectors["main button"] = [edit];
+  };
+  // Chrome separately serializes each function into one isolated world.
+  const injectedOpen = Function(
+    "return (" + openBlooketDetailPanel.toString() + ")",
+  )() as typeof openBlooketDetailPanel;
+  const injectedClose = Function(
+    "return (" + closeBlooketDetailPanel.toString() + ")",
+  )() as typeof closeBlooketDetailPanel;
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    const sidebarResult = inspectBlooketDetailSidebar("fixture");
+    assert.deepEqual(sidebarResult, { ok: true, value: {
+      title: "Synthetic fixture", description: "Original text",
+    } });
+    assert.equal(injectedOpen("fixture"), true);
+    assert.equal(opened, 1);
+    assert.equal(inspectBlooketDetailSidebar("fixture").ok, false);
+    const detail = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
+    assert.deepEqual(detail, { ok: true, value: {
+      schemaVersion: 1, id: "fixture", title: "Synthetic fixture",
+      description: "Original text", visibility: "private",
+    } });
+    assert.equal(injectedClose("fixture",
+      sidebarResult.ok ? sidebarResult.value as {
+        title: string; description: string
+      } : { title: "", description: "" },
+      { title: "Synthetic fixture", description: "Original text",
+        visibility: "private" }), true);
+    assert.equal(closed, 1);
+    assert.equal(isBlooketDetailPanelClosed("fixture"), true);
+    // A human action after the agent reopens the panel makes even a
+    // byte-for-byte unchanged form unsafe to discard.
+    assert.equal(injectedOpen("fixture"), true);
+    document.dispatchTrusted("pointerdown");
+    assert.equal(injectedClose("fixture", {
+      title: "Synthetic fixture", description: "Original text",
+    }, {
+      title: "Synthetic fixture", description: "Original text",
+      visibility: "private",
+    }), false);
+    assert.equal(closed, 1);
+    document.dispatchTrusted("change");
+    assert.equal(injectedClose("fixture", {
+      title: "Synthetic fixture", description: "Original text",
+    }, {
+      title: "Synthetic fixture", description: "Original text",
+      visibility: "private",
+    }), false);
+    assert.equal(closed, 1);
   });
 });

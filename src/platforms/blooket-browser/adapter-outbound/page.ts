@@ -382,6 +382,271 @@ export function inspectBlooketPage(
   }
 }
 
+// A read-owned Edit Info panel must be canceled, never saved. The recovered
+// edit module 12048 renders an explicit EDITING SET DETAILS heading and one
+// type=button Cancel control, distinct from its "Done" form submit control.
+// The recovered Edit route unmounts its original set sidebar when Edit Info
+// opens. Capture the visible source metadata BEFORE triggering that action;
+// an editable form by itself is not evidence of saved remote fields.
+export function inspectBlooketDetailSidebar(setId: string): PageReadResult {
+  const failed = (): PageReadResult => ({
+    ok: false,
+    code: "blooket-browser-failed",
+  });
+  try {
+    const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || !setId || setId.length > 512 ||
+        /[\x00-\x1f\x7f]/u.test(setId) ||
+        url.searchParams.getAll("id").length !== 1 ||
+        url.searchParams.get("id") !== setId ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]')) return failed();
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const mains = Array.from(document.querySelectorAll("main"));
+    const nav = Array.from(document.querySelectorAll(
+      'nav a[href="/my-sets"]',
+    ));
+    const logout = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/logout"]',
+    ));
+    const profile = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/login"]',
+    ));
+    if (mains.length !== 1 || !visible(mains[0]!) || nav.length !== 1 ||
+        !visible(nav[0]!) || logout.length !== 1 ||
+        logout[0]!.textContent?.trim() !== "Logout" ||
+        !(visible(logout[0]!) ||
+          (profile.length === 1 && visible(profile[0]!) &&
+            !!profile[0]!.textContent?.trim()))) return failed();
+    const challenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some(visible);
+    const organization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some(element => visible(element) &&
+      element.textContent?.trim() === "Select your organization");
+    if (challenge || organization) return failed();
+    const headings = Array.from(mains[0]!.querySelectorAll("h1"));
+    const editButtons = Array.from(mains[0]!.querySelectorAll("button"))
+      .filter(button => button.textContent?.trim() === "Edit Info");
+    if (headings.length !== 1 || !visible(headings[0]!) ||
+        editButtons.length !== 1 || !visible(editButtons[0]!))
+      return failed();
+    const sidebar = headings[0]!.parentElement?.parentElement;
+    if (sidebar?.tagName !== "DIV" || !visible(sidebar)) return failed();
+    // Module 34719 renders the description as a direct paragraph of its
+    // sidebar, after the title wrapper. No paragraph means empty description.
+    const descriptions = Array.from(sidebar.querySelectorAll(":scope > p"));
+    if (descriptions.length > 1 ||
+        descriptions.some(element => !visible(element))) return failed();
+    const title = headings[0]!.textContent ?? "";
+    const description = descriptions[0]?.textContent ?? "";
+    if (!title.trim() || title.length > 1_000 || description.length > 10_000)
+      return failed();
+    return { ok: true, value: { title, description } };
+  } catch {
+    return failed();
+  }
+}
+
+export function closeBlooketDetailPanel(
+  setId: string,
+  baseline: { readonly title: string; readonly description: string },
+  observed: {
+    readonly title: string;
+    readonly description: string;
+    readonly visibility: "private" | "public";
+  },
+): boolean {
+  try {
+    const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || !setId || setId.length > 512 ||
+        /[\x00-\x1f\x7f]/u.test(setId) ||
+        url.searchParams.getAll("id").length !== 1 ||
+        url.searchParams.get("id") !== setId ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]')) return false;
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const main = Array.from(document.querySelectorAll("main"));
+    const nav = Array.from(document.querySelectorAll(
+      'nav a[href="/my-sets"]',
+    ));
+    const logout = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/logout"]',
+    ));
+    const profile = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/login"]',
+    ));
+    if (main.length !== 1 || !visible(main[0]!) || nav.length !== 1 ||
+        !visible(nav[0]!) || logout.length !== 1 ||
+        logout[0]!.textContent?.trim() !== "Logout" ||
+        !(visible(logout[0]!) ||
+          (profile.length === 1 && visible(profile[0]!) &&
+            !!profile[0]!.textContent?.trim()))) return false;
+    const challenged = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some(visible);
+    const organization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some(element => visible(element) &&
+      element.textContent?.trim() === "Select your organization");
+    if (challenged || organization) return false;
+    const forms = Array.from(document.querySelectorAll(
+      "form#question-set-form",
+    ));
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM") return false;
+    const ids = Array.from(forms[0].querySelectorAll(
+      'input[type="hidden"][name="setId"]',
+    ));
+    if (ids.length !== 1 || ids[0]?.tagName !== "INPUT" ||
+        (ids[0] as HTMLInputElement).value !== setId) return false;
+    // Neither title nor description may have changed since the unedited
+    // sidebar snapshot. The editor unmounts that sidebar when it opens.
+    if (!baseline || !observed ||
+        typeof baseline.title !== "string" ||
+        typeof baseline.description !== "string" ||
+        baseline.title !== observed.title ||
+        baseline.description !== observed.description ||
+        (observed.visibility !== "private" &&
+          observed.visibility !== "public")) return false;
+    const editorTitles = Array.from(forms[0].querySelectorAll(
+      'input#title[name="title"]',
+    ));
+    const editorDescriptions = Array.from(forms[0].querySelectorAll(
+      'textarea#desc[name="desc"]',
+    ));
+    const switches = Array.from(forms[0].querySelectorAll(
+      'input#private[name="private"]',
+    ));
+    if (editorTitles.length !== 1 || editorDescriptions.length !== 1 ||
+        switches.length !== 1 ||
+        !visible(editorTitles[0]!) || !visible(editorDescriptions[0]!) ||
+        (editorTitles[0] as HTMLInputElement).value !== baseline.title ||
+        (editorDescriptions[0] as HTMLTextAreaElement).value !==
+          baseline.description) return false;
+    // The current switch must still express the exact reviewed state.
+    const switchInput = switches[0] as HTMLInputElement;
+    const checked = switchInput.getAttribute("aria-checked");
+    const switchLabel = Array.from(switchInput.labels ?? []);
+    const row = switchLabel[0]?.parentElement;
+    const labels = row?.querySelectorAll(":scope > p") ?? [];
+    if (switchInput.getAttribute("role") !== "switch" ||
+        switchInput.getAttribute("type") !== "checkbox" ||
+        switchLabel.length !== 1 || labels.length !== 1 ||
+        !visible(labels[0]!) || !visible(row!) ||
+        ((observed.visibility === "private" &&
+          (checked !== "false" ||
+            labels[0]!.textContent?.replace(/\s+/gu, " ").trim() !==
+              "Private (Only playable by you)")) ||
+          (observed.visibility === "public" &&
+          (checked !== "true" ||
+            labels[0]!.textContent?.replace(/\s+/gu, " ").trim() !==
+              "Public (Playable by everyone)")))) return false;
+    const headings = Array.from(main[0]!.querySelectorAll("p")).filter(
+      element => visible(element) &&
+        element.textContent?.trim() === "EDITING SET DETAILS",
+    );
+    if (headings.length !== 1) return false;
+    const header = headings[0]!.parentElement;
+    if (!header) return false;
+    const buttons = Array.from(header.querySelectorAll(
+      'button[type="button"]',
+    ));
+    if (buttons.length !== 1 || buttons[0]?.tagName !== "BUTTON")
+      return false;
+    const cancel = buttons[0] as HTMLButtonElement;
+    if (!visible(cancel) || cancel.disabled ||
+        cancel.getAttribute("aria-disabled") === "true") return false;
+    const world = globalThis as typeof globalThis & {
+      __blooketDetailEditWatch?: {
+        document: Document;
+        setId: string;
+        dirty: boolean;
+        dispose: () => void;
+      };
+    };
+    const watch = world.__blooketDetailEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
+    cancel.click();
+    watch.dispose();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isBlooketDetailPanelClosed(setId: string): boolean {
+  try {
+    const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || !setId || setId.length > 512 ||
+        /[\x00-\x1f\x7f]/u.test(setId) ||
+        url.searchParams.getAll("id").length !== 1 ||
+        url.searchParams.get("id") !== setId ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]')) return false;
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    };
+    const mains = Array.from(document.querySelectorAll("main"));
+    const nav = Array.from(document.querySelectorAll(
+      'nav a[href="/my-sets"]',
+    ));
+    const logout = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/logout"]',
+    ));
+    const profile = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/login"]',
+    ));
+    if (mains.length !== 1 || !visible(mains[0]!) || nav.length !== 1 ||
+        !visible(nav[0]!) || logout.length !== 1 ||
+        logout[0]!.textContent?.trim() !== "Logout" ||
+        !(visible(logout[0]!) ||
+          (profile.length === 1 && visible(profile[0]!) &&
+            !!profile[0]!.textContent?.trim()))) return false;
+    if (Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some(visible) || Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some(element => visible(element) &&
+      element.textContent?.trim() === "Select your organization")) return false;
+    const forms = Array.from(document.querySelectorAll(
+      "form#question-set-form",
+    ));
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM") return false;
+    const ids = Array.from(forms[0].querySelectorAll(
+      'input[type="hidden"][name="setId"]',
+    ));
+    if (ids.length !== 1 || ids[0]?.tagName !== "INPUT" ||
+        (ids[0] as HTMLInputElement).value !== setId) return false;
+    const titles = Array.from(forms[0].querySelectorAll(
+      'input#title[name="title"]',
+    ));
+    if (titles.length !== 1 || visible(titles[0]!)) return false;
+    const markers = Array.from(document.querySelectorAll("main p")).filter(
+      element => visible(element) &&
+        element.textContent?.trim() === "EDITING SET DETAILS",
+    );
+    if (markers.length !== 0) return false;
+    const buttons = Array.from(document.querySelectorAll(
+      "main button",
+    )).filter(button => button.textContent?.trim() === "Edit Info");
+    return buttons.length === 1 && visible(buttons[0]!);
+  } catch {
+    return false;
+  }
+}
+
 export function blooketReadUrl(operation: PageReadOperation): string | null {
   if (operation.kind === "session.observe") return null;
   if (operation.kind === "sets.list")
@@ -469,11 +734,54 @@ export function openBlooketDetailPanel(setId: string): boolean {
   if (titles.length !== 1 || titles[0]?.tagName !== "INPUT")
     return false;
   const bounds = titles[0]!.getBoundingClientRect();
-  if (bounds.width > 0 && bounds.height > 0) return true;
+  // An already-open editor may contain unsaved teacher changes.
+  // Only a newly opened panel belongs to this read operation.
+  if (bounds.width > 0 && bounds.height > 0) return false;
   const buttons = Array.from(document.querySelectorAll("main button")).filter(
     (button) => button.textContent?.trim() === "Edit Info",
   );
   if (buttons.length !== 1) return false;
-  (buttons[0] as HTMLButtonElement).click();
-  return true;
+  const opener = buttons[0] as HTMLButtonElement;
+  const openerBounds = opener.getBoundingClientRect();
+  if (openerBounds.width <= 0 || openerBounds.height <= 0 ||
+      opener.disabled || opener.getAttribute("aria-disabled") === "true")
+    return false;
+  // A read owns this editor only until the teacher interacts with it.
+  // Chrome injects these functions independently into its isolated world;
+  // no mutable values from the form cross the extension boundary.
+  const world = globalThis as typeof globalThis & {
+    __blooketDetailEditWatch?: {
+      document: Document;
+      setId: string;
+      dirty: boolean;
+      dispose: () => void;
+    };
+  };
+  world.__blooketDetailEditWatch?.dispose();
+  const watch = {
+    document,
+    setId,
+    dirty: false,
+    dispose: () => {},
+  };
+  const onInteraction = (event: Event) => {
+    if (event.isTrusted) watch.dirty = true;
+  };
+  const eventTypes = ["pointerdown", "keydown", "input", "change"];
+  watch.dispose = () => {
+    for (const type of eventTypes)
+      document.removeEventListener(type, onInteraction, true);
+    if (world.__blooketDetailEditWatch === watch)
+      delete world.__blooketDetailEditWatch;
+  };
+  for (const type of eventTypes)
+    document.addEventListener(type, onInteraction, true);
+  world.__blooketDetailEditWatch = watch;
+  try {
+    opener.click();
+    return true;
+  } catch {
+    watch.dispose();
+    return false;
+  }
 }

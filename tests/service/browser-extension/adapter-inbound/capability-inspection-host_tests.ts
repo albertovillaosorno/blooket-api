@@ -44,12 +44,17 @@ function fixture(options: {
   readonly cleanupFails?: boolean;
   readonly questionOpenRejected?: boolean;
   readonly drawerOpenRejected?: boolean;
+  readonly questionOpenThrows?: boolean;
+  readonly drawerOpenThrows?: boolean;
+  readonly questionOpenMalformed?: boolean;
+  readonly drawerOpenMalformed?: boolean;
   readonly malformedList?: boolean;
   readonly unknownEmpty?: boolean;
   readonly duplicateList?: boolean;
   readonly malformedSetId?: string;
   readonly extraOuterField?: boolean;
   readonly restoreFails?: boolean;
+  readonly unsafeOriginalEditor?: boolean;
   readonly cleanupPollThrows?: "drawer" | "question";
   readonly audioProbeReplies?: readonly unknown[];
   readonly setListReplies?: readonly unknown[];
@@ -93,6 +98,8 @@ function fixture(options: {
         scripts.push(input.func.name);
         const args = input.args ?? [];
         switch (input.func.name) {
+          case "canLeaveBlooketPageForRead":
+            return [{ result: !options.unsafeOriginalEditor }];
           case "inspectBlooketPage": {
             const operation = args[0] as { readonly kind: string };
             if (operation.kind === "session.observe") {
@@ -143,6 +150,10 @@ function fixture(options: {
             assert.equal(args[0], "set-fixture");
             if (options.questionOpenRejected) return [{ result: false }];
             panelOpen = true;
+            if (options.questionOpenThrows)
+              throw new Error("synthetic late modal acknowledgement failure");
+            if (options.questionOpenMalformed)
+              return [{ result: "unknown" }];
             return [{ result: true }];
           case "isBlooketCapabilityQuestionPanelReady": {
             const next = options.panelReadyReplies?.[panelReadyCount++];
@@ -152,6 +163,10 @@ function fixture(options: {
             assert.equal(panelOpen, true);
             if (options.drawerOpenRejected) return [{ result: false }];
             drawerOpen = true;
+            if (options.drawerOpenThrows)
+              throw new Error("synthetic late drawer acknowledgement failure");
+            if (options.drawerOpenMalformed)
+              return [{ result: "unknown" }];
             return [{ result: true }];
           case "inspectBlooketAudioCapabilityDrawer": {
             const reply = options.audioProbeReplies?.[audioProbeCount++];
@@ -271,7 +286,9 @@ test(
     ok: false,
     code: "blooket-browser-failed",
   });
-  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(
+      page.currentUrl(), "https://dashboard.blooket.com/edit?id=set-fixture",
+    );
   assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
   },
 );
@@ -284,13 +301,59 @@ test(
     page.chrome, 7, noPause,
   ).inspect();
   assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
-  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(
+      page.currentUrl(), "https://dashboard.blooket.com/edit?id=set-fixture",
+    );
   assert.ok(page.scripts.includes("closeBlooketAudioCapabilityDrawer"));
   assert.equal(page.scripts.includes(
     "closeBlooketCapabilityQuestionPanel",
   ), false);
   },
 );
+
+test(
+  "unconfirmed modal or drawer open never navigates away or guesses cleanup",
+  async () => {
+  for (const options of [
+    { questionOpenThrows: true },
+    { questionOpenMalformed: true },
+    { drawerOpenThrows: true },
+    { drawerOpenMalformed: true },
+  ]) {
+    const page = fixture(options);
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(),
+      "https://dashboard.blooket.com/edit?id=set-fixture");
+    assert.equal(page.scripts.includes(
+      "closeBlooketAudioCapabilityDrawer",
+    ), false);
+    assert.equal(page.scripts.includes(
+      "closeBlooketCapabilityQuestionPanel",
+    ), false);
+    assert.notEqual(page.navigations.at(-1), page.originalUrl);
+  }
+  },
+);
+
+test("existing unsaved editor blocks capability navigation", async () => {
+  const page = fixture({ unsafeOriginalEditor: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.navigations.length, 0);
+  assert.deepEqual(page.scripts, [
+    "canLeaveBlooketPageForRead",
+  ]);
+});
 
 test("restoration failure invalidates an otherwise clean probe", async () => {
   const page = fixture({ restoreFails: true });
@@ -323,7 +386,7 @@ test("malformed set-list evidence fails before Add Question", async () => {
   );
 });
 
-test("cleanup polling exceptions still restore the original tab", async () => {
+test("unconfirmed cleanup preserves the edit route", async () => {
   for (const cleanupPollThrows of ["drawer", "question"] as const) {
     const page = fixture({ cleanupPollThrows });
     const result = await createExtensionCapabilityInspectionHost(
@@ -332,7 +395,9 @@ test("cleanup polling exceptions still restore the original tab", async () => {
     assert.deepEqual(result, {
       ok: false, code: "blooket-browser-failed",
     });
-    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(
+      page.currentUrl(), "https://dashboard.blooket.com/edit?id=set-fixture",
+    );
     // If Audio closure could not be verified, do not click through its
     // overlay. A failure at the parent modal still permits its own cleanup.
     assert.equal(page.scripts.includes(
@@ -706,7 +771,9 @@ test(
       page.chrome, 7, noPause,
     ).inspect();
     assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
-    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(
+      page.currentUrl(), "https://dashboard.blooket.com/edit?id=set-fixture",
+    );
   }
   },
 );
@@ -721,7 +788,9 @@ test("malformed already-closed evidence never authorizes Cancel", async () => {
       page.chrome, 7, noPause,
     ).inspect();
     assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
-    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(
+      page.currentUrl(), "https://dashboard.blooket.com/edit?id=set-fixture",
+    );
     if ("audioClosedReplies" in options)
       assert.equal(page.scripts.includes(
         "closeBlooketAudioCapabilityDrawer",

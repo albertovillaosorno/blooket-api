@@ -34,6 +34,7 @@ import test from "node:test";
 
 import {
   blooketCapabilitySnapshotCandidate,
+  canLeaveBlooketPageForRead,
   closeBlooketAudioCapabilityDrawer,
   closeBlooketCapabilityQuestionPanel,
   inspectBlooketAudioCapabilityDrawer,
@@ -63,6 +64,11 @@ interface FixtureNode {
   closest(selector: string): FixtureNode | null;
   getBoundingClientRect(): { readonly width: number; readonly height: number };
   click(): void;
+  addEventListener(type: string, listener: (event: { isTrusted: boolean }) =>
+    void): void;
+  removeEventListener(type: string, listener: (event: { isTrusted: boolean })
+    => void): void;
+  dispatchTrusted(type: string): void;
 }
 
 function node(
@@ -70,10 +76,23 @@ function node(
   textContent = "",
   attributes: Record<string, string> = {},
 ): FixtureNode {
+  const listeners = new Map<string,
+    Set<(event: { isTrusted: boolean }) => void>>();
   return {
     tagName,
     textContent,
     value: "",
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    dispatchTrusted(type) {
+      for (const listener of listeners.get(type) ?? [])
+        listener({ isTrusted: true });
+    },
     clicked: 0,
     selectors: {},
     attributes,
@@ -169,6 +188,13 @@ function withPage(document: FixtureNode, run: () => void): void {
   try {
     run();
   } finally {
+    const world = globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; dispose: () => void
+      };
+    };
+    if (world.__blooketCapabilityEditWatch?.document === document)
+      world.__blooketCapabilityEditWatch.dispose();
     if (priorDocument)
       Object.defineProperty(globalThis, "document", priorDocument);
     else Reflect.deleteProperty(globalThis, "document");
@@ -177,6 +203,64 @@ function withPage(document: FixtureNode, run: () => void): void {
     else Reflect.deleteProperty(globalThis, "location");
   }
 }
+
+test("capability navigation leaves all teacher-owned editors untouched", () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  withPage(page.document, () => {
+    assert.equal(injected(), true);
+    const draft = node("INPUT");
+    draft.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    const selector =
+      'form#question-set-form input#title[name="title"], ' +
+      'form#question-set-form textarea#desc[name="desc"]';
+    page.document.selectors[selector] = [draft];
+    assert.equal(injected(), true); // Closed Edit Info remains in the DOM.
+    draft.getBoundingClientRect = () => ({ width: 30, height: 20 });
+    assert.equal(injected(), false);
+    draft.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(injected(), false);
+    page.document.selectors['input#question[name="question"]'] = [];
+    page.document.selectors['aside[data-drawer-open="true"]'] = [
+      drawer("supported"),
+    ];
+    assert.equal(injected(), false);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [];
+    page.document.selectors[
+      '[role="dialog"][aria-modal="true"]'
+    ] = [node("DIV")];
+    assert.equal(injected(), false);
+    page.document.selectors[
+      '[role="dialog"][aria-modal="true"]'
+    ] = [];
+    (page.document as FixtureNode & { activeElement?: FixtureNode })
+      .activeElement = node("TEXTAREA");
+    assert.equal(injected(), false);
+    (page.document as FixtureNode & { activeElement?: FixtureNode })
+      .activeElement = undefined;
+    assert.equal(injected(), true);
+    page.document.selectors['input[type="password"]'] = [node("INPUT")];
+    assert.equal(injected(), false);
+    page.document.selectors['input[type="password"]'] = [];
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: new URL("https://dashboard.blooket.com/unknown-route"),
+    });
+    assert.equal(injected(), false);
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: new URL("https://dashboard.blooket.com/edit?id=set-fixture"),
+    });
+    (page.document as FixtureNode & { title?: string }).title =
+      "Just a moment...";
+    assert.equal(injected(), false);
+  });
+});
 
 test("capability probe opens only the exact Add Question form", () => {
   const page = fixture();
@@ -198,7 +282,12 @@ test("audio drawer distinguishes the shared Plus gate and cancels", () => {
       page.question,
     ];
     const openDrawer = drawer(kind);
+    page.document.selectors['input#question[name="question"]'] = [];
     withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
       assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
       assert.equal(page.audio.clicked, 1);
       page.document.selectors['aside[data-drawer-open="true"]'] = [openDrawer];
@@ -235,8 +324,11 @@ test("capability controls refuse control-bearing set IDs", () => {
 
 test("ambiguous capability controls fail without clicking", () => {
   const page = fixture();
-  page.document.selectors['input#question[name="question"]'] = [page.question];
   withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
     page.form.selectors["button"] = [
       page.audio,
       node("BUTTON", "Audio", { type: "button" }),
@@ -282,12 +374,13 @@ test("capability snapshot resolves only the shared account media gate", () => {
 test("capability drawer never trusts a stale question-form set ID", () => {
   const page = fixture();
   const openDrawer = drawer("supported");
-  page.document.selectors['input#question[name="question"]'] = [
-    page.question,
-  ];
-  page.document.selectors['aside[data-drawer-open="true"]'] = [openDrawer];
-  page.setId.value = "another-set";
   withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    page.document.selectors['aside[data-drawer-open="true"]'] = [openDrawer];
+    page.setId.value = "another-set";
     assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
     assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
     assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok, false);
@@ -308,10 +401,11 @@ test(
   () => {
   const page = fixture();
   const existingDrawer = drawer("unsupported");
-  page.document.selectors['input#question[name="question"]'] = [
-    page.question,
-  ];
   withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
     for (const identities of [
       [],
       [page.setId, page.setId],
@@ -456,6 +550,27 @@ test("every injected capability action works without module imports", () => {
     assert.equal(closeQuestion("set-fixture"), true);
     page.document.selectors['input#question[name="question"]'] = [];
     assert.equal(isQuestionClosed("set-fixture"), true);
+    assert.equal(openQuestion("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(openAudio("set-fixture"), true);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [
+      activeDrawer,
+    ];
+    const previousDrawerClicks = activeDrawer.selectors[
+      'button[aria-label="Cancel"]'
+    ]![0]!.clicked;
+    const previousQuestionClicks = page.cancel.clicked;
+    // Trusted human interaction transfers both nested controls to the user.
+    page.document.dispatchTrusted("pointerdown");
+    assert.equal(inspectAudio("set-fixture").ok, false);
+    assert.equal(closeAudio("set-fixture"), false);
+    assert.equal(closeQuestion("set-fixture"), false);
+    assert.equal(activeDrawer.selectors[
+      'button[aria-label="Cancel"]'
+    ]![0]!.clicked, previousDrawerClicks);
+    assert.equal(page.cancel.clicked, previousQuestionClicks);
   });
 });
 
@@ -469,11 +584,13 @@ test(
   ]?.[0] as FixtureNode & { disabled?: boolean };
   assert.ok(input);
   input.disabled = true;
-  page.document.selectors['input#question[name="question"]'] = [
-    page.question,
-  ];
-  page.document.selectors['aside[data-drawer-open="true"]'] = [activeDrawer];
   withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [activeDrawer];
     assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
       ok: false, code: "blooket-browser-failed",
     });
@@ -515,5 +632,49 @@ test("two Add Question buttons resolve only the question-list toolbar", () => {
     toolbar.selectors["button"]!.push(node("BUTTON", "Add Question"));
     assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
     assert.equal(bottom.clicked, 1);
+  });
+});
+
+test("capability modal and Audio controls refuse disabled actions", () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    page.add.disabled = true;
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    page.add.disabled = false;
+    page.add.attributes["aria-disabled"] = "true";
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    delete page.add.attributes["aria-disabled"];
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    page.audio.disabled = true;
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    page.audio.disabled = false;
+    page.audio.attributes["aria-disabled"] = "true";
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    delete page.audio.attributes["aria-disabled"];
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+    const opened = drawer("supported");
+    page.document.selectors['aside[data-drawer-open="true"]'] = [opened];
+    const drawerCancel = opened.selectors[
+      'button[aria-label="Cancel"]'
+    ]![0]!;
+    drawerCancel.disabled = true;
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+    drawerCancel.disabled = false;
+    drawerCancel.attributes["aria-disabled"] = "true";
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+    delete drawerCancel.attributes["aria-disabled"];
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), true);
+    delete page.document.selectors['aside[data-drawer-open="true"]'];
+    page.cancel.disabled = true;
+    assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    page.cancel.disabled = false;
+    assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), true);
+    assert.equal(page.add.clicked, 1);
+    assert.equal(page.audio.clicked, 1);
+    assert.equal(drawerCancel.clicked, 1);
+    assert.equal(page.cancel.clicked, 1);
   });
 });
