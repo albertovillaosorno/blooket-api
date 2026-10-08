@@ -479,3 +479,20 @@ test(
   });
   },
 );
+
+
+test("capability opener accepts the observed closed account menu", () => {
+  const page = fixture();
+  const logout = node("A", "Logout");
+  logout.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  page.document.selectors['a[href="https://id.blooket.com/logout"]'] = [logout];
+  const profile = node("A", "Synthetic account");
+  page.document.selectors['a[href="https://id.blooket.com/login"]'] = [profile];
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    assert.equal(page.add.clicked, 1);
+    profile.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.add.clicked, 1);
+  });
+});

@@ -54,7 +54,19 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
       document.querySelector('input[type="password"]') === null &&
       visibleUnique("main") &&
       visibleUnique('nav a[href="/my-sets"]') &&
-      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
+      (() => {
+        const links = Array.from(document.querySelectorAll(
+          'a[href="https://id.blooket.com/logout"]',
+        ));
+        if (links.length !== 1 || links[0]!.textContent?.trim() !== "Logout")
+          return false;
+        if (visibleUnique('a[href="https://id.blooket.com/logout"]'))
+          return true;
+        // The real dashboard hides Logout while the account menu is closed.
+        const profile = 'a[href="https://id.blooket.com/login"]';
+        return visibleUnique(profile) &&
+          Boolean(document.querySelector(profile)?.textContent?.trim());
+      })();
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -134,7 +146,19 @@ export function openBlooketQuestionPanel(
       document.querySelector('input[type="password"]') === null &&
       visibleUnique("main") &&
       visibleUnique('nav a[href="/my-sets"]') &&
-      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
+      (() => {
+        const links = Array.from(document.querySelectorAll(
+          'a[href="https://id.blooket.com/logout"]',
+        ));
+        if (links.length !== 1 || links[0]!.textContent?.trim() !== "Logout")
+          return false;
+        if (visibleUnique('a[href="https://id.blooket.com/logout"]'))
+          return true;
+        // The real dashboard hides Logout while the account menu is closed.
+        const profile = 'a[href="https://id.blooket.com/login"]';
+        return visibleUnique(profile) &&
+          Boolean(document.querySelector(profile)?.textContent?.trim());
+      })();
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -210,7 +234,19 @@ export function inspectOpenedBlooketQuestion(
       document.querySelector('input[type="password"]') === null &&
       visibleUnique("main") &&
       visibleUnique('nav a[href="/my-sets"]') &&
-      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
+      (() => {
+        const links = Array.from(document.querySelectorAll(
+          'a[href="https://id.blooket.com/logout"]',
+        ));
+        if (links.length !== 1 || links[0]!.textContent?.trim() !== "Logout")
+          return false;
+        if (visibleUnique('a[href="https://id.blooket.com/logout"]'))
+          return true;
+        // The real dashboard hides Logout while the account menu is closed.
+        const profile = 'a[href="https://id.blooket.com/login"]';
+        return visibleUnique(profile) &&
+          Boolean(document.querySelector(profile)?.textContent?.trim());
+      })();
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -442,7 +478,19 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
       document.querySelector('input[type="password"]') === null &&
       visibleUnique("main") &&
       visibleUnique('nav a[href="/my-sets"]') &&
-      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
+      (() => {
+        const links = Array.from(document.querySelectorAll(
+          'a[href="https://id.blooket.com/logout"]',
+        ));
+        if (links.length !== 1 || links[0]!.textContent?.trim() !== "Logout")
+          return false;
+        if (visibleUnique('a[href="https://id.blooket.com/logout"]'))
+          return true;
+        // The real dashboard hides Logout while the account menu is closed.
+        const profile = 'a[href="https://id.blooket.com/login"]';
+        return visibleUnique(profile) &&
+          Boolean(document.querySelector(profile)?.textContent?.trim());
+      })();
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {
@@ -514,7 +562,19 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
       document.querySelector('input[type="password"]') === null &&
       visibleUnique("main") &&
       visibleUnique('nav a[href="/my-sets"]') &&
-      visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
+      (() => {
+        const links = Array.from(document.querySelectorAll(
+          'a[href="https://id.blooket.com/logout"]',
+        ));
+        if (links.length !== 1 || links[0]!.textContent?.trim() !== "Logout")
+          return false;
+        if (visibleUnique('a[href="https://id.blooket.com/logout"]'))
+          return true;
+        // The real dashboard hides Logout while the account menu is closed.
+        const profile = 'a[href="https://id.blooket.com/login"]';
+        return visibleUnique(profile) &&
+          Boolean(document.querySelector(profile)?.textContent?.trim());
+      })();
     const blockedByOrganization = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some((heading) => {

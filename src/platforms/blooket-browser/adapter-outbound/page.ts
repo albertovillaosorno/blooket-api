@@ -149,8 +149,16 @@ export function inspectBlooketPage(
     const authenticatedShell =
       mains.length === 1 && main !== null && visible(main) &&
       mySetsNavigation.length === 1 && visible(mySetsNavigation[0]!) &&
-      logoutLinks.length === 1 && visible(logoutLinks[0]!) &&
-      logoutLinks[0]!.textContent?.trim() === "Logout";
+      logoutLinks.length === 1 &&
+      logoutLinks[0]!.textContent?.trim() === "Logout" &&
+      (visible(logoutLinks[0]!) || (() => {
+        // Closing the account menu hides Logout, not the authenticated page.
+        const profiles = Array.from(document.querySelectorAll(
+          'a[href="https://id.blooket.com/login"]',
+        ));
+        return profiles.length === 1 && visible(profiles[0]!) &&
+          Boolean(profiles[0]!.textContent?.trim());
+      })());
     const organizationPrompt = Array.from(
       document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
@@ -406,7 +414,19 @@ export function openBlooketDetailPanel(setId: string): boolean {
     document.querySelector('input[type="password"]') === null &&
     visibleUnique("main") &&
     visibleUnique('nav a[href="/my-sets"]') &&
-    visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
+    (() => {
+      const links = Array.from(document.querySelectorAll(
+        'a[href="https://id.blooket.com/logout"]',
+      ));
+      if (links.length !== 1 || links[0]!.textContent?.trim() !== "Logout")
+        return false;
+      if (visibleUnique('a[href="https://id.blooket.com/logout"]'))
+        return true;
+      // The real dashboard hides Logout while the account menu is closed.
+      const profile = 'a[href="https://id.blooket.com/login"]';
+      return visibleUnique(profile) &&
+        Boolean(document.querySelector(profile)?.textContent?.trim());
+    })();
   const organizationPrompt = Array.from(document.querySelectorAll(
     '[role="dialog"][aria-modal="true"] h3',
   )).some((heading) => {
