@@ -188,12 +188,11 @@ const words = {
     prepare: "Guardar y preparar",
     download: "Descargar archivo preparado",
     quizzesHelp:
-      "La IA publica automáticamente y verifica el resultado. " +
-      "Puedes revisar o editar cuando quieras.",
-    connection: "Conexión con Blooket",
+      "Prepara quizzes con la IA y revisa tus borradores aquí.",
+    connection: "Publicación en Blooket",
     publicationPending:
-      "La publicación aún requiere validar el adaptador " +
-      "de Blooket. Guardar un borrador no lo publica.",
+      "La publicación automática en Blooket todavía no está disponible. " +
+      "Tus borradores se guardan en este espacio local.",
     configured: "Configurado",
     missing: "Sin configurar",
     saved: "Guardado. Reinicia el servicio si cambiaste el puerto.",
@@ -404,12 +403,11 @@ const words = {
     prepare: "Save and prepare",
     download: "Download prepared file",
     quizzesHelp:
-      "AI publishes automatically and verifies the result. " +
-      "You can review or edit whenever you want.",
-    connection: "Blooket connection",
+      "Prepare quizzes with AI and review your drafts here.",
+    connection: "Blooket publication",
     publicationPending:
-      "Publishing still requires a verified Blooket " +
-      "adapter. Saving a draft does not publish it.",
+      "Automatic Blooket publication is not available yet. " +
+      "Your drafts are saved in this local workspace.",
     configured: "Configured",
     missing: "Not configured",
     saved: "Saved. Restart the service if you changed the port.",
@@ -1639,6 +1637,7 @@ document.querySelectorAll("[data-tab]").forEach((button) =>
         $("#drafts").replaceChildren();
         if (!ids.length) {
           const text = document.createElement("p");
+          text.dataset.i18n = "noDrafts";
           text.textContent = t("noDrafts");
           $("#drafts").append(text);
         }

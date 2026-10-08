@@ -122,6 +122,17 @@ Current GitHub-hosted runner documentation identifies macos-26 as an ARM64
 standard runner. setup-node v7 supports pnpm cache restoration, and Apple
 documents safaridriver --enable for Safari WebDriver automation.
 
+On 2026-10-08, live Chrome inspection reproduced contradictory Quizzes
+copy: the heading promised automatic publication while the notice reported
+an unimplemented adapter. EN/ES text now describes available draft preparation
+and labels the pending feature as Blooket publication rather than connection.
+No publication gate was enabled or browser transport reclassified by this copy
+change.
+
+The same EN/ES browser check exposed a stale empty-draft message after changing
+language. Its generated paragraph now participates in ordinary translation,
+preserving draft contents while updating the surrounding product message.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto
