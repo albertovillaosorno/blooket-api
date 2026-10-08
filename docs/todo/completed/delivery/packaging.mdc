@@ -110,6 +110,11 @@ was accepted; cleanup removed the owned output and left prior artifacts intact.
 The correction reserves the excluded partial before traversal, with a real tar
 regression verifying contents, absence of self-inclusion, and no-clobber retry.
 
+The next full assembly exposed a shadowed archive variable: publication targeted
+the existing cached Node archive and safely stopped with `EEXIST`. The final
+distribution destination now has a distinct name; the guard preserved the cache
+and owned failed output was removed. Neither failed run is package acceptance.
+
 ## Blockers
 
 None. Signing, notarization, Gatekeeper, installed Safari behavior, native

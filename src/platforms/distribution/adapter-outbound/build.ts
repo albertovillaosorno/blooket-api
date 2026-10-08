@@ -235,8 +235,9 @@ export async function buildDistribution(
   const directory = distributionDirectory(repo, outputName);
   const output = join(directory, target);
   const mac = target.startsWith("darwin-");
-  const archive = join(directory, target + (mac ? ".zip" : ".tar.gz"));
-  for (const existing of [output, archive]) {
+  const destinationArchive = join(directory,
+    target + (mac ? ".zip" : ".tar.gz"));
+  for (const existing of [output, destinationArchive]) {
     try {
       await lstat(existing);
       throw new Error("package-output-already-exists");
@@ -461,12 +462,12 @@ export async function buildDistribution(
     try { await file.sync(); }
     finally { await file.close(); }
     // A no-clobber publish also preserves an archive created during assembly.
-    await link(partialArchive, archive);
+    await link(partialArchive, destinationArchive);
     const parent = await open(directory, "r");
     try { await parent.sync(); }
     finally { await parent.close(); }
     await rm(partialArchive);
-    return { target, output, archive, sourceRevision };
+    return { target, output, archive: destinationArchive, sourceRevision };
   } catch (error) {
     await rm(output, { recursive: true, force: true });
     throw error;
