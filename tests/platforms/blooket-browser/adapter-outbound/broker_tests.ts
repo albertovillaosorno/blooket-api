@@ -170,3 +170,48 @@ test("timeouts and close never replay pending browser jobs", async () => {
   });
   assert.equal(closing.next(TOKEN), null);
 });
+
+test("invalid browser commands fail before extension dispatch", async () => {
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN,
+    timeoutMs: 25,
+  });
+  for (const invalid of [
+    { kind: "session.authenticate" },
+    { kind: "sets.get" },
+    { kind: "sets.list", extraneous: true },
+  ]) {
+    assert.deepEqual(await broker.request(invalid as never), {
+      ok: false,
+      code: "blooket-browser-failed",
+    });
+    assert.equal(broker.status().pending, 0);
+    assert.equal(broker.next(TOKEN), null);
+  }
+  broker.close();
+});
+
+test(
+  "valid credential commands preserve bounded broker correlation",
+  async () => {
+    const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+    const command = {
+      kind: "session.authenticate" as const,
+      loginIdentifier: "synthetic@example.invalid",
+      password: "test-only-no-account",
+    };
+    const pending = broker.request(command);
+    const job = broker.next(TOKEN);
+    assert.ok(job);
+    assert.deepEqual(job.command, command);
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: job.schemaVersion,
+      id: job.id,
+      ok: true,
+      value: null,
+    }), true);
+    assert.deepEqual(await pending, { ok: true, value: null });
+    assert.equal(broker.status().pending, 0);
+    broker.close();
+  },
+);

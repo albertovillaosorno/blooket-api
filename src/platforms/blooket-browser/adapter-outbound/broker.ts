@@ -34,6 +34,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
   BLOOKET_BROWSER_BRIDGE_VERSION,
+  decodeBlooketBrowserBridgeRequest,
   decodeBlooketBrowserBridgeResponse,
   type BlooketBrowserBridgeRequest,
 } from "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -127,11 +128,15 @@ export function createBlooketBrowserBridgeBroker(
         };
       }
       const id = randomUUID();
-      const request: BlooketBrowserBridgeRequest = {
+      const decoded = decodeBlooketBrowserBridgeRequest({
         schemaVersion: BLOOKET_BROWSER_BRIDGE_VERSION,
         id,
         command,
-      };
+      });
+      if (!decoded.ok) {
+        return { ok: false, code: "blooket-browser-failed" };
+      }
+      const request: BlooketBrowserBridgeRequest = decoded.value;
       return await new Promise<BlooketBrowserBridgeTransportResult>(
         (resolve) => {
           const timer = setTimeout(() => {
