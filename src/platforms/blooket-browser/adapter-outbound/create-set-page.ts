@@ -53,6 +53,25 @@ export function prepareBlooketCreateSetForm(
     code: "blooket-browser-failed",
   });
   try {
+    // Chrome executes each function in isolation. The prior preparation
+    // cannot authorize a click behind a newly mounted human/security stop.
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        heading.textContent?.trim() === "Select your organization";
+    });
+    if (document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]') !== null ||
+        blockedByChallenge || blockedByOrganization)
+      return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/create" ||
@@ -147,6 +166,25 @@ export function submitBlooketCreateSetForm(
     code: "blooket-browser-failed",
   });
   try {
+    // Chrome executes each function in isolation. The prior preparation
+    // cannot authorize a click behind a newly mounted human/security stop.
+    const blockedByChallenge = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some((frame) => {
+      const bounds = frame.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
+    const blockedByOrganization = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some((heading) => {
+      const bounds = heading.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        heading.textContent?.trim() === "Select your organization";
+    });
+    if (document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]') !== null ||
+        blockedByChallenge || blockedByOrganization)
+      return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/create"

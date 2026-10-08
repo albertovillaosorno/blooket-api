@@ -53,6 +53,7 @@ interface FixtureNode {
   querySelectorAll(selector: string): FixtureNode[];
   dispatchEvent(event: Event): boolean;
   click(): void;
+  getBoundingClientRect(): { readonly width: number; readonly height: number };
 }
 
 function node(
@@ -66,6 +67,7 @@ function node(
     value: "",
     labels: [],
     clicked: 0,
+    getBoundingClientRect: () => ({ width: 24, height: 20 }),
     selectors: {},
     attributes,
     getAttribute(name) {
@@ -371,4 +373,31 @@ test("an edit redirect behind a password prompt is not a receipt", () => {
       ok: false, code: "blooket-browser-failed",
     });
   });
+});
+
+
+test("human overlays block Create Set preparation and submission", () => {
+  const input = { title: "Synthetic", description: "", private: true };
+  for (const reason of ["verification", "password", "organization",
+    "captcha"] as const) {
+    const page = fixture(true);
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.deepEqual(prepareBlooketCreateSetForm(input), { ok: true });
+      if (reason === "verification")
+        Object.assign(page.document, { title: "Just a moment..." });
+      if (reason === "password")
+        page.document.selectors['input[type="password"]'] = [node("INPUT")];
+      if (reason === "organization")
+        page.document.selectors['[role="dialog"][aria-modal="true"] h3'] = [
+          node("H3", "Select your organization"),
+        ];
+      if (reason === "captcha")
+        page.document.selectors[
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        ] = [node("IFRAME")];
+      assert.equal(submitBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.form.selectors["button"]?.[0]?.clicked, 0);
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+    });
+  }
 });
