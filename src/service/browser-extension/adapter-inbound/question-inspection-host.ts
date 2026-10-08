@@ -91,7 +91,10 @@ export function createExtensionQuestionInspectionHost(
   const ready = async (url: string, deadline: number): Promise<boolean> => {
     if (now() >= deadline) return false;
     const tab = await chrome.tabs.get(tabId);
-    return tab.status === "complete" && tab.url === url;
+    // Chrome may finish a tab request after the caller's read deadline.
+    // Never let that late response authorize another page script or click.
+    return now() < deadline &&
+      tab.status === "complete" && tab.url === url;
   };
   const enumerate = async (
     setId: string, url: string, deadline: number,
@@ -207,6 +210,23 @@ export function createExtensionQuestionInspectionHost(
               if (!decoded) invalid = true;
               break;
             }
+            if (decoded && !invalid && await ready(url, deadline)) {
+              // A question may change while the modal remains open even when
+              // its row number is unchanged. Compare canonical facts twice.
+              await pause(0);
+              if (now() >= deadline) invalid = true;
+              else {
+                const again = await script(
+                  inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
+                  [setId, number],
+                );
+                const confirmed = decodeInspectedQuestion(again, number);
+                if (
+                  now() >= deadline || !confirmed ||
+                  JSON.stringify(decoded) !== JSON.stringify(confirmed)
+                ) invalid = true;
+              }
+            } else invalid = true;
           } finally {
             closed = await close(setId, url, deadline);
           }

@@ -396,9 +396,20 @@ and verifies panel cleanup.
 The Chrome question-read worker now runs a deadline-bounded, non-mutating
 inspection host. It checks each modal's parsed question through the canonical
 version-three decoder, cancels and confirms panel closure, and re-enumerates
-the exact visible question numbers before publishing the result. Any insertion,
-deletion, reorder, tab switch, malformed script result, or deadline exhaustion
-fails the entire read instead of returning a mixed visible collection. The
+the exact visible question numbers before publishing the result.
+
+The host now rechecks the clock after each asynchronous tab-read result; a late
+`tabs.get` can no longer authorize a browser script. It also reads each
+already-open question modal twice, checking that both canonical version-three
+observations agree before canceling the form. A changed prompt, malformed
+second reply, or an exception rejects the whole collection and still attempts
+owned-modal cancellation. These checks observe normalized text/flags only:
+question image/audio content identity remains unverified and no remote atomic
+snapshot is claimed.
+
+Any insertion, deletion, reorder, tab switch, malformed script result, or
+deadline exhaustion fails the entire read instead of returning a mixed visible
+collection. The
 eight-second scan budget includes edit-route navigation and leaves a margin
 before the bridge's ten-second request timeout.
 
