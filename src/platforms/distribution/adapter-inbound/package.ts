@@ -29,7 +29,8 @@
 // - Defaults:
 //   - Unsupported hosts and invalid lifecycle inputs fail closed.
 //
-import { buildDistribution, TARGETS } from "../adapter-outbound/build.ts";
+import { buildDistribution, distributionDirectory, TARGETS } from
+  "../adapter-outbound/build.ts";
 import { verifyDistribution } from "../adapter-outbound/verify.ts";
 import { buildBrowserExtension } from "../adapter-outbound/extension.ts";
 import { mkdir } from "node:fs/promises";
@@ -39,6 +40,20 @@ const args = process.argv.slice(2);
 const verify = args[0] === "--verify";
 const target = args[verify ? 1 : 0];
 const extra = args.slice(verify ? 2 : 1);
+let outputName: string | undefined;
+let release = false;
+let validOptions = true;
+for (let index = 0; index < extra.length; index++) {
+  const option = extra[index];
+  if (option === "--release" && verify && !release) release = true;
+  else if (option === "--output" && outputName === undefined) {
+    outputName = extra[++index];
+    try {
+      if (outputName === undefined) throw new Error("missing-output-name");
+      distributionDirectory(".", outputName);
+    } catch { validOptions = false; }
+  } else validOptions = false;
+}
 if (args.length === 1 && args[0] === "--extension") {
   const repo = fileURLToPath(new URL("../../../../", import.meta.url));
   const destination = join(repo, ".temp/distributions/browser-extension");
@@ -52,21 +67,25 @@ if (args.length === 1 && args[0] === "--extension") {
   }
 } else if (
   !TARGETS.some((value) => value === target) ||
-  extra.some((item) => !verify || item !== "--release")
+  !validOptions
 ) {
-  process.stderr.write("Choose linux-x64 or darwin-arm64.\n");
+  process.stderr.write(
+    "Choose linux-x64 or darwin-arm64 with valid options.\n",
+  );
   process.exitCode = 1;
 } else {
   try {
     if (verify) {
       await verifyDistribution(
         target as (typeof TARGETS)[number],
-        extra.includes("--release"),
+        release,
+        outputName,
       );
       process.stdout.write("Extracted package checks passed.\n");
     } else {
       const result = await buildDistribution(
         target as (typeof TARGETS)[number],
+        outputName,
       );
       process.stdout.write(JSON.stringify(result) + "\n");
     }

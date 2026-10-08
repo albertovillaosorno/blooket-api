@@ -88,6 +88,22 @@ pnpm cache use through setup-node, the ARM64 macOS runner, and direct execution
 of erasable TypeScript under Node 24. Platform-specific Apple trust and native
 acceptance are intentionally owned by task blooket-15.
 
+On 2026-10-08, extracted-package verification was corrected to return the
+current `{items, completeness}` bridge contract for synthetic My Sets reads.
+This retains the explicit unknown collection completeness instead of
+fabricating an exhausted list or using the rejected legacy bare-array format.
+
+Package commands now accept a bounded `--output <name>` inside the existing
+repository distribution directory. Separate acceptance builds reuse shared
+dependencies/downloads without deleting or replacing an earlier package.
+Assembly claims its output exclusively, rejects existing directories/archives,
+and publishes a fully written/synced archive with a no-clobber hard link.
+
+Portable regressions exercise the actual package CLI's malformed/duplicate
+options and refusal of an existing archive before build activity. Synthetic
+previous bytes remain unchanged. Names cannot select arbitrary paths; an
+actual extracted package remains the integration gate for launcher/CLI behavior.
+
 ## Blockers
 
 None. Signing, notarization, Gatekeeper, installed Safari behavior, native

@@ -37,12 +37,14 @@ import {
   rm,
   chmod,
   realpath,
-  access,
+  lstat,
+  open,
+  link,
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve, basename } from "node:path";
 import { buildBrowserExtension } from "./extension.ts";
 import { buildMacIcon } from "./icons.ts";
 
@@ -209,26 +211,47 @@ async function npmPackage(
     integrityScope: "archive" as const,
   };
 }
-export async function buildDistribution(target: DistributionTarget) {
+export function distributionDirectory(repo: string, outputName?: string) {
+  if (outputName !== undefined &&
+      (typeof outputName !== "string" ||
+        !/^[a-z][a-z0-9-]{0,47}$/u.test(outputName)))
+    throw new Error("invalid-package-output-name");
+  return join(repo, ".temp/distributions", outputName ?? "");
+}
+export async function buildDistribution(
+  target: DistributionTarget, outputName?: string,
+) {
   if (!TARGETS.includes(target)) throw new Error("unsupported-package-target");
   const repo = fileURLToPath(new URL("../../../../", import.meta.url));
   const cache = join(repo, ".temp/distribution-cache");
-  const output = join(repo, ".temp/distributions", target);
-  try {
-    await access(output);
-    throw new Error("package-output-already-exists");
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
-      throw error;
+  const directory = distributionDirectory(repo, outputName);
+  const output = join(directory, target);
+  const mac = target.startsWith("darwin-");
+  const archive = join(directory, target + (mac ? ".zip" : ".tar.gz"));
+  for (const existing of [output, archive]) {
+    try {
+      await lstat(existing);
+      throw new Error("package-output-already-exists");
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error &&
+          error.code === "ENOENT"))
+        throw error;
+    }
   }
   await mkdir(cache, { recursive: true });
-  const mac = target.startsWith("darwin-");
+  await mkdir(directory, { recursive: true });
+  if (await realpath(directory) !== resolve(directory))
+    throw new Error("unsafe-package-output");
+  // Exclusive ownership prevents concurrent builders from deleting each other.
+  await mkdir(output);
+  const partialArchive = join(output,
+    mac ? ".archive.partial.zip" : ".archive.partial.tar.gz");
   const bundle = mac ? join(output, "Blooket API.app/Contents") : output;
   const resource = mac ? join(bundle, "Resources") : output;
   const app = join(resource, "app");
   const runtime = join(resource, "runtime");
-  await mkdir(runtime, { recursive: true });
   try {
+    await mkdir(runtime, { recursive: true });
     await mkdir(join(resource, "extensions"), { recursive: true });
     await buildBrowserExtension(repo, join(resource, "extensions/chrome"));
     for (const file of [
@@ -417,7 +440,7 @@ export async function buildDistribution(target: DistributionTarget) {
         "zip",
         [
           "-qr",
-          join(repo, ".temp/distributions", target + ".zip"),
+          partialArchive,
           "Blooket API.app",
         ],
         output,
@@ -426,13 +449,23 @@ export async function buildDistribution(target: DistributionTarget) {
       await createLinuxLauncher(output, cache);
       await run("tar", [
         "-czf",
-        join(repo, ".temp/distributions", target + ".tar.gz"),
+        partialArchive,
+        "--exclude=./" + basename(partialArchive),
         "-C",
         output,
         ".",
       ]);
     }
-    return { target, output, sourceRevision };
+    const file = await open(partialArchive, "r");
+    try { await file.sync(); }
+    finally { await file.close(); }
+    // A no-clobber publish also preserves an archive created during assembly.
+    await link(partialArchive, archive);
+    const parent = await open(directory, "r");
+    try { await parent.sync(); }
+    finally { await parent.close(); }
+    await rm(partialArchive);
+    return { target, output, archive, sourceRevision };
   } catch (error) {
     await rm(output, { recursive: true, force: true });
     throw error;

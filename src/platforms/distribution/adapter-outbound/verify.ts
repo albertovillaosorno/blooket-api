@@ -53,6 +53,7 @@ import {
   MAC_LOGIN_AGENT_LABEL,
   MAC_LOGIN_AGENT_PLIST,
   TARGETS,
+  distributionDirectory,
   type DistributionTarget,
 } from "./build.ts";
 
@@ -63,10 +64,12 @@ const execute = promisify(execFile);
 export async function verifyDistribution(
   target: DistributionTarget,
   release = false,
+  outputName?: string,
 ): Promise<void> {
   assert.ok(TARGETS.includes(target));
   assert.equal(target, process.platform + "-" + process.arch);
   const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const directory = distributionDirectory(repo, outputName);
   const root = await mkdtemp(join(repo, ".temp/package verification "));
   const mac = target.startsWith("darwin-");
   const resources = mac
@@ -94,14 +97,14 @@ export async function verifyDistribution(
     if (mac)
       await execute("unzip", [
         "-q",
-        join(repo, ".temp/distributions", target + ".zip"),
+        join(directory, target + ".zip"),
         "-d",
         root,
       ]);
     else
       await execute("tar", [
         "-xzf",
-        join(repo, ".temp/distributions", target + ".tar.gz"),
+        join(directory, target + ".tar.gz"),
         "-C",
         root,
       ]);
@@ -375,8 +378,10 @@ export async function verifyDistribution(
             "questions.list",
           ].includes(job.command.kind));
           const value = job.command.kind === "session.observe" ? "my-sets"
-            : job.command.kind === "sets.list" ? [{ schemaVersion: 1,
-              id: "package-fixture", title: "Synthetic quiz" }]
+            : job.command.kind === "sets.list" ? {
+              completeness: "unknown", items: [{ schemaVersion: 1,
+                id: "package-fixture", title: "Synthetic quiz" }],
+            }
             : job.command.kind === "questions.list" ? [{
               schemaVersion: 1, number: 1, question: "Type sun.",
               qType: "typing", random: true, timeLimit: 15,

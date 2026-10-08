@@ -37,7 +37,23 @@ import {
   MAC_LOGIN_AGENT_LABEL,
   MAC_LOGIN_AGENT_PLIST,
   macLoginAgentPlist,
+  distributionDirectory,
 } from "../../../../src/platforms/distribution/adapter-outbound/build.ts";
+import { join } from "node:path";
+
+test("package output names remain repository-owned and cannot select paths",
+  () => {
+    assert.equal(distributionDirectory("/synthetic/repo"),
+      "/synthetic/repo/.temp/distributions");
+    assert.equal(distributionDirectory("/synthetic/repo", "acceptance"),
+      "/synthetic/repo/.temp/distributions/acceptance");
+    for (const name of ["", "../foreign", "/outside", "a/b", "A", "a\\b",
+      "a\n", "a".repeat(49)])
+      assert.throws(() => distributionDirectory("/synthetic/repo", name));
+    assert.equal(join(distributionDirectory("/synthetic/repo", "acceptance"),
+      "linux-x64.tar.gz"),
+    "/synthetic/repo/.temp/distributions/acceptance/linux-x64.tar.gz");
+  });
 
 const yaml = await import(
   new URL(

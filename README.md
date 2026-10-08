@@ -327,7 +327,16 @@ npm run package:verify -- linux-x64
 The product package target is `darwin-arm64`; `linux-x64` remains the portable
 development/validation package target. Outputs live under
 `.temp/distributions/`; assembly refuses to overwrite an existing target
-directory.
+directory or archive. Use the same explicit output name for a separate build
+and its verification, while reusing the existing dependency/download cache:
+
+```sh
+npm run package -- linux-x64 --output acceptance
+npm run package:verify -- linux-x64 --output acceptance
+```
+
+This selects `.temp/distributions/acceptance/`; output names cannot select
+arbitrary paths. Archive publication never overwrites a previous artifact.
 
 Packages include their Node runtime, native Sharp/libvips libraries, and
 Cloudflare
