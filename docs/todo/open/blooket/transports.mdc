@@ -6,7 +6,7 @@ priority: "p1"
 horizon: "publication"
 order: 90
 area: "blooket"
-task: "TODO - Verified HTTP writes and browser fallback"
+task: "TODO - Working Blooket writes and browser fallback"
 legacy_task: "TODO 09"
 depends_on:
   - "blooket-08"
@@ -24,7 +24,7 @@ validation:
   - "jig validate --root ."
 ---
 
-# TODO - Verified HTTP writes and browser fallback
+# TODO - Working Blooket writes and browser fallback
 
 ## Objective
 
@@ -33,10 +33,17 @@ before mutation, and reconcile ambiguous outcomes without replay.
 
 ## Acceptance
 
-Complete when every admitted transport has tested payload and response
-contracts, unsupported cases select fallback before mutation, and ambiguous
-writes enter reconciliation. Action hashes and HTTP 200 alone do not establish a
-stable server API or confirmed write.
+**IT WORKS** when the product can create a set and add or edit admitted
+questions through a working Blooket transport, with the resulting quiz verified
+from fresh remote state. A browser implementation is enough to ship this
+functionality. HTTP writes are an optional optimization: do not postpone a
+working browser path to reverse-engineer an unverified private HTTP response.
+
+Select any supported transport before mutation. If a write might have happened,
+reconcile before retrying or using another transport; never create duplicates
+merely because a request timed out. Demonstrate actual product-owned Create Set
+and Add Question behavior plus focused failure tests. Leave speculative HTTP
+coverage and broad compatibility exploration to ongoing hardening.
 
 ## Implementation notes
 

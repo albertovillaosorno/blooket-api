@@ -37,14 +37,17 @@ checks, service ownership, and tunnel lifecycle on the Mac.
 
 ## Acceptance
 
-Test that first-use runs once, failed attempts remain repairable, logs are
-bounded, and the user sees useful translated failures. Platform-only macOS
-hardening belongs to task blooket-15.
+**IT WORKS** when the teacher can install/launch the packaged service,
+finish or repair first-use configuration, start and stop it predictably, and
+opt in/out of launch at login. The local workspace and configured online MCP /
+Cloudflare lifecycle must work without duplicate services, hidden persistence,
+or lost settings; failures must be understandable and repairable.
 
-Complete when first-use runs once, manual rerun repairs its status, start/stop
-and opt-in login launch are visible/reversible, and disablement or shutdown
-cleans up the gateway/tunnel. Sleep or reconnection must never replay an
-ambiguous Blooket write.
+Demonstrate working product flows and targeted startup/shutdown/recovery tests.
+Use the owned OS lifecycle and leave Apple-specific trust, recipient-device
+smoke tests, exotic permission cases, and compatibility polishing to the final
+ongoing hardening task. An interrupted browser write must still never be
+replayed merely because the service restarted.
 
 ## Implementation notes
 

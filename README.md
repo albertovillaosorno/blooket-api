@@ -424,9 +424,9 @@ Source, documentation, diagnostics, and commits use English. Product UI
 language, quiz language, and original-media language are independent.
 
 Read [AGENTS.md](AGENTS.md) for instruction routing, the
-[developer profile](docs/agents/developer/AGENTS.md) for repository rules,
+[developer profile](docs/agents/AGENTS-DEV.md) for repository rules,
 and the
-[user profile](docs/agents/user/AGENTS.md) for admitted teacher workflows.
+[user profile](docs/agents/AGENTS-TEACHER.md) for admitted teacher workflows.
 Continue [TODO.md](TODO.md) in order and record actual verification instead of
 marking externally blocked tasks complete.
 

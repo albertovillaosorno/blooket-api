@@ -117,7 +117,7 @@ export async function executeLibraryCommand(
     );
     if (payload.kind === "profile") {
       const source = await readFile(
-        new URL("../../../../docs/agents/user/AGENTS.md", import.meta.url),
+        new URL("../../../../docs/agents/AGENTS-TEACHER.md", import.meta.url),
         "utf8",
       );
       if (Buffer.byteLength(source, "utf8") > 64_000)

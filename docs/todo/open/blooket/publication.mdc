@@ -37,10 +37,17 @@ media admission, conflict detection, pacing, and recovery.
 
 ## Acceptance
 
-Complete when canonical execution can create and edit an admitted quiz, confirm
-remote IDs/questions/media after reload, detect conflicts, and recover safely
-from interruption. Require the same validation, media ceiling, and pacing for
-MCP, CLI, HTTP, and browser entrypoints.
+**IT WORKS** when an authorized teacher request through the canonical
+CLI/MCP flow can create and edit an admitted Blooket quiz (questions, types,
+timing, and supported media), then re-read the remote quiz and confirm the
+intended result. The workflow must retain recoverable progress and avoid
+creating duplicate sets or questions after uncertain outcomes.
+
+Demonstrate at least one real end-to-end publication through this product, plus
+targeted tests for interruption, conflicting edits, and media admission.
+Reject unsupported or unsafe operations visibly; do not label a saved local
+draft or a synthetic transport fixture as published. Extra polish, theoretical
+platform cases, and expanding test coverage belong to the final ongoing task.
 
 ## Implementation notes
 

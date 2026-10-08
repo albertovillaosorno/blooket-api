@@ -6,7 +6,7 @@ priority: "p3"
 horizon: "acceptance"
 order: 170
 area: "acceptance"
-task: "TODO - macOS, Safari, and ChatGPT platform hardening"
+task: "TODO - Ongoing compatibility assurance and product hardening"
 legacy_task: "TODO 15"
 depends_on:
   - "blooket-03"
@@ -40,14 +40,46 @@ validation:
   - "jig validate --root ."
 ---
 
-# TODO - macOS, Safari, and ChatGPT platform hardening
+# TODO - Ongoing compatibility assurance and product hardening
 
 ## Objective
 
-Own every remaining macOS-, Safari-, and ChatGPT-specific concern in one final
-record so platform-only validation does not block otherwise completed work.
+Continuously find and fix product defects and improve usability, tests, Linux
+stubs, and theoretical macOS/Safari/ChatGPT compatibility without blocking
+functional delivery. Keep this record open until explicitly closed by Alberto.
 
 ## Acceptance
+
+**ONGOING -- NEVER AUTO-COMPLETE.** This final task is a continuously open
+maintenance and product-improvement lane. Its acceptance criterion is **IT WORKS
+better after each iteration**: find a real issue or useful improvement,
+reproduce it where practical, add focused regression coverage, fix or improve
+the implementation, and verify that existing behavior still works. Repeat this
+cycle whenever development agents are authorized to work; the existence of this
+TODO does not itself start a background agent or grant deployment authority.
+
+Focus on bugs, missing tests, correctness, recovery, edge cases, performance,
+behavior, EN/ES UX, accessibility, UI polish, Safari/ChatGPT compatibility,
+**theoretical macOS ARM64 compatibility assurance** from official docs,
+contracts, portable tests and opt-in native CI, and reliable Linux development
+stubs/adapters. Keep Mac-only concerns here; never claim a real recipient-Mac
+or native behavior was tested when it was only inferred.
+
+**Manual closure gate:** do NOT mark this record completed, move it to
+`docs/todo/completed/`, or remove it from `TODO.md` unless Alberto explicitly
+instructs closing **this exact ongoing task**. Passing tests, fixing known bugs,
+shipping an app, or completing the other TODOs does not satisfy that gate.
+Remain active indefinitely until that explicit instruction, even with zero
+currently known bugs. Never block functional delivery or safe releases solely
+because this ongoing improvement queue remains open.
+
+Keep provider challenges, consent, secret boundaries, honest verification, and
+safe rollback intact. This task can discover and correct issues in previously
+completed areas without reopening their milestones; never self-approve a
+release, modify accounts without authorization, or weaken existing safeguards
+just to obtain green tests.
+
+## Compatibility coverage guidance
 
 Use current official Apple, WebKit, GitHub Actions, and ChatGPT/MCP
 documentation. Deterministic implementation, protocol tests, and native ARM64
@@ -92,6 +124,7 @@ documents safaridriver --enable for Safari WebDriver automation.
 
 ## Blockers
 
-No earlier record may use recipient-Mac, Safari, or ChatGPT-specific acceptance
-as its blocker. Remaining platform-only hardening is intentionally centralized
-here.
+This evergreen record has no finite technical completion target; only Alberto
+can explicitly authorize closure of this exact task. Earlier functional tasks
+must not wait for a recipient-Mac smoke test, exhaustive compatibility review,
+or completion of this ongoing hardening lane.

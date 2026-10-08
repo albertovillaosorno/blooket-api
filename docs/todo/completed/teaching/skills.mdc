@@ -14,7 +14,7 @@ contracts:
   - "docs/technical/adr/canonical-dependency-direction.md"
 scope:
   - "docs/skills/"
-  - "docs/agents/user/"
+  - "docs/agents/AGENTS-TEACHER.md"
   - "src/api/teacher-library/"
 validation:
   - "npm run check"

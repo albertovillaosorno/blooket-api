@@ -2,8 +2,11 @@
 
 Only unfinished work is indexed here. Read the linked record for acceptance,
 dependencies, blockers, and evidence; preserve its stable ID when completing it.
-Execute entries in the displayed order; reordering or splitting requires
-synchronized record metadata and dependencies.
+
+Execute entries in the displayed order with **IT WORKS** as the functional
+acceptance standard: finish usable end-to-end behavior first, then iterate.
+Never relax authentication, data preservation, safe updates, or honest evidence.
+The final ongoing maintenance task is intentionally never auto-completed.
 
 ## P1 - Foundations
 
@@ -11,36 +14,36 @@ synchronized record metadata and dependencies.
 
 ### TODO - Authenticated Blooket reads
 
-Finish verified questions, capabilities, pagination, and browser-session stops
-without presenting incomplete reads as publication-ready state.
+Make authenticated My Sets, questions, and capabilities actually readable,
+with clear stops instead of fabricated remote state.
 
 [Record](docs/todo/open/blooket/reads.mdc)
 
-### TODO - Verified HTTP writes and browser fallback
+### TODO - Working Blooket writes and browser fallback
 
-Validate actual action payloads and responses, select supported transports
-before mutation, and reconcile ambiguous outcomes without replay.
+Make real Create Set and question writes work and verify them after reload.
+Browser-first is enough; unverified HTTP is optional, not a launch blocker.
 
 [Record](docs/todo/open/blooket/transports.mdc)
 
 ### TODO - Mutation pacing and human checkpoints
 
-Share bounded account mutation budgets across transports and preserve
-recoverable human-action stops for challenges and unfamiliar access states.
+Make real publication paced, cancellable, and recoverable without duplicate
+writes; stop clearly when human action is needed.
 
 [Record](docs/todo/open/blooket/pacing.mdc)
 
 ### TODO - Journaled quiz publication
 
-Connect canonical create/edit execution with fresh remote read-back, strict
-media admission, conflict detection, pacing, and recovery.
+Publish and edit real quizzes from canonical CLI/MCP tools, verify the remote
+result, and recover safely when interrupted.
 
 [Record](docs/todo/open/blooket/publication.mdc)
 
 ### TODO - Autonomous AI quiz publication
 
-Finish admitted AI image delivery, automatic publication, verification,
-correction, progress, cancellation, and recovery through canonical operations.
+Make the teacher's AI-to-Blooket request actually publish and verify a quiz,
+including supported media, progress, and recoverable human stops.
 
 [Record](docs/todo/open/teaching/ai-review.mdc)
 
@@ -48,26 +51,26 @@ correction, progress, cancellation, and recovery through canonical operations.
 
 ### TODO - Diagnostics and launch at login
 
-Implement visible, reversible launch-at-login and finish first-use checks,
-service ownership, and tunnel lifecycle.
+Make first run, start/stop, opt-in launch at login, and the online MCP tunnel
+work as a usable and reversible teacher-facing workflow.
 
 [Record](docs/todo/open/delivery/lifecycle.mdc)
 
 ### TODO - Safe automatic application updates
 
-Implement and verify opt-in public GitHub updates with trusted artifacts, safe
-restart, retained data, and independent login-startup preferences.
+**Release-critical:** safely install trusted updates and restart without losing
+teacher data or the old usable app on failure. This is how improvements reach
+the recipient; safe rollback/recovery is a functional requirement.
 
 [Record](docs/todo/open/delivery/updates.mdc)
 
-## P4 - Teacher workflows
+## P4 - Continuous maintenance (never auto-complete)
 
-## P5 - Final platform hardening
+### TODO - Ongoing compatibility assurance and product hardening
 
-### TODO - macOS, Safari, and ChatGPT platform hardening
-
-Keep all remaining platform-specific review in one final record. Official
-platform documentation plus the opt-in ARM64 Safari CI job are sufficient;
-recipient-machine or actual-client smoke tests do not block earlier work.
+Keep finding and fixing bugs, adding regressions, improving behavior, UI/UX,
+Linux stubs, and theoretical macOS/Safari/ChatGPT assurance. **Never close or
+remove this last TODO until Alberto explicitly requests its completion.**
+Its perpetual status must not block delivery of working features or updates.
 
 [Record](docs/todo/open/acceptance/teacher.mdc)

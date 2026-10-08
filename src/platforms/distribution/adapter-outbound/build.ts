@@ -234,12 +234,16 @@ export async function buildDistribution(target: DistributionTarget) {
     for (const file of [
       "src",
       "assets/icon",
-      "docs/agents/user",
       "docs/skills",
       "LICENSE-MIT",
       "THIRD-PARTY-NOTICES.md",
     ])
       await cp(join(repo, file), join(app, file), { recursive: true });
+    await mkdir(join(app, "docs/agents"), { recursive: true });
+    await cp(
+      join(repo, "docs/agents/AGENTS-TEACHER.md"),
+      join(app, "docs/agents/AGENTS-TEACHER.md"),
+    );
     await writeFile(
       join(app, "package.json"),
       JSON.stringify({

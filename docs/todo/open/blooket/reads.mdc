@@ -33,10 +33,18 @@ without presenting incomplete reads as publication-ready state.
 
 ## Acceptance
 
-Complete when fresh validated remote state can be read reliably, capability
-changes are detected, and a missing/challenged session returns the appropriate
-stop instead of fabricated data or a mutation. These reads establish the
-baselines needed for publication and conflict detection.
+**IT WORKS** when the teacher can use the product's real, authenticated Blooket
+session to list her sets, open a set, read its questions and relevant media, and
+inspect supported account capabilities. The data needed for publication must
+remain accurate after a fresh browser read; incomplete pagination or an unknown
+field must be shown as incomplete/unknown, never invented as a complete result.
+
+A signed-out session, provider challenge, organization choice, expired session,
+or unfamiliar state must produce a clear actionable stop rather than reading
+stale data or proceeding to a mutation. Demonstrate a usable authenticated
+read path and targeted regressions for the important stops. Do not hold this
+functional milestone open for exhaustive browser/Safari/recipient-Mac
+compatibility assurance: that belongs to the final ongoing hardening record.
 
 ## Implementation notes
 
