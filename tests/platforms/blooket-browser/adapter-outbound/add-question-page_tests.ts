@@ -49,6 +49,7 @@ interface FixtureNode {
   value: string;
   files?: { readonly length: number };
   parent?: FixtureNode;
+  parentElement?: FixtureNode;
   clicked: number;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
@@ -57,6 +58,7 @@ interface FixtureNode {
   querySelectorAll(selector: string): FixtureNode[];
   closest(selector: string): FixtureNode | null;
   dispatchEvent(event: Event): boolean;
+  getBoundingClientRect(): { width: number; height: number };
   click(): void;
 }
 
@@ -70,6 +72,7 @@ function node(
     textContent,
     value: "",
     clicked: 0,
+    getBoundingClientRect: () => ({ width: 24, height: 20 }),
     selectors: {},
     attributes,
     getAttribute(name) {
@@ -392,4 +395,25 @@ test("ambiguous controls and invalid question semantics fail closed", () => {
       assert.equal(page.submit.clicked, 0);
     },
   );
+});
+
+
+test("two Add Question buttons resolve only the question-list toolbar", () => {
+  const page = fixture();
+  const toolbar = node("DIV");
+  const bottom = node("BUTTON", "Add Question");
+  bottom.parentElement = toolbar;
+  toolbar.selectors["button"] = [
+    node("BUTTON", "Show all answers"), bottom,
+  ];
+  page.document.selectors["button"] = [page.add, bottom];
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(openBlooketAddQuestionPanel("set-fixture"), true);
+      assert.equal(page.add.clicked, 0);
+      assert.equal(bottom.clicked, 1);
+      toolbar.selectors["button"]!.push(node("BUTTON", "Add Question"));
+      assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
+      assert.equal(bottom.clicked, 1);
+    });
 });

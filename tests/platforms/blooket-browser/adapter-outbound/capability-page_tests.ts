@@ -53,6 +53,7 @@ interface FixtureNode {
   textContent: string;
   value: string;
   parent?: FixtureNode;
+  parentElement?: FixtureNode;
   clicked: number;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
@@ -494,5 +495,25 @@ test("capability opener accepts the observed closed account menu", () => {
     profile.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
     assert.equal(page.add.clicked, 1);
+  });
+});
+
+
+test("two Add Question buttons resolve only the question-list toolbar", () => {
+  const page = fixture();
+  const toolbar = node("DIV");
+  const bottom = node("BUTTON", "Add Question");
+  bottom.parentElement = toolbar;
+  toolbar.selectors["button"] = [
+    node("BUTTON", "Show all answers"), bottom,
+  ];
+  page.document.selectors["button"] = [page.add, bottom];
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    assert.equal(page.add.clicked, 0);
+    assert.equal(bottom.clicked, 1);
+    toolbar.selectors["button"]!.push(node("BUTTON", "Add Question"));
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(bottom.clicked, 1);
   });
 });

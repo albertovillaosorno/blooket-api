@@ -96,9 +96,22 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
     )
       return false;
     if (document.querySelector('input#question[name="question"]')) return false;
-    const buttons = Array.from(document.querySelectorAll("button")).filter(
+    let buttons = Array.from(document.querySelectorAll("button")).filter(
       (button) => normalized(button) === "Add Question",
     );
+    // The live Edit page repeats Add Question in its header and list.
+    // Resolve the observed list toolbar instead of choosing by DOM order.
+    if (buttons.length === 2) {
+      buttons = buttons.filter(button => {
+        const peers = Array.from(
+          button.parentElement?.querySelectorAll("button") ?? [],
+        );
+        return peers.filter(peer =>
+          normalized(peer) === "Add Question").length === 1 &&
+          peers.filter(peer =>
+            normalized(peer) === "Show all answers").length === 1;
+      });
+    }
     if (buttons.length !== 1) return false;
     (buttons[0] as HTMLButtonElement).click();
     return true;
