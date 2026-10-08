@@ -223,6 +223,9 @@ test(
   const identity = node("INPUT", "", { type: "hidden", name: "setId" });
   identity.value = "fixture";
   form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  form.selectors['input#title[name="title"]'] = [title];
+  form.selectors['textarea#desc[name="desc"]'] = [description];
+  form.selectors['input#private[name="private"]'] = [privacy];
   document.selectors['form#question-set-form'] = [form];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     const result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
@@ -268,6 +271,39 @@ test(
       kind: "sets.get", setId: "fixture",
     }).ok, false);
     form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+    document.selectors['input#title[name="title"]'] = [
+      node("INPUT"),
+    ];
+    const scoped = inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    });
+    assert.equal(scoped.ok, true);
+    if (scoped.ok)
+      assert.equal((scoped.value as { title: string }).title,
+        "Synthetic fixture");
+    form.selectors['input#title[name="title"]'] = [];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    form.selectors['input#title[name="title"]'] = [title, title];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    form.selectors['input#title[name="title"]'] = [title];
+    form.selectors['textarea#desc[name="desc"]'] = [
+      description, description,
+    ];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    form.selectors['textarea#desc[name="desc"]'] = [description];
+    form.selectors['input#private[name="private"]'] = [
+      privacy, privacy,
+    ];
+    assert.equal(inspectBlooketPage({
+      kind: "sets.get", setId: "fixture",
+    }).ok, false);
+    form.selectors['input#private[name="private"]'] = [privacy];
     title.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(inspectBlooketPage({
       kind: "sets.get", setId: "fixture",
@@ -496,7 +532,10 @@ test("read routes encode IDs and panel opening never submits a form", () => {
   document.selectors['form#question-set-form'] = [form];
   const title = node("INPUT");
   title.getBoundingClientRect = () => ({ width: 0, height: 0 });
-  document.selectors['input#title[name="title"]'] = [title];
+  form.selectors['input#title[name="title"]'] = [title];
+  document.selectors['input#title[name="title"]'] = [
+    node("INPUT"),
+  ];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);
@@ -504,6 +543,10 @@ test("read routes encode IDs and panel opening never submits a form", () => {
     assert.equal(openBlooketDetailPanel("fixture"), false);
     assert.equal(clicks, 1);
     identity.value = "fixture";
+    form.selectors['input#title[name="title"]'] = [title, title];
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    assert.equal(clicks, 1);
+    form.selectors['input#title[name="title"]'] = [title];
     title.getBoundingClientRect = () => ({ width: 20, height: 20 });
     assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);

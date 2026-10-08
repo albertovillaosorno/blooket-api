@@ -176,6 +176,11 @@ Worker retries respect that opener's boolean result and refuse to read after
 a rejected opener; no Save/submit action is invoked. Synthetic DOM and worker
 regressions cover wrong/duplicate form IDs and hidden metadata controls.
 
+The extractor and opener now scope visible metadata selectors to that same
+unique form, rejecting missing or duplicate controls. Unrelated title,
+description, or privacy controls elsewhere in the document cannot be returned
+as evidence for the requested set.
+
 This adds no claim of live provider acceptance or server-side atomicity.
 
 Recovered My Sets module 52644 and its captured route HTML establish the true
