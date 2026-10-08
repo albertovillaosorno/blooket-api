@@ -379,24 +379,98 @@ test(
   const second = broker.request({ kind: "sets.list" });
   assert.equal(broker.next(TOKEN), null);
   tick += 2_100;
-  const next = broker.next(TOKEN);
-  assert.ok(next);
-  assert.equal(next.command.kind, "sets.list");
+  // The first lease has expired; so has the queued read's safety margin.
+  assert.equal(broker.next(TOKEN), null);
   assert.deepEqual(await first, {
+    ok: false, code: "blooket-browser-unavailable",
+  });
+  assert.deepEqual(await second, {
     ok: false, code: "blooket-browser-unavailable",
   });
   assert.equal(broker.complete(TOKEN, {
     schemaVersion: 1, id: active.id,
     ok: true, value: "my-sets",
   }), false);
+  const fresh = broker.request({ kind: "sets.list" });
+  const next = broker.next(TOKEN);
+  assert.ok(next);
+  assert.equal(next.command.kind, "sets.list");
   assert.equal(broker.complete(TOKEN, {
     schemaVersion: 1, id: next.id,
     ok: true, value: { completeness: "complete", items: [] },
   }), true);
-  assert.deepEqual(await second, {
+  assert.deepEqual(await fresh, {
     ok: true, value: { completeness: "complete", items: [] },
   });
   broker.close();
+  },
+);
+
+test(
+  "queued browser reads fail before dispatch when too close to expiry",
+  async () => {
+    for (const kind of [
+      "session.observe", "sets.list", "sets.get", "questions.list",
+    ] as const) {
+      let tick = 10_000;
+      const broker = createBlooketBrowserBridgeBroker({
+        token: TOKEN, now: () => tick,
+      });
+      const command = kind === "sets.get" || kind === "questions.list"
+        ? { kind, setId: "synthetic-set" }
+        : { kind };
+      const pending = broker.request(command);
+      tick += 1_501;
+      assert.equal(broker.next(TOKEN), null);
+      assert.deepEqual(await pending, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+      assert.equal(broker.status().pending, 0);
+      broker.close();
+    }
+  },
+);
+
+test(
+  "a queued capability inspection requires its cleanup time budget",
+  async () => {
+    let tick = 10_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    const pending = broker.request({ kind: "capabilities.inspect" });
+    tick += 501;
+    assert.equal(broker.next(TOKEN), null);
+    assert.deepEqual(await pending, {
+      ok: false, code: "blooket-browser-unavailable",
+    });
+    broker.close();
+  },
+);
+
+test(
+  "fresh reads and capability jobs retain single-dispatch success",
+  async () => {
+    for (const [kind, delay] of [
+      ["sets.list", 1_500],
+      ["capabilities.inspect", 500],
+    ] as const) {
+      let tick = 10_000;
+      const broker = createBlooketBrowserBridgeBroker({
+        token: TOKEN, now: () => tick,
+      });
+      const pending = broker.request({ kind });
+      tick += delay;
+      const dispatched = broker.next(TOKEN);
+      assert.ok(dispatched);
+      assert.equal(dispatched.command.kind, kind);
+      assert.equal(broker.next(TOKEN), null);
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: dispatched.id, ok: true, value: null,
+      }), true);
+      assert.deepEqual(await pending, { ok: true, value: null });
+      broker.close();
+    }
   },
 );
 

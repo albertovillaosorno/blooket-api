@@ -569,6 +569,20 @@ before admitting the next queued job and pairing reset settles both active and
 waiting requests without replay. This is a broker scheduling guarantee only:
 a Chrome script that outlives its expired lease cannot be forcibly recalled.
 
+Queued read-only browser jobs now require enough lifetime to complete their
+local budgets when dispatched. `session.observe`, `sets.list`, `sets.get`, and
+`questions.list` retain at least 8,500 ms; `capabilities.inspect` retains at
+least 9,500 ms for its nine-second probe and cleanup window. The standard broker
+lifetime remains ten seconds. A stale job returns browser-unavailable before
+any page script or modal action begins, while a newly requested read can be
+admitted once the active lease has expired.
+
+These are bounded local dispatch margins, not Chrome API latency guarantees or
+Blooket rate limits. Custom shorter test timeouts clamp the minimum lifetime
+to that timeout so tests can still dispatch fresh synthetic jobs. Existing
+mutating commands remain subject to their separate no-replay and admission
+rules; this change does not establish their end-to-end provider acceptance.
+
 An isolated Linux Chrome for Testing 151 smoke run on 2026-10-08 compiled the
 current unpacked extension and connected it to a disposable local service and
 broker. Two concurrent read-only `session.observe` requests both returned the
