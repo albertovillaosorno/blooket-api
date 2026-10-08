@@ -31,6 +31,8 @@
 //
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
+import { decodeBlooketQuestionRead, type BlooketQuestionRead } from
+  "../../../ir/blooket-question-reads/contract/question-read.ts";
 import {
   runBlooketAddQuestionPageAction,
   type BlooketTextQuestionPageInput,
@@ -274,28 +276,49 @@ async function observeQuestion(
     );
     if (opened !== true) return browserFailure();
 
-    let inspected: unknown;
-    for (let readAttempt = 0; readAttempt < 15; readAttempt++) {
-      inspected = await script(
-        inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
-        [input.setId, input.number],
-      );
-      if (matchesQuestion(inspected, input)) break;
-      await pause(POLL_MS);
+    let confirmed = false;
+    try {
+      for (let readAttempt = 0; readAttempt < 15; readAttempt++) {
+        const inspected = await script(
+          inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
+          [input.setId, input.number],
+        );
+        // Only the exact page-not-ready reply permits another read.
+        // Inconsistent successful data cannot become a receipt later.
+        if (pageUnavailable(inspected)) {
+          await pause(POLL_MS);
+          continue;
+        }
+        const first = matchingQuestion(inspected, input);
+        if (first) {
+          // A hydrated question may change even with an unchanged row number.
+          await pause(0);
+          const again = await script(
+            inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
+            [input.setId, input.number],
+          );
+          const second = matchingQuestion(again, input);
+          confirmed = !!second &&
+            JSON.stringify(first) === JSON.stringify(second);
+        }
+        break;
+      }
+    } catch {
+      // Best-effort Cancel remains necessary after an uncertain read.
     }
-    if (!matchesQuestion(inspected, input)) return browserFailure();
-
     const closed = await script(
       closeBlooketQuestionPanel as (...args: never[]) => unknown,
       [input.setId],
-    );
+    ).catch(() => false);
     if (closed !== true) return browserFailure();
     for (let closeAttempt = 0; closeAttempt < 15; closeAttempt++) {
       const isClosed = await script(
         isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
         [input.setId],
-      );
-      if (isClosed === true) return { ok: true };
+      ).catch(() => false);
+      if (isClosed === true)
+        return confirmed ? { ok: true } : browserFailure();
+      if (isClosed !== false) return browserFailure();
       await pause(POLL_MS);
     }
     return browserFailure();
@@ -326,52 +349,55 @@ async function observe(script: Script): Promise<string | undefined> {
   return result.value;
 }
 
-function matchesQuestion(
+function matchingQuestion(
   result: unknown,
   input: BlooketTextQuestionPageInput,
-): boolean {
-  if (
-    !result ||
-    typeof result !== "object" ||
-    !("ok" in result) ||
-    result.ok !== true ||
-    !("value" in result) ||
-    !result.value ||
-    typeof result.value !== "object"
-  )
-    return false;
-  const value = result.value as Record<string, unknown>;
+): BlooketQuestionRead | undefined {
+  if (!result || typeof result !== "object" || Array.isArray(result) ||
+      Object.keys(result).sort().join() !== "ok,value" ||
+      !("ok" in result) || result.ok !== true ||
+      !("value" in result)) return undefined;
+  const decoded = decodeBlooketQuestionRead(result.value);
+  if (!decoded.ok) return undefined;
+  const value = decoded.value;
   const answers = input.answers.map((answer, index) => ({
     kind: "text",
     content: answer.text,
     correct: answer.correct,
     match: input.answerTypes?.[index] ?? null,
   }));
-  return (
-    value["schemaVersion"] === 3 &&
-    value["number"] === input.number &&
-    value["question"] === input.question &&
-    value["equation"] === null &&
-    value["qType"] === input.qType &&
-    value["random"] === input.random &&
-    value["timeLimit"] === input.timeLimit &&
-    JSON.stringify(value["answers"]) === JSON.stringify(answers) &&
-    value["hasImage"] === false &&
-    value["hasAudio"] === false
-  );
+  return value.number === input.number &&
+    value.question === input.question &&
+    value.equation === null &&
+    value.qType === input.qType &&
+    value.random === input.random &&
+    value.timeLimit === input.timeLimit &&
+    JSON.stringify(value.answers) === JSON.stringify(answers) &&
+    value.hasImage === false && value.hasAudio === false
+    ? value : undefined;
+}
+
+function pageUnavailable(result: unknown): boolean {
+  return !!result && typeof result === "object" &&
+    !Array.isArray(result) &&
+    Object.keys(result).sort().join() === "code,ok" &&
+    "ok" in result && result.ok === false &&
+    "code" in result && result.code === "blooket-browser-failed";
 }
 
 function questionNumberPresent(result: unknown, number: number): boolean {
-  if (
-    !result ||
-    typeof result !== "object" ||
-    !("ok" in result) ||
-    result.ok !== true ||
-    !("value" in result) ||
-    !Array.isArray(result.value)
-  )
-    return false;
-  return result.value.filter((value) => value === number).length === 1;
+  if (!result || typeof result !== "object" || Array.isArray(result) ||
+      Object.keys(result).sort().join() !== "ok,value" ||
+      !("ok" in result) || result.ok !== true ||
+      !("value" in result) || !Array.isArray(result.value) ||
+      result.value.length > 200) return false;
+  const seen = new Set<number>();
+  for (const value of result.value) {
+    if (!Number.isSafeInteger(value) || value < 1 || value > 10_000 ||
+        seen.has(value)) return false;
+    seen.add(value);
+  }
+  return seen.has(number);
 }
 
 function exactOk(value: unknown): boolean {

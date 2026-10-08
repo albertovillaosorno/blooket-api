@@ -57,6 +57,9 @@ function fakeChrome(options: {
   readonly initialUrl?: string;
   readonly navigationState?: string;
   readonly mismatchReadBack?: boolean;
+  readonly readBackReplies?: readonly unknown[];
+  readonly listReply?: unknown;
+  readonly closeFails?: boolean;
 }) {
   let tab = {
     url: options.initialUrl ??
@@ -67,6 +70,7 @@ function fakeChrome(options: {
   let modalOpen = false;
   let questionAdded = false;
   let questionPanel = false;
+  let readBackReads = 0;
   const calls: string[] = [];
   const chrome: AddQuestionChromePort = {
     tabs: {
@@ -117,7 +121,7 @@ function fakeChrome(options: {
             throw new Error("unexpected-add-question-action");
           case "listBlooketQuestionNumbers":
             return [{
-              result: {
+              result: options.listReply ?? {
                 ok: true,
                 value: questionAdded ? [1] : [],
               },
@@ -128,6 +132,10 @@ function fakeChrome(options: {
             return [{ result: questionPanel }];
           case "inspectOpenedBlooketQuestion":
             assert.deepEqual(args, ["set-fixture", 1]);
+            if (options.readBackReplies) return [{
+              result: options.readBackReplies[readBackReads++],
+            }];
+            readBackReads++;
             return [{
               result: {
                 ok: true,
@@ -154,6 +162,7 @@ function fakeChrome(options: {
             }];
           case "closeBlooketQuestionPanel":
             assert.deepEqual(args, ["set-fixture"]);
+            if (options.closeFails) return [{ result: false }];
             questionPanel = false;
             return [{ result: true }];
           case "isBlooketQuestionPanelClosed":
@@ -165,7 +174,8 @@ function fakeChrome(options: {
       },
     },
   };
-  return { chrome, calls, setTab: (url: string) => {
+  return { chrome, calls, readBackReads: () => readBackReads,
+    setTab: (url: string) => {
     tab = { url, status: "complete" };
     navigated = false;
   } };
@@ -187,6 +197,7 @@ test("host confirms Add Question only after exact read-back", async () => {
   );
   assert.ok(fake.calls.includes("inspectOpenedBlooketQuestion"));
   assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
+  assert.equal(fake.readBackReads(), 2);
 });
 
 test("navigation challenge stops before opening Add Question", async () => {
@@ -229,6 +240,7 @@ test("post-submit mismatch fails without a second submit", async () => {
     ).length,
     1,
   );
+  assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
 });
 
 test("foreign starting tabs fail before navigation", async () => {
@@ -317,5 +329,66 @@ test(
   const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {});
   assert.equal((await host.addQuestion(input)).ok, false);
   assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);
+
+const canonicalReadBack = {
+  schemaVersion: 3, number: 1, question: "Type sun.", equation: null,
+  qType: "typing", random: true, timeLimit: 15,
+  answers: [{ kind: "text", content: "sun", correct: true,
+    match: "exactly" }],
+  hasImage: false, hasAudio: false,
+};
+
+test(
+  "malformed successful read-back cannot authorize a question write",
+  async () => {
+  for (const response of [
+    { ok: true, value: { ...canonicalReadBack, secret: "private" } },
+    { ok: true, value: canonicalReadBack, secret: "private" },
+    { ok: true, value: { ...canonicalReadBack, hasAudio: "false" } },
+  ]) {
+    const fake = fakeChrome({ readBackReplies: [response] });
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => {},
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(fake.readBackReads(), 1);
+    assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
+  }
+  },
+);
+
+test(
+  "changing question contents invalidate a supposedly confirmed mutation",
+  async () => {
+  const fake = fakeChrome({ readBackReplies: [
+    { ok: true, value: canonicalReadBack },
+    { ok: true, value: { ...canonicalReadBack, question: "Different" } },
+  ] });
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => {},
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.readBackReads(), 2);
+  assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
+  },
+);
+
+test(
+  "malformed number-list envelope never opens read-back panel",
+  async () => {
+  for (const listReply of [
+    { ok: true, value: [1], private: "secret" },
+    { ok: true, value: [1, 2, 2] },
+    { ok: true, value: [1, "2"] },
+  ]) {
+    const fake = fakeChrome({ listReply });
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => {},
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  }
   },
 );
