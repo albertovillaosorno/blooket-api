@@ -354,3 +354,23 @@ test("question reads reject unsupported types and unsafe numbers", () => {
     );
   }
 });
+
+test("question collections use the browser read safety cap", () => {
+  const bounded = Array.from({ length: 200 }, (_, index) => ({
+    ...question,
+    number: index + 1,
+  }));
+  const admitted = decodeBlooketQuestionReadList(bounded);
+  assert.equal(admitted.ok, true);
+  if (admitted.ok) assert.equal(admitted.value.length, 200);
+
+  const oversized = decodeBlooketQuestionReadList([
+    ...bounded,
+    { ...question, number: 201 },
+  ]);
+  assert.equal(oversized.ok, false);
+  if (!oversized.ok) {
+    assert.equal(oversized.issues[0]?.path, "$");
+    assert.equal(oversized.issues[0]?.code, "too-many-questions");
+  }
+});
