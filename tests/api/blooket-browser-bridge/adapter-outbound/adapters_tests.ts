@@ -359,3 +359,27 @@ test("invalid states and transport exceptions fail closed", async () => {
     code: "blooket-browser-failed",
   });
 });
+
+test("malformed bridge transport envelopes cannot reach any port", async () => {
+  for (const invalid of [
+    { ok: false, code: "private-failure", raw: "secret" },
+    { ok: false, code: "blooket-browser-unavailable", raw: "secret" },
+    { ok: true, value: "my-sets", raw: "secret" },
+    { ok: "true", value: "my-sets" },
+    null,
+  ]) {
+    const ports = createBlooketBrowserBridgeAdapters({
+      request: async () => invalid as BlooketBrowserBridgeTransportResult,
+    });
+    const failure = { ok: false, code: "blooket-browser-failed" };
+    assert.deepEqual(await ports.session.observe(), failure);
+    assert.deepEqual(await ports.session.authenticate({
+      loginIdentifier: "synthetic@example.invalid",
+      password: "not-a-real-account",
+    }), failure);
+    assert.deepEqual(await ports.capabilities.inspect(), failure);
+    assert.deepEqual(await ports.sets.list(), failure);
+    assert.deepEqual(await ports.sets.get("fixture"), failure);
+    assert.deepEqual(await ports.questions.list("fixture"), failure);
+  }
+});
