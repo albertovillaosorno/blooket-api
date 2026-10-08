@@ -352,12 +352,22 @@ async function safeListProbe(
   probe: () => Promise<BlooketSetListProbeResult>,
 ): Promise<BlooketSetListProbeResult> {
   try {
-    return await probe();
+    const result = await probe();
+    if (!result || typeof result !== "object" || Array.isArray(result))
+      return browserReadFailure();
+    if (result.ok === false) return validateReadFailure(result);
+    if (result.ok === true &&
+        Object.keys(result).sort().join() === "completeness,ok,value" &&
+        (result.completeness === "complete" ||
+          result.completeness === "unknown"))
+      return {
+        ok: true,
+        completeness: result.completeness,
+        value: result.value,
+      };
+    return browserReadFailure();
   } catch {
-    return {
-      ok: false,
-      code: "blooket-browser-failed",
-    };
+    return browserReadFailure();
   }
 }
 
@@ -365,24 +375,37 @@ async function safeProbe(
   probe: () => Promise<BlooketSetProbeResult>,
 ): Promise<BlooketSetProbeResult> {
   try {
-    return await probe();
+    const result = await probe();
+    if (!result || typeof result !== "object" || Array.isArray(result))
+      return browserReadFailure();
+    if (result.ok === false) return validateReadFailure(result);
+    if (result.ok === true &&
+        Object.keys(result).sort().join() === "ok,value")
+      return { ok: true, value: result.value };
+    return browserReadFailure();
   } catch {
-    return {
-      ok: false,
-      code: "blooket-browser-failed",
-    };
+    return browserReadFailure();
   }
 }
 
 async function safeQuestionProbe(
   probe: () => Promise<BlooketQuestionProbeResult>,
 ): Promise<BlooketQuestionProbeResult> {
-  try {
-    return await probe();
-  } catch {
-    return {
-      ok: false,
-      code: "blooket-browser-failed",
-    };
-  }
+  return await safeProbe(probe);
+}
+
+function validateReadFailure(
+  result: { readonly ok: false; readonly code: unknown },
+): Extract<BlooketSetProbeResult, { readonly ok: false }> {
+  if (Object.keys(result).sort().join() === "code,ok" &&
+      (result.code === "blooket-browser-failed" ||
+        result.code === "blooket-browser-unavailable"))
+    return { ok: false, code: result.code };
+  return browserReadFailure();
+}
+
+function browserReadFailure(): Extract<
+  BlooketSetProbeResult, { readonly ok: false }
+> {
+  return { ok: false, code: "blooket-browser-failed" };
 }

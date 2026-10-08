@@ -552,3 +552,61 @@ test("invalid question payloads do not expose raw adapter values", async () => {
   assert.equal(result.ok, false);
   assert.equal(JSON.stringify(result).includes(rawSecret), false);
 });
+
+test("malformed read adapter failures never expose raw fields", async () => {
+  for (const invalid of [
+    { ok: false, code: "raw-provider-error", message: "private-data" },
+    { ok: false, code: "blooket-browser-failed", raw: "private-data" },
+    { ok: "false", code: "raw-provider-error" },
+    null,
+  ]) {
+    const list = {
+      list: async () => invalid,
+      get: async () => invalid,
+    } as unknown as BlooketSetReadPort;
+    const questions = {
+      list: async () => invalid,
+    } as unknown as BlooketQuestionReadPort;
+    const b = () => browser([{ ok: true, state: "edit" }], []);
+    const results = [
+      await listBlooketSets(b(), secretStore([]), list),
+      await getBlooketSet(b(), secretStore([]), list, "fixture"),
+      await listBlooketQuestions(b(), secretStore([]), questions, "fixture"),
+    ];
+    for (const result of results) {
+      assert.deepEqual(result, {
+        ok: false, stage: "read", code: "blooket-browser-failed",
+      });
+      assert.equal(JSON.stringify(result).includes("private-data"), false);
+    }
+  }
+});
+
+test("read adapters cannot attach extra fields to success", async () => {
+  const reads = {
+    list: async () => ({
+      ok: true, completeness: "complete", value: [],
+      extra: "private-data",
+    }),
+    get: async () => ({
+      ok: true, extra: "private-data",
+      value: {
+        schemaVersion: 1, id: "fixture", title: "Synthetic",
+        description: "", visibility: "private",
+      },
+    }),
+  } as unknown as BlooketSetReadPort;
+  const questions = {
+    list: async () => ({ ok: true, value: [], extra: "private-data" }),
+  } as unknown as BlooketQuestionReadPort;
+  const b = () => browser([{ ok: true, state: "edit" }], []);
+  for (const result of [
+    await listBlooketSets(b(), secretStore([]), reads),
+    await getBlooketSet(b(), secretStore([]), reads, "fixture"),
+    await listBlooketQuestions(b(), secretStore([]), questions, "fixture"),
+  ]) {
+    assert.deepEqual(result, {
+      ok: false, stage: "read", code: "blooket-browser-failed",
+    });
+  }
+});
