@@ -249,13 +249,27 @@ export function inspectBlooketPage(
       identities[0]?.tagName !== "INPUT" ||
       (identities[0] as HTMLInputElement).value !== operation.setId
     ) return failed();
-    const title = document.querySelector('input#title[name="title"]');
-    const description = document.querySelector('textarea#desc[name="desc"]');
-    const privacy = document.querySelector('input#private[name="private"]');
+    const titles = Array.from(forms[0]!.querySelectorAll(
+      'input#title[name="title"]',
+    ));
+    const descriptions = Array.from(forms[0]!.querySelectorAll(
+      'textarea#desc[name="desc"]',
+    ));
+    const switches = Array.from(forms[0]!.querySelectorAll(
+      'input#private[name="private"]',
+    ));
     if (
-      title?.tagName !== "INPUT" ||
-      description?.tagName !== "TEXTAREA" ||
-      privacy?.tagName !== "INPUT" ||
+      titles.length !== 1 ||
+      descriptions.length !== 1 ||
+      switches.length !== 1
+    ) return failed();
+    const title = titles[0]!;
+    const description = descriptions[0]!;
+    const privacy = switches[0]!;
+    if (
+      title.tagName !== "INPUT" ||
+      description.tagName !== "TEXTAREA" ||
+      privacy.tagName !== "INPUT" ||
       privacy.getAttribute("type") !== "checkbox" ||
       privacy.getAttribute("role") !== "switch" ||
       !visible(title) ||
@@ -344,11 +358,13 @@ export function openBlooketDetailPanel(setId: string): boolean {
     identities[0]?.tagName !== "INPUT" ||
     (identities[0] as HTMLInputElement).value !== setId
   ) return false;
-  const title = document.querySelector('input#title[name="title"]');
-  if (title) {
-    const bounds = title.getBoundingClientRect();
-    if (bounds.width > 0 && bounds.height > 0) return true;
-  }
+  const titles = Array.from(forms[0]!.querySelectorAll(
+    'input#title[name="title"]',
+  ));
+  if (titles.length !== 1 || titles[0]?.tagName !== "INPUT")
+    return false;
+  const bounds = titles[0]!.getBoundingClientRect();
+  if (bounds.width > 0 && bounds.height > 0) return true;
   const buttons = Array.from(document.querySelectorAll("main button")).filter(
     (button) => button.textContent?.trim() === "Edit Info",
   );
