@@ -126,13 +126,23 @@ export function decodeBlooketQuestionRead(
     path,
   ));
 
-  const number = positiveInteger(value["number"], path + ".number", issues);
+  const number = positiveInteger(
+    value["number"], path + ".number", issues, 10_000,
+  );
   const rawQuestion = requiredString(
     value["question"],
     path + ".question",
     issues,
   );
-  const normalizedQuestion = rawQuestion === undefined
+  if (rawQuestion !== undefined && rawQuestion.length > 20_000) {
+    issues.push({
+      path: path + ".question",
+      code: "question-too-long",
+      message: "Question text exceeds the local browser read bound.",
+    });
+  }
+  const normalizedQuestion =
+    rawQuestion === undefined || rawQuestion.length > 20_000
     ? undefined
     : version === BLOOKET_QUESTION_READ_VERSION
       ? decodeCurrentQuestion(
@@ -155,6 +165,7 @@ export function decodeBlooketQuestionRead(
     value["timeLimit"],
     path + ".timeLimit",
     issues,
+    86_400,
   );
   const answers = version === LEGACY_BLOOKET_QUESTION_READ_VERSION
     ? decodeLegacyAnswers(value, path, qType, issues)
@@ -518,7 +529,8 @@ function decodeAnswer(
   if (
     (kind === "image" && content !== null)
     || ((kind === "text" || kind === "math")
-      && (typeof content !== "string" || content.length === 0))
+      && (typeof content !== "string" || content.length === 0 ||
+        content.length > 10_000))
     || (kind === "math"
       && typeof content === "string"
       && content.includes(LEGACY_MATH_ANSWER_MARKER))
@@ -564,7 +576,9 @@ function decodeAnswer(
     || correct === undefined
     || (match !== null && match !== "exactly" && match !== "contains")
     || (kind === "image" && content !== null)
-    || ((kind === "text" || kind === "math") && typeof content !== "string")
+    || ((kind === "text" || kind === "math") &&
+      (typeof content !== "string" || content.length === 0 ||
+        content.length > 10_000))
     || (kind === "math"
       && typeof content === "string"
       && content.includes(LEGACY_MATH_ANSWER_MARKER))
@@ -587,11 +601,13 @@ function positiveInteger(
   value: unknown,
   path: string,
   issues: ValidationIssue[],
+  max: number,
 ): number | undefined {
   if (
     typeof value === "number"
     && Number.isSafeInteger(value)
     && value > 0
+    && value <= max
   ) {
     return value;
   }
@@ -645,7 +661,13 @@ function stringArray(
       path + "[" + String(index) + "]",
       issues,
     );
-    if (item !== undefined) result.push(item);
+    if (item !== undefined && item.length > 10_000) {
+      issues.push({
+        path: path + "[" + String(index) + "]",
+        code: "answer-too-long",
+        message: "Answer text exceeds the local browser read bound.",
+      });
+    } else if (item !== undefined) result.push(item);
   }
   return result;
 }

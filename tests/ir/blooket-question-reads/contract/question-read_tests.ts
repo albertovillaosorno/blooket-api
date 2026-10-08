@@ -412,3 +412,35 @@ test("oversized answer and match arrays fail before normalization", () => {
     }
   }
 });
+
+test("canonical question fields keep browser safety bounds", () => {
+  const current = {
+    schemaVersion: 3, number: 1, question: "Type sun.", equation: null,
+    qType: "typing", random: true, timeLimit: 10,
+    answers: [{
+      kind: "text", content: "sun", correct: true, match: "exactly",
+    }],
+    hasImage: false, hasAudio: false,
+  };
+  for (const candidate of [
+    { ...current, number: 10_001 },
+    { ...current, timeLimit: 86_401 },
+    { ...current, question: "q".repeat(20_001) },
+    {
+      ...current,
+      answers: [{ ...current.answers[0], content: "a".repeat(10_001) }],
+    },
+    { ...question, number: 10_001 },
+    { ...question, timeLimit: 86_401 },
+    { ...question, question: "q".repeat(20_001) },
+    { ...question, answers: ["a".repeat(10_001)],
+      correctAnswers: ["a".repeat(10_001)] },
+  ]) {
+    assert.equal(decodeBlooketQuestionRead(candidate).ok, false);
+  }
+  assert.equal(decodeBlooketQuestionRead({
+    ...current, number: 10_000, timeLimit: 86_400,
+    question: "q".repeat(20_000),
+    answers: [{...current.answers[0], content: "a".repeat(10_000)}],
+  }).ok, true);
+});
