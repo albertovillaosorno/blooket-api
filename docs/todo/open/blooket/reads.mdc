@@ -210,6 +210,12 @@ Set ID admission is also aligned across CLI, canonical read ports, browser
 bridge, and page extraction: control characters (including newline, tab, DEL)
 are not valid opaque IDs. This rejects transport-dependent interpretations
 without inventing a provider ID grammar.
+
+The read-only capability inspection host now enforces the same control-byte
+exclusion on an untrusted candidate set ID before navigating to its edit page.
+It also requires an exact two-field successful set-list envelope; unexpected
+outer fields and malformed IDs fail without opening Add Question. Synthetic
+probes verify that the original tab URL is restored on those failures.
 The same admission guards run inside the injected Add Question, capability, and
 question-panel functions before opening or interacting with visible controls.
 

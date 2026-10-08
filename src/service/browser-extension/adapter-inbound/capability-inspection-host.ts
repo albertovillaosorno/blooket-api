@@ -326,6 +326,8 @@ function firstSetId(value: unknown): string | null | undefined {
   if (
     !value ||
     typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join() !== "ok,value" ||
     !("ok" in value) ||
     value.ok !== true ||
     !("value" in value) ||
@@ -357,7 +359,7 @@ function firstSetId(value: unknown): string | null | undefined {
       typeof record["id"] !== "string" ||
       record["id"].length < 1 ||
       record["id"].length > 512 ||
-      record["id"].includes("\0") ||
+      /[\x00-\x1f\x7f]/u.test(record["id"]) ||
       seen.has(record["id"]) ||
       typeof record["title"] !== "string" ||
       !record["title"].trim() ||

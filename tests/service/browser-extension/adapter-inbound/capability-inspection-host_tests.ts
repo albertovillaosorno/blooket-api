@@ -45,6 +45,8 @@ function fixture(options: {
   readonly malformedList?: boolean;
   readonly unknownEmpty?: boolean;
   readonly duplicateList?: boolean;
+  readonly malformedSetId?: string;
+  readonly extraOuterField?: boolean;
   readonly restoreFails?: boolean;
   readonly cleanupPollThrows?: "drawer" | "question";
 } = {}) {
@@ -104,6 +106,7 @@ function fixture(options: {
               return [{
                 result: {
                   ok: true,
+                  ...(options.extraOuterField ? { secret: "untrusted" } : {}),
                   value: {
                     items: options.empty || options.unknownEmpty
                       ? []
@@ -111,7 +114,7 @@ function fixture(options: {
                           { length: options.duplicateList ? 2 : 1 },
                           () => ({
                             schemaVersion: 1,
-                            id: "set-fixture",
+                            id: options.malformedSetId ?? "set-fixture",
                             title: "Synthetic fixture",
                           }),
                         ),
@@ -311,3 +314,39 @@ test(
   }
   },
 );
+
+test(
+  "control-bearing set IDs never reach capability panel navigation",
+  async () => {
+  for (const malformedSetId of ["x\ny", "x\ty", "x\u007fy"]) {
+    const page = fixture({ malformedSetId });
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(), page.originalUrl);
+    assert.equal(page.navigations.some(
+      (url) => url.includes("/edit?id=" + encodeURIComponent(malformedSetId)),
+    ), false);
+    assert.equal(page.scripts.includes(
+      "openBlooketCapabilityQuestionPanel",
+    ), false);
+  }
+  },
+);
+
+test("unexpected outer list fields fail before edit navigation", async () => {
+  const page = fixture({ extraOuterField: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel",
+  ), false);
+});
