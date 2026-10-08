@@ -355,7 +355,8 @@ test(
 test("capability probes refuse a human prompt or missing session", () => {
   for (const mode of [
     "organization", "challenge", "password-overlay", "missing-shell",
-    "interstitial",
+    "interstitial", "hidden-main", "duplicate-main", "hidden-navigation",
+    "duplicate-navigation", "hidden-logout", "duplicate-logout",
   ] as const) {
     const page = fixture();
     const activeDrawer = drawer("supported");
@@ -372,10 +373,30 @@ test("capability probes refuse a human prompt or missing session", () => {
     } else if (mode === "interstitial") {
       (page.document as FixtureNode & { title: string }).title =
         "Just a moment...";
-    } else {
+    } else if (mode === "missing-shell") {
       page.document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
     }
     withPage(page.document, () => {
+      if (mode === "hidden-main")
+        page.document.selectors["main"]![0]!.getBoundingClientRect =
+          () => ({ width: 0, height: 0 });
+      if (mode === "duplicate-main")
+        page.document.selectors["main"]!.push(node("MAIN"));
+      if (mode === "hidden-navigation")
+        page.document.selectors['nav a[href="/my-sets"]']![0]!
+          .getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (mode === "duplicate-navigation")
+        page.document.selectors['nav a[href="/my-sets"]']!.push(
+          node("A", "My Sets"),
+        );
+      if (mode === "hidden-logout")
+        page.document.selectors[
+          'a[href="https://id.blooket.com/logout"]'
+        ]![0]!.getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (mode === "duplicate-logout")
+        page.document.selectors[
+          'a[href="https://id.blooket.com/logout"]'
+        ]!.push(node("A", "Logout"));
       assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
       page.document.selectors['input#question[name="question"]'] = [
         page.question,

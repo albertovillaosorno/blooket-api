@@ -201,6 +201,44 @@ test("question panels expose normalized read facts without saving", () => {
       });
       assert.equal(decodeBlooketQuestionRead(result.value).ok, true);
     }
+    // The form is readable, but stale or ambiguous dashboard shell markers
+    // must invalidate every page action before it can click Cancel.
+    const main = document.selectors["main"]![0]!;
+    const nav = document.selectors['nav a[href="/my-sets"]']![0]!;
+    const logout = document.selectors[
+      'a[href="https://id.blooket.com/logout"]'
+    ]![0]!;
+    for (const marker of [
+      "hidden-main", "duplicate-main", "hidden-nav", "duplicate-nav",
+      "hidden-logout", "duplicate-logout",
+    ]) {
+      main.getBoundingClientRect = () => ({
+        width: marker === "hidden-main" ? 0 : 24, height: 20,
+      });
+      nav.getBoundingClientRect = () => ({
+        width: marker === "hidden-nav" ? 0 : 24, height: 20,
+      });
+      logout.getBoundingClientRect = () => ({
+        width: marker === "hidden-logout" ? 0 : 24, height: 20,
+      });
+      document.selectors["main"] = marker === "duplicate-main"
+        ? [main, node("MAIN")] : [main];
+      document.selectors['nav a[href="/my-sets"]'] =
+        marker === "duplicate-nav" ? [nav, node("A", "My Sets")] : [nav];
+      document.selectors['a[href="https://id.blooket.com/logout"]'] =
+        marker === "duplicate-logout"
+          ? [logout, node("A", "Logout")] : [logout];
+      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+      assert.equal(inspectOpenedBlooketQuestion("fixture", 1).ok, false);
+      assert.equal(closeBlooketQuestionPanel("fixture"), false);
+      assert.equal(closed, 0);
+    }
+    main.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    nav.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    logout.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    document.selectors["main"] = [main];
+    document.selectors['nav a[href="/my-sets"]'] = [nav];
+    document.selectors['a[href="https://id.blooket.com/logout"]'] = [logout];
     assert.equal(closeBlooketQuestionPanel("fixture"), true);
     assert.equal(closed, 1);
     assert.equal(isBlooketQuestionPanelClosed("fixture"), true);

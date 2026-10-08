@@ -551,6 +551,45 @@ test("dashboard reads require the recovered authenticated shell", () => {
   });
 });
 
+test("hidden or duplicate authenticated shell markers reject reads", () => {
+  for (const marker of [
+    "hidden-main", "duplicate-main", "hidden-navigation",
+    "duplicate-navigation", "hidden-logout", "duplicate-logout",
+  ]) {
+    const { document, main } = base();
+    main.selectors["article"] = [card()];
+    if (marker === "hidden-main")
+      main.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    if (marker === "duplicate-main")
+      document.selectors["main"]!.push(node("MAIN"));
+    if (marker === "hidden-navigation") {
+      document.selectors['nav a[href="/my-sets"]']![0]!
+        .getBoundingClientRect = () => ({ width: 0, height: 0 });
+    }
+    if (marker === "duplicate-navigation") {
+      document.selectors['nav a[href="/my-sets"]']!.push(
+        node("A", "My Sets"),
+      );
+    }
+    if (marker === "hidden-logout") {
+      document.selectors[
+        'a[href="https://id.blooket.com/logout"]'
+      ]![0]!.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    }
+    if (marker === "duplicate-logout") {
+      document.selectors[
+        'a[href="https://id.blooket.com/logout"]'
+      ]!.push(node("A", "Logout"));
+    }
+    page(document, "https://dashboard.blooket.com/my-sets", () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "unexpected-page",
+      });
+      assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    });
+  }
+});
+
 test(
   "organization selection is a human stop before set reads",
   () => {
@@ -790,7 +829,8 @@ test("read routes encode IDs and panel opening never submits a form", () => {
 test("Edit Info opener refuses human-action overlays and lost sessions", () => {
   for (const mode of [
     "organization", "challenge", "password-overlay", "missing-shell",
-    "interstitial",
+    "interstitial", "hidden-main", "duplicate-main", "hidden-nav",
+    "duplicate-nav", "hidden-logout", "duplicate-logout",
   ] as const) {
     const { document } = base();
     const button = node("BUTTON", "Edit Info");
@@ -818,10 +858,28 @@ test("Edit Info opener refuses human-action overlays and lost sessions", () => {
     } else if (mode === "interstitial") {
       (document as FixtureNode & { title: string }).title =
         "Just a moment...";
-    } else {
+    } else if (mode === "missing-shell") {
       document.selectors['a[href="https://id.blooket.com/logout"]'] = [];
     }
     page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+      if (mode === "hidden-main")
+        document.selectors["main"]![0]!.getBoundingClientRect =
+          () => ({ width: 0, height: 0 });
+      if (mode === "duplicate-main")
+        document.selectors["main"]!.push(node("MAIN"));
+      if (mode === "hidden-nav")
+        document.selectors['nav a[href="/my-sets"]']![0]!
+          .getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (mode === "duplicate-nav")
+        document.selectors['nav a[href="/my-sets"]']!.push(
+          node("A", "My Sets"),
+        );
+      if (mode === "hidden-logout")
+        document.selectors['a[href="https://id.blooket.com/logout"]']![0]!
+          .getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (mode === "duplicate-logout")
+        document.selectors['a[href="https://id.blooket.com/logout"]']!
+          .push(node("A", "Logout"));
       assert.equal(openBlooketDetailPanel("fixture"), false);
       assert.equal(clicks, 0);
     });

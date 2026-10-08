@@ -138,13 +138,19 @@ export function inspectBlooketPage(
       };
     }
     if (url.origin !== "https://dashboard.blooket.com") return failed();
-    const main = document.querySelector("main");
-    const mySetsNavigation = document.querySelector('nav a[href="/my-sets"]');
-    const logoutLinks = Array.from(
-      document.querySelectorAll('a[href="https://id.blooket.com/logout"]'),
-    ).filter((link) => link.textContent?.trim() === "Logout");
+    const mains = Array.from(document.querySelectorAll("main"));
+    const main = mains[0] ?? null;
+    const mySetsNavigation = Array.from(document.querySelectorAll(
+      'nav a[href="/my-sets"]',
+    ));
+    const logoutLinks = Array.from(document.querySelectorAll(
+      'a[href="https://id.blooket.com/logout"]',
+    ));
     const authenticatedShell =
-      main !== null && mySetsNavigation !== null && logoutLinks.length === 1;
+      mains.length === 1 && main !== null && visible(main) &&
+      mySetsNavigation.length === 1 && visible(mySetsNavigation[0]!) &&
+      logoutLinks.length === 1 && visible(logoutLinks[0]!) &&
+      logoutLinks[0]!.textContent?.trim() === "Logout";
     const organizationPrompt = Array.from(
       document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
@@ -388,15 +394,19 @@ export function blooketReadUrl(operation: PageReadOperation): string | null {
 export function openBlooketDetailPanel(setId: string): boolean {
   // This opener executes separately from the guarded metadata read. A prior
   // session observation cannot authorize a click behind a new human prompt.
+  const visibleUnique = (selector: string, text?: string): boolean => {
+    const elements = Array.from(document.querySelectorAll(selector));
+    if (elements.length !== 1) return false;
+    const bounds = elements[0]!.getBoundingClientRect();
+    return bounds.width > 0 && bounds.height > 0 &&
+      (text === undefined || elements[0]!.textContent?.trim() === text);
+  };
   const authenticated =
     document.title !== "Just a moment..." &&
-    document.querySelector("main") !== null &&
     document.querySelector('input[type="password"]') === null &&
-    document.querySelector('nav a[href="/my-sets"]') !== null &&
-    Array.from(document.querySelectorAll(
-      'a[href="https://id.blooket.com/logout"]',
-    )).filter((link) => link.textContent?.trim() === "Logout")
-      .length === 1;
+    visibleUnique("main") &&
+    visibleUnique('nav a[href="/my-sets"]') &&
+    visibleUnique('a[href="https://id.blooket.com/logout"]', "Logout");
   const organizationPrompt = Array.from(document.querySelectorAll(
     '[role="dialog"][aria-modal="true"] h3',
   )).some((heading) => {

@@ -738,6 +738,15 @@ read rather than being treated as authenticated. This deliberately does not
 claim `expired-session`: the curated evidence does not distinguish expiry from
 a normal signed-out redirect.
 
+Every browser-injected read action now also requires one uniquely observed
+visible `main`, My Sets navigation anchor, and exactly labeled Logout anchor.
+A hidden or duplicate shell control invalidates session observation, My Sets,
+question-modal reads/Cancel, capability probes, and the read-only Edit Info
+opener. Chrome serializes each injected function independently, so each carries
+its own local check rather than relying on a previous observation. These
+synthetic negative cases tighten admission but do not prove an authenticated
+remote session or resolve the known challenge interstitial.
+
 Live Chrome-for-Testing acceptance on 2026-10-07 exposed one login-observer bug:
 Blooket's ordinary `/login` page mounts a visible reCAPTCHA anchor whose URL is
 explicitly `size=invisible`. Treating every visible reCAPTCHA iframe as an
