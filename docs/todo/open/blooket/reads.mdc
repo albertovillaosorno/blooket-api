@@ -418,6 +418,13 @@ closure. A switched edit route or duplicate `id` query parameter fails closed
 rather than accepting another set's question as the requested result. Portable
 regressions cover the identity checks; no new live question-read claim follows.
 
+Question enumeration now also requires positive on-screen geometry for every
+recovered accessible Edit-question control. A loaded zero-question observation
+requires exactly one geometrically visible Add Question button. Opening an
+existing question requires both the uniquely labeled card and its Edit button
+to be visible; hidden controls cannot count toward the list or trigger clicks.
+These are structural visibility checks, not evidence of server completeness.
+
 The recovered question editor in module 89770 renders a hidden serialized
 `input#question[name="question"]` and a separate hidden
 `input#setId[name="setId"]` inside its form. Module 89035 emits both hidden

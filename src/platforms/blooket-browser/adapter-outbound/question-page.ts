@@ -81,16 +81,18 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
       '[role="button"]' + '[aria-label^="Edit question "]';
     const controls = Array.from(document.querySelectorAll(selector));
     if (controls.length > 200) return failed();
-    if (
-      controls.length === 0 &&
-      !Array.from(document.querySelectorAll("button")).some(
-        (button) => button.textContent?.trim() === "Add Question",
-      )
-    )
-      return failed();
+    if (controls.length === 0) {
+      const addButtons = Array.from(document.querySelectorAll("button"))
+        .filter((button) => button.textContent?.trim() === "Add Question");
+      if (addButtons.length !== 1) return failed();
+      const bounds = addButtons[0]!.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return failed();
+    }
     const numbers: number[] = [];
     const seen = new Set<number>();
     for (const control of controls) {
+      const bounds = control.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return failed();
       const label = control.getAttribute("aria-label") ?? "";
       const match = /^Edit question ([1-9][0-9]*)$/u.exec(label);
       if (!match) return failed();
@@ -162,11 +164,15 @@ export function openBlooketQuestionPanel(
       ),
     );
     if (controls.length !== 1) return false;
+    const cardBounds = controls[0]!.getBoundingClientRect();
+    if (cardBounds.width <= 0 || cardBounds.height <= 0) return false;
     const buttons = Array.from(controls[0]!.querySelectorAll("button")).filter(
       (button) =>
         button.textContent?.replace(/\u00a0/gu, " ").trim() === "Edit",
     );
     if (buttons.length !== 1) return false;
+    const editBounds = buttons[0]!.getBoundingClientRect();
+    if (editBounds.width <= 0 || editBounds.height <= 0) return false;
     (buttons[0] as HTMLButtonElement).click();
     return true;
   } catch {
