@@ -228,20 +228,34 @@ async function read(
     return await host.inspect(operation.setId, readDeadline);
   }
   if (operation.kind === "sets.get") {
-    await script(
-      current,
-      openBlooketDetailPanel as (...args: never[]) => unknown,
-      [operation.setId],
-    );
+    let opened = false;
+    for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
+      attempt++) {
+      const result = await script(
+        current,
+        openBlooketDetailPanel as (...args: never[]) => unknown,
+        [operation.setId],
+      );
+      if (result === true) {
+        opened = true;
+        break;
+      }
+      await pause(100);
+    }
+    if (!opened) throw new Error("browser-details-unavailable");
     // Opening details is asynchronous; retry reads, never a form submission.
-    for (let attempt = 0; attempt < 15; attempt++) {
+    for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
+      attempt++) {
       const result = await script(
         current,
         inspectBlooketPage as (...args: never[]) => unknown,
         [operation],
       );
-      if (result && typeof result === "object" && "ok" in result && result.ok)
-        return result;
+      if (
+        result && typeof result === "object" && !Array.isArray(result) &&
+        Object.keys(result).sort().join() === "ok,value" &&
+        "ok" in result && result.ok === true
+      ) return result;
       await pause(100);
     }
     throw new Error("browser-details-unavailable");

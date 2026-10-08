@@ -45,6 +45,7 @@ test(
   let creates = 0;
   let closed = false;
   let validStatus = true;
+  let detailOpenSucceeds = true;
   let questionPanelCloses = true;
   let addQuestionPanelReady = false;
   let capabilityPanelReady = false;
@@ -105,7 +106,7 @@ test(
         scripts.push(func.name);
         if (func.name === "openBlooketDetailPanel") {
           assert.deepEqual(args, ["opaque id/with spaces"]);
-          return [{ result: true }];
+          return [{ result: detailOpenSucceeds }];
         }
         if (func.name === "listBlooketQuestionNumbers")
           return [{ result: { ok: true, value: [1] } }];
@@ -370,6 +371,16 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    detailOpenSucceeds = false;
+    const beforeRejectedOpen = scripts.length;
+    const rejectedDetail = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(rejectedDetail.ok, false);
+    assert.equal(scripts.slice(beforeRejectedOpen).every(
+      (name) => name === "openBlooketDetailPanel",
+    ), true);
+    detailOpenSucceeds = true;
     const questions = await expectReply({
       kind: "questions.list",
       setId: "set-fixture",
