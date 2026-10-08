@@ -177,18 +177,15 @@ async function bridgeFetch(
 }
 async function script(
   current: Connection,
+  browser: ReturnType<typeof ownedBrowser>,
   func: (...args: never[]) => unknown,
   args: unknown[] = [],
 ) {
-  if (connection !== current)
-    throw new Error("retired-browser-connection");
-  const replies = await chrome.scripting.executeScript({
+  const replies = await browser.scripting.executeScript({
     target: { tabId: current.tabId },
     func,
     args,
   });
-  if (connection !== current)
-    throw new Error("retired-browser-connection");
   if (replies.length !== 1 || replies[0]?.result === undefined)
     throw new Error("browser-read-unavailable");
   return replies[0].result;
@@ -239,6 +236,7 @@ async function read(
         throw new Error("browser-set-list-unavailable");
       const result = await script(
         current,
+        browser,
         inspectBlooketPage as (...args: never[]) => unknown,
         [operation],
       );
@@ -284,6 +282,7 @@ async function read(
       throw new Error("browser-set-list-unavailable");
     const after = await script(
       current,
+      browser,
       inspectBlooketPage as (...args: never[]) => unknown,
       [operation],
     );
@@ -311,6 +310,7 @@ async function read(
         throw new Error("browser-details-unavailable");
       const result = await script(
         current,
+        browser,
         openBlooketDetailPanel as (...args: never[]) => unknown,
         [operation.setId],
       );
@@ -331,6 +331,7 @@ async function read(
         throw new Error("browser-details-unavailable");
       const result = await script(
         current,
+        browser,
         inspectBlooketPage as (...args: never[]) => unknown,
         [operation],
       );
@@ -352,6 +353,7 @@ async function read(
           throw new Error("browser-details-unavailable");
         const again = await script(
           current,
+          browser,
           inspectBlooketPage as (...args: never[]) => unknown,
           [operation],
         );
@@ -376,6 +378,7 @@ async function read(
   }
   const observed = await script(
     current,
+    browser,
     inspectBlooketPage as (...args: never[]) => unknown,
     [operation],
   );
@@ -398,6 +401,7 @@ async function read(
       throw new Error("browser-session-changed");
     const again = await script(
       current,
+      browser,
       inspectBlooketPage as (...args: never[]) => unknown,
       [operation],
     );
@@ -411,9 +415,14 @@ async function read(
   }
   return observed;
 }
-function ownedBrowser(current: Connection, activeGeneration: number) {
+function ownedBrowser(
+  current: Connection,
+  activeGeneration: number,
+  deadline = Infinity,
+) {
   const requireOwner = () => {
-    if (connection !== current || generation !== activeGeneration)
+    if (connection !== current || generation !== activeGeneration ||
+        Date.now() >= deadline)
       throw new Error("retired-browser-connection");
   };
   return {
@@ -470,6 +479,18 @@ async function relay(current: Connection, activeGeneration: number) {
         const decoded = decodeBlooketBrowserBridgeRequest(next.job);
         if (!decoded.ok) throw new Error("invalid-browser-job");
         const job = decoded.value;
+        // The broker has a ten-second response deadline. Reserve a local
+        // margin so a late page poll cannot trigger another form action after
+        // its caller has stopped waiting. In-flight scripts remain ambiguous.
+        const budgetMs = job.command.kind === "session.authenticate"
+          ? 7_500
+          : job.command.kind === "capabilities.inspect" ||
+              job.command.kind === "sets.create" ||
+              job.command.kind === "questions.create"
+            ? 9_000 : 8_000;
+        const jobBrowser = ownedBrowser(
+          current, activeGeneration, Date.now() + budgetMs,
+        );
         let result: unknown = { ok: false, code: "blooket-browser-failed" };
         try {
           if (
@@ -478,10 +499,10 @@ async function relay(current: Connection, activeGeneration: number) {
             job.command.kind === "sets.get" ||
             job.command.kind === "questions.list"
           ) {
-            result = await read(current, browser, job.command);
+            result = await read(current, jobBrowser, job.command);
           } else if (job.command.kind === "session.authenticate") {
             const host = createExtensionSessionAuthenticationHost(
-              browser,
+              jobBrowser,
               current.tabId,
               pause,
             );
@@ -491,14 +512,14 @@ async function relay(current: Connection, activeGeneration: number) {
             });
           } else if (job.command.kind === "capabilities.inspect") {
             const host = createExtensionCapabilityInspectionHost(
-              browser,
+              jobBrowser,
               current.tabId,
               pause,
             );
             result = await host.inspect();
           } else if (job.command.kind === "sets.create") {
             const host = createExtensionCreateSetHost(
-              browser,
+              jobBrowser,
               current.tabId,
               pause,
             );
@@ -526,7 +547,7 @@ async function relay(current: Connection, activeGeneration: number) {
             }
           } else if (job.command.kind === "questions.create") {
             const host = createExtensionAddQuestionHost(
-              browser,
+              jobBrowser,
               current.tabId,
               pause,
             );

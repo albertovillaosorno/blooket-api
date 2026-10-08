@@ -196,6 +196,13 @@ validated.
 
 ## Evidence
 
+On 2026-10-08, the extension relay began imposing operation-local browser
+budgets shorter than the ten-second bridge deadline, in addition to its
+connection-generation fence. An injected-clock Add Question regression proves
+that a late modal-opener response cannot authorize further form actions.
+Already dispatched browser scripts cannot be canceled retroactively; this is
+synthetic continuation protection rather than live browser timing evidence.
+
 On 2026-10-08, credential retrieval began validating bounded login
 identifier and password fields before handing them to a browser host. An
 invalid supplied identifier causes no secret-store reads, while a malformed
