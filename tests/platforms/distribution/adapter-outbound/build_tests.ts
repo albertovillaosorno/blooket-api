@@ -30,7 +30,11 @@
 //   - Failed checks block release and cleanup only the owned fixture.
 //
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, mkdtemp, mkdir, writeFile, rm } from
+  "node:fs/promises";
+import { tmpdir } from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import test from "node:test";
 import {
   MAC_LOGIN_AGENT_EXECUTABLE,
@@ -38,8 +42,29 @@ import {
   MAC_LOGIN_AGENT_PLIST,
   macLoginAgentPlist,
   distributionDirectory,
+  createLinuxArchive,
 } from "../../../../src/platforms/distribution/adapter-outbound/build.ts";
 import { join } from "node:path";
+
+test("Linux archives exclude their reserved partial and keep a stable root",
+  { skip: process.platform !== "linux" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "package-tar-"));
+    const execute = promisify(execFile);
+    try {
+      const output = join(root, "package");
+      await mkdir(output);
+      await writeFile(join(output, "keep.txt"), "synthetic package data");
+      const partial = join(output, ".archive.partial.tar.gz");
+      await createLinuxArchive(output, partial);
+      const listing = await execute("tar", ["-tzf", partial]);
+      assert.ok(listing.stdout.includes("./keep.txt"));
+      assert.ok(!listing.stdout.includes(".archive.partial"));
+      const extracted = await execute("tar", ["-xOzf", partial, "./keep.txt"]);
+      assert.equal(extracted.stdout, "synthetic package data");
+      await assert.rejects(createLinuxArchive(output, partial),
+        { code: "EEXIST" });
+    } finally { await rm(root, { recursive: true }); }
+  });
 
 test("package output names remain repository-owned and cannot select paths",
   () => {
