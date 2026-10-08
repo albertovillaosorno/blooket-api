@@ -227,6 +227,74 @@ async function read(
     );
     return await host.inspect(operation.setId, readDeadline);
   }
+  if (operation.kind === "sets.list") {
+    let initial: unknown;
+    let captured = false;
+    // React can hydrate after the document reaches the complete state.
+    for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
+      attempt++) {
+      const currentTab = await chrome.tabs.get(current.tabId);
+      if (currentTab.status !== "complete" || currentTab.url !== target)
+        throw new Error("browser-set-list-unavailable");
+      const result = await script(
+        current,
+        inspectBlooketPage as (...args: never[]) => unknown,
+        [operation],
+      );
+      if (
+        result && typeof result === "object" && !Array.isArray(result) &&
+        Object.keys(result).sort().join() === "code,ok" &&
+        "ok" in result && result.ok === false &&
+        "code" in result && result.code === "blooket-browser-failed"
+      ) {
+        await pause(100);
+        continue;
+      }
+      if (
+        !result || typeof result !== "object" || Array.isArray(result) ||
+        Object.keys(result).sort().join() !== "ok,value" ||
+        !("ok" in result) || result.ok !== true ||
+        !("value" in result) || !result.value ||
+        typeof result.value !== "object" || Array.isArray(result.value) ||
+        Object.keys(result.value).sort().join() !== "completeness,items" ||
+        !("completeness" in result.value) ||
+        !("items" in result.value) ||
+        !Array.isArray(result.value.items) ||
+        result.value.items.length > 200 ||
+        (result.value.completeness !== "complete" &&
+          result.value.completeness !== "unknown") ||
+        (result.value.items.length === 0
+          ? result.value.completeness !== "complete"
+          : result.value.completeness !== "unknown")
+      ) throw new Error("browser-set-list-unavailable");
+      initial = result;
+      captured = true;
+      break;
+    }
+    if (!captured || Date.now() >= readDeadline)
+      throw new Error("browser-set-list-unavailable");
+    // Read again after an event-loop yield: loading or card changes are not a
+    // complete baseline. The second observation is never retried.
+    await pause(100);
+    if (Date.now() >= readDeadline)
+      throw new Error("browser-set-list-unavailable");
+    const tabAfter = await chrome.tabs.get(current.tabId);
+    if (tabAfter.status !== "complete" || tabAfter.url !== target)
+      throw new Error("browser-set-list-unavailable");
+    const after = await script(
+      current,
+      inspectBlooketPage as (...args: never[]) => unknown,
+      [operation],
+    );
+    if (
+      Date.now() >= readDeadline ||
+      JSON.stringify(initial) !== JSON.stringify(after)
+    ) throw new Error("browser-set-list-unavailable");
+    const checkedTab = await chrome.tabs.get(current.tabId);
+    if (checkedTab.status !== "complete" || checkedTab.url !== target)
+      throw new Error("browser-set-list-unavailable");
+    return initial;
+  }
   if (operation.kind === "sets.get") {
     let opened = false;
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;

@@ -46,6 +46,12 @@ test(
   let closed = false;
   let validStatus = true;
   let detailOpenSucceeds = true;
+  let listFailuresRemaining = 0;
+  let listDrifts = false;
+  let listEmpty = false;
+  let listEmptyDrifts = false;
+  let listInvalidEnvelope = false;
+  let setListReads = 0;
   let questionPanelCloses = true;
   let addQuestionPanelReady = false;
   let capabilityPanelReady = false;
@@ -226,6 +232,36 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "sets.list") {
+          setListReads++;
+          if (listFailuresRemaining > 0) {
+            listFailuresRemaining--;
+            return [{ result: {
+              ok: false, code: "blooket-browser-failed",
+            } }];
+          }
+          if (listInvalidEnvelope) return [{ result: {
+            ok: true, extra: "untrusted",
+            value: { items: [], completeness: "complete" },
+          } }];
+          return [{ result: {
+            ok: true,
+            value: {
+              items: (listEmpty &&
+                  (!listEmptyDrifts || setListReads % 2 !== 0))
+                ? []
+                : [{
+                    schemaVersion: 1,
+                    id: "set-fixture",
+                    title: listDrifts && setListReads % 2 === 0
+                      ? "Changed synthetic title" : "Synthetic",
+                  }],
+              completeness: (listEmpty &&
+                  (!listEmptyDrifts || setListReads % 2 !== 0))
+                ? "complete" : "unknown",
+            },
+          } }];
+        }
         return [
           {
             result: {
@@ -357,7 +393,44 @@ test(
     assert.equal((await announce({ origin, token })).ok, true);
     assert.equal((await announce({ origin, token })).ok, true);
     assert.equal(creates, 1);
-    assert.equal((await expectReply({ kind: "sets.list" })).ok, true);
+    const firstSets = await expectReply({ kind: "sets.list" });
+    assert.equal(firstSets.ok, true);
+    assert.equal(firstSets.value.completeness, "unknown");
+    assert.equal(setListReads, 2);
+    listFailuresRemaining = 2;
+    setListReads = 0;
+    const delayedSets = await expectReply({ kind: "sets.list" });
+    assert.equal(delayedSets.ok, true);
+    assert.equal(delayedSets.value.completeness, "unknown");
+    assert.equal(setListReads, 4);
+    assert.equal(listFailuresRemaining, 0);
+    listDrifts = true;
+    setListReads = 0;
+    const changedSets = await expectReply({ kind: "sets.list" });
+    assert.equal(changedSets.ok, false);
+    assert.equal(setListReads, 2);
+    listDrifts = false;
+    listInvalidEnvelope = true;
+    setListReads = 0;
+    const malformedSets = await expectReply({ kind: "sets.list" });
+    assert.equal(malformedSets.ok, false);
+    assert.equal(setListReads, 1);
+    listInvalidEnvelope = false;
+    listEmpty = true;
+    setListReads = 0;
+    const emptySets = await expectReply({ kind: "sets.list" });
+    assert.equal(emptySets.ok, true);
+    assert.deepEqual(emptySets.value, {
+      items: [], completeness: "complete",
+    });
+    assert.equal(setListReads, 2);
+    listEmptyDrifts = true;
+    setListReads = 0;
+    const changingEmptySets = await expectReply({ kind: "sets.list" });
+    assert.equal(changingEmptySets.ok, false);
+    assert.equal(setListReads, 2);
+    listEmpty = false;
+    listEmptyDrifts = false;
     assert.equal(
       (
         await expectReply({
