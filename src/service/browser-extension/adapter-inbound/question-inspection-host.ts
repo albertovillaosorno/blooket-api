@@ -95,26 +95,45 @@ export function createExtensionQuestionInspectionHost(
   };
   const enumerate = async (
     setId: string, url: string, deadline: number,
+    waitForControls = false,
   ): Promise<readonly number[] | undefined> => {
-    if (!await ready(url, deadline)) return undefined;
-    const result = await script(
-      listBlooketQuestionNumbers as (...args: never[]) => unknown,
-      [setId],
-    );
-    if (!result || typeof result !== "object" || Array.isArray(result) ||
-        Object.keys(result).sort().join() !== "ok,value" ||
-        !("ok" in result) || result.ok !== true ||
-        !("value" in result) || !Array.isArray(result.value) ||
-        result.value.length > MAX_QUESTIONS)
-      return undefined;
-    const seen = new Set<number>();
-    for (const number of result.value) {
-      if (!Number.isSafeInteger(number) || number < 1 ||
-          number > MAX_NUMBER || seen.has(number)) return undefined;
-      seen.add(number);
+    const attempts = waitForControls ? MAX_POLLS : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (!await ready(url, deadline)) return undefined;
+      const result = await script(
+        listBlooketQuestionNumbers as (...args: never[]) => unknown,
+        [setId],
+      );
+      // A failed page observation can mean that React is not hydrated yet.
+      // Retry only the exact, secret-free failure, never malformed envelopes.
+      if (
+        waitForControls && result && typeof result === "object" &&
+        !Array.isArray(result) &&
+        Object.keys(result).sort().join() === "code,ok" &&
+        "ok" in result && result.ok === false &&
+        "code" in result && result.code === "blooket-browser-failed"
+      ) {
+        if (attempt + 1 >= attempts || now() >= deadline)
+          return undefined;
+        await pause(POLL_MS);
+        continue;
+      }
+      if (!result || typeof result !== "object" || Array.isArray(result) ||
+          Object.keys(result).sort().join() !== "ok,value" ||
+          !("ok" in result) || result.ok !== true ||
+          !("value" in result) || !Array.isArray(result.value) ||
+          result.value.length > MAX_QUESTIONS)
+        return undefined;
+      const seen = new Set<number>();
+      for (const number of result.value) {
+        if (!Number.isSafeInteger(number) || number < 1 ||
+            number > MAX_NUMBER || seen.has(number)) return undefined;
+        seen.add(number);
+      }
+      // A scripted answer from a tab that switched mid-flight is not evidence.
+      return await ready(url, deadline) ? result.value as number[] : undefined;
     }
-    // A scripted answer from a tab that switched mid-flight is not evidence.
-    return await ready(url, deadline) ? result.value as number[] : undefined;
+    return undefined;
   };
   const close = async (
     setId: string, url: string, deadline: number,
@@ -149,7 +168,7 @@ export function createExtensionQuestionInspectionHost(
       const url = DASHBOARD_ORIGIN + "/edit?id=" +
         encodeURIComponent(setId);
       try {
-        const numbers = await enumerate(setId, url, deadline);
+        const numbers = await enumerate(setId, url, deadline, true);
         if (!numbers) return browserFailure();
         const questions: BlooketQuestionRead[] = [];
         const encoder = new TextEncoder();
@@ -182,6 +201,9 @@ export function createExtensionQuestionInspectionHost(
           if (totalBytes > MAX_RESULT_BYTES) return browserFailure();
           questions.push(decoded);
         }
+        // A transient zero can precede a hydrated question list. Compare only
+        // after another event-loop opportunity. Server completeness is unknown.
+        if (numbers.length === 0) await pause(POLL_MS);
         const after = await enumerate(setId, url, deadline);
         if (!after || after.length !== numbers.length ||
             after.some((number, index) => number !== numbers[index]))
