@@ -165,7 +165,10 @@ function fakeChrome(options: {
       },
     },
   };
-  return { chrome, calls };
+  return { chrome, calls, setTab: (url: string) => {
+    tab = { url, status: "complete" };
+    navigated = false;
+  } };
 }
 
 test("host confirms Add Question only after exact read-back", async () => {
@@ -242,3 +245,77 @@ test("foreign starting tabs fail before navigation", async () => {
   });
   assert.equal(fake.calls.some((value) => value.startsWith("update:")), false);
 });
+
+test(
+  "a user-selected route is not overwritten by Add Question navigation",
+  async () => {
+  const fake = fakeChrome({});
+  const get = fake.chrome.tabs.get;
+  let reads = 0;
+  fake.chrome.tabs.get = async (id) => {
+    if (++reads === 2)
+      fake.setTab("https://dashboard.blooket.com/edit?id=another-set");
+    return await get(id);
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {});
+  assert.equal((await host.addQuestion(input)).ok, false);
+  assert.equal(fake.calls.some((name) => name.startsWith("update:")), false);
+  },
+);
+
+test(
+  "a switched tab after an Add Question opener never prepares or submits",
+  async () => {
+  const fake = fakeChrome({});
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async (request) => {
+    const response = await execute(request);
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "open")
+      fake.setTab("https://dashboard.blooket.com/create");
+    return response;
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {});
+  assert.equal((await host.addQuestion(input)).ok, false);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:is-ready"),
+    false);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+  },
+);
+
+test(
+  "a switched tab after Add Question preparation never submits",
+  async () => {
+  const fake = fakeChrome({});
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async (request) => {
+    const response = await execute(request);
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "prepare")
+      fake.setTab("https://dashboard.blooket.com/create");
+    return response;
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {});
+  assert.equal((await host.addQuestion(input)).ok, false);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+  },
+);
+
+test(
+  "a switched tab during read-back cannot confirm an Add Question write",
+  async () => {
+  const fake = fakeChrome({});
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async (request) => {
+    const response = await execute(request);
+    if (request.func.name === "listBlooketQuestionNumbers")
+      fake.setTab("https://dashboard.blooket.com/edit?id=another-set");
+    return response;
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {});
+  assert.equal((await host.addQuestion(input)).ok, false);
+  assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);

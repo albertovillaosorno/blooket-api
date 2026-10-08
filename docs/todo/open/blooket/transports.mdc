@@ -55,6 +55,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-08, the Add Question Chrome host added exact edit-route ownership
+checks around its opener, readiness, preparation, one submit, and each later
+read-back script. A navigation between the initial tab check and requested
+edit page no longer overwrites a user-selected route. Synthetic regressions
+cover stale navigation, modal opening, preparation, and read-back without a
+live mutation.
+
 On 2026-10-08, the synthetic Create Set Chrome host added a fresh tab-route
 check before navigation so an independently selected edit route is not
 overwritten. Exact Create-page checks now guard form preparation and submission;
