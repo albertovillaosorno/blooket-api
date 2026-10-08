@@ -75,6 +75,22 @@ export function inspectBlooketPage(
         return true;
       }
     });
+    // Observed Chrome for Testing interstitial on both Blooket origins:
+    // a document-complete Cloudflare verification without a captcha iframe.
+    // This is a human/provider stop, never an authenticated page or login form.
+    const securityInterstitial =
+      document.title === "Just a moment..." &&
+      Array.from(document.querySelectorAll("h1, h2, h3")).some((heading) =>
+        visible(heading) &&
+        heading.textContent?.trim() === "Performing security verification"
+      );
+    if (securityInterstitial) {
+      return operation.kind === "session.observe" &&
+          (url.origin === "https://id.blooket.com" ||
+            url.origin === "https://dashboard.blooket.com")
+        ? { ok: true, value: "security-challenge" }
+        : failed();
+    }
     if (
       operation.kind === "session.observe" &&
       url.origin === "https://id.blooket.com"

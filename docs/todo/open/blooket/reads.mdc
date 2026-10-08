@@ -82,6 +82,18 @@ worker discards the result instead of asserting a stale ready, signed-out, or
 challenge state. Synthetic tests cover identity-origin transitions and a
 same-origin dashboard page switch; no credentials are read by this operation.
 
+On 2026-10-07, an isolated Chrome for Testing 151 session loaded the freshly
+built unpacked extension and connected to an isolated local service. Both
+public Blooket origins displayed a document-complete security interstitial:
+page title "Just a moment..." with visible "Performing security verification".
+There was no CAPTCHA iframe and no normal login form.
+
+Previously this was misclassified as `unexpected-page`; the observer returns the
+human/provider stop `security-challenge` only for the exact observed title and
+visible heading on the two admitted origins. The read surface still refuses
+to return set data and never attempts to solve the verification. This is live
+challenge-state acceptance only, not authenticated read acceptance.
+
 Missing or stale local instances fail closed. Local requests use exact loopback
 discovery, bounded responses, correlation checks, CSRF admission, and no
 redirects.
