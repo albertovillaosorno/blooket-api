@@ -151,6 +151,42 @@ const envelope = (command: string, payload: unknown = {}) => ({
   payload,
 });
 
+test("incompatible extension reads give actionable canonical diagnostics",
+  async () => {
+    const fixture = dependencies("my-sets");
+    let observations = 0;
+    let lists = 0;
+    const result = await executeCommand(
+      envelope("blooket.sets.list"), undefined, {
+        ...fixture.ports,
+        session: {
+          ...fixture.ports.session,
+          observe: async () => {
+            observations++;
+            return { ok: true, state: "my-sets" };
+          },
+        },
+        sets: {
+          ...fixture.ports.sets,
+          list: async () => {
+            lists++;
+            return { ok: false, code: "blooket-browser-incompatible" };
+          },
+        },
+      },
+    );
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.deepEqual(result.issues, [{
+      path: "$.blooket", code: "blooket-browser-incompatible",
+      message: "The Blooket extension and workspace use incompatible read " +
+        "formats. Update or reload the Blooket API extension, " +
+        "then retry the read.",
+    }]);
+    assert.equal(observations, 1);
+    assert.equal(lists, 1);
+  });
+
 test("canonical reads reuse a ready session without secret access",
   async () => {
   const fixture = dependencies("my-sets");

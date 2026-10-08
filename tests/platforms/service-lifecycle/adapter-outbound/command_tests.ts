@@ -68,6 +68,7 @@ test("local reads and MCP traverse the real CLI and service bridge",
     instance,
     browserBridge: bridge,
   });
+  let legacyList = false;
   const poll = setInterval(() => {
     const job = bridge.next(bridge.pairingToken());
     if (!job) return;
@@ -137,7 +138,7 @@ test("local reads and MCP traverse the real CLI and service bridge",
                 hasImage: false,
                 hasAudio: false,
               }]
-            : {
+            : legacyList ? [] : {
                 items: [{
                   schemaVersion: 1,
                   id: "fixture",
@@ -215,6 +216,30 @@ test("local reads and MCP traverse the real CLI and service bridge",
       5,
     );
     assert.equal(JSON.stringify(mcp).includes(bridge.pairingToken()), false);
+    legacyList = true;
+    const incompatible = await executeJsonCommand(
+      command.command, command.payload, command.operationId, root,
+    );
+    assert.equal(incompatible.ok, false);
+    if (!incompatible.ok)
+      assert.equal(incompatible.issues[0]?.code,
+        "blooket-browser-incompatible");
+    const incompatibleMcp = await callTeacherTool(
+      "blooket_sets_list", {}, root,
+    );
+    assert.equal(incompatibleMcp.isError, true);
+    const decoded = decodeResultEnvelope(
+      JSON.parse(incompatibleMcp.content[0]!.text),
+    );
+    assert.equal(decoded.ok, true);
+    if (decoded.ok) {
+      assert.equal(decoded.value.ok, false);
+      if (!decoded.value.ok)
+        assert.equal(decoded.value.issues[0]?.code,
+          "blooket-browser-incompatible");
+    }
+    assert.equal(JSON.stringify(incompatibleMcp)
+      .includes(bridge.pairingToken()), false);
   } finally {
     clearInterval(poll);
     bridge.close();

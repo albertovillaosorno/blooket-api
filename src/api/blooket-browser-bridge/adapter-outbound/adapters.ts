@@ -106,6 +106,10 @@ export function createBlooketBrowserBridgeAdapters(
       list: async () => {
         const result = await safeRequest(transport, { kind: "sets.list" });
         if (!result.ok) return result;
+        // Older workers returned a bare array without collection evidence.
+        // Refuse it, but distinguish protocol drift from a provider page stop.
+        if (Array.isArray(result.value))
+          return { ok: false, code: "blooket-browser-incompatible" };
         if (
           !result.value ||
           typeof result.value !== "object" ||

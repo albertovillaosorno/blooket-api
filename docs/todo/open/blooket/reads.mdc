@@ -1061,6 +1061,18 @@ current live browser acceptance remains pending.
 
 ## Blockers
 
+On 2026-10-08, a live canonical CLI list request confirmed that the connected
+development extension returns the legacy bare-array format. The current
+service requires explicit collection-completeness evidence, so it refuses
+those rows and returns `blooket-browser-incompatible` with extension reload
+instructions. This distinguishes the observed protocol mismatch from a
+provider page or authentication stop without relaxing read admission.
+
+Portable regressions cover empty, nonempty, and malformed legacy arrays,
+the application diagnostic, and actual CLI/MCP subprocess projection.
+The current extension must still be loaded and its real reads accepted;
+recognizing an old response is not successful account enumeration.
+
 **Installation blocker:** the browser-control URL policy rejects
 `chrome://extensions/` and forbids bypassing it through another control surface.
 The human loaded the development extension manually. Future reloads during
