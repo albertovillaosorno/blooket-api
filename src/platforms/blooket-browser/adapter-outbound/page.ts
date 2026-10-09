@@ -335,11 +335,17 @@ export function inspectBlooketPage(
     // Module 31017 renders the state wording in a paragraph *beside* the
     // toggle's <label>, not inside it. Check the visible direct sibling and
     // the inverted aria-checked state without guessing framework CSS classes.
-    const labels = Array.from((privacy as HTMLInputElement).labels ?? []);
-    if (labels.length !== 1 || labels[0]?.tagName !== "LABEL")
-      return failed();
-    const row = labels[0]!.parentElement;
-    if (row?.tagName !== "DIV") return failed();
+    // Current forms associate both an outer field label and an inner toggle
+    // label. Only the toggle row has one direct state paragraph; its label
+    // may sit inside a span wrapper. Multiple candidate rows remain unknown.
+    const rows = Array.from((privacy as HTMLInputElement).labels ?? [])
+      .filter(label => label.tagName === "LABEL")
+      .map(label => label.parentElement?.tagName === "SPAN"
+        ? label.parentElement.parentElement : label.parentElement)
+      .filter(row => row?.tagName === "DIV" &&
+        row.querySelectorAll(":scope > p").length === 1);
+    if (rows.length !== 1 || !visible(rows[0]!)) return failed();
+    const row = rows[0]!;
     const states = Array.from(row.querySelectorAll(":scope > p"));
     if (
       states.length !== 1 || states[0]?.tagName !== "P" ||
@@ -521,12 +527,17 @@ export function closeBlooketDetailPanel(
     // The current switch must still express the exact reviewed state.
     const switchInput = switches[0] as HTMLInputElement;
     const checked = switchInput.getAttribute("aria-checked");
-    const switchLabel = Array.from(switchInput.labels ?? []);
-    const row = switchLabel[0]?.parentElement;
+    const rows = Array.from(switchInput.labels ?? [])
+      .filter(label => label.tagName === "LABEL")
+      .map(label => label.parentElement?.tagName === "SPAN"
+        ? label.parentElement.parentElement : label.parentElement)
+      .filter(row => row?.tagName === "DIV" &&
+        row.querySelectorAll(":scope > p").length === 1);
+    const row = rows[0];
     const labels = row?.querySelectorAll(":scope > p") ?? [];
     if (switchInput.getAttribute("role") !== "switch" ||
         switchInput.getAttribute("type") !== "checkbox" ||
-        switchLabel.length !== 1 || labels.length !== 1 ||
+        rows.length !== 1 || labels.length !== 1 ||
         !visible(labels[0]!) || !visible(row!) ||
         ((observed.visibility === "private" &&
           (checked !== "false" ||
