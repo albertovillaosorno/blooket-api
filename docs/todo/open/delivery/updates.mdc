@@ -607,12 +607,53 @@ service restart, native Mac acceptance, or an enabled product installer. The
 remaining application composition and production trust requirements are
 unchanged.
 
+### Journaled installation application controller (2026-10-09)
+
+`install.ts` under the application-update application role now coordinates
+prepared authority, durable intent, fresh directory orientation, publisher
+reassessment, quiescence, health, and guarded inverse recovery. Independently
+prepared authority is copied before asynchronous admission; neither
+journal paths nor persisted healthy phases grant trust or current health.
+
+One forward exchange follows durable intent and a second candidate assessment
+after quiescence. A lost acknowledgement is resolved through fresh orientation,
+not blind replay. Failed/canceled candidate startup durably records rollback
+intent, reassesses the retained old app, quiesces writers, and observes the
+inverse before checking old health. Each health challenge uses a fresh nonce
+and exact expected version.
+
+Cancellation during health cannot commit a late
+candidate success. Unknown identities, incomplete native writers, failed
+directory sync, lost ownership, unsafe journal state, and failed health retain
+both app trees and their recovery record.
+
+Thirty-one targeted regressions pass, including real private journal storage,
+held publication/journal locks, actual compiled Linux exchanges and inverse
+rollback, and ephemeral Ed25519 manifest verification. Lifecycle and Apple
+assessment are explicitly synthetic: these tests do not prove actual app
+restart, Apple acceptance, production keys, or the shipping updater.
+
+Synthetic
+user-data bytes remain unchanged through success and failure. Interrupted intent
+and healthy phases are reassessed; concurrent calls coalesce without releasing
+ownership before an admitted writer closes. The [Node child-process lifecycle
+contract][child-process-current] was checked on 2026-10-09.
+
+No product entrypoint/default ports were added. An independent installer must
+compose actual preparation, all persistent-writer fences, publisher assessment,
+bounded descendant supervision, silent restart, and authenticated runtime health
+before enabling this controller. Signed production artifacts and opt-in EN/ES
+controls also remain functional requirements. Native Mac/Safari execution alone
+remains in blooket-15 and does not block this portable implementation.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,
-`Blooket API.app` identity verification, atomic replacement, restart, rollback,
-and recovery remain functional work. Platform-only signing/notarization and
-native acceptance belong to task blooket-15.
+independent installer composition with all writer fences and actual runtime
+health, and opt-in product controls remain functional work. Existing identity,
+atomic exchange, journal, and orchestration primitives still need production
+composition. Platform-only signing/notarization and native acceptance belong to
+task blooket-15.
 
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
 [api]: https://docs.github.com/en/rest/releases/releases
@@ -642,3 +683,5 @@ native acceptance belong to task blooket-15.
 
 [child-completion]:
   https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html
+
+[child-process-current]: https://nodejs.org/api/child_process.html

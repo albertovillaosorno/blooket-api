@@ -566,3 +566,31 @@ At this checkpoint the Chrome connector exposed no connected Chrome. The
 additional DevTools MCP could not find its configured stable Chrome executable.
 Those transport failures do not diagnose the earlier provider challenge and do
 not authorize starting a different authenticated profile or weakening its gates.
+
+## Installation sequencing and existing Chrome connection (2026-10-09)
+
+`src/api/application-updates/application/install.ts` coordinates journaled
+installation and guarded rollback from independently prepared local authority.
+The mirrored targeted suite exercises real private journals and Linux atomic
+exchange/inverse recovery, plus synthetic trust/lifecycle failures. Never supply
+permissive production ports based on these doubles. Independent installer
+composition, all writer fences, actual authenticated version/nonce health,
+publisher provisioning, and opt-in product controls remain required.
+
+At the next browser check Chrome for Testing was running, but neither
+the Chrome connector nor the configured DevTools MCP could reach it. A separate
+scoped owner-installed CLI connection attempted to attach to the existing
+profile only; Chrome had no active remote-debugging endpoint.
+
+No new browser,
+profile, copied session, or challenge bypass was created. The owner was given
+Chrome's own remote-debugging activation step so the existing working session
+can be reused. A missing endpoint does not explain the earlier Cloudflare stop.
+
+After the owner enabled remote debugging, the scoped CLI connected to the
+existing Chrome for Testing profile. An actual accessibility snapshot showed
+the authenticated acceptance quiz with its four preserved questions and no
+Cloudflare challenge. This confirms restored browser access, not the cause of
+the earlier challenge or successful corrected image upload. The CLI's managed
+extension list was empty even though its page inventory exposed the existing
+extension worker; reloading that unmanaged extension by ID was refused.
