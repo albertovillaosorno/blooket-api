@@ -39,12 +39,15 @@ import type { ValidationIssue } from
   "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
   decodeProjectBundle,
-  type ProjectBundle,
 } from "../../project-bundles/domain/project-bundle.ts";
 import { validateProjectCapabilities } from
   "../../project-validation/domain/capabilities.ts";
 import { countUnresolvedProjectImages } from
   "../../project-validation/domain/media-references.ts";
+import { decodeProjectDocument, type ProjectDocument } from
+  "../../project-documents/domain/project.ts";
+import { decodePreparedMediaIdentities, type PreparedMediaIdentities } from
+  "./prepared-media-identities.ts";
 import type {
   MultipleChoiceQuestion,
   QuestionDocument,
@@ -183,28 +186,74 @@ export function buildBlooketWritePlan(
 
   return {
     ok: true,
-    value: lowerBundle(decoded.value),
+    value: lowerProject(decoded.value.project),
   };
 }
 
-function lowerBundle(bundle: ProjectBundle): BlooketWritePlan {
+// Durable publication needs stable IDs and admitted byte identities rather
+// than descriptive JSONL records or fabricated filesystem locations.
+export function buildPreparedBlooketWritePlan(
+  project: unknown,
+  expectedMedia: unknown,
+  capabilities: unknown,
+): BuildBlooketWritePlanResult {
+  const decoded = decodeProjectDocument(project);
+  if (!decoded.ok)
+    return { ok: false, kind: "invalid-project", issues: decoded.issues };
+  const media = decodePreparedMediaIdentities(expectedMedia);
+  const references = [decoded.value.coverImage,
+    ...decoded.value.questions.flatMap(question => [question.image,
+      ...(question.type === "multiple-choice"
+        ? question.answers.map(answer => answer.image) : []),
+    ]),
+  ].filter(image => image !== null);
+  const unresolved = references.filter(image => image.mediaId === null).length;
+  if (unresolved > 0)
+    return { ok: false, kind: "unresolved-media", count: unresolved };
+  const ids = new Set(references.map(image => image.mediaId!));
+  if (!media || media.items.length !== ids.size ||
+      media.items.some(item => !ids.has(item.mediaId)))
+    return { ok: false, kind: "invalid-project", issues: [{
+      path: "$.media", code: "prepared-media-identity-mismatch",
+      message: "Expected exactly one prepared identity per referenced " +
+        "media ID.",
+    }] };
+  const limits = decodeBlooketCapabilitySnapshot(capabilities);
+  if (!limits.ok)
+    return { ok: false, kind: "invalid-capabilities", issues: limits.issues };
+  const issues = validateProjectCapabilities(decoded.value, limits.value);
+  if (issues.length > 0)
+    return { ok: false, kind: "incompatible-capabilities", issues };
+  return { ok: true, value: lowerProject(decoded.value, media) };
+}
+
+function lowerProject(
+  project: ProjectDocument,
+  expectedMedia?: PreparedMediaIdentities,
+): BlooketWritePlan {
   const desiredOperations = [
     {
       kind: "set" as const,
-      title: bundle.project.title,
-      description: bundle.project.description,
-      visibility: bundle.project.visibility,
-      coverMediaId: resolvedMediaId(bundle.project.coverImage),
+      title: project.title,
+      description: project.description,
+      visibility: project.visibility,
+      coverMediaId: resolvedMediaId(project.coverImage),
     },
-    ...bundle.project.questions.map((question, index) => ({
+    ...project.questions.map((question, index) => ({
       kind: "question" as const,
       localQuestionId: question.id,
       questionNumber: index + 1,
       question: lowerQuestion(question),
     })),
   ];
+  // Empty contexts preserve legacy text plan and operation identities.
+  const identityState = expectedMedia && expectedMedia.items.length > 0
+    ? ["prepared-media:v1", desiredOperations,
+        [...expectedMedia.items].sort((a, b) =>
+          a.mediaId < b.mediaId ? -1 : a.mediaId > b.mediaId ? 1 : 0)]
+    : desiredOperations;
   const desiredStateSha256 = createHash("sha256")
-    .update(JSON.stringify(desiredOperations), "utf8")
+    .update(JSON.stringify(identityState), "utf8")
     .digest("hex");
   const planId = "plan:" + desiredStateSha256;
   const operations: BlooketWriteOperation[] = desiredOperations.map(

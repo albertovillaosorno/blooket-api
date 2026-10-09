@@ -199,9 +199,9 @@ their old digest for existing recovery journals.
 
 The authorized observation proves the emitted image reader on one saved
 question, not a newly loaded extension, file upload, or canonical publication.
-The prepared-file transport and immutable expected-media identity still need
-composition before enabling media writes. Never remove the publication media
-gate based on this read evidence alone.
+The corrected prepared-file transport still needs live acceptance, and initial
+media capture remains pending. The durable identity composition described below
+does not open the media gate; never remove it based on read evidence alone.
 
 The internal Add Question bridge now admits one exact prepared PNG/JPEG/GIF
 byte envelope. Only job delivery allows four megabytes for base64 expansion;
@@ -210,8 +210,9 @@ serialized delivery before leasing a job.
 
 Source paths, arbitrary filenames,
 URLs, SVG, question audio, and answer images remain unadmitted. Canonical
-publication still refuses media until immutable expected identity and recovery
-compose into its final verifier.
+publication still refuses new media mutations pending initial capture and live
+prepared-file acceptance. Its version-two snapshot now binds immutable expected
+identity into recovery and final verification.
 
 My Sets nonempty collection completeness remains unknown. Do not turn a stable
 visible subset into a complete baseline for ambiguous Create Set recovery.
@@ -544,3 +545,24 @@ solved. A different profile explains different session state but does not prove
 the cause of the provider challenge. Official Cloudflare guidance was checked
 again on 2026-10-09 at [supported browsers][cf-supported] and
 [challenge troubleshooting][cf-troubleshooting].
+
+## Durable publication identity foundation (2026-10-09)
+
+`publication-snapshot.ts` under the write-plan domain decodes exact version-one
+text snapshots and version-two expected-media contexts. Text plan IDs are
+unchanged; media plans hash the sorted frozen byte identities. No descriptive
+media JSONL, path, current library resolution, or provider URL can redefine a
+past attempted effect. Covers and answer images remain refused because the
+remote read contract cannot yet establish their exact identity.
+
+Canonical reconcile and verify now consume that durable context. Synthetic
+fixtures prove interrupted question-image recovery and final comparison even
+when today's local bytes change, plus refusal of changed hashes and cross-plan
+checkpoints. These fixtures do not prove live upload or canonical publication.
+Initial media capture and the real corrected native upload remain pending;
+new and resumed media mutation steps continue to return the unsupported stop.
+
+At this checkpoint the Chrome connector exposed no connected Chrome. The
+additional DevTools MCP could not find its configured stable Chrome executable.
+Those transport failures do not diagnose the earlier provider challenge and do
+not authorize starting a different authenticated profile or weakening its gates.

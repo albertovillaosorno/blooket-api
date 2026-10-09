@@ -39,6 +39,25 @@ state, prefixed as an operation identifier. Operation IDs derive from that plan
 ID. Retrying the same desired state therefore reuses identities, while changing
 remote-visible content creates a new plan.
 
+Durable publication snapshots also admit version two, which carries exact
+prepared-media identities beside the frozen document and capabilities. Its
+planner validates exactly one identity per referenced stable media ID instead
+of requiring descriptive JSONL records or synthesizing filesystem paths. The
+framed desired-state hash includes the sorted ID/revision/format/byte-length/
+SHA-256 facts whenever media is present. Changing a rendition therefore changes
+all plan/operation bindings, while identity ordering and descriptive metadata
+do not.
+
+Empty identity contexts retain the exact legacy text plan hash.
+
+Version-one snapshots remain text-only and retain their existing checkpoint and
+journal bindings. Final image verification and reconciliation consume the
+version-two frozen expected context without resolving today's media library.
+Cover and answer-image snapshots are refused until their remote identity can
+be verified. This snapshot foundation does not admit new media mutations:
+the live prepared-file transport must still pass acceptance before enabling
+that creation path.
+
 Progress uses a version-two checkpoint containing the exact plan ID, the next
 operation index, and the opaque remote set ID after Create Set succeeds. The
 checkpoint advances only when the executor confirms the exact next operation ID.

@@ -173,11 +173,10 @@ question reconciliation can use a copied admitted expected identity and requires
 version-four remote byte evidence plus preservation of the prior collection.
 It never resolves the current library to decide the outcome of an older write.
 
-This is portable execution/verifier composition evidence. Canonical publication
-snapshots do not yet persist this context and their media gate remains closed.
-Persist the model into the immutable saved-draft snapshot, bind write-time
-admission and final verification to the same context, and demonstrate live
-publication before removing that gate or completing this record.
+This is portable execution/verifier composition evidence. At this checkpoint,
+canonical publication snapshots did not yet persist this context. Subsequent
+version-two snapshot foundation below addresses durable identity composition;
+new media creation and live publication acceptance remain pending.
 
 The [Node Buffer documentation](https://nodejs.org/api/buffer.html), checked
 on 2026-10-09, distinguishes copying typed-array contents from sharing its
@@ -194,3 +193,25 @@ before lock acquisition or session I/O. A malformed context cannot be ignored
 when no media resolver is supplied, and neither failure opens an attempt journal
 or dispatches a write. The synthetic regressions fail against the prior commit
 and pass with this entry-boundary correction.
+
+### Durable expected-media snapshot foundation (2026-10-09)
+
+Canonical publication now writes an exact version-two frozen snapshot, with an
+empty identity context for currently admitted text drafts. Version-one text
+snapshots still resume with identical plan/checkpoint/journal bindings. The
+shared decoder admits exact question-image identities without descriptive
+metadata or fabricated paths and rejects unverifiable covers and answer images.
+
+For media plans, sorted ID, recipe revision, format, actual length, and SHA-256
+join the desired-state hash. Changing those facts cannot reinterpret an old
+checkpoint or attempt. Reconciliation and final verification use the frozen
+context; they never fetch current local bytes to decide an old remote outcome.
+The owning service now passes its existing prepared-media port and decoded
+expected context into persisted execution.
+
+Portable regressions verify legacy resumption, identity-order independence,
+changed-byte plan binding, malformed/extra/missing identities, capability
+refusals, simulated interrupted image reconciliation, and final image conflict.
+The simulated provider is explicitly not live canonical acceptance. New and
+resumed media mutations remain closed; initial media capture, corrected native
+upload acceptance, and real CLI/MCP publication remain required.

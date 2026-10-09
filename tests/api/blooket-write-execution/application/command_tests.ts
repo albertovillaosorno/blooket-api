@@ -48,10 +48,21 @@ import type { BlooketQuestionRead } from
   "../../../../src/ir/blooket-question-reads/contract/question-read.ts";
 import type { BlooketSetDetail } from
   "../../../../src/ir/blooket-set-reads/contract/set-read.ts";
-import { publicationFiles } from
+import { publicationFiles, createPublicationSnapshot } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/write-checkpoint-files/adapter-outbound/publication.ts";
 
+import { identifyPreparedMedia } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/projects/blooket-write-plans/domain/prepared-media-identities.ts";
+import { decodeBlooketPublicationSnapshot } from
+  "../../../../src/projects/blooket-write-plans/domain/publication-snapshot.ts";
+import { executePersistedBlooketWrite } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/application/execute-persisted.ts";
+import { blooketSetReadWriteVerifier } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/application/set-read-verifier.ts";
 import { acquireUpdatePublicationBoundary } from
   "../../../../src/api/application-updates/application/publication-boundary.ts";
 
@@ -116,7 +127,7 @@ async function state(root: string) {
       questions: { list: async () => ({ ok: true,
         value: structuredClone(questions) }) },
     },
-    writes: { execute: async (operation, target) => {
+    writes: { execute: async (operation, target, context) => {
       writes++;
       if (ambiguous) return { ok: false,
         kind: "browser", code: "blooket-browser-failed" };
@@ -132,7 +143,12 @@ async function state(root: string) {
       if (!lowered.ok || lowered.value.kind !== "add-question")
         throw new Error("fixture lowering failed");
       const expected = lowered.value;
-      questions.push({ schemaVersion: 3, number: expected.number,
+      const preparedImage = context.preparedMedia[0];
+      const image = preparedImage && identifyPreparedMedia(preparedImage);
+      questions.push({ ...(image ? { schemaVersion: 4 as const,
+          imageEvidence: { byteLength: image.byteLength,
+            sha256: image.sha256 } } : { schemaVersion: 3 as const }),
+        number: expected.number,
         question: expected.question, equation: null, qType: expected.qType,
         random: expected.random, timeLimit: expected.timeLimit,
         answers: expected.answers.map((answer, index) => {
@@ -141,7 +157,7 @@ async function state(root: string) {
             ? answer.text : null, correct: answer.correct,
             match: expected.answerTypes?.[index] ?? null };
         }),
-        hasImage: false, hasAudio: false,
+        hasImage: image !== undefined, hasAudio: false,
       });
       return { ok: true, receipt: null };
     } },
@@ -435,5 +451,135 @@ test("uncertain attempts block updates and survive until reconciliation",
     const boundary = await acquireUpdatePublicationBoundary(state.root);
     assert.ok(boundary.ok);
     await boundary.release();
+    assert.equal(state.writes(), 1);
+  }); });
+
+async function mediaRecoveryFixture(state: Awaited<ReturnType<typeof state>>) {
+  const preparedMedia = { mediaId: "icon", revision: 1,
+    format: "png" as const, bytes: new Uint8Array([137, 80, 78, 71, 13, 10]) };
+  const identity = identifyPreparedMedia(preparedMedia)!;
+  const snapshot = { schemaVersion: 2, draftId: "fixture",
+    revision: state.revision, capabilities,
+    document: { ...document, questions: [{ ...document.questions[0],
+      image: { description: "Synthetic icon", mediaId: "icon" },
+    }] }, expectedMedia: { schemaVersion: 1, items: [identity] },
+  };
+  const files = await publicationFiles(state.root, "fixture");
+  await createPublicationSnapshot(files.snapshot, snapshot);
+  const decoded = decodeBlooketPublicationSnapshot(snapshot, "fixture")!;
+  const verifier = blooketSetReadWriteVerifier(state.host.blooket.sets,
+    state.host.blooket.questions, decoded.expectedMedia);
+  const media = { read: async () => ({ ok: true as const,
+    value: preparedMedia }) };
+  const options = { pacer: state.host.pacer, media,
+    expectedMedia: decoded.expectedMedia };
+  const set = await executePersistedBlooketWrite(files, decoded.plan,
+    state.host.blooket.session, state.host.blooket.secrets,
+    state.host.writes, verifier, options);
+  assert.ok(set.ok);
+  return { files, decoded, verifier, options, preparedMedia };
+}
+
+test("canonical verification uses the durable image rather than current media",
+  async () => { await fixture(async state => {
+    const saved = await mediaRecoveryFixture(state);
+    assert.ok((await executePersistedBlooketWrite(saved.files,
+      saved.decoded.plan, state.host.blooket.session,
+      state.host.blooket.secrets, state.host.writes, saved.verifier,
+      saved.options)).ok);
+    saved.preparedMedia.bytes.fill(0);
+    const host = { ...state.host, preparedMedia: { read: async () => {
+      throw new Error("Verification must not resolve current media.");
+    } } };
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("verify"), host))["published"], true);
+    const question = state.questions[0]!;
+    assert.equal(question.schemaVersion, 4);
+    if (question.schemaVersion === 4) state.questions[0] = { ...question,
+      imageEvidence: { ...question.imageEvidence!, sha256: "f".repeat(64) },
+    };
+    const changed = await executeBlooketPublicationCommand(
+      command("verify"), host);
+    assert.ok(!changed.ok);
+    assert.equal(changed.issues[0]?.code,
+      "blooket-publication-remote-conflict");
+  }); });
+
+test("image reconciliation retains frozen identity after interruption",
+  async () => { await fixture(async state => {
+    const saved = await mediaRecoveryFixture(state);
+    const uncertain = { execute: async (...args:
+      Parameters<typeof state.host.writes.execute>) => {
+      await state.host.writes.execute(...args);
+      return { ok: false as const, kind: "browser" as const,
+        code: "blooket-browser-failed" as const };
+    } };
+    const attempt = await executePersistedBlooketWrite(saved.files,
+      saved.decoded.plan, state.host.blooket.session,
+      state.host.blooket.secrets, uncertain, saved.verifier, saved.options);
+    assert.ok(attempt.ok && attempt.kind === "reconciliation-required");
+    saved.preparedMedia.bytes.fill(0);
+    const reconciled = value(await executeBlooketPublicationCommand(
+      command("reconcile"), { ...state.host, preparedMedia: {
+        read: async () => { throw new Error("No current library reads."); },
+      } }));
+    assert.equal(reconciled["completedOperations"], 2);
+    assert.equal(state.writes(), 2);
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("verify"), state.host))["published"], true);
+  }); });
+
+test("resuming stored media cannot bypass the pending live mutation gate",
+  async () => { await fixture(async state => {
+    const saved = await mediaRecoveryFixture(state);
+    const snapshotBytes = await readFile(saved.files.snapshot, "utf8");
+    const stopped = await executeBlooketPublicationCommand(
+      command("step", state.revision), state.host);
+    assert.ok(!stopped.ok);
+    assert.equal(stopped.issues[0]?.code,
+      "blooket-publication-media-unsupported");
+    assert.equal(await readFile(saved.files.snapshot, "utf8"), snapshotBytes);
+    assert.equal(state.writes(), 1);
+  }); });
+
+test("legacy text publications retain checkpoint bindings",
+  async () => { await fixture(async state => {
+    value(await executeBlooketPublicationCommand(
+      command("step", state.revision), state.host));
+    const files = await publicationFiles(state.root, "fixture");
+    const stored = JSON.parse(await readFile(files.snapshot, "utf8"));
+    assert.equal(stored.schemaVersion, 2);
+    assert.deepEqual(stored.expectedMedia, { schemaVersion: 1, items: [] });
+    const { expectedMedia: unused, ...legacy } = stored;
+    void unused;
+    // Simulate an intact previous-version snapshot, preserving its checkpoint.
+    await writeFile(files.snapshot, JSON.stringify({ ...legacy,
+      schemaVersion: 1 }));
+    value(await executeBlooketPublicationCommand(
+      command("step", state.revision), state.host));
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("verify"), state.host))["published"], true);
+    assert.equal(state.writes(), 2);
+  }); });
+
+test("altered image identities cannot reinterpret an existing checkpoint",
+  async () => { await fixture(async state => {
+    const saved = await mediaRecoveryFixture(state);
+    const snapshot = JSON.parse(await readFile(saved.files.snapshot, "utf8"));
+    snapshot.expectedMedia.items[0].sha256 = "d".repeat(64);
+    await writeFile(saved.files.snapshot, JSON.stringify(snapshot));
+    const checkpoint = await readFile(saved.files.checkpoint, "utf8");
+    const provider = async (): Promise<never> => {
+      throw new Error("No provider reads after a cross-plan checkpoint.");
+    };
+    const stopped = await executeBlooketPublicationCommand(
+      command("verify"), { ...state.host, blooket: { ...state.host.blooket,
+        session: { observe: provider, authenticate: provider },
+        questions: { list: provider },
+      } });
+    assert.ok(!stopped.ok);
+    assert.equal(stopped.issues[0]?.code,
+      "blooket-publication-recovery-required");
+    assert.equal(await readFile(saved.files.checkpoint, "utf8"), checkpoint);
     assert.equal(state.writes(), 1);
   }); });

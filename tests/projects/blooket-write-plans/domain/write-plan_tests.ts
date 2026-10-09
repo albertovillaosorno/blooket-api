@@ -72,7 +72,7 @@ const capabilities = {
 
 import { decodeOperationId } from
   "../../../../src/ir/operation-identifiers/domain/operation-id.ts";
-import { buildBlooketWritePlan } from
+import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
 
 const media = [
@@ -357,4 +357,60 @@ test("media descriptions and vault paths do not enter plan payloads", () => {
   assert.equal(serialized.includes("silver moon"), false);
   assert.equal(serialized.includes("media/sun.png"), false);
   assert.equal(serialized.includes("media/moon.png"), false);
+});
+
+const identities = { schemaVersion: 1, items: [
+  { mediaId: "sun", revision: 1, format: "png", byteLength: 20,
+    sha256: "a".repeat(64) },
+  { mediaId: "moon", revision: 2, format: "jpeg", byteLength: 30,
+    sha256: "b".repeat(64) },
+] };
+
+test("prepared planning binds every byte identity without metadata or paths",
+  () => {
+    const original = buildPreparedBlooketWritePlan(project(), identities,
+      capabilities);
+    assert.ok(original.ok);
+    assert.deepEqual(buildPreparedBlooketWritePlan(project(), {
+      ...identities, items: [...identities.items].reverse(),
+    }, capabilities), original);
+    for (const change of [{ revision: 3 }, { format: "gif" },
+      { byteLength: 21 }, { sha256: "c".repeat(64) }]) {
+      const changed = buildPreparedBlooketWritePlan(project(), {
+        ...identities, items: [{ ...identities.items[0], ...change },
+          identities.items[1]],
+      }, capabilities);
+      assert.ok(changed.ok);
+      assert.notEqual(changed.value.planId, original.value.planId);
+      assert.ok(changed.value.operations.every(operation =>
+        operation.operationId.startsWith(changed.value.planId)));
+    }
+    assert.ok(!JSON.stringify(original).includes("media/sun.png"));
+  });
+
+test("prepared planning rejects missing extra and unresolved media", () => {
+  for (const items of [[], identities.items.slice(0, 1),
+    [...identities.items, { ...identities.items[0], mediaId: "unused" }]])
+    assert.equal(buildPreparedBlooketWritePlan(project(), {
+      schemaVersion: 1, items,
+    }, capabilities).ok, false);
+  const unresolved = project();
+  const result = buildPreparedBlooketWritePlan({ ...unresolved,
+    coverImage: { ...unresolved.coverImage, mediaId: null },
+  }, identities, capabilities);
+  assert.ok(!result.ok && result.kind === "unresolved-media");
+  assert.equal(buildPreparedBlooketWritePlan(project(), identities, {
+    ...capabilities, features: { ...capabilities.features,
+      answerImages: "unknown" },
+  }).ok, false);
+});
+
+test("empty prepared context preserves all legacy text plan identities", () => {
+  const text = { ...project(), coverImage: null, questions: [{
+    id: "q", type: "typing-answer", prompt: "Type sun.",
+    timeLimitSeconds: 15, image: null, matchMode: "exact", answer: "sun",
+  }] };
+  assert.deepEqual(buildPreparedBlooketWritePlan(text,
+    { schemaVersion: 1, items: [] }, capabilities),
+  buildBlooketWritePlan(JSON.stringify(text), "", capabilities));
 });
