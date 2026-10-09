@@ -52,13 +52,43 @@ export async function startMcpGateway(options: {
   const auth = createTeacherAuthorization(options.publicUrl);
   const publicHost = new URL(options.publicUrl).host;
   let active = 0;
+  const handlers = new Set<Promise<void>>();
+  let quiescing = false;
+  let closing: Promise<void> | undefined;
   const server = createServer((request, response) => {
-    void handle(request, response).catch(() => {
-      if (!response.headersSent)
-        send(response, 400, { error: "invalid_request" });
-      else response.end();
-    });
+    if (quiescing) {
+      send(response, 503, { error: "service_stopping" });
+      return;
+    }
+    const task = Promise.resolve().then(() => handle(request, response))
+      .catch(() => {
+        if (response.destroyed) return;
+        if (!response.headersSent)
+          send(response, 400, { error: "invalid_request" });
+        else response.end();
+      }).finally(() => { handlers.delete(task); });
+    handlers.add(task);
   });
+  function quiesce(): Promise<void> {
+    quiescing = true;
+    closing ??= (async () => {
+      auth.revokeAll();
+      let failure: unknown;
+      const closed = new Promise<void>(resolve => {
+        server.close(error => {
+          if (error && !("code" in error &&
+              error.code === "ERR_SERVER_NOT_RUNNING")) failure = error;
+          resolve();
+        });
+        server.closeAllConnections();
+      });
+      // A disconnected client cannot abandon a canonical CLI writer.
+      await Promise.allSettled([...handlers]);
+      await closed;
+      if (failure) throw failure;
+    })();
+    return closing;
+  }
   server.requestTimeout = 30_000;
   server.headersTimeout = 15_000;
   async function handle(
@@ -284,6 +314,7 @@ export async function startMcpGateway(options: {
   });
   return {
     server,
+    quiesce,
     pending: auth.pending,
     approve: auth.approve,
     reject: auth.reject,

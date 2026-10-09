@@ -36,13 +36,18 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import childProcess from "node:child_process";
+import { EventEmitter } from "node:events";
+import { syncBuiltinESMExports } from "node:module";
+import { PassThrough } from "node:stream";
+import { setImmediate as nextTurn } from "node:timers/promises";
 import { startMcpGateway } from
   "../../../../src/mcp/streamable-gateway/adapter-inbound/gateway.ts";
 
 test(
   "remote gateway authenticates calls and projects " +
     "tools through the canonical CLI",
-  async () => {
+  async t => {
     const root = await mkdtemp(join(tmpdir(), "mcp-gateway-"));
     const gateway = await startMcpGateway({
       publicUrl: "https://teacher.example/mcp",
@@ -237,13 +242,53 @@ test(
       assert.equal(envelope.ok, true);
       assert.deepEqual(envelope.value, []);
       assert.match(envelope.operationId, /^mcp:/u);
-      gateway.revokeAll();
-      assert.equal((await call("tools/list", {})).status, 401);
-    } finally {
-      await new Promise<void>((resolve) => {
-        gateway.server.close(() => resolve());
-        gateway.server.closeAllConnections();
+      let entered!: () => void;
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      let childOperation = "";
+      const child = Object.assign(new EventEmitter(), {
+        stdin: new PassThrough(), stdout: new PassThrough(), kill: () => true,
       });
+      child.stdin.once("data", data => {
+        const command = JSON.parse(data.toString());
+        assert.equal(command.command, "skills.put");
+        childOperation = command.operationId;
+        entered();
+      });
+      const spawn = t.mock.method(childProcess, "spawn", () => child);
+      syncBuiltinESMExports();
+      try {
+        const pendingCall = call("tools/call", { name: "skills_put",
+          arguments: { id: "synthetic-guidance", text: "Synthetic",
+            expectedRevision: null },
+        }).catch(() => undefined);
+        await started;
+        gateway.revokeAll();
+        assert.equal((await call("tools/list", {})).status, 401);
+        let stopped = false;
+        const draining = gateway.quiesce();
+        assert.equal(gateway.quiesce(), draining);
+        void draining.then(() => { stopped = true; });
+        await nextTurn();
+        assert.equal(stopped, false);
+        assert.deepEqual(gateway.connections(), []);
+        child.stdout.emit("data", Buffer.from(JSON.stringify({
+          version: 1, operationId: childOperation, ok: true, value: {},
+        })));
+        child.emit("exit", 0);
+        await nextTurn();
+        assert.equal(stopped, false);
+        child.emit("close", 0);
+        await draining;
+        await pendingCall;
+        assert.equal(stopped, true);
+        assert.equal(gateway.server.listening, false);
+      } finally {
+        child.emit("close", 0);
+        spawn.mock.restore();
+        syncBuiltinESMExports();
+      }
+    } finally {
+      await gateway.quiesce();
       await rm(root, { recursive: true, force: true });
     }
   },
