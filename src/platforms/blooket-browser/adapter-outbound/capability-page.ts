@@ -474,6 +474,9 @@ export function inspectBlooketAudioCapabilityDrawer(
     if (drawers.length !== 1) return failed();
     const drawer = drawers[0]!;
     const titles = Array.from(drawer.querySelectorAll("span"))
+      // The live upsell repeats its title inside the subscription link.
+      // Interactive labels are not drawer headings; duplicate headings stop.
+      .filter((span) => !span.closest("a") && !span.closest("button"))
       .map((span) => normalized(span))
       .filter(
         (text) =>
