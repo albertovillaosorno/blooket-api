@@ -308,3 +308,66 @@ test("a FIFO without a writer cannot hang journal recovery",
       } finally { await opened.store.close(); }
     });
   });
+
+test("queued creation owns the original directory and signed-context facts",
+  async () => { await temporary(async root => {
+    const opened = await openUpdateInstallationStore(join(root, "journal"));
+    assert.ok(opened.ok);
+    try {
+      const input = journalFixture();
+      const expected = structuredClone(input);
+      const creating = opened.store.create(input);
+      Reflect.set(input.installedIdentity, "inode", "20");
+      Reflect.set(input.candidateIdentity, "inode", "30");
+      Reflect.set(input.document.manifest.assets[0]!, "sha256", "b".repeat(64));
+      Reflect.set(input.document, "signature", "A".repeat(86));
+      assert.equal(await creating, "created");
+      assert.deepEqual(await opened.store.read(), expected);
+    } finally { await opened.store.close(); }
+  }); });
+
+test("queued replacement owns both expected and next intent before I/O",
+  async () => { await temporary(async root => {
+    const opened = await openUpdateInstallationStore(join(root, "journal"));
+    assert.ok(opened.ok);
+    try {
+      const input = journalFixture();
+      await opened.store.create(input);
+      const next = advanceUpdateInstallationJournal(input, "exchange-intent");
+      assert.ok(next.ok);
+      const expected = structuredClone(next.value);
+      const replacing = opened.store.replace(input, next.value);
+      Reflect.set(input.installedIdentity, "inode", "20");
+      Reflect.set(next.value, "phase", "old-observed");
+      await replacing;
+      assert.deepEqual(await opened.store.read(), expected);
+    } finally { await opened.store.close(); }
+  }); });
+
+test("invalid creation cannot become admitted while its operation is queued",
+  async () => { await temporary(async root => {
+    const opened = await openUpdateInstallationStore(join(root, "journal"));
+    assert.ok(opened.ok);
+    try {
+      const invalid = { ...journalFixture(), phase: "new-healthy" };
+      const creating = opened.store.create(invalid);
+      invalid.phase = "prepared";
+      await assert.rejects(creating, /update-journal-invalid/);
+      assert.equal(await opened.store.read(), undefined);
+    } finally { await opened.store.close(); }
+  }); });
+
+test("invalid replacement cannot change phase validity while queued",
+  async () => { await temporary(async root => {
+    const opened = await openUpdateInstallationStore(join(root, "journal"));
+    assert.ok(opened.ok);
+    try {
+      const input = journalFixture();
+      await opened.store.create(input);
+      const invalid = { ...input, phase: "new-healthy" };
+      const replacing = opened.store.replace(input, invalid);
+      invalid.phase = "exchange-intent";
+      await assert.rejects(replacing, /update-journal-transition-invalid/);
+      assert.deepEqual(await opened.store.read(), input);
+    } finally { await opened.store.close(); }
+  }); });
