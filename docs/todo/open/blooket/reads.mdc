@@ -215,7 +215,16 @@ layout bounds. It does not dismiss consent or navigate past a visible modal,
 active input, question editor, drawer, challenge, or Create Set draft.
 Serialized-function regressions cover hidden/collapsed/non-displayed dialogs,
 visible dialogs, and failed style inspection; all 15 page tests pass.
-Live corrected-worker acceptance remains required before completing this task.
+
+After loading committed `00e8472`, canonical question reads succeeded for all
+four saved acceptance questions, including byte length and SHA-256 for both
+images. The user-authored photo remained intact.
+
+Capability inspection still
+failed because the live audio upsell repeats its heading inside a subscription
+link; the reader now excludes interactive labels from heading selection.
+Duplicate noninteractive headings remain ambiguous, with serialized regressions.
+Corrected capability acceptance remains required before completing this task.
 
 The CSS contract was checked on 2026-10-09 against
 [MDN visibility][css-visibility] and [MDN getComputedStyle][computed-style].

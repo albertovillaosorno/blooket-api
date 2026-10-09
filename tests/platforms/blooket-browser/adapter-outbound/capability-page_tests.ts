@@ -358,6 +358,31 @@ test("audio drawer distinguishes the shared Plus gate and cancels", () => {
   }
 });
 
+test("audio upsell link text is not a second drawer heading", () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    const upsell = drawer("unsupported");
+    const link = node("A", "Upgrade to Plus");
+    const label = node("SPAN", "Upgrade to Plus");
+    label.parent = link;
+    upsell.selectors["span"]!.push(label);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [upsell];
+    const injected = Function(
+      "return (" + inspectBlooketAudioCapabilityDrawer.toString() + ")",
+    )() as typeof inspectBlooketAudioCapabilityDrawer;
+    assert.deepEqual(injected("set-fixture"), {
+      ok: true, value: "unsupported",
+    });
+    // Two noninteractive titles still indicate an ambiguous provider panel.
+    upsell.selectors["span"]!.push(node("SPAN", "Upgrade to Plus"));
+    assert.equal(injected("set-fixture").ok, false);
+  });
+});
+
 test("capability controls refuse control-bearing set IDs", () => {
   const page = fixture();
   withPage(page.document, () => {
