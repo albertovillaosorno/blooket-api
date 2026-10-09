@@ -46,12 +46,18 @@ const request = (command: unknown) => ({
 test("browser client labels admit only canonical extension roots", () => {
   for (const value of [
     "chrome-extension://fixture-extension/",
+    "chrome-extension://fixture-extension/#" +
+      "89aa67d6-4253-4013-9a54-68c37ce9e2af",
     "safari-web-extension://FC730C5C-1446-42CF-A5BB-9097337A63D1/",
   ]) assert.deepEqual(decodeBlooketBrowserClient(value), { ok: true, value });
   for (const value of [
     undefined, null, [], ["chrome-extension://fixture/"],
     "chrome-extension://fixture", "chrome-extension://fixture/a",
     "chrome-extension://fixture/?extra=1", "chrome-extension://fixture/#x",
+    "chrome-extension://fixture/#89AA67D6-4253-4013-9a54-68c37ce9e2af",
+    "chrome-extension://fixture/#89aa67d6-4253-4013-9a54-68c37ce9e2af/x",
+    "chrome-extension://fixture/?unknown=1#" +
+      "89aa67d6-4253-4013-9a54-68c37ce9e2af",
     "chrome-extension://user@fixture/", "chrome-extension://fixture:12/",
     "chrome-extension://fixture/\n", "https://fixture/", "file:///",
     "chrome-extension://" + "a".repeat(201) + "/",
@@ -280,4 +286,76 @@ test("bridge failures admit only stable browser codes", () => {
     ).ok,
     false,
   );
+});
+
+test("Add Question image transport accepts only prepared bounded bytes", () => {
+  const valid = {
+    kind: "questions.create",
+    setId: "synthetic-set",
+    number: 1,
+    question: "Synthetic image question",
+    answers: [{ text: "Yes", correct: true }],
+    qType: "typing",
+    random: true,
+    answerTypes: ["exactly"],
+    timeLimit: 15,
+  };
+  const image = {
+    format: "png",
+    base64: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+      .toString("base64"),
+  };
+  const admitted = decodeBlooketBrowserBridgeRequest(request({
+    ...valid, image,
+  }));
+  assert.equal(admitted.ok, true);
+  if (admitted.ok && admitted.value.command.kind === "questions.create")
+    assert.deepEqual(admitted.value.command.image, image);
+  for (const value of [
+    { ...valid, image: null },
+    { ...valid, image: { ...image, path: "/tmp/private-media" } },
+    { ...valid, image: { ...image, url: "https://example.invalid/" } },
+    { ...valid, image: { ...image, format: "jpeg" } },
+    { ...valid, image: { ...image, base64: "A".repeat(3_333_333) } },
+  ]) {
+    const result = decodeBlooketBrowserBridgeRequest(request(value));
+    assert.equal(result.ok, false);
+    if (!result.ok)
+      assert.equal(JSON.stringify(result).includes(image.base64), false);
+  }
+});
+
+test("browser tab focus is an exact, credential-free bridge command", () => {
+  assert.deepEqual(decodeBlooketBrowserBridgeRequest(
+    request({ kind: "browser.activate" }),
+  ), { ok: true, value: request({ kind: "browser.activate" }) });
+  for (const invalid of [
+    { kind: "browser.activate", url: "https://untrusted.invalid" },
+    { kind: "browser.activate", userAgent: "modified-browser" },
+    { kind: "browser.activate", profilePath: "/tmp/profile" },
+    { kind: "browser.activate", solveCaptcha: true },
+    { kind: "browser.activate", cookies: [] },
+  ]) assert.equal(decodeBlooketBrowserBridgeRequest(
+    request(invalid),
+  ).ok, false);
+});
+
+test("bridge text controls reject every forbidden literal byte", () => {
+  const command = {
+    kind: "sets.create", title: "Synthetic",
+    description: "Prepared by teacher", private: true,
+  };
+  for (const codePoint of [0, 1, 8, 11, 12, 14, 31, 127]) {
+    const invalid = String.fromCharCode(codePoint);
+    assert.equal(decodeBlooketBrowserBridgeRequest(request({
+      ...command, title: "Set" + invalid + "name",
+    })).ok, false);
+    assert.equal(decodeBlooketBrowserBridgeRequest(request({
+      ...command, description: "Draft" + invalid + "text",
+    })).ok, false);
+  }
+  // Preserved multiline teacher descriptions remain valid.
+  assert.equal(decodeBlooketBrowserBridgeRequest(request({
+    ...command, description: "Line one\nLine two\r\n\tIndented",
+  })).ok, true);
 });

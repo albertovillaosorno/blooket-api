@@ -12,6 +12,8 @@ const words = {
       "Update or reload Blooket API in your browser, disable older " +
       "copies, and restart the app.",
     "blooket-attention-required": "Blooket needs your attention. Open its tab.",
+    "blooket-tab-unavailable":
+      "The connected Blooket tab could not be focused. Reopen the workspace.",
     error: "The local service is unavailable.",
   },
   es: {
@@ -28,6 +30,8 @@ const words = {
       "las copias antiguas y reinicia la aplicación.",
     "blooket-attention-required":
       "Blooket necesita tu atención. Abre su pestaña.",
+    "blooket-tab-unavailable":
+      "No se pudo mostrar la pestaña conectada. Reabre el espacio local.",
     error: "El servicio local no está disponible.",
   },
 };

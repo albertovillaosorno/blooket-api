@@ -25,12 +25,53 @@ const words = {
     serviceStopped:
       "Blooket API se detuvo. Abre la aplicación para iniciarla otra " +
       "vez.",
+    openBlooketBrowser: "Abrir Blooket en mi navegador",
+    checkBlooketReadiness: "Comprobar lectura de Mis Sets",
+    readChecking: "Comprobando la sesión y Mis Sets…",
+    readInterrupted: "La lectura se interrumpió: ",
+    readNotConnected:
+      "La extensión no está conectada. Ábrela en tu navegador habitual.",
+    readMultipleClients:
+      "Hay varios navegadores conectados. Cierra el perfil extra y " +
+      "vuelve a comprobar en tu navegador habitual.",
+    readUnconfirmed:
+      "No se ha podido confirmar la sesión; no se ha leído Mis Sets.",
+    readChallenge:
+      "Cloudflare sigue requiriendo intervención. Pulsa Mostrar pestaña " +
+      "conectada, verifica allí y vuelve a comprobar Mis Sets.",
+    readSignedOut: "Inicia sesión en la pestaña conectada.",
+    readOrganization:
+      "Selecciona la organización en la pestaña conectada.",
+    readUnexpected:
+      "La página de Blooket no es reconocible. Revisa la pestaña.",
+    readSetsUnconfirmed:
+      "Se detectó la sesión, pero Mis Sets no se pudo verificar.",
+    readSetsComplete: "Mis Sets leído completamente. Sets: ",
+    readSetsUnknown:
+      "Mis Sets leído parcialmente; total desconocido. Sets visibles: ",
+    focusBlooketTab: "Mostrar pestaña conectada",
+    blooketTabFocused: "Se solicitó mostrar la pestaña conectada.",
+    blooketTabUnavailable:
+      "No hay una pestaña conectada disponible. Abre Blooket " +
+      "en el navegador habitual y activa la extensión allí.",
+    blooketTabMultipleClients:
+      "Varios navegadores están conectados. Cierra los perfiles extra.",
+    browserAttentionHelp:
+      "Si aparece Cloudflare, usa primero la pestaña conectada: así " +
+      "verificas la misma sesión. Si no hay ninguna, abre Blooket en " +
+      "tu navegador habitual y activa allí la extensión.",
+    blooketBrowserOpened:
+      "Se solicitó abrir Blooket en el navegador del sistema.",
+    blooketBrowserFailed:
+      "No se pudo abrir el navegador del sistema.",
     browserExtensions: "Extensiones del navegador",
     refreshBrowserConnection: "Comprobar conexión",
     browserConnected: "La extensión está conectada al espacio local.",
     browserDisconnected:
       "No hay una extensión conectada. Activa Blooket API en el navegador " +
       "y mantén abierto este espacio.",
+    browserMultipleClients:
+      "Hay varios navegadores conectados; cierra los perfiles extra.",
     browserConnectionUnknown: "No se pudo comprobar la conexión del navegador.",
     browserIncompatible:
       "Se detectó una conexión incompatible del navegador. Actualiza " +
@@ -267,12 +308,53 @@ const words = {
     stopService: "Stop Blooket API",
     serviceStopped:
       "Blooket API stopped. Open the application to start it again.",
+    openBlooketBrowser: "Open Blooket in my browser",
+    checkBlooketReadiness: "Check My Sets read",
+    readChecking: "Checking your session and My Sets…",
+    readInterrupted: "The read was interrupted: ",
+    readNotConnected:
+      "The extension is not connected. Open it in your regular browser.",
+    readMultipleClients:
+      "Multiple browsers are connected. Close the extra profile and " +
+      "try again in your regular browser.",
+    readUnconfirmed:
+      "The session could not be confirmed; My Sets was not read.",
+    readChallenge:
+      "Cloudflare still needs attention. Select Show connected tab, " +
+      "complete verification there, then check My Sets again.",
+    readSignedOut: "Sign in using the connected tab.",
+    readOrganization:
+      "Choose the organization in the connected tab.",
+    readUnexpected:
+      "The Blooket page is not recognized. Check the connected tab.",
+    readSetsUnconfirmed:
+      "The session was detected, but My Sets could not be verified.",
+    readSetsComplete: "My Sets fully read. Sets: ",
+    readSetsUnknown:
+      "My Sets partially read; total unknown. Visible sets: ",
+    focusBlooketTab: "Show connected tab",
+    blooketTabFocused: "Requested the connected browser tab.",
+    blooketTabUnavailable:
+      "No connected tab is available. Open Blooket in your usual " +
+      "browser and enable the extension there.",
+    blooketTabMultipleClients:
+      "Multiple browser profiles are connected. Close the extra profiles.",
+    browserAttentionHelp:
+      "If Cloudflare appears, first use the connected tab so you verify " +
+      "the same session. If none is connected, open Blooket in your " +
+      "regular browser and enable the extension there.",
+    blooketBrowserOpened:
+      "Requested Blooket in your system browser.",
+    blooketBrowserFailed:
+      "Could not open the system browser.",
     browserExtensions: "Browser extensions",
     refreshBrowserConnection: "Check connection",
     browserConnected: "The extension is connected to the local workspace.",
     browserDisconnected:
       "No extension is connected. Enable Blooket API in your browser " +
       "and keep this workspace open.",
+    browserMultipleClients:
+      "Multiple browsers are connected; close the extra profiles.",
     browserConnectionUnknown: "The browser connection could not be checked.",
     browserIncompatible:
       "An incompatible browser connection was detected. Update or reload " +
@@ -501,6 +583,7 @@ let locale = "es",
   sourceBase64,
   sourceBase64Promise,
   animatedColorSuggestion;
+let blooketReadiness = null;
 let editorBusy = false,
   preparedDirty = false,
   preparing = false,
@@ -579,7 +662,41 @@ function translate() {
   });
   $("#preparedPreview").alt = t("preparedLabel");
   if (selected) updateAdmissionControls();
+  renderBlooketReadiness();
   renderGallery();
+}
+function renderBlooketReadiness() {
+  const destination = $("#blooketReadinessState");
+  const value = blooketReadiness;
+  if (!value) { destination.textContent = ""; return; }
+  if (value === "checking") {
+    destination.textContent = t("readChecking");
+    return;
+  }
+  if (typeof value === "string") {
+    destination.textContent = t(value);
+    return;
+  }
+  if (value.read === "not-attempted" || value.read === "interrupted") {
+    const state = value.state;
+    destination.textContent =
+      (value.read === "interrupted" ? t("readInterrupted") : "") + t(
+      state === "security-challenge" ? "readChallenge" :
+        state === "signed-out" || state === "expired-session"
+          ? "readSignedOut" :
+          state === "organization-prompt" ? "readOrganization" :
+            "readUnexpected",
+    );
+    return;
+  }
+  if (value.read !== "observed") {
+    destination.textContent = t("readSetsUnconfirmed");
+    return;
+  }
+  destination.textContent = t(
+    value.completeness === "complete" ? "readSetsComplete" :
+      "readSetsUnknown",
+  ) + String(value.count);
 }
 function toast(message) {
   $("#toast").textContent = message;
@@ -1509,7 +1626,8 @@ function renderSettingsState() {
   renderUpdates();
   const bridge = bootstrap.browserBridge;
   $("#browserConnectionState").textContent = t(
-    bridge?.connected === true ? "browserConnected" :
+    bridge?.multipleBrowserClients === true ? "browserMultipleClients" :
+      bridge?.connected === true ? "browserConnected" :
       bridge?.connected === false ? "browserDisconnected" :
         "browserConnectionUnknown",
   );
@@ -1579,6 +1697,44 @@ $("#refreshLoginItem").addEventListener("click", async event => {
     renderSettingsState();
   } catch (error) { report(error); }
   finally { event.target.disabled = false; }
+});
+$("#checkBlooketReadiness").addEventListener("click", async event => {
+  event.target.disabled = true;
+  blooketReadiness = "checking";
+  renderBlooketReadiness();
+  try {
+    const result = await api("/api/blooket-readiness-check", {});
+    blooketReadiness = result;
+  } catch (error) {
+    blooketReadiness = error.message === "blooket-browser-multiple-clients"
+      ? "readMultipleClients" :
+      error.message === "blooket-browser-not-connected"
+        ? "readNotConnected" : "readUnconfirmed";
+  } finally {
+    renderBlooketReadiness();
+    event.target.disabled = false;
+  }
+});
+$("#focusBlooketTab").addEventListener("click", async event => {
+  event.target.disabled = true;
+  try {
+    await api("/api/blooket-connected-tab-focus", {});
+    $("#blooketBrowserState").textContent = t("blooketTabFocused");
+  } catch (error) {
+    $("#blooketBrowserState").textContent = t(
+      error.message === "blooket-browser-multiple-clients"
+        ? "blooketTabMultipleClients" : "blooketTabUnavailable",
+    );
+  } finally { event.target.disabled = false; }
+});
+$("#openBlooketBrowser").addEventListener("click", async event => {
+  event.target.disabled = true;
+  try {
+    await api("/api/blooket-browser-open", {});
+    $("#blooketBrowserState").textContent = t("blooketBrowserOpened");
+  } catch {
+    $("#blooketBrowserState").textContent = t("blooketBrowserFailed");
+  } finally { event.target.disabled = false; }
 });
 $("#refreshBrowserConnection").addEventListener("click", async event => {
   event.target.disabled = true;

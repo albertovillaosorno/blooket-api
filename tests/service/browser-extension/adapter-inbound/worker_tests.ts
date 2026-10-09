@@ -40,9 +40,13 @@ test(
   const root = "chrome-extension://synthetic/";
   const origin = "http://127.0.0.1:4567";
   let token = "a".repeat(43);
+  let observedClientLabel;
   let listener;
+  let onTabUpdated;
   let tabUrl = "https://dashboard.blooket.com/my-sets";
   let creates = 0;
+  const foregroundedTabs: number[] = [];
+  const focusedWindows: number[] = [];
   let closed = false;
   let validStatus = true;
   let incompatibleStatus = false;
@@ -98,6 +102,7 @@ test(
   const scripts = [];
   const requests = [];
   const stored = {};
+  const persistentProfile = {};
   const priorChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
   const priorFetch = globalThis.fetch;
   const browser = {
@@ -110,24 +115,40 @@ test(
       },
     },
     tabs: {
+      onUpdated: {
+        addListener: callback => { onTabUpdated = callback; },
+      },
       query: async () => [{ id: 99, url: origin + "/" }],
       create: async ({ url }) => {
         creates++;
         tabUrl = url;
-        return { id: 7, url, status: "complete" };
+        return { id: 7, url, status: "complete", windowId: 3 };
       },
       get: async (id) => {
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
-        return { id, url: tabUrl, status: "complete" };
+        return { id, url: tabUrl, status: "complete", windowId: 3 };
       },
-      update: async (id, { url }) => {
+      update: async (id, { url, active }) => {
         assert.equal(id, 7);
-        tabUrl = url;
-        return { id, url, status: "complete" };
+        if (url !== undefined) tabUrl = url;
+        if (active === true) foregroundedTabs.push(id);
+        return { id, url: tabUrl, status: "complete", windowId: 3 };
+      },
+    },
+    windows: {
+      update: async (id, options) => {
+        assert.equal(id, 3);
+        assert.deepEqual(options, { focused: true });
+        focusedWindows.push(id);
+        return {};
       },
     },
     storage: {
+      local: {
+        get: async () => ({ ...persistentProfile }),
+        set: async value => Object.assign(persistentProfile, value),
+      },
       session: {
         get: async () => ({ ...stored }),
         set: async (value) => Object.assign(stored, value),
@@ -149,6 +170,10 @@ test(
         scripts.push(func.name);
         if (func.name === "canLeaveBlooketPageForRead")
           return [{ result: !unsafeReadSource }];
+        if (func.name === "runBlooketCreateSetOwnership") {
+          assert.ok(args?.[0] === "claim" || args?.[0] === "check");
+          return [{ result: true }];
+        }
         if (func.name === "inspectBlooketDetailSidebar") {
           assert.deepEqual(args, ["opaque id/with spaces"]);
           detailSidebarReadCount++;
@@ -429,7 +454,17 @@ test(
     assert.equal(options.credentials, "omit");
     assert.equal(options.redirect, "error");
     assert.equal(options.headers.Authorization, "Bearer " + token);
-    assert.equal(options.headers["x-blooket-browser-client"], root);
+    const label = options.headers["x-blooket-browser-client"];
+    assert.match(label, new RegExp(
+      "^chrome-extension://synthetic/#" +
+      "[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+      "u",
+    ));
+    if (observedClientLabel !== undefined)
+      assert.equal(label, observedClientLabel);
+    observedClientLabel = label;
+    assert.equal(label.split("#")[1],
+      persistentProfile["blooket-browser-profile-id"]);
     requests.push(url);
     if ((url.endsWith("/status") && incompatibleStatus) ||
       (url.endsWith("/next") && incompatiblePoll)) {
@@ -490,7 +525,7 @@ test(
         assert.equal(
           listener(
             { kind: "workspace-ready", ...value },
-            { url: origin + "/", tab: { id: 99 } },
+            { url: value.origin + "/", tab: { id: 99 } },
             resolve,
           ),
           true,
@@ -520,6 +555,43 @@ test(
     assert.equal((await announce({ origin, token })).ok, true);
     assert.equal((await announce({ origin, token })).ok, true);
     assert.equal(creates, 1);
+    const beforeForeignWorkspace = requests.length;
+    const foreignWorkspace = await announce({
+      origin: "http://127.0.0.1:9999", token: "b".repeat(43),
+    });
+    assert.deepEqual(foreignWorkspace, {
+      ok: false, status: "workspace-already-connected",
+    });
+    assert.equal(requests.length, beforeForeignWorkspace);
+    assert.equal(creates, 1);
+    assert.equal(persistentProfile["blooket-owned-tab-id"], 7);
+    const focused = await expectReply({ kind: "browser.activate" });
+    assert.deepEqual(focused, {
+      schemaVersion: 1, id: focused.id,
+      ok: true, value: { focused: true },
+    });
+    assert.deepEqual(foregroundedTabs, [7]);
+    assert.deepEqual(focusedWindows, [3]);
+    tabUrl = "https://untrusted.invalid/unrelated";
+    const foreignFocus = await expectReply({ kind: "browser.activate" });
+    assert.deepEqual(foreignFocus, {
+      schemaVersion: 1, id: foreignFocus.id,
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(foregroundedTabs, [7]);
+    assert.deepEqual(focusedWindows, [3]);
+    assert.deepEqual(await message({ kind: "open-blooket" }), {
+      ok: false, status: "blooket-tab-unavailable",
+    });
+    assert.deepEqual(foregroundedTabs, [7]);
+    // The same local workspace must not adopt a tab navigated elsewhere.
+    const disconnectedTab = await announce({ origin, token });
+    assert.equal(disconnectedTab.ok, true);
+    assert.equal(creates, 2);
+    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    assert.equal(persistentProfile["blooket-owned-tab-id"], 7);
+    foregroundedTabs.length = 0;
+    focusedWindows.length = 0;
     const firstSets = await expectReply({ kind: "sets.list" });
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
@@ -816,12 +888,47 @@ test(
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
     assert.equal((await message({ kind: "status" })).status, "connected");
+    assert.equal(typeof onTabUpdated, "function");
+    onTabUpdated(999, { title: "Just a moment..." }, {
+      id: 999, url: "https://dashboard.blooket.com/my-sets",
+    });
+    onTabUpdated(7, { title: "Ordinary Blooket page" }, {
+      id: 7, url: tabUrl,
+    });
+    assert.equal(foregroundedTabs.length, 0);
+    onTabUpdated(7, { title: "Just a moment..." }, {
+      id: 7, url: tabUrl, windowId: 3,
+    });
+    onTabUpdated(7, { title: "Just a moment..." }, {
+      id: 7, url: tabUrl, windowId: 3,
+    });
+    const eventDeadline = realNow() + 1000;
+    while (focusedWindows.length !== 1) {
+      assert.ok(realNow() < eventDeadline,
+        "owned background challenge did not open its browser window");
+      await pause(10);
+    }
+    assert.deepEqual(foregroundedTabs, [7]);
     observedSessionOverride = "security-challenge";
     const challenged = await expectReply({ kind: "session.observe" });
     assert.equal(challenged.ok, true);
     assert.equal(challenged.value, "security-challenge");
+    const focusedDeadline = realNow() + 1000;
+    while (focusedWindows.length !== 1) {
+      assert.ok(realNow() < focusedDeadline,
+        "confirmed challenge did not surface its browser window");
+      await pause(10);
+    }
+    assert.deepEqual(foregroundedTabs, [7]);
+    assert.deepEqual(focusedWindows, [3]);
+    const sameChallenge = await expectReply({ kind: "session.observe" });
+    assert.equal(sameChallenge.value, "security-challenge");
+    assert.deepEqual(foregroundedTabs, [7]);
     assert.equal((await message({ kind: "status" })).status,
       "blooket-attention-required");
+    assert.equal((await message({ kind: "open-blooket" })).ok, true);
+    assert.deepEqual(foregroundedTabs, [7, 7]);
+    assert.deepEqual(focusedWindows, [3, 3]);
     observedSessionOverride = null;
     assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
     assert.equal((await message({ kind: "status" })).status, "connected");
@@ -946,3 +1053,372 @@ test(
     else Reflect.deleteProperty(globalThis, "chrome");
   }
 });
+
+test("worker startup rejects a stored tab moved outside Blooket",
+  async () => {
+  const priorChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+  const priorFetch = globalThis.fetch;
+  const origin = "http://127.0.0.1:4567";
+  const root = "chrome-extension://isolated-restore-fixture/";
+  let listener;
+  let removed = 0;
+  let created = 0;
+  const mocked = {
+    runtime: {
+      getURL: path => root + path,
+      onMessage: { addListener: callback => { listener = callback; } },
+    },
+    tabs: {
+      onUpdated: { addListener: () => {} },
+      query: async () => [],
+      get: async () => ({ id: 7, url: "https://untrusted.invalid" }),
+      create: async () => { created++; throw Error("unexpected-create"); },
+    },
+    storage: {
+      session: {
+        get: async () => ({ connection: {
+          origin, token: "a".repeat(43), tabId: 7,
+        } }),
+        remove: async key => {
+          assert.equal(key, "connection");
+          removed++;
+        },
+      },
+    },
+  };
+  Object.defineProperty(globalThis, "chrome", {
+    value: mocked, configurable: true,
+  });
+  globalThis.fetch = async () => {
+    throw Error("stale-connection-must-not-poll");
+  };
+  try {
+    await import(
+      "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
+      "?stale-stored-tab-recovery"
+    );
+    const result = await new Promise(resolve => {
+      assert.equal(listener({ kind: "status" }, {
+        url: root + "src/ui/browser-extension/adapter-inbound/popup.html",
+      }, resolve), true);
+    });
+    assert.deepEqual(result, { ok: true, status: "waiting-for-workspace" });
+    assert.equal(removed, 1);
+    assert.equal(created, 0);
+  } finally {
+    if (priorChrome)
+      Object.defineProperty(globalThis, "chrome", priorChrome);
+    else Reflect.deleteProperty(globalThis, "chrome");
+    globalThis.fetch = priorFetch;
+  }
+  },
+);
+
+test("worker startup only restores a live, admitted Blooket tab",
+  async () => {
+  const priorChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+  const priorFetch = globalThis.fetch;
+  const origin = "http://127.0.0.1:4567";
+  const root = "chrome-extension://restored-fixture/";
+  let listener;
+  let removed = 0;
+  let gets = 0;
+  let creates = 0;
+  Object.defineProperty(globalThis, "chrome", {
+    configurable: true,
+    value: {
+      runtime: {
+        getURL: path => root + path,
+        onMessage: { addListener: callback => { listener = callback; } },
+      },
+      tabs: {
+        onUpdated: { addListener: () => {} },
+        query: async () => [],
+        get: async id => {
+          gets++;
+          return { id, url: "https://dashboard.blooket.com/my-sets" };
+        },
+        create: async () => { creates++; throw Error("unexpected-create"); },
+      },
+      storage: {
+        session: {
+          get: async () => ({ connection: {
+            origin, token: "a".repeat(43), tabId: 7,
+          } }),
+          remove: async () => { removed++; },
+        },
+      },
+    },
+  });
+  let releaseFetch!: () => void;
+  const waitFetch = new Promise<void>(resolve => { releaseFetch = resolve; });
+  globalThis.fetch = async () => {
+    await waitFetch;
+    return new Response(null, { status: 426 });
+  };
+  try {
+    await import(
+      "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
+      "?valid-stored-tab-restoration"
+    );
+    await pause(30);
+    const popup = () => new Promise(resolve => {
+      assert.equal(listener({ kind: "status" }, {
+        url: root + "src/ui/browser-extension/adapter-inbound/popup.html",
+      }, resolve), true);
+    });
+    assert.deepEqual(await popup(), { ok: true, status: "connected" });
+    releaseFetch();
+    await pause(30);
+    assert.deepEqual(await popup(),
+      { ok: true, status: "extension-update-required" });
+    assert.ok(gets >= 2);
+    assert.equal(creates, 0);
+    assert.equal(removed, 1);
+  } finally {
+    releaseFetch();
+    if (priorChrome)
+      Object.defineProperty(globalThis, "chrome", priorChrome);
+    else Reflect.deleteProperty(globalThis, "chrome");
+    globalThis.fetch = priorFetch;
+  }
+  },
+);
+
+test("worker startup discards malformed stored connection bytes",
+  async () => {
+  const previousChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+  const previousFetch = globalThis.fetch;
+  const root = "chrome-extension://bad-stored-fixture/";
+  let callback;
+  let removed = 0;
+  let gets = 0;
+  Object.defineProperty(globalThis, "chrome", {
+    configurable: true,
+    value: {
+      runtime: {
+        getURL: path => root + path,
+        onMessage: { addListener: listener => { callback = listener; } },
+      },
+      tabs: {
+        onUpdated: { addListener: () => {} },
+        query: async () => [],
+        get: async () => { gets++; throw Error("unexpected-tab-get"); },
+      },
+      storage: {
+        session: {
+          get: async () => ({ connection: {
+            origin: "https://untrusted.invalid",
+            token: "not-a-token", tabId: 7,
+          } }),
+          remove: async key => {
+            assert.equal(key, "connection");
+            removed++;
+            throw Error("synthetic-storage-readonly");
+          },
+        },
+      },
+    },
+  });
+  globalThis.fetch = async () => { throw Error("unexpected-fetch"); };
+  try {
+    await import(
+      "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
+      "?invalid-stored-connection-cleanup"
+    );
+    const status = await new Promise(resolve => {
+      assert.equal(callback({ kind: "status" }, {
+        url: root + "src/ui/browser-extension/adapter-inbound/popup.html",
+      }, resolve), true);
+    });
+    assert.deepEqual(status, { ok: true, status: "waiting-for-workspace" });
+    assert.equal(removed, 1);
+    assert.equal(gets, 0);
+  } finally {
+    if (previousChrome)
+      Object.defineProperty(globalThis, "chrome", previousChrome);
+    else Reflect.deleteProperty(globalThis, "chrome");
+    globalThis.fetch = previousFetch;
+  }
+  },
+);
+
+test("a recycled saved tab ID cannot claim a teacher editor",
+  async () => {
+  const priorChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+  const priorFetch = globalThis.fetch;
+  const origin = "http://127.0.0.1:4567";
+  const ext = "chrome-extension://recycled-tab-fixture/";
+  let listener;
+  const created: number[] = [];
+  const stored: Record<string, unknown> = { "blooket-owned-tab-id": 7 };
+  const sessions: Record<string, unknown> = {};
+  Object.defineProperty(globalThis, "chrome", {
+    configurable: true,
+    value: {
+      runtime: {
+        getURL: (part: string) => ext + part,
+        onMessage: { addListener: (fn: unknown) => { listener = fn; } },
+      },
+      tabs: {
+        onUpdated: { addListener: () => {} },
+        query: async () => [],
+        get: async (id: number) => ({ id, status: "complete",
+          url: id === 7
+            ? "https://dashboard.blooket.com/edit?id=teacher-draft"
+            : "https://dashboard.blooket.com/my-sets" }),
+        create: async () => {
+          created.push(8);
+          return { id: 8, url: "https://dashboard.blooket.com/my-sets",
+            status: "complete" };
+        },
+      },
+      storage: {
+        local: {
+          get: async () => ({ ...stored }),
+          set: async (value: Record<string, unknown>) => {
+            Object.assign(stored, value);
+          },
+        },
+        session: {
+          get: async () => ({ ...sessions }),
+          set: async (value: Record<string, unknown>) => {
+            Object.assign(sessions, value);
+          },
+          remove: async (key: string) => { delete sessions[key]; },
+        },
+      },
+    },
+  });
+  globalThis.fetch = async (url: string) =>
+    url.endsWith("/api/browser-bridge/status")
+      ? Response.json({ ok: true, pending: 0, connected: false })
+      : new Response(null, { status: 426 });
+  try {
+    await import(
+      "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
+      "?recycled-editor-tab"
+    );
+    const reply = await new Promise(resolve => {
+      assert.equal(listener({ kind: "workspace-ready", origin,
+        token: "a".repeat(43) }, {
+        url: origin + "/", tab: { id: 99 },
+      }, resolve), true);
+    });
+    assert.deepEqual(reply, { ok: true, status: "connected" });
+    assert.deepEqual(created, [8]);
+    assert.equal(stored["blooket-owned-tab-id"], 8);
+    assert.equal((sessions.connection as { tabId: number }).tabId, 8);
+    // Let the synthetic 426 retire its relay before restoring global chrome.
+    for (let attempt = 0; "connection" in sessions && attempt < 50;
+      attempt++) await pause(10);
+    assert.equal("connection" in sessions, false);
+  } finally {
+    if (priorChrome)
+      Object.defineProperty(globalThis, "chrome", priorChrome);
+    else Reflect.deleteProperty(globalThis, "chrome");
+    globalThis.fetch = priorFetch;
+  }
+  },
+);
+
+test("Cloudflare landing tabs survive reload without claiming editor tabs",
+  async () => {
+  const previousChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
+  const previousFetch = globalThis.fetch;
+  const origin = "http://127.0.0.1:4567";
+  const cases = [
+    ["Just a moment...",
+      "https://dashboard.blooket.com/my-sets?__cf_chl_rt_tk=fake", 0],
+    ["My Sets",
+      "https://dashboard.blooket.com/my-sets?__cf_chl_rt_tk=fake", 1],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/edit?id=teacher-draft", 1],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/my-sets?filter=private", 1],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/my-sets?__cf_chl_rt_tk=x" +
+        "&__cf_chl_rt_tk=y", 1],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/my-sets?__cf_chl_rt_tk=", 1],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/my-sets?__cf_chl_rt_tk=" +
+        "x".repeat(1_025), 1],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/my-sets?__cf_chl_rt_tk=fake#draft", 1],
+    ["Just a moment...",
+      "https://id.blooket.com/login?__cf_chl_rt_tk=fake", 0],
+    ["Just a moment...",
+      "https://dashboard.blooket.com/create?__cf_chl_rt_tk=fake", 1],
+  ] as const;
+  try {
+    for (const [index, scenario] of cases.entries()) {
+      const [title, url, expectedCreated] = scenario;
+      const extension = "chrome-extension://cf-tab-fixture/";
+      let listener;
+      let created = 0;
+      const local: Record<string, unknown> = { "blooket-owned-tab-id": 7 };
+      const session: Record<string, unknown> = {};
+      Object.defineProperty(globalThis, "chrome", {
+        configurable: true,
+        value: {
+          runtime: {
+            getURL: (path: string) => extension + path,
+            onMessage: { addListener: (fn: unknown) => { listener = fn; } },
+          },
+          tabs: {
+            onUpdated: { addListener: () => {} },
+            query: async () => [],
+            get: async (id: number) => ({ id, url, title }),
+            create: async () => {
+              created++;
+              return { id: 8, url: "https://dashboard.blooket.com/my-sets",
+                title: "My Sets" };
+            },
+          },
+          storage: {
+            local: {
+              get: async () => ({ ...local }),
+              set: async (value: Record<string, unknown>) => {
+                Object.assign(local, value);
+              },
+            },
+            session: {
+              get: async () => ({ ...session }),
+              set: async (value: Record<string, unknown>) => {
+                Object.assign(session, value);
+              },
+              remove: async (key: string) => { delete session[key]; },
+            },
+          },
+        },
+      });
+      globalThis.fetch = async (requestUrl: string) =>
+        requestUrl.endsWith("/api/browser-bridge/status")
+          ? Response.json({ ok: true, pending: 0, connected: false })
+          : new Response(null, { status: 426 });
+      await import(
+        "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
+        "?cloudflare-owned-tab-" + index
+      );
+      const result = await new Promise(resolve => {
+        assert.equal(listener({ kind: "workspace-ready", origin,
+          token: "a".repeat(43) }, { url: origin + "/", tab: { id: 99 } },
+        resolve), true);
+      });
+      assert.deepEqual(result, { ok: true, status: "connected" });
+      assert.equal(created, expectedCreated, url.split("?")[0]);
+      assert.equal((session.connection as { tabId: number }).tabId,
+        expectedCreated === 0 ? 7 : 8);
+      for (let i = 0; "connection" in session && i < 50; i++)
+        await pause(10);
+      assert.equal("connection" in session, false);
+    }
+  } finally {
+    if (previousChrome)
+      Object.defineProperty(globalThis, "chrome", previousChrome);
+    else Reflect.deleteProperty(globalThis, "chrome");
+    globalThis.fetch = previousFetch;
+  }
+  },
+);

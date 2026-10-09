@@ -167,6 +167,9 @@ test("symbolic parents, replaced directories and public storage fail closed",
         { ok: false, reason: "storage" });
       const publicDirectory = join(root, "public");
       await mkdir(publicDirectory, { mode: 0o755 });
+      // An inherited 0077 umask can silently create this as private 0700.
+      // Set the unsafe mode explicitly so the refusal is actually exercised.
+      await chmod(publicDirectory, 0o755);
       assert.deepEqual(await openUpdateInstallationStore(publicDirectory),
         { ok: false, reason: "storage" });
       const directory = join(root, "journal");

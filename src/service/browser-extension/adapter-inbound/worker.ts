@@ -59,7 +59,9 @@ import {
 interface BrowserTab {
   id?: number;
   url?: string;
+  title?: string;
   status?: string;
+  windowId?: number;
 }
 interface Connection {
   origin: string;
@@ -80,6 +82,13 @@ declare const chrome: {
     };
   };
   tabs: {
+    onUpdated: {
+      addListener(listener: (
+        tabId: number,
+        changeInfo: { title?: string },
+        tab: BrowserTab,
+      ) => void): void;
+    };
     query(options: { url: string[] }): Promise<BrowserTab[]>;
     create(options: { url: string; active: boolean }): Promise<BrowserTab>;
     get(id: number): Promise<BrowserTab>;
@@ -87,6 +96,9 @@ declare const chrome: {
       id: number,
       options: { url?: string; active?: boolean },
     ): Promise<BrowserTab>;
+  };
+  windows: {
+    update(id: number, options: { focused: boolean }): Promise<unknown>;
   };
   scripting: {
     executeScript(options: {
@@ -97,6 +109,10 @@ declare const chrome: {
     }): Promise<{ result?: unknown }[]>;
   };
   storage: {
+    local?: {
+      get(key: string): Promise<Record<string, unknown>>;
+      set(value: Record<string, unknown>): Promise<void>;
+    };
     session?: {
       get(key: string): Promise<Record<string, unknown>>;
       set(value: Record<string, unknown>): Promise<void>;
@@ -109,7 +125,31 @@ let connection: Connection | undefined;
 let generation = 0;
 let status = "waiting-for-workspace";
 let pendingUiAction = Promise.resolve();
+let humanWindowRaised = false;
+let browserClientLabel: Promise<string> | undefined;
 class BrowserBridgeCompatibilityError extends Error {}
+
+function pairedBrowserLabel(): Promise<string> {
+  browserClientLabel ??= (async () => {
+    // Each browser profile retains its own anonymous extension identity.
+    // The bridge can then refuse jobs if a second profile with unrelated
+    // cookies is paired to the same local service. No account data stored.
+    const key = "blooket-browser-profile-id";
+    let id: string | undefined;
+    try {
+      const stored = (await chrome.storage.local?.get(key))?.[key];
+      if (typeof stored === "string" &&
+          /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u.test(stored))
+        id = stored;
+    } catch { /* Storage may be disabled in a browser variant. */ }
+    id ??= crypto.randomUUID();
+    try {
+      await chrome.storage.local?.set({ [key]: id });
+    } catch { /* Remain stable until this worker is recreated. */ }
+    return chrome.runtime.getURL("") + "#" + id;
+  })();
+  return browserClientLabel;
+}
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -141,7 +181,10 @@ function configured(value: unknown): Connection | undefined {
   }
 }
 
-async function jsonResponse(response: Response): Promise<unknown> {
+async function jsonResponse(
+  response: Response,
+  maxBytes = 1_000_000,
+): Promise<unknown> {
   if (!response.ok || !response.body) throw new Error("bridge-unavailable");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -151,7 +194,8 @@ async function jsonResponse(response: Response): Promise<unknown> {
       const part = await reader.read();
       if (part.done) break;
       size += part.value.length;
-      if (size > 1_000_000) throw new Error("bridge-response-too-large");
+      if (size > maxBytes || chunks.length >= 2_048 || part.value.length === 0)
+        throw new Error("bridge-response-too-large");
       chunks.push(part.value);
     }
   } finally {
@@ -177,13 +221,16 @@ async function bridgeFetch(
     signal: AbortSignal.timeout(2000),
     headers: {
       Authorization: "Bearer " + current.token,
-      [BLOOKET_BROWSER_CLIENT_HEADER]: chrome.runtime.getURL(""),
+      [BLOOKET_BROWSER_CLIENT_HEADER]: await pairedBrowserLabel(),
       ...(value === undefined ? {} : { "Content-Type": "application/json" }),
     },
     ...(value === undefined ? {} : { body: JSON.stringify(value) }),
   });
   if (response.status === 426) throw new BrowserBridgeCompatibilityError();
-  return await jsonResponse(response);
+  // Base64 expands one admitted image to ~3.34 MB. Only job delivery receives
+  // that allowance; status and result responses keep their original bound.
+  return await jsonResponse(response,
+    route === "/api/browser-bridge/next" ? 4_000_000 : 1_000_000);
 }
 async function script(
   current: Connection,
@@ -571,6 +618,26 @@ function ownedBrowser(
   };
 }
 
+// A verified human challenge is shown in the real browser's existing tab.
+// Never launch an automated solver, change the User-Agent, or copy cookies.
+async function showHumanBlooketTab(
+  tabId: number,
+  stillOwned: () => boolean = () => true,
+): Promise<boolean> {
+  if (!stillOwned()) return false;
+  const tab = await chrome.tabs.get(tabId);
+  if (tab.id !== tabId || !tab.url || !stillOwned() ||
+      !["https://dashboard.blooket.com", "https://id.blooket.com"]
+        .includes(new URL(tab.url).origin)) return false;
+  await chrome.tabs.update(tabId, { active: true });
+  if (!stillOwned()) return false;
+  if (typeof tab.windowId !== "number" ||
+      !Number.isSafeInteger(tab.windowId) || tab.windowId < 0)
+    return false;
+  await chrome.windows.update(tab.windowId, { focused: true });
+  return true;
+}
+
 async function relay(current: Connection, activeGeneration: number) {
   const browser = ownedBrowser(current, activeGeneration);
   const isOwner = () => connection === current &&
@@ -608,7 +675,13 @@ async function relay(current: Connection, activeGeneration: number) {
         );
         let result: unknown = { ok: false, code: "blooket-browser-failed" };
         try {
-          if (
+          if (job.command.kind === "browser.activate") {
+            const visible = await showHumanBlooketTab(current.tabId,
+              isOwner);
+            result = visible
+              ? { ok: true, value: { focused: true } }
+              : { ok: false, code: "blooket-browser-failed" };
+          } else if (
             job.command.kind === "session.observe" ||
             job.command.kind === "sets.list" ||
             job.command.kind === "sets.get" ||
@@ -677,6 +750,7 @@ async function relay(current: Connection, activeGeneration: number) {
                 random: job.command.random,
                 answerTypes: job.command.answerTypes,
                 timeLimit: job.command.timeLimit,
+                ...(job.command.image ? { image: job.command.image } : {}),
               }),
             };
           }
@@ -696,6 +770,9 @@ async function relay(current: Connection, activeGeneration: number) {
           "value" in result && typeof result.value === "string"
         ) {
           const state = result.value;
+          if (state === "dashboard" || state === "my-sets" ||
+              state === "create" || state === "edit")
+            humanWindowRaised = false;
           if (
             state === "signed-out" || state === "expired-session" ||
             state === "security-challenge" ||
@@ -711,6 +788,18 @@ async function relay(current: Connection, activeGeneration: number) {
           id: job.id,
           ...(result as Record<string, unknown>),
         });
+        // The client must get its result before any best-effort window
+        // activation. Never steal focus repeatedly in a challenge loop.
+        if (job.command.kind === "session.observe" &&
+            !humanWindowRaised && result && typeof result === "object" &&
+            !Array.isArray(result) && "ok" in result &&
+            result.ok === true && "value" in result &&
+            (result.value === "security-challenge" ||
+              result.value === "organization-prompt")) {
+          humanWindowRaised = true;
+          await showHumanBlooketTab(current.tabId, isOwner)
+            .catch(() => undefined);
+        }
       }
       if (status === "connection-unavailable") status = "connected";
     } catch (error) {
@@ -728,11 +817,42 @@ async function relay(current: Connection, activeGeneration: number) {
   }
 }
 async function disconnect() {
+  humanWindowRaised = false;
   generation++;
   connection = undefined;
   status = "disconnected";
   await chrome.storage.session?.remove("connection");
 }
+function admittedBlooketTab(tab: BrowserTab | undefined): boolean {
+  if (!tab?.id || !tab.url) return false;
+  try {
+    return ["https://dashboard.blooket.com", "https://id.blooket.com"]
+      .includes(new URL(tab.url).origin);
+  } catch { return false; }
+}
+
+function reclaimableBlooketTab(tab: BrowserTab | undefined): boolean {
+  // Local storage outlives extension and browser restarts. A recycled numeric
+  // tab ID at /edit or /create may contain a teacher's unfinished work.
+  // Reclaim only our previous landing route, never an editor or modal route.
+  if (!admittedBlooketTab(tab)) return false;
+  const url = new URL(tab!.url!);
+  const landing = url.origin === "https://dashboard.blooket.com" &&
+    url.pathname === "/my-sets" ||
+    url.origin === "https://id.blooket.com" &&
+    url.pathname === "/login";
+  if (!landing || url.hash) return false;
+  if (!url.search) return true;
+  // Cloudflare can append this provider-owned one-time query while showing
+  // its challenge. Preserve the *same* tab through an extension reload, but
+  // never reclaim an arbitrary editor, search, or foreign query.
+  return tab?.title === "Just a moment..." &&
+    url.searchParams.size === 1 &&
+    url.searchParams.getAll("__cf_chl_rt_tk").length === 1 &&
+    (url.searchParams.get("__cf_chl_rt_tk")?.length ?? 0) <= 1_024 &&
+    (url.searchParams.get("__cf_chl_rt_tk")?.length ?? 0) > 0;
+}
+
 async function connectWorkspace(message: unknown) {
   if (
     !message ||
@@ -747,11 +867,22 @@ async function connectWorkspace(message: unknown) {
     tabId: connection?.tabId ?? 1,
   });
   if (!candidate) return { ok: false, status: "connection-unavailable" };
+  // Multiple Blooket API workspace tabs may announce every ten seconds.
+  // A healthy paired service must not be silently replaced by whichever
+  // different local service happened to announce most recently.
+  if (connection && connection.origin !== candidate.origin &&
+      status !== "connection-unavailable")
+    return { ok: false, status: "workspace-already-connected" };
   if (
     connection?.origin === candidate.origin &&
     connection.token === candidate.token
-  )
-    return { ok: true, status };
+  ) {
+    try {
+      const tab = await chrome.tabs.get(connection.tabId);
+      if (tab.id === connection.tabId && admittedBlooketTab(tab))
+        return { ok: true, status };
+    } catch { /* The owned tab was closed. Reconnect to a new one. */ }
+  }
   let verified: unknown;
   try {
     verified = await bridgeFetch(candidate, "/api/browser-bridge/status");
@@ -778,10 +909,28 @@ async function connectWorkspace(message: unknown) {
   let tab: BrowserTab | undefined;
   if (connection) {
     try {
-      tab = await chrome.tabs.get(connection.tabId);
+      const existing = await chrome.tabs.get(connection.tabId);
+      if (existing.id === connection.tabId && admittedBlooketTab(existing))
+        tab = existing;
     } catch {
       /* Closed. */
     }
+  }
+  // An extension reload clears session storage but does not close the
+  // browser tab it created. Reclaim only its recorded, still-open Blooket
+  // tab; never grab a teacher's unrelated pre-existing tab or draft.
+  if (!tab?.id) {
+    try {
+      const owned = (await chrome.storage.local?.get(
+        "blooket-owned-tab-id",
+      ))?.["blooket-owned-tab-id"];
+      if (typeof owned === "number" && Number.isSafeInteger(owned) &&
+          owned > 0) {
+        const previousTab = await chrome.tabs.get(owned);
+        if (previousTab.id === owned && reclaimableBlooketTab(previousTab))
+          tab = previousTab;
+      }
+    } catch { /* A remembered tab can be closed or unavailable. */ }
   }
   if (!tab?.id)
     tab = await chrome.tabs.create({
@@ -789,6 +938,9 @@ async function connectWorkspace(message: unknown) {
       active: false,
     });
   if (!tab.id) return { ok: false, status: "browser-unavailable" };
+  try {
+    await chrome.storage.local?.set({ "blooket-owned-tab-id": tab.id });
+  } catch { /* Continue with the ephemeral, owned tab. */ }
   await disconnect();
   connection = { ...candidate, tabId: tab.id };
   await chrome.storage.session?.set({ connection });
@@ -827,8 +979,11 @@ async function handlePopup(message: unknown) {
     return { ok: true, status };
   }
   if (message.kind === "open-blooket" && connection) {
-    await chrome.tabs.update(connection.tabId, { active: true });
-    return { ok: true, status };
+    const selected = connection;
+    const focused = await showHumanBlooketTab(selected.tabId,
+      () => connection === selected);
+    return focused ? { ok: true, status } :
+      { ok: false, status: "blooket-tab-unavailable" };
   }
   return { ok: false, status: "invalid-request" };
 }
@@ -876,14 +1031,42 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   return true;
 });
 
+// A newly opened background Blooket tab may show a Cloudflare page before
+// the first CLI read. Surface it once, based only on the owned tab's URL and
+// interstitial title. This is visibility, not authentication evidence.
+chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
+  if (!connection || tabId !== connection.tabId || humanWindowRaised ||
+      changes.title !== "Just a moment..." || !tab.url) return;
+  const owned = connection;
+  humanWindowRaised = true;
+  void showHumanBlooketTab(tabId, () => connection === owned)
+    .catch(() => undefined);
+});
+
 async function restoreConnection() {
   try {
-    const previous = configured(
-      (await chrome.storage.session?.get("connection"))?.["connection"],
-    );
+    const saved = (await chrome.storage.session?.get(
+      "connection",
+    ))?.["connection"];
+    const previous = configured(saved);
+    if (saved !== undefined && !previous) {
+      try { await chrome.storage.session?.remove("connection"); }
+      catch { /* Invalid bytes are never imported into live state. */ }
+    }
     if (previous) {
-      connection = previous;
-      void relay(previous, generation);
+      let valid = false;
+      try {
+        const tab = await chrome.tabs.get(previous.tabId);
+        valid = tab.id === previous.tabId && admittedBlooketTab(tab);
+      } catch { /* The stored tab might have been closed or replaced. */ }
+      if (valid) {
+        connection = previous;
+        status = "connected";
+        void relay(previous, generation);
+      } else {
+        try { await chrome.storage.session?.remove("connection"); }
+        catch { /* The new workspace still needs discovery. */ }
+      }
     }
     await discoverWorkspaces();
   } catch {

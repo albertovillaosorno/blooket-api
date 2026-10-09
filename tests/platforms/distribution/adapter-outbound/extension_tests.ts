@@ -78,7 +78,10 @@ test(
     Object.defineProperty(globalThis, "chrome", {
       configurable: true,
       value: {
-        tabs: { query: async () => [] },
+        tabs: {
+          query: async () => [],
+          onUpdated: { addListener: () => {} },
+        },
         runtime: {
           onMessage: {
             addListener: () => {

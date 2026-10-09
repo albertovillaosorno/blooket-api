@@ -644,3 +644,100 @@ test(
   broker.close();
   },
 );
+
+test("oversized combined image and text job never enters a browser lease",
+  async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const imageBytes = Buffer.alloc(2_499_999);
+    imageBytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
+    const answers = Array.from({ length: 85 }, (_, index) => ({
+      text: "Synthetic-" + index + "-" + "x".repeat(9_480),
+      correct: true,
+    }));
+    const command = {
+      kind: "questions.create" as const, setId: "fixture", number: 1,
+      question: "Synthetic question", answers,
+      qType: "typing" as const, random: true,
+      answerTypes: Array.from({ length: 85 },
+        () => "exactly" as const),
+      timeLimit: 15,
+      image: { format: "png" as const,
+        base64: imageBytes.toString("base64") },
+    };
+    assert.ok(Buffer.byteLength(JSON.stringify({
+      ok: true, job: { schemaVersion: 1,
+        id: "00000000-0000-0000-0000-000000000000", command },
+    })) > 4_000_000);
+    const result = await broker.request(command);
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(broker.status().pending, 0);
+    assert.equal(broker.next(TOKEN), null);
+  } finally { broker.close(); }
+  },
+);
+
+test("two browser profiles block ambiguous dispatch until one goes stale",
+  async () => {
+  let tick = 100_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN, now: () => tick, timeoutMs: 10_000,
+  });
+  // Two distinct Chrome profiles can install the exact same extension ID.
+  const a = "chrome-extension://same-extension/#" +
+    "89aa67d6-4253-4013-9a54-68c37ce9e2af";
+  const b = "chrome-extension://same-extension/#" +
+    "d861f680-3afd-444a-9994-12058e349f18";
+  try {
+    assert.equal(broker.next(TOKEN, a), null);
+    assert.equal(broker.status().connected, true);
+    tick += 100;
+    assert.equal(broker.next(TOKEN, b), null);
+    assert.equal(broker.status().multipleBrowserClients, true);
+    assert.equal(broker.status().connected, false);
+    const pending = broker.request({ kind: "browser.activate" });
+    for (let index = 0; index < 4; index++) {
+      tick += 100;
+      assert.equal(broker.next(TOKEN, index % 2 ? b : a), null);
+    }
+    assert.equal(broker.status().pending, 0);
+    assert.deepEqual(await pending, {
+      ok: false, code: "blooket-browser-unavailable",
+    });
+    // A normal profile can resume after the extra testing profile stops.
+    // No queued write is allowed to switch profiles while both are active.
+    tick += 10_001;
+    assert.equal(broker.status().multipleBrowserClients, false);
+    const expired = broker.next(TOKEN, a);
+    assert.equal(expired, null);
+    assert.equal(broker.status().connected, true);
+    const next = broker.request({ kind: "browser.activate" });
+    const job = broker.next(TOKEN, a);
+    assert.ok(job);
+    assert.deepEqual(job.command, { kind: "browser.activate" });
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: 1, id: job.id, ok: true,
+      value: { focused: true },
+    }, a), true);
+    assert.deepEqual(await next, { ok: true, value: { focused: true } });
+  } finally { broker.close(); }
+  },
+);
+
+test("a client is offline at its exact heartbeat deadline", () => {
+  let tick = 1_000_000;
+  const broker = createBlooketBrowserBridgeBroker({
+    token: TOKEN, timeoutMs: 10_000, now: () => tick,
+  });
+  try {
+    broker.next(TOKEN, "chrome-extension://profile-a/");
+    assert.equal(broker.status().connected, true);
+    tick += 9_999;
+    assert.equal(broker.status().connected, true);
+    tick++;
+    assert.equal(broker.status().connected, false);
+    assert.equal(broker.status().multipleBrowserClients, false);
+  } finally { broker.close(); }
+});

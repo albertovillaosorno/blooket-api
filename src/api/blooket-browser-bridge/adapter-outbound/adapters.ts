@@ -45,6 +45,9 @@ import type { BlooketSetReadPort } from
   "../../blooket-set-reads/contract/set-reads.ts";
 import type { BlooketBrowserBridgeTransport } from
   "../../../platforms/blooket-browser/contract/bridge-transport.ts";
+import {
+  decodeBlooketPreparedImage, type BlooketPreparedImage,
+} from "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
 
 const OBSERVED_STATES: ReadonlySet<string> = new Set(
   BLOOKET_NAVIGATION_STATE_KINDS.filter(
@@ -153,12 +156,23 @@ export function createBlooketBrowserBridgeAdapters(
         return decodeCreateSetSurfaceResult(result.value);
       },
       addQuestion: async (submission, media) => {
-        if (
-          submission.image !== null ||
-          media.length !== 0 ||
-          submission.answers.some((answer) => answer.kind !== "text")
-        )
+        if (submission.answers.some((answer) => answer.kind !== "text"))
           return browserFailureWithKind();
+        let image: BlooketPreparedImage | undefined;
+        if (submission.image !== null) {
+          const file = media[0];
+          if (media.length !== 1 || !file ||
+              file.mediaId !== submission.image.mediaId ||
+              !Number.isSafeInteger(file.revision) || file.revision < 1 ||
+              !(file.bytes instanceof Uint8Array) || file.bytes.length < 1 ||
+              file.bytes.length >= 2_500_000) return browserFailureWithKind();
+          const decoded = decodeBlooketPreparedImage({
+            format: file.format,
+            base64: Buffer.from(file.bytes).toString("base64"),
+          });
+          if (!decoded.ok) return browserFailureWithKind();
+          image = decoded.value;
+        } else if (media.length !== 0) return browserFailureWithKind();
         const result = await safeRequest(transport, {
           kind: "questions.create",
           setId: submission.remoteSetId,
@@ -172,6 +186,7 @@ export function createBlooketBrowserBridgeAdapters(
           random: submission.random,
           answerTypes: submission.answerTypes,
           timeLimit: submission.timeLimit,
+          ...(image ? { image } : {}),
         });
         if (!result.ok) return browserFailureWithKind(result.code);
         return decodeAddQuestionSurfaceResult(result.value);

@@ -42,6 +42,8 @@ const BROWSER_ENVIRONMENT_KEYS = [
   "LC_ALL",
   "DISPLAY",
   "WAYLAND_DISPLAY",
+  "XDG_ACTIVATION_TOKEN",
+  "DESKTOP_STARTUP_ID",
   "XAUTHORITY",
   "DBUS_SESSION_BUS_ADDRESS",
   "XDG_RUNTIME_DIR",
@@ -61,6 +63,13 @@ export function browserOpeningEnvironment(
   return environment;
 }
 
+// A human-owned Blooket sign-in stays in the OS default browser with its
+// ordinary cookie jar. Do not replace it with a headless, emulated, or
+// fingerprint-modified browser when Cloudflare requests human action.
+export async function openBlooketInDefaultBrowser(): Promise<void> {
+  await openWithSystemBrowser("https://dashboard.blooket.com/my-sets");
+}
+
 export async function openLocalWorkspace(origin: string) {
   decodeServiceRuntime({
     version: 1,
@@ -68,6 +77,10 @@ export async function openLocalWorkspace(origin: string) {
     instance: "00000000-0000-0000-0000-000000000000",
     origin,
   });
+  await openWithSystemBrowser(origin);
+}
+
+async function openWithSystemBrowser(target: string): Promise<void> {
   const executable =
     process.platform === "darwin"
       ? "/usr/bin/open"
@@ -76,7 +89,7 @@ export async function openLocalWorkspace(origin: string) {
         : undefined;
   if (!executable) throw new Error("browser-opening-unsupported");
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(executable, [origin], {
+    const child = spawn(executable, [target], {
       stdio: "ignore",
       env: browserOpeningEnvironment(process.env),
     });

@@ -75,29 +75,15 @@ export function inspectBlooketPage(
         return true;
       }
     });
-    // Observed Chrome for Testing interstitial on both Blooket origins:
-    // a document-complete Cloudflare verification without a captcha iframe.
-    // This is a human/provider stop, never an authenticated page or login form.
-    const securityInterstitial =
-      document.title === "Just a moment..." &&
-      Array.from(document.querySelectorAll("h1, h2, h3")).some((heading) =>
-        visible(heading) &&
-        heading.textContent?.trim() === "Performing security verification"
-      );
-    if (securityInterstitial) {
-      return operation.kind === "session.observe" &&
-          (url.origin === "https://id.blooket.com" ||
-            url.origin === "https://dashboard.blooket.com")
-        ? { ok: true, value: "security-challenge" }
-        : failed();
-    }
-    // Interstitials can temporarily keep an old React shell mounted while
-    // its verification heading is replaced. Never use that shell as evidence.
+    // Cloudflare can replace its headings during manual verification,
+    // including after the checkbox was clicked. The exact document title
+    // at either admitted Blooket origin is still a provider security stop;
+    // never claim the old authenticated React shell underneath as ready.
     if (document.title === "Just a moment...") {
       return operation.kind === "session.observe" &&
           (url.origin === "https://id.blooket.com" ||
             url.origin === "https://dashboard.blooket.com")
-        ? { ok: true, value: "unexpected-page" }
+        ? { ok: true, value: "security-challenge" }
         : failed();
     }
     if (
