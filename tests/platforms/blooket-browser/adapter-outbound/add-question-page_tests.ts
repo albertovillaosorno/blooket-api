@@ -51,6 +51,7 @@ interface FixtureNode {
   parent?: FixtureNode;
   parentElement?: FixtureNode;
   clicked: number;
+  visibility: string;
   disabled?: boolean;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
@@ -73,6 +74,7 @@ function node(
     textContent,
     value: "",
     clicked: 0,
+    visibility: "visible",
     getBoundingClientRect: () => ({ width: 24, height: 20 }),
     selectors: {},
     attributes,
@@ -109,10 +111,17 @@ function withPage(
   run: () => void,
 ): void {
   const keys = ["document", "location", "HTMLInputElement", "Event",
-    "MutationObserver", "__blooketAddQuestionFormWatch"] as const;
+    "MutationObserver", "getComputedStyle",
+    "__blooketAddQuestionFormWatch"] as const;
   const prior = new Map(
     keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
   );
+  Object.defineProperty(globalThis, "getComputedStyle", {
+    configurable: true,
+    value: (node: FixtureNode) => ({
+      display: "block", visibility: node.visibility,
+    }),
+  });
   class InputFixture {}
   Object.defineProperty(InputFixture.prototype, "value", {
     configurable: true,
@@ -941,8 +950,11 @@ test("question openers refuse a visible teacher modal", () => {
     "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
       assert.equal(page.add.clicked, 0);
-      modal.getBoundingClientRect = () => ({ width: 0, height: 0 });
-      assert.equal(openBlooketAddQuestionPanel("set-fixture"), true);
+      modal.visibility = "hidden";
+      const injected = Function("return (" +
+        runBlooketAddQuestionPageAction.toString() + ")",
+      )() as typeof runBlooketAddQuestionPageAction;
+      assert.equal(injected("open", "set-fixture"), true);
       assert.equal(page.add.clicked, 1);
   });
 });

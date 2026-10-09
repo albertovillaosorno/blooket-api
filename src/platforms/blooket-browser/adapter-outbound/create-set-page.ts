@@ -113,6 +113,7 @@ export function prepareBlooketCreateSetForm(
     const watch = (globalThis as typeof globalThis & {
       __blooketCreateSetWatch?: {
         document: Document; form: Element; dirty: boolean; submitted: boolean;
+        privacyChangeTarget?: HTMLInputElement;
       };
     }).__blooketCreateSetWatch;
     if (!watch || watch.document !== document ||
@@ -185,7 +186,13 @@ export function prepareBlooketCreateSetForm(
 
     setValue(titleInput, input.title);
     setValue(descriptionInput, input.description);
-    if (currentPrivate !== input.private) privacyInput.click();
+    if (currentPrivate !== input.private) {
+      // Checkbox activation fires trusted input/change even for click().
+      // Own only these synchronous events on this exact privacy control.
+      watch.privacyChangeTarget = privacyInput;
+      try { privacyInput.click(); }
+      finally { delete watch.privacyChangeTarget; }
+    }
     return { ok: true };
   } catch {
     return failed();
@@ -388,7 +395,10 @@ export function runBlooketCreateSetOwnership(
     ));
     if (dialogs.some(node => {
       const bounds = node.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      if (bounds.width <= 0 || bounds.height <= 0) return false;
+      const style = getComputedStyle(node);
+      return style.display !== "none" && style.visibility !== "hidden" &&
+        style.visibility !== "collapse";
     })) return false;
     const forms = Array.from(document.querySelectorAll(
       "form#question-set-form",
@@ -402,6 +412,7 @@ export function runBlooketCreateSetOwnership(
         form: HTMLFormElement;
         dirty: boolean;
         submitted: boolean;
+        privacyChangeTarget?: HTMLInputElement;
         dispose: () => void;
       };
     };
@@ -419,7 +430,10 @@ export function runBlooketCreateSetOwnership(
     };
     const types = ["pointerdown", "keydown", "input", "change"];
     const onInteraction = (event: Event) => {
-      if (event.isTrusted) watch.dirty = true;
+      const ownedPrivacyChange = watch.privacyChangeTarget !== undefined &&
+        event.target === watch.privacyChangeTarget &&
+        (event.type === "input" || event.type === "change");
+      if (event.isTrusted && !ownedPrivacyChange) watch.dirty = true;
     };
     let observer: MutationObserver | undefined;
     watch.dispose = () => {
