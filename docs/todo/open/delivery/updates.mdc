@@ -27,6 +27,7 @@ scope:
   - src/platforms/update-downloads/
   - src/platforms/update-extraction/
   - src/platforms/bundle-exchange/
+  - src/platforms/update-journals/
   - src/settings/teacher-preferences/
   - src/api/teacher-configuration/
   - src/service/
@@ -494,6 +495,44 @@ storage. Node's [directory iteration contract][directory-iteration], checked on
 This boundary is a composition prerequisite, not an enabled updater; other
 persistent writers, install journals, independent helper lifecycle, production
 publisher trust, safe restart/rollback, and UI integration remain pending.
+
+### Durable installation recovery records
+
+A schema-one installation journal records the signed envelope, original and
+candidate directory identities, versions, sibling locations, and explicit
+intent/observation/health phases. Its exact decoder rejects foreign locations,
+changed installation IDs, contradictory device/inode facts, unsupported phases,
+and non-newer candidates. Transition validation cannot skip intent or observed
+ownership; decoding a signature-shaped envelope never grants publisher trust.
+
+The private journal adapter bounds UTF-8/JSON reads to 16 KiB and retains a
+cross-process installation lock. Exclusive creation preserves existing work;
+compare-and-replace refuses stale or changed immutable facts and uses durable
+atomic replacement. Symbolic, hard-linked, publicly readable, oversized,
+malformed, or replaced storage fails closed without clearing recovery evidence.
+
+Close drains admitted I/O before releasing ownership and refuses further work.
+A failed close can retry ownership release while the store remains closed;
+nonblocking no-follow reads reject special files without waiting for a writer.
+
+Recovery assessment requires independent proof that the native writer has
+stopped and fresh observation of both retained directories. Lost exchange
+acknowledgements require a new health check, never a blind second exchange;
+even a recorded healthy phase requires fresh health. Unknown ownership cannot
+authorize removal or replacement, and rollback intent remains distinct from
+observed restoration and verified old-version health.
+
+Portable tests persist intent around a real Linux native exchange, reopen the
+journal before recording completion, perform the guarded inverse rollback,
+and verify both application trees remain. Additional cases cover a separate
+process, stale transitions, corrupted bytes, storage permissions, and close
+ordering. Node's [filesystem contract][directory-iteration], checked on
+2026-10-08, establishes bigint identity and nanosecond timestamp reads; these
+checks do not claim native Darwin acceptance or an enabled product updater.
+
+Independent installer lifecycle, other persistent-writer fencing, candidate
+preparation/Apple reassessment, production publisher trust, actual service
+restart/health, and local UI/opt-in composition remain functional work.
 
 ## Blockers
 
