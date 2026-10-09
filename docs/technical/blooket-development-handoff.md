@@ -126,7 +126,15 @@ verified extension version from this transport label.
 
 The owner supplied Chrome DevTools CLI 1.10.1 for explicit development reloads.
 It controls a separate Chrome for Testing profile, which may not share the
-owner's authenticated window. Browser-tool extension-management restrictions
+owner's authenticated window. A real installed/reloaded current worker passed
+canonical signed-out inspection on 2026-10-08.
+
+Authenticated reads stopped because the separate profile's login token request
+returned 403. The site
+reported "Could not get CSRF token". This requires a normal confirmed session,
+not a security bypass or a fabricated token.
+
+Browser-tool extension-management restrictions
 remain applicable to that tool; use an explicitly authorized dedicated reload
 operation rather than navigating a blocked internal browser page.
 

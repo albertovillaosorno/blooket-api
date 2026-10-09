@@ -62,8 +62,11 @@ import { loadWriteCheckpointFile } from
   "../../../platforms/write-checkpoint-files/adapter-outbound/file.ts";
 import { loadWriteAttemptFile } from
   "../../../platforms/write-attempt-files/adapter-outbound/file.ts";
-import { tryAcquireFileLock } from
+import { tryAcquireFileLock, type FileLock } from
   "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
+import { acquirePublicationBoundary } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../platforms/write-checkpoint-files/adapter-outbound/update-boundary.ts";
 import type { BlooketWriteExecutionPort } from
   "../contract/write-execution.ts";
 import type { BlooketMutationPacer } from "./mutation-pacing.ts";
@@ -100,11 +103,16 @@ export async function executeBlooketPublicationCommand(
   const { root, blooket, writes, pacer, signal } = host;
   const success = (value: unknown) =>
     commandSuccess(command.operationId, value);
-  const files = await publicationFiles(root, draftId).catch(() => undefined);
-  if (!files) return fail("publication-storage-unavailable");
-  const lock = await tryAcquireFileLock(files.lock);
-  if (!lock.ok) return fail("blooket-publication-busy");
+  const boundary = await acquirePublicationBoundary(root);
+  if (!boundary.ok) return fail(boundary.reason === "busy"
+    ? "blooket-publication-busy" : "publication-storage-unavailable");
+  let publicationLock: FileLock | undefined;
   try {
+    const files = await publicationFiles(root, draftId).catch(() => undefined);
+    if (!files) return fail("publication-storage-unavailable");
+    const lock = await tryAcquireFileLock(files.lock);
+    if (!lock.ok) return fail("blooket-publication-busy");
+    publicationLock = lock.lock;
     if (signal?.aborted) return fail("blooket-publication-cancelled");
     let snapshot = await readPublicationSnapshot(files.snapshot);
     let currentCapabilities: BlooketCapabilitySnapshot | undefined;
@@ -269,8 +277,12 @@ export async function executeBlooketPublicationCommand(
   } catch {
     return fail("blooket-publication-unavailable");
   } finally {
-    try { await lock.lock.release(); }
-    catch { return fail("publication-lock-release-failed"); }
+    let releaseFailed = false;
+    try { await publicationLock?.release(); }
+    catch { releaseFailed = true; }
+    try { await boundary.lock.release(); }
+    catch { releaseFailed = true; }
+    if (releaseFailed) return fail("publication-lock-release-failed");
   }
 }
 
