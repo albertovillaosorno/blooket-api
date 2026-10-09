@@ -9,16 +9,16 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Preparation and submission of observed text-only Add Question forms.
+//   - Preparation and submission of observed Add Question forms.
 // - Must-Not:
-//   - Upload media, infer success, read React internals, or retry submission.
+//   - Choose paths, open a file picker, infer success, or retry submission.
 // - Allows:
-//   - Inputs: Exact set/question text semantics on one Blooket edit page.
+//   - Inputs: Exact question semantics and optional bounded prepared bytes.
 //   - Outputs: Panel readiness and exact prepare/submit acknowledgements.
 //   - Side effects: Open the Add Question modal, set one hidden form value,
-//     and click one verified Save Question submit control.
+//     attach one owned File, and click one Save Question submit control.
 // - Split-When:
-//   - Media-backed questions gain independently verified upload mechanics.
+//   - Another question media family needs different verified controls.
 // - Merge-When:
 //   - Blooket exposes a stable provider-owned question write API.
 // - Summary:
@@ -28,9 +28,12 @@
 // - Usage:
 //   - Open, prepare, revalidate-submit, then verify through fresh read-back.
 // - Defaults:
-//   - Ambiguous controls, media, duplicate answers, or malformed state fail.
+//   - Ambiguous controls, unowned media, or malformed state fail.
 //
-export interface BlooketTextQuestionPageInput {
+import type { BlooketPreparedImage } from
+  "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
+
+export interface BlooketQuestionPageInput {
   readonly setId: string;
   readonly number: number;
   readonly question: string;
@@ -42,7 +45,10 @@ export interface BlooketTextQuestionPageInput {
   readonly random: boolean;
   readonly answerTypes: readonly ("exactly" | "contains")[] | null;
   readonly timeLimit: number;
+  readonly image?: BlooketPreparedImage;
 }
+
+export type BlooketTextQuestionPageInput = BlooketQuestionPageInput;
 
 export type BlooketAddQuestionPageResult =
   | { readonly ok: true }
@@ -50,7 +56,11 @@ export type BlooketAddQuestionPageResult =
 
 export type BlooketAddQuestionPageAction =
   | "open"
+  | "open-image"
+  | "cancel-image"
   | "is-ready"
+  | "is-image-ready"
+  | "finalize-image"
   | "prepare"
   | "submit";
 
@@ -62,6 +72,26 @@ export function runBlooketAddQuestionPageAction(
     ok: false,
     code: "blooket-browser-failed",
   });
+  const opens = action === "open" || action === "open-image";
+  const probes = action === "is-ready" || action === "is-image-ready";
+  const world = globalThis as typeof globalThis & {
+    __blooketAddQuestionFormWatch?: {
+      document: Document;
+      setId: string;
+      dirty: boolean;
+      submitted: boolean;
+      prepared: boolean;
+      finalized: boolean;
+      form?: HTMLFormElement;
+      question?: HTMLInputElement;
+      fileInput?: HTMLInputElement;
+      file?: File;
+      number?: number;
+      image?: BlooketPreparedImage;
+      url?: string;
+      dispose: () => void;
+    };
+  };
   const editRoute = (setId: string): boolean => {
     if (
       !setId ||
@@ -174,7 +204,7 @@ export function runBlooketAddQuestionPageAction(
       question: input.question,
       answers,
       correctAnswers,
-      image: "" as const,
+      image: "",
       audio: "" as const,
       qType: input.qType,
       random: input.random,
@@ -203,7 +233,7 @@ export function runBlooketAddQuestionPageAction(
         (visibleUnique(accountSelector) &&
           !!document.querySelector(accountSelector)?.textContent?.trim()));
     if (!authenticated)
-      return action === "open" || action === "is-ready" ? false : failed();
+      return opens || probes ? false : failed();
     // Independently reject human/security overlays on every injected step.
     // The old Edit controls can remain mounted behind a new provider stop.
     const challenge = Array.from(document.querySelectorAll(
@@ -222,15 +252,28 @@ export function runBlooketAddQuestionPageAction(
     if (document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]') !== null ||
         challenge || organizationPrompt)
-      return action === "open" || action === "is-ready" ? false : failed();
+      return opens || probes ? false : failed();
     if (
       action !== "open" &&
+      action !== "open-image" &&
+      action !== "cancel-image" &&
       action !== "is-ready" &&
+      action !== "is-image-ready" &&
+      action !== "finalize-image" &&
       action !== "prepare" &&
       action !== "submit"
     ) return failed();
-    if (action === "open") {
+    if (opens) {
       if (typeof value !== "string" || !editRoute(value)) return false;
+      if (document.querySelector('input#question[name="question"]'))
+        return false;
+      const dialogs = Array.from(document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"]',
+      ));
+      if (dialogs.some(dialog => {
+        const bounds = dialog.getBoundingClientRect();
+        return bounds.width > 0 && bounds.height > 0;
+      })) return false;
       let buttons = Array.from(document.querySelectorAll("button")).filter(
         (button) => normalizedText(button) === "Add Question",
       );
@@ -253,18 +296,236 @@ export function runBlooketAddQuestionPageAction(
       const bounds = opener.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0 || opener.disabled ||
           opener.getAttribute("aria-disabled") === "true") return false;
-      opener.click();
+      {
+        // Do not revoke a previous upload's Blob URL or abandon a teacher's
+        // local draft. A submitted modal may still have a server action in
+        // flight even after the transport lease is no longer available.
+        const previous = world.__blooketAddQuestionFormWatch;
+        if (previous && previous.document === document &&
+            (previous.submitted || previous.dirty ||
+              previous.form?.isConnected !== false)) return false;
+        // Only a modal opened by this isolated-world owner may be written.
+        previous?.dispose();
+        const watch: NonNullable<
+          typeof world.__blooketAddQuestionFormWatch
+        > = {
+          document, setId: value, dirty: false,
+          prepared: false, finalized: false,
+          submitted: false, dispose: () => {},
+        };
+        const types = ["pointerdown", "keydown", "input", "change"];
+        const onInteraction = (event: Event) => {
+          if (event.isTrusted) watch.dirty = true;
+        };
+        let observer: MutationObserver | undefined;
+        watch.dispose = () => {
+          for (const type of types)
+            watch.document.removeEventListener(type, onInteraction, true);
+          observer?.disconnect();
+          // The provider owns its preview URL and its cleanup lifecycle.
+          if (world.__blooketAddQuestionFormWatch === watch)
+            delete world.__blooketAddQuestionFormWatch;
+        };
+        try {
+          for (const type of types)
+            document.addEventListener(type, onInteraction, true);
+          observer = new MutationObserver(() => {
+            if (watch.form && !watch.form.isConnected) watch.dispose();
+          });
+          observer.observe(document, { childList: true, subtree: true });
+          world.__blooketAddQuestionFormWatch = watch;
+          opener.click();
+        } catch { watch.dispose(); return false; }
+      }
       return true;
     }
-    if (action === "is-ready")
-      return typeof value === "string" && questionForm(value) !== null;
+    if (action === "is-ready") {
+      if (typeof value !== "string") return false;
+      const resolved = questionForm(value);
+      if (!resolved) return false;
+      const watch = world.__blooketAddQuestionFormWatch;
+      if (!watch || watch.document !== document || watch.setId !== value ||
+          watch.dirty || watch.submitted ||
+          (watch.form && watch.form !== resolved.form) ||
+          (watch.question && watch.question !== resolved.question))
+        return false;
+      watch.form = resolved.form;
+      watch.question = resolved.question;
+      return true;
+    }
+    if (action === "is-image-ready") {
+      if (typeof value !== "string") return false;
+      const resolved = questionForm(value);
+      const watch = world.__blooketAddQuestionFormWatch;
+      if (!resolved || !watch || watch.document !== document ||
+          watch.setId !== value || watch.dirty || watch.submitted ||
+          !watch.prepared || watch.finalized || !watch.image || !watch.file ||
+          watch.form !== resolved.form || watch.question !== resolved.question)
+        return false;
+      const fields = resolved.form.querySelectorAll(
+        'input[name="coverImageFile"]',
+      );
+      if (fields.length !== 1 || fields[0]?.tagName !== "INPUT") return false;
+      const fileInput = fields[0] as HTMLInputElement;
+      if (fileInput.type !== "file" || fileInput.name !== "coverImageFile" ||
+          !fileInput.hidden || fileInput.disabled ||
+          fileInput.getAttribute("form") !== null ||
+          fileInput.closest("form") !== resolved.form ||
+          fileInput.files?.length !== 1 || fileInput.files[0] !== watch.file)
+        return false;
+      const removes = Array.from(resolved.form.querySelectorAll("button"))
+        .filter(button => normalizedText(button) === "Remove Image");
+      if (removes.length !== 1 || removes[0]?.tagName !== "BUTTON")
+        return false;
+      const remove = removes[0] as HTMLButtonElement;
+      const bounds = remove.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0 || remove.disabled ||
+          remove.getAttribute("aria-disabled") === "true") return false;
+      if (resolved.question.value.length > 100_000) return false;
+      const raw: unknown = JSON.parse(resolved.question.value);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
+          !("number" in raw) || raw.number !== watch.number ||
+          !("audio" in raw) || raw.audio !== "" ||
+          !("image" in raw) || typeof raw.image !== "string" ||
+          raw.image.length > 2_000 ||
+          !raw.image.startsWith("blob:https://dashboard.blooket.com/"))
+        return false;
+      if ((watch.fileInput && watch.fileInput !== fileInput) ||
+          (watch.url && watch.url !== raw.image)) return false;
+      watch.fileInput = fileInput;
+      watch.url = raw.image;
+      return true;
+    }
+    if (action === "cancel-image") {
+      if (typeof value !== "string") return failed();
+      const resolved = questionForm(value);
+      const watch = world.__blooketAddQuestionFormWatch;
+      if (!resolved || !watch || watch.document !== document ||
+          watch.setId !== value || watch.dirty || watch.submitted ||
+          watch.form !== resolved.form || watch.question !== resolved.question)
+        return failed();
+      const buttons = Array.from(resolved.form.querySelectorAll(
+        'button[type="button"]',
+      )).filter(button => normalizedText(button) === "Cancel");
+      if (buttons.length !== 1 || buttons[0]?.tagName !== "BUTTON")
+        return failed();
+      const cancel = buttons[0] as HTMLButtonElement;
+      const bounds = cancel.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0 || cancel.disabled ||
+          cancel.getAttribute("aria-disabled") === "true") return failed();
+      cancel.click();
+      watch.dispose();
+      return { ok: true };
+    }
     if (typeof value === "string") return failed();
     const input = value;
     const expected = serializedQuestion(input);
     if (expected === null) return failed();
     const resolved = questionForm(input.setId);
-    if (resolved === null || !emptyFileInputs(resolved.form)) return failed();
-    if (action === "prepare") {
+    if (resolved === null) return failed();
+    const hasImage = Object.hasOwn(input, "image");
+    const watch = world.__blooketAddQuestionFormWatch;
+    if (!watch || watch.document !== document ||
+        watch.setId !== input.setId || watch.dirty || watch.submitted ||
+        (watch.form && watch.form !== resolved.form) ||
+        (watch.question && watch.question !== resolved.question) ||
+        (action === "prepare" && watch.prepared) ||
+        (action === "finalize-image" &&
+          (!hasImage || !watch.prepared || watch.finalized)) ||
+        (action === "submit" && !watch.finalized)) return failed();
+    if (hasImage) {
+      const image = input.image;
+      if (!image || typeof image !== "object" ||
+          Object.keys(image).sort().join() !== "base64,format" ||
+          (image.format !== "png" && image.format !== "jpeg" &&
+            image.format !== "gif") || typeof image.base64 !== "string" ||
+          image.base64.length < 4 || image.base64.length > 3_333_332 ||
+          !watch || watch.document !== document ||
+          watch.setId !== input.setId || watch.dirty || watch.submitted)
+        return failed();
+      if (action === "prepare") {
+        if (!emptyFileInputs(resolved.form) || watch.fileInput ||
+            (watch.form && watch.form !== resolved.form) ||
+            resolved.form.querySelector('input[name="coverImageFile"]'))
+          return failed();
+        const binary = atob(image.base64);
+        if (binary.length < 1 || binary.length >= 2_500_000 ||
+            btoa(binary) !== image.base64) return failed();
+        const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+        const valid = image.format === "png"
+          ? bytes.length >= 8 &&
+            [137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)
+          : image.format === "jpeg"
+            ? bytes.length >= 3 && bytes[0] === 255 &&
+              bytes[1] === 216 && bytes[2] === 255
+            : bytes.length >= 6 && bytes[0] === 71 && bytes[1] === 73 &&
+              bytes[2] === 70 && bytes[3] === 56 &&
+              (bytes[4] === 55 || bytes[4] === 57) && bytes[5] === 97;
+        if (!valid) return failed();
+        // Hand bytes to the observed provider input. Its change handler
+        // prepares React media state and the hidden upload field; appending
+        // our own field bypasses that state and can silently drop the image.
+        const pickers = Array.from(resolved.form.querySelectorAll(
+          'input[type="file"]',
+        ));
+        if (pickers.length !== 1 || pickers[0]?.tagName !== "INPUT")
+          return failed();
+        const picker = pickers[0] as HTMLInputElement;
+        if (picker.name !== "" || picker.type !== "file" || picker.disabled ||
+            picker.multiple || picker.getAttribute("form") !== null ||
+            picker.closest("form") !== resolved.form ||
+            picker.accept !== "image/jpeg,image/png,image/gif,image/svg+xml")
+          return failed();
+        const file = new File([bytes], "question." + image.format, {
+          type: "image/" + image.format,
+        });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        watch.form = resolved.form;
+        watch.question = resolved.question;
+        watch.file = file;
+        watch.number = input.number;
+        watch.image = { format: image.format, base64: image.base64 };
+        // Latch before dispatch: a lost acknowledgement never permits replay.
+        watch.prepared = true;
+        picker.files = transfer.files;
+        if (picker.files?.length !== 1 || picker.files[0] !== file)
+          return failed();
+        picker.dispatchEvent(new Event("change", { bubbles: true }));
+        return { ok: true };
+      }
+      if (watch.form !== resolved.form ||
+          watch.question !== resolved.question ||
+          !watch.file || !watch.fileInput || !watch.image || !watch.url ||
+          watch.image.format !== image.format ||
+          watch.image.base64 !== image.base64 ||
+          watch.fileInput.closest("form") !== resolved.form ||
+          watch.fileInput.files?.length !== 1 ||
+          watch.fileInput.files[0] !== watch.file) return failed();
+      const files = Array.from(resolved.form.querySelectorAll(
+        'input[type="file"]',
+      ));
+      if (files.filter(file => file === watch.fileInput).length !== 1 ||
+          files.some(file => file !== watch.fileInput &&
+            ((file as HTMLInputElement).value !== "" ||
+              ((file as HTMLInputElement).files?.length ?? 0) !== 0)) ||
+          resolved.form.querySelectorAll('input[name="coverImageFile"]')
+            .length !== 1 ||
+          watch.fileInput.name !== "coverImageFile" ||
+          watch.fileInput.disabled || watch.fileInput.type !== "file" ||
+          watch.fileInput.getAttribute("form") !== null) return failed();
+      if (action === "finalize-image") {
+        if (resolved.question.value.length > 100_000) return failed();
+        const raw = JSON.parse(resolved.question.value);
+        if (!raw || typeof raw !== "object" ||
+            raw.image !== watch.url || raw.number !== input.number ||
+            raw.audio !== "") return failed();
+      }
+      expected.image = watch.url;
+    } else if (!emptyFileInputs(resolved.form)) return failed();
+    if (action === "prepare" || action === "finalize-image") {
+      watch.form = resolved.form;
+      watch.question = resolved.question;
       const descriptor = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
         "value",
@@ -273,6 +534,8 @@ export function runBlooketAddQuestionPageAction(
       descriptor.set.call(resolved.question, JSON.stringify(expected));
       resolved.question.dispatchEvent(new Event("input", { bubbles: true }));
       resolved.question.dispatchEvent(new Event("change", { bubbles: true }));
+      watch.prepared = true;
+      watch.finalized = !hasImage || action === "finalize-image";
       return { ok: true };
     }
     if (resolved.question.value !== JSON.stringify(expected)) return failed();
@@ -286,10 +549,11 @@ export function runBlooketAddQuestionPageAction(
     if (bounds.width <= 0 || bounds.height <= 0 || submit.disabled ||
         submit.getAttribute("aria-disabled") === "true")
       return failed();
+    watch.submitted = true;
     submit.click();
     return { ok: true };
   } catch {
-    return action === "open" || action === "is-ready" ? false : failed();
+    return opens || probes ? false : failed();
   }
 }
 

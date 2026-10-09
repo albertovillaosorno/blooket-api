@@ -108,6 +108,17 @@ export function prepareBlooketCreateSetForm(
     if (forms.length !== 1 || forms[0]?.tagName !== "FORM")
       return failed();
     const form = forms[0];
+    // This must be checked inside the same injected click/fill operation:
+    // a separate host preflight cannot close the human-input race window.
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCreateSetWatch?: {
+        document: Document; form: Element; dirty: boolean; submitted: boolean;
+      };
+    }).__blooketCreateSetWatch;
+    if (!watch || watch.document !== document ||
+        watch.form !== form || watch.dirty || watch.submitted ||
+        !form.isConnected)
+      return failed();
     const titles = Array.from(form.querySelectorAll(
       'input#title[name="title"]',
     ));
@@ -237,6 +248,17 @@ export function submitBlooketCreateSetForm(
     if (forms.length !== 1 || forms[0]?.tagName !== "FORM")
       return failed();
     const form = forms[0];
+    // This must be checked inside the same injected click/fill operation:
+    // a separate host preflight cannot close the human-input race window.
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCreateSetWatch?: {
+        document: Document; form: Element; dirty: boolean; submitted: boolean;
+      };
+    }).__blooketCreateSetWatch;
+    if (!watch || watch.document !== document ||
+        watch.form !== form || watch.dirty || watch.submitted ||
+        !form.isConnected)
+      return failed();
     const titles = Array.from(form.querySelectorAll(
       'input#title[name="title"]',
     ));
@@ -296,6 +318,8 @@ export function submitBlooketCreateSetForm(
     if (bounds.width <= 0 || bounds.height <= 0 || submit.disabled ||
         submit.getAttribute("aria-disabled") === "true")
       return failed();
+    // A lost click acknowledgement must never authorize a second submit.
+    watch.submitted = true;
     submit.click();
     return { ok: true };
   } catch {
@@ -347,4 +371,73 @@ export function observeBlooketCreateSetSuccess():
   } catch {
     return failed();
   }
+}
+
+// Claim only a freshly navigated form and relinquish ownership immediately
+// upon any genuine user input. Both steps run in Chrome's isolated world.
+export function runBlooketCreateSetOwnership(
+  action: "claim" | "check",
+): boolean {
+  try {
+    if (location.origin !== "https://dashboard.blooket.com" ||
+        location.pathname !== "/create" ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]')) return false;
+    const dialogs = Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"]',
+    ));
+    if (dialogs.some(node => {
+      const bounds = node.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    })) return false;
+    const forms = Array.from(document.querySelectorAll(
+      "form#question-set-form",
+    ));
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM") return false;
+    const form = forms[0] as HTMLFormElement;
+    if (!form.isConnected) return false;
+    const world = globalThis as typeof globalThis & {
+      __blooketCreateSetWatch?: {
+        document: Document;
+        form: HTMLFormElement;
+        dirty: boolean;
+        submitted: boolean;
+        dispose: () => void;
+      };
+    };
+    const previous = world.__blooketCreateSetWatch;
+    if (action === "check")
+      return !!previous && previous.document === document &&
+        previous.form === form && !previous.dirty && !previous.submitted;
+    if (action !== "claim") return false;
+    // A still-mounted form was already claimed: never reassign a pending
+    // submission or silently discard teacher interactions.
+    if (previous && previous.form.isConnected) return false;
+    previous?.dispose();
+    const watch: NonNullable<typeof world.__blooketCreateSetWatch> = {
+      document, form, dirty: false, submitted: false, dispose: () => {},
+    };
+    const types = ["pointerdown", "keydown", "input", "change"];
+    const onInteraction = (event: Event) => {
+      if (event.isTrusted) watch.dirty = true;
+    };
+    let observer: MutationObserver | undefined;
+    watch.dispose = () => {
+      for (const type of types)
+        watch.document.removeEventListener(type, onInteraction, true);
+      observer?.disconnect();
+      if (world.__blooketCreateSetWatch === watch)
+        delete world.__blooketCreateSetWatch;
+    };
+    try {
+      for (const type of types)
+        document.addEventListener(type, onInteraction, true);
+      observer = new MutationObserver(() => {
+        if (!watch.form.isConnected) watch.dispose();
+      });
+      observer.observe(document, { childList: true, subtree: true });
+      world.__blooketCreateSetWatch = watch;
+      return true;
+    } catch { watch.dispose(); return false; }
+  } catch { return false; }
 }

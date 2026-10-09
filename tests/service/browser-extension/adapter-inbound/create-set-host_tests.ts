@@ -48,6 +48,9 @@ function fakeChrome(options: {
     readonly status: string;
   }[];
   readonly scripts?: ScriptStep[];
+  readonly canLeave?: unknown;
+  readonly claimed?: unknown;
+  readonly owned?: unknown;
 }) {
   const calls: string[] = [];
   let tab = {
@@ -75,6 +78,18 @@ function fakeChrome(options: {
     },
     scripting: {
       executeScript: async (request) => {
+        if (request.func.name === "canLeaveBlooketPageForRead") {
+          calls.push("can-leave-check");
+          return [{ result: options.canLeave === undefined
+              ? true : options.canLeave }];
+        }
+        if (request.func.name === "runBlooketCreateSetOwnership") {
+          const action = request.args?.[0];
+          calls.push("create-ownership:" + action);
+          return [{ result: action === "claim"
+            ? options.claimed === undefined ? true : options.claimed
+            : options.owned === undefined ? true : options.owned }];
+        }
         calls.push("script");
         const next = scripts.shift();
         const result = typeof next === "function"
@@ -252,9 +267,10 @@ test(
   const original = fake.chrome.scripting.executeScript;
   fake.chrome.scripting.executeScript = async (request) => {
     const result = await original(request);
-    fake.setTab({
-      url: "https://dashboard.blooket.com/my-sets", status: "complete",
-    });
+    if (request.func.name === "prepareBlooketCreateSetForm")
+      fake.setTab({
+        url: "https://dashboard.blooket.com/my-sets", status: "complete",
+      });
     return result;
   };
   const input = { title: "Synthetic", description: "", private: true };
@@ -409,18 +425,23 @@ test(
     "https://dashboard.blooket.com/edit?id=one&id=two",
     "https://example.invalid/",
   ]) {
-    const fake = fakeChrome({ scripts: [prepared] });
-    fake.setTab({ url: "https://dashboard.blooket.com/create",
-      status: "complete" });
+    const fake = fakeChrome({
+      afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+        status: "complete" }],
+      scripts: [createState, prepared],
+    });
+    const host = createExtensionCreateSetHost(
+      fake.chrome, 7, async () => {},
+    );
+    assert.deepEqual(await host.openCreateSet(), { ok: true });
     const submit = fake.chrome.scripting.executeScript;
     fake.chrome.scripting.executeScript = async (request) => {
       const response = await submit(request);
-      fake.setTab({ url, status: "complete" });
+      if (request.func.name === "submitBlooketCreateSetForm")
+        fake.setTab({ url, status: "complete" });
       return response;
     };
-    assert.deepEqual(await createExtensionCreateSetHost(
-      fake.chrome, 7, async () => {},
-    ).submitCreateSet(expected), {
+    assert.deepEqual(await host.submitCreateSet(expected), {
       ok: false, kind: "browser", code: "blooket-browser-failed",
     });
   }
@@ -430,21 +451,110 @@ test(
 test(
   "Create Set submit permits the expected loading edit redirect",
   async () => {
-  const fake = fakeChrome({ scripts: [prepared] });
-  fake.setTab({ url: "https://dashboard.blooket.com/create",
-    status: "complete" });
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [createState, prepared],
+  });
+  const host = createExtensionCreateSetHost(
+    fake.chrome, 7, async () => {},
+  );
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
   const execute = fake.chrome.scripting.executeScript;
   fake.chrome.scripting.executeScript = async (request) => {
     const reply = await execute(request);
-    fake.setTab({
-      url: "https://dashboard.blooket.com/edit?id=opaque%20set",
-      status: "loading",
-    });
+    if (request.func.name === "submitBlooketCreateSetForm")
+      fake.setTab({
+        url: "https://dashboard.blooket.com/edit?id=opaque%20set",
+        status: "loading",
+      });
     return reply;
   };
-  assert.deepEqual(await createExtensionCreateSetHost(
-    fake.chrome, 7, async () => {},
-  ).submitCreateSet({ title: "Test", description: "", private: true }), {
+  assert.deepEqual(await host.submitCreateSet({
+    title: "Test", description: "", private: true,
+  }), {
     ok: true,
   });
 });
+
+test("Create Set never navigates away from existing teacher edit work",
+  async () => {
+  for (const denied of [false, null, { ok: true }, "true"]) {
+    const fake = fakeChrome({
+      initialUrl: "https://dashboard.blooket.com/edit?id=teacher-draft",
+      canLeave: denied,
+    });
+    const result = await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).openCreateSet();
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.includes("can-leave-check"), true);
+    assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  }
+  },
+);
+
+test("Create Set refuses navigation drift during leave inspection",
+  async () => {
+  const fake = fakeChrome({});
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    const result = await execute(request);
+    if (request.func.name === "canLeaveBlooketPageForRead")
+      fake.setTab({
+        url: "https://dashboard.blooket.com/edit?id=teacher-draft",
+        status: "complete",
+      });
+    return result;
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("Create Set does not overwrite an existing create-page draft",
+  async () => {
+  const fake = fakeChrome({
+    initialUrl: "https://dashboard.blooket.com/create",
+  });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("script"), false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("Create Set refuses ownership after a page or teacher state change",
+  async () => {
+  const entry = { url: "https://dashboard.blooket.com/create",
+    status: "complete" };
+  const unclaimable = fakeChrome({
+    afterUpdate: [entry], scripts: [createState], claimed: false,
+  });
+  const host = createExtensionCreateSetHost(
+    unclaimable.chrome, 7, async () => undefined,
+  );
+  assert.equal((await host.openCreateSet()).ok, false);
+  assert.equal(unclaimable.calls.includes("create-ownership:claim"), true);
+  assert.equal(unclaimable.calls.includes("create-ownership:check"), false);
+  const changed = fakeChrome({
+    afterUpdate: [entry], scripts: [createState], owned: false,
+  });
+  const other = createExtensionCreateSetHost(
+    changed.chrome, 7, async () => undefined,
+  );
+  assert.equal((await other.openCreateSet()).ok, true);
+  assert.equal((await other.prepareCreateSet({
+    title: "Synthetic", description: "", private: true,
+  })).ok, false);
+  assert.equal((await other.submitCreateSet({
+    title: "Synthetic", description: "", private: true,
+  })).ok, false);
+  assert.equal(changed.calls.filter(x => x === "script").length, 1);
+  },
+);

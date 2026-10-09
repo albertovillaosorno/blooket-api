@@ -124,6 +124,23 @@ changing dependency layout or validators.
 The 1280-by-720 default canvas is an application choice, not a verified Blooket
 requirement. GIF FPS controls timing, not a guaranteed file size.
 
+## If Blooket requests browser verification
+
+Use **Show connected tab** in Quizzes to bring forward the extension's actual
+Blooket session, then complete any provider verification yourself. **Check My
+Sets read** checks that same session without publishing or signing in. A
+challenge during the read remains an interrupted read, never a success.
+
+If no extension is connected, **Open Blooket in my browser** opens the ordinary
+system browser. Enable Blooket API in that browser and open the local workspace
+there. Separate Chrome profiles have separate sessions; verification in one
+profile does not authenticate another. When multiple profiles connect, the app
+stops and asks you to close the extra profiles before trying again.
+
+These controls do not run a CAPTCHA solver or change browser security settings.
+They also do not configure Cloudflare Tunnel, which is the separate online MCP
+connection described below.
+
 ## Connect an online AI client
 
 Cloudflare Tunnel is the supported provider. The user provisions the hostname

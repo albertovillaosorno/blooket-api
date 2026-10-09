@@ -203,10 +203,15 @@ The prepared-file transport and immutable expected-media identity still need
 composition before enabling media writes. Never remove the publication media
 gate based on this read evidence alone.
 
-Media transport remains unsupported by the bridge surfaces. Review the actual
-request/response byte limits and serialization before adding prepared files:
-base64 expands bytes, and accepted image size is not an envelope size allowance.
-Do not widen every endpoint or expose arbitrary paths to make an upload fit.
+The internal Add Question bridge now admits one exact prepared PNG/JPEG/GIF
+byte envelope. Only job delivery allows four megabytes for base64 expansion;
+other responses retain their previous cap. The broker bounds the complete
+serialized delivery before leasing a job.
+
+Source paths, arbitrary filenames,
+URLs, SVG, question audio, and answer images remain unadmitted. Canonical
+publication still refuses media until immutable expected identity and recovery
+compose into its final verifier.
 
 My Sets nonempty collection completeness remains unknown. Do not turn a stable
 visible subset into a complete baseline for ambiguous Create Set recovery.
@@ -316,3 +321,226 @@ unavailability must not block completion of P2/P3 functional work.
 
 <!-- jig-ignore-next-line: Preserve the official browser-support source URL. -->
 [challenge-browsers]: https://developers.cloudflare.com/cloudflare-challenges/reference/supported-browsers/
+
+## Human browser challenge handoff (2026-10-09)
+
+Cloudflare's [supported browsers documentation][cf-supported] states that
+browser automation frameworks are not supported for completing production
+challenges. It also warns that embedded browsers have limited support and that
+extensions changing the user agent, Canvas, or WebGL can interfere with
+verification. Its [challenge troubleshooting guide][cf-troubleshooting]
+identifies network issues, cookie or JavaScript restrictions, other extensions,
+and detection errors as potential causes of challenge loops. These are provider
+limitations, not evidence of a defective checkbox or license to spoof a
+browser fingerprint.
+
+The local Quizzes view now offers two explicit human actions. **Show connected
+tab** sends a bounded, credential-free `browser.activate` job to the existing
+paired extension, preserving that browser's ordinary account session. **Open
+Blooket in my browser** uses only the operating system's default browser
+opener with a fixed Blooket dashboard URL; it never supplies a profile,
+user-agent override, debugging flag, cookie, or account secret. If the default
+browser is different from the connected extension's browser, the user must
+enable the extension in the browser where verification was completed; solving a
+challenge in one profile does not authenticate a different one.
+
+The extension additionally brings forward its owned Blooket tab when it first
+observes a challenge interstitial title or confirms the challenge in a read.
+Repeated observations do not repeatedly steal focus. This action never
+clicks a provider challenge, sends credentials, or interprets window activation
+as authenticated readiness. A native `WKWebView` was not selected as the main
+verification surface because it would have separate cookies and weaker
+provider compatibility; macOS still uses its existing lightweight native
+launcher plus the already-installed system browser.
+
+Positive evidence covers strict local request admission, synthetic worker
+focus and duplicate-suppression tests, visible bilingual browser controls in
+Chrome for Testing, the compiled extension closure, and extracted Linux package
+smoke. No authenticated provider read after a solved Cloudflare challenge is
+claimed. Final real-account acceptance remains dependent on a genuine human
+session in a supported browser with the Blooket API extension enabled.
+
+<!-- jig-ignore-next-line: Official browser-support URL is indivisible. -->
+[cf-supported]: https://developers.cloudflare.com/cloudflare-challenges/reference/supported-browsers/
+<!-- jig-ignore-next-line: Official challenge-support URL is indivisible. -->
+[cf-troubleshooting]: https://developers.cloudflare.com/cloudflare-challenges/troubleshooting/challenge-solve-issues/
+
+## Paired-session read check and multiple-profile safety (2026-10-09)
+
+The Quizzes panel includes **Check My Sets read**. It performs only an
+explicit paired `session.observe`, then `sets.list` when the observed route
+is recognized as ready. The response contains no set names, account IDs,
+cookies, passwords, media, or URLs.
+
+It reports human stops without a list attempt; unknown read completeness
+stays explicitly unknown. The service
+runs the canonical exact set-summary decoder before showing a count.
+
+Separate browser profiles can have different Blooket cookies even when they
+install the same Blooket API extension ID. The extension saves an anonymous
+UUID in its own profile-local extension storage and sends it as a strictly
+validated suffix to its existing browser-client label. The service tracks
+short-lived identified client leases, rejects ambiguous new requests when
+more than one distinct profile is actively polling, and exposes a safe
+boolean UI warning.
+
+In-flight dispatched jobs remain bound to their exact client label. Legacy
+clients without a profile suffix are accepted for
+compatibility but cannot be distinguished if they share an extension ID.
+
+The extension also remembers the numeric ID of its product-created Blooket
+tab in profile-local storage. After an extension reload, it reclaims that
+tab only if the recorded ID still exists at an admitted Blooket origin.
+It never adopts an arbitrary teacher-owned browser tab. The actual isolated
+Chrome for Testing smoke confirmed that subsequent extension reloads kept
+the same Blooket tab count instead of creating another challenge tab.
+
+The read-check workflow is verified by synthetic bridge/HTTP tests and by
+Chrome for Testing returning the provider's `security-challenge` state on
+a real Blooket page. Those observations demonstrate an honest human stop,
+not authenticated My Sets access, successful Cloudflare verification, or
+permission to publish a quiz.
+
+## Reconnection and challenge-classification follow-up (2026-10-09)
+
+An exact `Just a moment...` document title at either admitted Blooket origin
+is now an actionable `security-challenge` during `session.observe`, even when
+Cloudflare has replaced the original verification heading after a manual
+checkbox interaction. Other read operations remain failures; the old
+authenticated shell cannot be read through an interstitial. This does not
+click, automate, or bypass the challenge.
+
+A healthy extension connection now refuses unsolicited workspace announcements
+from a different local service. Announcements from the same service with a
+rotated token remain valid, and a disconnected old service may be replaced.
+The worker also confirms that its connected tab is still at an admitted
+Blooket origin before reusing it after a workspace announcement; a tab that
+was navigated elsewhere cannot become a read or write target.
+
+The browser bridge command source previously contained literal ASCII control
+bytes inside title/description character-class regular expressions.
+Those bytes were changed to equivalent printable `\\xHH` escapes, and
+regression tests cover rejected controls and allowed multiline descriptions.
+The committed parent revision also contains raw controls, so text-mode Git
+comparison (`git diff -a`) is still needed until the source is committed.
+
+The isolated Chrome for Testing 155 smoke reached the provider's real
+security-challenge stop; it did not produce authenticated My Sets data.
+An additional Chrome DevTools daemon became unresponsive during an extension
+reload probe and its exact owned processes were terminated. Neither that
+unconfirmed reload probe nor synthetic snapshots establish successful human
+challenge completion. Keep the first authenticated-read acceptance open.
+
+## Tab recovery and workspace ownership (2026-10-09, later session)
+
+The extension now validates the Blooket origin before reusing the current
+connected tab or restoring a stored tab after a worker restart. A closed tab,
+a replaced tab, or malformed session-storage connection cannot become the
+target for authenticated reads or writes. The owner-created tab reference
+remains profile-local and does not grant access to arbitrary teacher tabs.
+
+A live connection also remains bound to its healthy local workspace when
+multiple Blooket API workspace pages announce their services. An authorized
+token rotation on that same origin is still admitted so a pairing reset can
+retire old work safely; a failed or unavailable prior connection may be
+replaced. Worker regressions cover a competing local service and interrupted
+form actions during token rotation.
+
+The observed provider page sometimes changes its visible verification heading
+while retaining the exact Cloudflare `Just a moment...` title. The safe
+classifier therefore treats this title at the two admitted Blooket origins as
+a `security-challenge` human stop, never as authenticated set data. Actual
+Chrome for Testing 155 still returned a human-action-required challenge,
+not a successful authenticated read.
+
+## Post-read challenge handoff and safe tab reuse (2026-10-09)
+
+The local Quizzes readiness button now distinguishes a provider challenge
+that appears **during** My Sets reading from a challenge observed **before**
+that read. If the first read fails with the exact stable browser-failed code,
+the service performs one non-mutating session observation.
+
+A confirmed signed out, organization, unfamiliar-page, or
+security-challenge result is surfaced
+as an interrupted read with an actionable human stop. The failed set read is
+never replayed and no credentials are accessed. Unavailable reads do not
+trigger the extra observation, and an unconfirmed follow-up remains unknown.
+
+The extension's explicit popup focus command now reports a failure when the
+stored tab is no longer at Blooket instead of returning a false success. The
+startup restoration path reports its validated saved connection as connected
+without waiting for a new CLI job; stale or malformed stored connections
+remain rejected even when optional storage cleanup fails.
+
+An owned numeric tab ID retained in profile-local extension storage can be
+recycled by Chrome across browser restarts. The extension therefore only
+reclaims an old stored ID at an exact ordinary My Sets or login landing
+route, with no unexpected search/hash. It does not reclaim a recycled ID at
+Edit or Create, even if it is still a Blooket origin. A synthetic regression
+confirms that an existing teacher editor is not adopted or navigated away.
+
+Chrome for Testing 155 with a freshly built unpacked extension and isolated
+local service confirmed the honest `security-challenge` UI stop in the local
+Quizzes view and the extension popup's attention-required state. A synthetic
+UI-only response confirmed the interrupted-read wording in both English and
+Spanish. Neither result proves an authenticated My Sets read or Cloudflare
+clearance. The Mac/Safari release target remains untested on this Linux host.
+
+### Cloudflare query and tab restoration
+
+Chrome may append a one-time `__cf_chl_rt_tk` query to the provider's My Sets
+landing URL while the document title still reads `Just a moment...`. A tab
+with that exact single query can now survive an extension reload without a
+second challenge tab. The rule does not accept custom query names, duplicates,
+search filters, Edit, Create, an unexpected hash, or arbitrary titles.
+
+Synthetic worker tests cover both the retained provider challenge tab and
+rejected teacher-editing or ambiguous routes. The provider query value is
+neither persisted anew nor exposed in an API response. This does not mean the
+challenge was solved or that the browser acquired an authenticated session.
+
+
+## Prepared-file correction and current browser availability (2026-10-09)
+
+An authorized emitted-host test submitted one fictional text question but
+Blooket discarded its attempted image. Independent read-back rejected the
+mutation, and no automatic replay occurred. The partial test question remains
+identified as a fixture; the owner's existing photo was preserved. This is
+failure evidence, not a successful product image publication.
+
+A subsequent non-submitting browser diagnostic assigned the same repository
+icon bytes to the provider's blank native file input and dispatched change.
+No operating-system picker opened. Blooket's own handler displayed Remove Image,
+created its hidden `coverImageFile` input, and stored its preview URL in the
+serialized question. The diagnostic editor was canceled without saving.
+
+The corrected isolated-world runner therefore assigns an immutable File only
+to that uniquely observed input: empty name, single selection, exact accepted
+formats, no foreign form association. It never appends its own upload field or
+creates/revokes a provider preview URL. The host waits for the provider's hidden
+file and visible Remove Image control, binds the exact file and preview,
+finalizes canonical question semantics, and permits one Submit.
+
+Human input,
+changed forms/files/preview, delayed preparation, or an uncertain
+acknowledgement
+prevent replay. Remote byte length and SHA-256 still have to match independent
+saved-question reads before this internal host reports success.
+
+Portable regressions exercise delayed provider preparation, missing or altered
+file state, changed bytes, foreign previews, cancellation before Submit,
+serialized runner closure, and post-submit identity failure. The corrected
+upload has not yet been demonstrated against the live provider. Do not promote
+these synthetic fixtures into live acceptance or remove the media gate.
+
+At this follow-up, the browser connector listed no connected Chrome and the
+owner-supplied DevTools CLI reported that its daemon was not running. The helper
+wrapper uses a separate profile rather than the previously authenticated
+browser; it also creates directories outside this repository and uses Bash,
+so it was inspected but not invoked under the current repository/zsh boundary.
+
+No account secret, cookie, or challenge token was copied, and no challenge was
+solved. A different profile explains different session state but does not prove
+the cause of the provider challenge. Official Cloudflare guidance was checked
+again on 2026-10-09 at [supported browsers][cf-supported] and
+[challenge troubleshooting][cf-troubleshooting].

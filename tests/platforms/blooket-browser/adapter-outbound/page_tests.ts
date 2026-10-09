@@ -966,7 +966,7 @@ test(
     }
     page(document, origin, () => {
       assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
-        ok: true, value: "unexpected-page",
+        ok: true, value: "security-challenge",
       });
       assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     });
@@ -997,7 +997,7 @@ test("injected page readers work without module lexical scope", () => {
   (document as FixtureNode & { title: string }).title = "Just a moment...";
   page(document, "https://dashboard.blooket.com/my-sets", () => {
     assert.deepEqual(inspect({ kind: "session.observe" }), {
-      ok: true, value: "unexpected-page",
+      ok: true, value: "security-challenge",
     });
     assert.equal(inspect({ kind: "sets.list" }).ok, false);
     assert.equal(open("fixture"), false);

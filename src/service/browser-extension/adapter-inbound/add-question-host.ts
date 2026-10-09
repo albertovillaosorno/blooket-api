@@ -9,15 +9,15 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Chrome mechanics for one observed text-only Add Question mutation.
+//   - Chrome mechanics for one observed Add Question mutation.
 // - Must-Not:
-//   - Expose bridge commands, upload media, retry submit, or infer success.
+//   - Expose bytes, choose paths, retry submit, or infer success.
 // - Allows:
-//   - Inputs: One dedicated tab and exact text-question form semantics.
+//   - Inputs: One dedicated tab, exact semantics, and admitted prepared bytes.
 //   - Outputs: Confirmed read-back success or explicit navigation/browser stop.
 //   - Side effects: Navigate, open modal, submit once, inspect and close panel.
 // - Split-When:
-//   - Media-backed questions require independent host mechanics.
+//   - Another media family requires independent host mechanics.
 // - Merge-When:
 //   - Browser worker directly owns all guarded question-write orchestration.
 // - Summary:
@@ -31,6 +31,12 @@
 //
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
+import { blooketPreparedImageBytes } from
+  "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
+import { decodeBlooketBrowserBridgeRequest } from
+  "../../../ir/blooket-browser-bridge/contract/message.ts";
+import { inspectOpenedBlooketQuestionImage } from
+  "../../../platforms/blooket-browser/adapter-outbound/question-image-page.ts";
 import { decodeBlooketQuestionRead, type BlooketQuestionRead } from
   "../../../ir/blooket-question-reads/contract/question-read.ts";
 import {
@@ -40,6 +46,8 @@ import {
   "../../../platforms/blooket-browser/adapter-outbound/add-question-page.ts";
 import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import { canLeaveBlooketPageForRead } from
+  "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import {
   closeBlooketQuestionPanel,
   inspectOpenedBlooketQuestion,
@@ -124,9 +132,28 @@ export function createExtensionAddQuestionHost(
 
   return {
     addQuestion: async (
-      input: BlooketTextQuestionPageInput,
+      candidate: BlooketTextQuestionPageInput,
     ): Promise<ExtensionAddQuestionResult> => {
       try {
+        const decoded = decodeBlooketBrowserBridgeRequest({
+          schemaVersion: 1,
+          id: "00000000-0000-0000-0000-000000000000",
+          command: { ...candidate, kind: "questions.create" },
+        });
+        if (!decoded.ok || decoded.value.command.kind !== "questions.create")
+          return browserFailure();
+        const input = decoded.value.command;
+        let imageIdentity: { byteLength: number; sha256: string } | undefined;
+        if (input.image) {
+          const bytes = blooketPreparedImageBytes(input.image);
+          if (!bytes) return browserFailure();
+          const digest = await crypto.subtle.digest("SHA-256", bytes);
+          imageIdentity = {
+            byteLength: bytes.length,
+            sha256: Array.from(new Uint8Array(digest))
+              .map(byte => byte.toString(16).padStart(2, "0")).join(""),
+          };
+        }
         const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
           encodeURIComponent(input.setId);
         const before = await chrome.tabs.get(tabId);
@@ -137,8 +164,18 @@ export function createExtensionAddQuestionHost(
         const current = await chrome.tabs.get(tabId);
         if (current.status !== "complete" || current.url !== before.url)
           return browserFailure();
-        if (current.url !== editUrl)
+        if (current.url !== editUrl) {
+          // A write may navigate from My Sets or another dashboard view.
+          // Never discard an existing teacher editor to reach its target.
+          const canLeave = await script(
+            canLeaveBlooketPageForRead as (...args: never[]) => unknown,
+          );
+          if (canLeave !== true) return browserFailure();
+          const afterGuard = await chrome.tabs.get(tabId);
+          if (afterGuard.status !== "complete" ||
+              afterGuard.url !== current.url) return browserFailure();
           await chrome.tabs.update(tabId, { url: editUrl });
+        }
 
         const ready = await waitForEdit(
           script, chrome, tabId, editUrl, pause,
@@ -159,9 +196,15 @@ export function createExtensionAddQuestionHost(
             throw new Error("browser-write-tab-changed");
           return result;
         };
+        // Recheck the target editor before taking control of an Add Question
+        // modal. A manual Edit Info or question form may already be open.
+        const safeToOpen = await ownedScript(
+          canLeaveBlooketPageForRead as (...args: never[]) => unknown,
+        );
+        if (safeToOpen !== true) return browserFailure();
         const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-          ["open", input.setId],
+          [input.image ? "open-image" : "open", input.setId],
         );
         if (opened !== true) return browserFailure();
 
@@ -183,7 +226,38 @@ export function createExtensionAddQuestionHost(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
           ["prepare", input],
         );
-        if (!exactOk(prepared)) return browserFailure();
+        if (!exactOk(prepared)) {
+          if (input.image) await ownedScript(
+            runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+            ["cancel-image", input.setId],
+          ).catch(() => undefined);
+          return browserFailure();
+        }
+
+        if (input.image) {
+          // Provider media state settles asynchronously after the file change.
+          // Do not submit until its owned hidden field and preview agree.
+          let imageReady = false;
+          for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+            const result = await ownedScript(
+              runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+              ["is-image-ready", input.setId],
+            );
+            if (result === true) { imageReady = true; break; }
+            await pause(POLL_MS);
+          }
+          const finalized = imageReady ? await ownedScript(
+            runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+            ["finalize-image", input],
+          ) : undefined;
+          if (!exactOk(finalized)) {
+            await ownedScript(
+              runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+              ["cancel-image", input.setId],
+            ).catch(() => undefined);
+            return browserFailure();
+          }
+        }
 
         const submittedResult = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
@@ -196,6 +270,7 @@ export function createExtensionAddQuestionHost(
           chrome,
           tabId,
           pause,
+          imageIdentity,
         );
       } catch {
         return browserFailure();
@@ -234,6 +309,7 @@ async function observeQuestion(
   chrome: AddQuestionChromePort,
   tabId: number,
   pause: (ms: number) => Promise<void>,
+  imageIdentity?: { readonly byteLength: number; readonly sha256: string },
 ): Promise<ExtensionAddQuestionResult> {
   const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
     encodeURIComponent(input.setId);
@@ -300,6 +376,22 @@ async function observeQuestion(
           const second = matchingQuestion(again, input);
           confirmed = !!second &&
             JSON.stringify(first) === JSON.stringify(second);
+          if (confirmed && imageIdentity) {
+            const image = await script(
+              inspectOpenedBlooketQuestionImage as
+                (...args: never[]) => unknown,
+              [input.setId, input.number, 5_000],
+            );
+            confirmed = imageMatches(image, imageIdentity);
+            if (confirmed) {
+              const final = matchingQuestion(await script(
+                inspectOpenedBlooketQuestion as (...args: never[]) => unknown,
+                [input.setId, input.number],
+              ), input);
+              confirmed = !!final &&
+                JSON.stringify(first) === JSON.stringify(final);
+            }
+          }
         }
         break;
       }
@@ -373,8 +465,24 @@ function matchingQuestion(
     value.random === input.random &&
     value.timeLimit === input.timeLimit &&
     JSON.stringify(value.answers) === JSON.stringify(answers) &&
-    value.hasImage === false && value.hasAudio === false
+    value.hasImage === (input.image !== undefined) && value.hasAudio === false
     ? value : undefined;
+}
+
+function imageMatches(
+  result: unknown,
+  expected: { readonly byteLength: number; readonly sha256: string },
+): boolean {
+  if (!result || typeof result !== "object" || Array.isArray(result) ||
+      Object.keys(result).sort().join() !== "ok,value" ||
+      !("ok" in result) || result.ok !== true || !("value" in result) ||
+      !result.value || typeof result.value !== "object" ||
+      Array.isArray(result.value) ||
+      Object.keys(result.value).sort().join() !== "byteLength,sha256")
+    return false;
+  return "byteLength" in result.value && "sha256" in result.value &&
+    result.value.byteLength === expected.byteLength &&
+    result.value.sha256 === expected.sha256;
 }
 
 function pageUnavailable(result: unknown): boolean {

@@ -400,3 +400,55 @@ test("malformed bridge transport envelopes cannot reach any port", async () => {
     assert.deepEqual(await ports.questions.list("fixture"), failure);
   }
 });
+
+test("browser write adapter forwards one owned prepared image, not paths",
+  async () => {
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const adapters = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: { ok: true } },
+  ], commands));
+  const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const submission = {
+    schemaVersion: 1 as const,
+    kind: "add-question" as const,
+    remoteSetId: "set-fixture",
+    number: 1,
+    question: "Synthetic image prompt",
+    answers: [{ kind: "text" as const,
+      text: "Sun", correct: true }],
+    image: { mediaId: "fixture-image" },
+    audio: "" as const,
+    qType: "typing" as const,
+    random: true,
+    answerTypes: ["exactly" as const],
+    timeLimit: 15,
+  };
+  const media = [{
+    mediaId: "fixture-image", revision: 1,
+    format: "png" as const, bytes,
+  }];
+  assert.deepEqual(await adapters.writes.addQuestion(submission, media), {
+    ok: true,
+  });
+  assert.deepEqual(commands, [{
+    kind: "questions.create", setId: "set-fixture", number: 1,
+    question: "Synthetic image prompt",
+    answers: [{ text: "Sun", correct: true }],
+    qType: "typing", random: true, answerTypes: ["exactly"],
+    timeLimit: 15,
+    image: { format: "png", base64: Buffer.from(bytes).toString("base64") },
+  }]);
+  for (const invalidMedia of [
+    [{ ...media[0]!, mediaId: "wrong-asset" }],
+    [{ ...media[0]!, revision: 0 }],
+    [{ ...media[0]!, format: "jpeg" as const }],
+    [...media, ...media],
+    [],
+  ]) {
+    assert.equal((await adapters.writes.addQuestion(
+      submission, invalidMedia,
+    )).ok, false);
+  }
+  assert.equal(commands.length, 1);
+  },
+);

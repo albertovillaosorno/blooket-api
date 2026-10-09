@@ -54,6 +54,9 @@ const MIN_CAPABILITY_DISPATCH_MS = 9_500;
 // and independent read-back. Never dispatch close to broker expiry; a form
 // can still mutate after the caller has stopped waiting for its reply.
 const MIN_WRITE_DISPATCH_MS = 9_500;
+// The extension reads each /next JSON response with a four-megabyte cap.
+// Account for the actual envelope before leasing any image-backed write.
+const MAX_DELIVERY_JSON_BYTES = 4_000_000;
 
 interface PendingJob {
   readonly request: BlooketBrowserBridgeRequest;
@@ -77,6 +80,7 @@ export interface BlooketBrowserBridgeBroker
   status(): {
     readonly pending: number;
     readonly connected: boolean;
+    readonly multipleBrowserClients: boolean;
     readonly incompatibleClients: number;
     readonly requiresExtensionUpdate: boolean;
   };
@@ -106,8 +110,14 @@ export function createBlooketBrowserBridgeBroker(
   const pending = new Map<string, PendingJob>();
   let closed = false;
   let lastPollAt = 0;
+  const activeClients = new Map<string, number>();
   const incompatibleClients = new Set<string>();
   let unidentifiedClient = false;
+
+  function pruneClients() {
+    for (const [client, at] of activeClients)
+      if (now() - at >= timeoutMs) activeClients.delete(client);
+  }
 
   function authenticated(candidate: string): boolean {
     const left = Buffer.from(token, "utf8");
@@ -137,6 +147,7 @@ export function createBlooketBrowserBridgeBroker(
       if (closed) return;
       token = randomBytes(32).toString("base64url");
       lastPollAt = 0;
+      activeClients.clear();
       incompatibleClients.clear();
       unidentifiedClient = false;
       for (const id of [...pending.keys()]) {
@@ -145,7 +156,9 @@ export function createBlooketBrowserBridgeBroker(
     },
 
     request: async (command) => {
-      if (closed || pending.size >= maxPending) {
+      pruneClients();
+      if (closed || activeClients.size > 1 ||
+          pending.size >= maxPending) {
         return {
           ok: false,
           code: "blooket-browser-unavailable",
@@ -161,6 +174,9 @@ export function createBlooketBrowserBridgeBroker(
         return { ok: false, code: "blooket-browser-failed" };
       }
       const request: BlooketBrowserBridgeRequest = decoded.value;
+      if (Buffer.byteLength(JSON.stringify({ ok: true, job: request })) >
+          MAX_DELIVERY_JSON_BYTES)
+        return { ok: false, code: "blooket-browser-failed" };
       return await new Promise<BlooketBrowserBridgeTransportResult>(
         (resolve) => {
           const timer = setTimeout(() => {
@@ -185,6 +201,14 @@ export function createBlooketBrowserBridgeBroker(
       if (closed || !authenticated(candidate)) return null;
       if (client !== undefined && incompatibleClients.has(client)) return null;
       lastPollAt = now();
+      pruneClients();
+      if (client !== undefined &&
+          (activeClients.has(client) || activeClients.size < 16))
+        activeClients.set(client, lastPollAt);
+      // A second distinct extension can represent a different user browser
+      // profile with different account cookies. Fail closed instead of
+      // dispatching the user's next job to whichever profile polls first.
+      if (activeClients.size > 1) return null;
       // Polling can be concurrent after extension reconnection. Expire stale
       // leases first, then keep at most one job in the browser at a time.
       for (const job of pending.values()) {
@@ -262,6 +286,7 @@ export function createBlooketBrowserBridgeBroker(
           decoded.value.ok && Array.isArray(decoded.value.value)) {
         // Bound authenticated client observations as well as pending jobs.
         if (incompatibleClients.size < 16) incompatibleClients.add(client);
+        activeClients.delete(client);
         lastPollAt = 0;
       }
       settle(
@@ -284,12 +309,18 @@ export function createBlooketBrowserBridgeBroker(
       }
     },
 
-    status: () => ({
+    status: () => {
+      pruneClients();
+      const multipleBrowserClients = activeClients.size > 1;
+      return {
       pending: pending.size,
-      connected: !closed && lastPollAt > 0 && now() - lastPollAt <= timeoutMs,
+      connected: !closed && !multipleBrowserClients &&
+        lastPollAt > 0 && now() - lastPollAt < timeoutMs,
+      multipleBrowserClients,
       incompatibleClients: incompatibleClients.size,
       requiresExtensionUpdate: unidentifiedClient ||
         incompatibleClients.size > 0,
-    }),
+      };
+    },
   };
 }

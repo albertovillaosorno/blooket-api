@@ -29,6 +29,10 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
+import { openBlooketInDefaultBrowser } from
+  "../../../platforms/browser-opening/adapter-outbound/open.ts";
+import { decodeBlooketSetList } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
 import { createPackagedLoginItemControl, type LoginItemControl } from
   "../../../platforms/service-lifecycle/adapter-outbound/login-item.ts";
 import { inspectLoginItem, setLoginItemPreference } from
@@ -150,6 +154,7 @@ export async function startBrowserService(
     browserBridge?: BlooketBrowserBridgeBroker;
     updates?: ApplicationUpdateChecker;
     loginItem?: LoginItemControl;
+    openBlooketBrowser?: () => Promise<void>;
     safariExtension?: {
       available: () => Promise<boolean>;
       open: () => Promise<
@@ -476,6 +481,120 @@ export async function startBrowserService(
           ? 36_000_000
           : 1_000_000,
       );
+      if (url.pathname === "/api/blooket-readiness-check") {
+        if (!body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).length !== 0)
+          throw new Error("invalid-blooket-readiness-check");
+        if (!browserBridge.status().connected) {
+          json(response, 409, {
+            ok: false, code: browserBridge.status().multipleBrowserClients
+              ? "blooket-browser-multiple-clients"
+              : "blooket-browser-not-connected",
+          });
+          return;
+        }
+        // The only way to claim readiness is a fresh observation from the
+        // same paired tab followed by a fresh My Sets read. No login or
+        // mutation jobs may be dispatched by this UI action.
+        const session = await browserBridge.request({
+          kind: "session.observe",
+        });
+        const states = [
+          "dashboard", "my-sets", "create", "edit", "signed-out",
+          "expired-session", "security-challenge", "organization-prompt",
+          "unexpected-page",
+        ];
+        if (!session.ok || typeof session.value !== "string" ||
+            !states.includes(session.value)) {
+          json(response, 409, {
+            ok: false, code: "blooket-session-unconfirmed",
+          });
+          return;
+        }
+        const state = session.value;
+        if (!["dashboard", "my-sets", "create", "edit"].includes(state)) {
+          json(response, 200, { ok: true, state, read: "not-attempted" });
+          return;
+        }
+        const sets = await browserBridge.request({ kind: "sets.list" });
+        if (!sets.ok && sets.code === "blooket-browser-failed") {
+          // A read may start authenticated and land on Cloudflare mid-read.
+          // Re-observe once without replaying the failed My Sets operation,
+          // credential access, or an automatic login attempt.
+          const stopped = await browserBridge.request({
+            kind: "session.observe",
+          });
+          if (stopped.ok && typeof stopped.value === "string" &&
+              ["security-challenge", "organization-prompt", "signed-out",
+                "expired-session", "unexpected-page"]
+                .includes(stopped.value)) {
+            json(response, 200, {
+              ok: true, state: stopped.value, read: "interrupted",
+            });
+            return;
+          }
+        }
+        const value = sets.ok ? sets.value : null;
+        if (!value || typeof value !== "object" || Array.isArray(value) ||
+            Object.keys(value).sort().join() !== "completeness,items" ||
+            !("completeness" in value) ||
+            !("items" in value) || !Array.isArray(value.items) ||
+            value.items.length > 200 ||
+            !(value.completeness === "complete" ||
+              value.completeness === "unknown") ||
+            (value.items.length === 0 && value.completeness !== "complete") ||
+            (value.items.length > 0 && value.completeness !== "unknown")) {
+          json(response, 200, { ok: true, state, read: "unconfirmed" });
+          return;
+        }
+        const decoded = decodeBlooketSetList(value.items);
+        if (!decoded.ok) {
+          json(response, 200, { ok: true, state, read: "unconfirmed" });
+          return;
+        }
+        json(response, 200, { ok: true, state, read: "observed",
+          completeness: value.completeness, count: decoded.value.length });
+        return;
+      }
+      if (url.pathname === "/api/blooket-connected-tab-focus") {
+        if (!body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).length !== 0)
+          throw new Error("invalid-blooket-browser-focus");
+        // Only the live, paired extension can focus its owned Blooket tab.
+        // Never copy cookies between profiles or browse to caller URLs.
+        if (!browserBridge.status().connected) {
+          json(response, 409, {
+            ok: false, code: browserBridge.status().multipleBrowserClients
+              ? "blooket-browser-multiple-clients"
+              : "blooket-browser-not-connected",
+          });
+          return;
+        }
+        const result = await browserBridge.request({
+          kind: "browser.activate",
+        });
+        const focused = result.ok && result.value !== null &&
+          typeof result.value === "object" &&
+          !Array.isArray(result.value) &&
+          Object.keys(result.value).join() === "focused" &&
+          "focused" in result.value && result.value.focused === true;
+        json(response, focused ? 200 : 409,
+          focused ? { ok: true } : {
+            ok: false, code: "blooket-browser-focus-unavailable",
+          });
+        return;
+      }
+      if (url.pathname === "/api/blooket-browser-open") {
+        // Explicit same-origin user gesture only. No remote URLs, browser
+        // flags, account cookies, or automated challenge interactions.
+        if (!body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).length !== 0)
+          throw new Error("invalid-blooket-browser-open");
+        await (options.openBlooketBrowser ??
+          openBlooketInDefaultBrowser)();
+        json(response, 200, { ok: true });
+        return;
+      }
       if (url.pathname === "/api/login-item") {
         json(response, 200,
           await setLoginItemPreference(root, body, loginItem));
@@ -823,7 +942,8 @@ async function handleBrowserBridgeRequest(
     json(response, 426, { ok: false, code: "blooket-browser-incompatible" });
     return;
   }
-  if (extensionOrigin !== undefined && client.value !== extensionOrigin + "/") {
+  if (extensionOrigin !== undefined &&
+      client.value.split("#")[0] !== extensionOrigin + "/") {
     json(response, 403, { ok: false, code: "invalid-origin" });
     return;
   }

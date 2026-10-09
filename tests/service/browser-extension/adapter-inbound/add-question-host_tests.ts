@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 
 import {
   createExtensionAddQuestionHost,
@@ -41,6 +42,12 @@ import {
 import type { BlooketTextQuestionPageInput } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/blooket-browser/adapter-outbound/add-question-page.ts";
+
+const imageBytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const image = {
+  format: "png" as const,
+  base64: imageBytes.toString("base64"),
+};
 
 const input: BlooketTextQuestionPageInput = {
   setId: "set-fixture",
@@ -60,6 +67,11 @@ function fakeChrome(options: {
   readonly readBackReplies?: readonly unknown[];
   readonly listReply?: unknown;
   readonly closeFails?: boolean;
+  readonly prepareFails?: boolean;
+  readonly imageReady?: boolean;
+  readonly finalizeFails?: boolean;
+  readonly imageProbeReply?: unknown;
+  readonly canLeave?: unknown;
 }) {
   let tab = {
     url: options.initialUrl ??
@@ -72,6 +84,7 @@ function fakeChrome(options: {
   let questionPanel = false;
   let readBackReads = 0;
   const calls: string[] = [];
+  let submittedImage = false;
   const chrome: AddQuestionChromePort = {
     tabs: {
       get: async () => {
@@ -99,6 +112,9 @@ function fakeChrome(options: {
           : func.name;
         calls.push(call);
         switch (func.name) {
+          case "canLeaveBlooketPageForRead":
+            return [{ result: options.canLeave === undefined
+              ? true : options.canLeave }];
           case "inspectBlooketPage":
             return [{
               result: {
@@ -107,15 +123,31 @@ function fakeChrome(options: {
               },
             }];
           case "runBlooketAddQuestionPageAction":
-            if (args?.[0] === "open") {
+            if (args?.[0] === "open" || args?.[0] === "open-image") {
               modalOpen = args?.[1] === "set-fixture";
               return [{ result: modalOpen }];
             }
             if (args?.[0] === "is-ready") return [{ result: modalOpen }];
-            if (args?.[0] === "prepare") return [{ result: { ok: true } }];
+            if (args?.[0] === "is-image-ready")
+              return [{ result: options.imageReady ?? true }];
+            if (args?.[0] === "finalize-image") return [{ result:
+              options.finalizeFails ? {
+                ok: false, code: "blooket-browser-failed",
+              } : { ok: true },
+            }];
+            if (args?.[0] === "cancel-image") {
+              modalOpen = false;
+              return [{ result: { ok: true } }];
+            }
+            if (args?.[0] === "prepare") return [{ result:
+              options.prepareFails ? {
+                ok: false, code: "blooket-browser-failed",
+              } : { ok: true },
+            }];
             if (args?.[0] === "submit") {
               modalOpen = false;
               questionAdded = true;
+              submittedImage = !!(args[1] as { image?: unknown })?.image;
               return [{ result: { ok: true } }];
             }
             throw new Error("unexpected-add-question-action");
@@ -155,11 +187,19 @@ function fakeChrome(options: {
                     correct: true,
                     match: "exactly",
                   }],
-                  hasImage: false,
+                  hasImage: submittedImage,
                   hasAudio: false,
                 },
               },
             }];
+          case "inspectOpenedBlooketQuestionImage":
+            return [{ result: options.imageProbeReply ?? {
+              ok: true, value: {
+                byteLength: imageBytes.length,
+                sha256: createHash("sha256").update(imageBytes)
+                  .digest("hex"),
+              },
+            } }];
           case "closeBlooketQuestionPanel":
             assert.deepEqual(args, ["set-fixture"]);
             if (options.closeFails) return [{ result: false }];
@@ -199,6 +239,73 @@ test("host confirms Add Question only after exact read-back", async () => {
   assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
   assert.equal(fake.readBackReads(), 2);
 });
+
+test("image write requires a matching persisted byte digest", async () => {
+  const fake = fakeChrome({});
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion({ ...input, image });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(fake.calls.filter(
+    value => value === "runBlooketAddQuestionPageAction:submit",
+  ).length, 1);
+  assert.equal(fake.calls.includes(
+    "runBlooketAddQuestionPageAction:open-image",
+  ), true);
+  assert.equal(fake.calls.includes("inspectOpenedBlooketQuestionImage"),
+    true);
+  assert.equal(fake.readBackReads(), 3);
+});
+
+test("image write refuses absent, altered, or malformed byte evidence",
+  async () => {
+  for (const reply of [
+    { ok: true, value: null },
+    { ok: true, value: { byteLength: imageBytes.length,
+      sha256: "0".repeat(64) } },
+    { ok: true, value: { byteLength: imageBytes.length,
+      sha256: createHash("sha256").update(imageBytes).digest("hex"),
+      url: "https://example.invalid/not-a-receipt" } },
+    { ok: false, code: "blooket-browser-failed" },
+  ]) {
+    const fake = fakeChrome({ imageProbeReply: reply });
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion({ ...input, image });
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.filter(
+      value => value === "runBlooketAddQuestionPageAction:submit",
+    ).length, 1);
+    assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
+  }
+  },
+);
+
+test("invalid image and failed preparation never submit a question",
+  async () => {
+  const invalid = fakeChrome({});
+  const bad = await createExtensionAddQuestionHost(
+    invalid.chrome, 7, async () => undefined,
+  ).addQuestion({ ...input, image: {
+    format: "png", base64: "AQIDBA==",
+  } });
+  assert.equal(bad.ok, false);
+  assert.equal(invalid.calls.includes(
+    "runBlooketAddQuestionPageAction:open-image",
+  ), false);
+  const failed = fakeChrome({ prepareFails: true });
+  const result = await createExtensionAddQuestionHost(
+    failed.chrome, 7, async () => undefined,
+  ).addQuestion({ ...input, image });
+  assert.equal(result.ok, false);
+  assert.equal(failed.calls.includes(
+    "runBlooketAddQuestionPageAction:cancel-image",
+  ), true);
+  assert.equal(failed.calls.includes(
+    "runBlooketAddQuestionPageAction:submit",
+  ), false);
+  },
+);
 
 test("navigation challenge stops before opening Add Question", async () => {
   const fake = fakeChrome({ navigationState: "security-challenge" });
@@ -392,3 +499,74 @@ test(
   }
   },
 );
+
+test("Add Question never abandons a teacher editor on target navigation",
+  async () => {
+  for (const denied of [false, null, { ok: true }, "true"]) {
+    const fake = fakeChrome({
+      initialUrl: "https://dashboard.blooket.com/edit?id=teacher-draft",
+      canLeave: denied,
+    });
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.includes("canLeaveBlooketPageForRead"), true);
+    assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+    assert.equal(fake.calls.includes(
+      "runBlooketAddQuestionPageAction:open",
+    ), false);
+  }
+  },
+);
+
+test("Add Question refuses a teacher route changed during leave inspection",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    const reply = await original(request);
+    if (request.func.name === "canLeaveBlooketPageForRead")
+      fake.setTab("https://dashboard.blooket.com/edit?id=teacher-draft");
+    return reply;
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("Add Question refuses to open over a teacher-owned target editor",
+  async () => {
+  const target = "https://dashboard.blooket.com/edit?id=set-fixture";
+  const fake = fakeChrome({ initialUrl: target, canLeave: false });
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("canLeaveBlooketPageForRead"), true);
+  assert.equal(fake.calls.includes(
+    "runBlooketAddQuestionPageAction:open",
+  ), false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+
+test("image settlement failure cancels only before a single possible submit",
+  async () => {
+  for (const options of [{ imageReady: false }, { finalizeFails: true }]) {
+    const fake = fakeChrome(options);
+    const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {});
+    assert.equal((await host.addQuestion({ ...input, image })).ok, false);
+    assert.equal(fake.calls.includes(
+      "runBlooketAddQuestionPageAction:submit",
+    ), false);
+    assert.equal(fake.calls.filter(call => call ===
+      "runBlooketAddQuestionPageAction:prepare").length, 1);
+    assert.equal(fake.calls.filter(call => call ===
+      "runBlooketAddQuestionPageAction:cancel-image").length, 1);
+  }
+});

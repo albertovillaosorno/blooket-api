@@ -47,8 +47,11 @@ export function canLeaveBlooketPageForRead(): boolean {
         document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]')) return false;
     const path = location.pathname;
+    // The Create Set page is itself a draft form, even when no control has
+    // focus. A route change could silently discard the teacher's work.
+    if (path === "/create") return false;
     if (path !== "/my-sets" && path !== "/edit" &&
-        path !== "/create" && !path.startsWith("/set/")) return false;
+        !path.startsWith("/set/")) return false;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;

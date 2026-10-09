@@ -36,6 +36,7 @@ import {
   observeBlooketCreateSetSuccess,
   prepareBlooketCreateSetForm,
   submitBlooketCreateSetForm,
+  runBlooketCreateSetOwnership,
 } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/blooket-browser/adapter-outbound/create-set-page.ts";
@@ -95,6 +96,7 @@ function withPage(
   document: FixtureNode,
   href: string,
   run: () => void,
+  withSyntheticOwner = true,
 ): void {
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   for (const key of [
@@ -103,6 +105,7 @@ function withPage(
     "HTMLInputElement",
     "HTMLTextAreaElement",
     "Event",
+    "__blooketCreateSetWatch",
   ])
     descriptors.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
 
@@ -150,6 +153,16 @@ function withPage(
     configurable: true,
     value: EventFixture,
   });
+  if (withSyntheticOwner && href.endsWith("/create")) {
+    const form = document.querySelector("form#question-set-form");
+    if (form) {
+      Object.assign(form, { isConnected: true });
+      Object.defineProperty(globalThis, "__blooketCreateSetWatch", {
+        configurable: true,
+        value: { document, form, dirty: false, submitted: false },
+      });
+    }
+  }
   try {
     run();
   } finally {
@@ -292,6 +305,9 @@ test("submit revalidates prepared state before one exact click", () => {
     };
     assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
     assert.deepEqual(submitBlooketCreateSetForm(expected), { ok: true });
+    assert.equal(submit.clicked, 1);
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
     assert.equal(submit.clicked, 1);
 
     page.title.value = "Changed after preparation";
@@ -498,3 +514,161 @@ test("Create Set redirects reject new organization and CAPTCHA prompts", () => {
     });
   }
 });
+
+test("Create Set owner watch refuses human edits and overlapping claims",
+  () => {
+  const page = fixture(true);
+  const form = page.form as FixtureNode & { isConnected: boolean };
+  form.isConnected = true;
+  const listeners = new Set<(event: { isTrusted: boolean }) => void>();
+  const doc = page.document as FixtureNode & {
+    addEventListener: (kind: string,
+      listener: (event: { isTrusted: boolean }) => void) => void;
+    removeEventListener: (kind: string,
+      listener: (event: { isTrusted: boolean }) => void) => void;
+  };
+  doc.addEventListener = (_kind, listener) => { listeners.add(listener); };
+  doc.removeEventListener = (_kind, listener) => {
+    listeners.delete(listener);
+  };
+  let mutation = () => {};
+  class Observer {
+    constructor(callback: () => void) { mutation = callback; }
+    observe() {}
+    disconnect() {}
+  }
+  const before = Object.getOwnPropertyDescriptor(globalThis,
+    "MutationObserver");
+  Object.defineProperty(globalThis, "MutationObserver", {
+    configurable: true, value: Observer,
+  });
+  try {
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      const serialized = Function("return (" +
+        runBlooketCreateSetOwnership.toString() + ")",
+      )() as typeof runBlooketCreateSetOwnership;
+      assert.equal(serialized("check"), false);
+      assert.equal(serialized("claim"), true);
+      assert.equal(serialized("claim"), false);
+      assert.equal(serialized("check"), true);
+      assert.deepEqual(prepareBlooketCreateSetForm({
+        title: "Synthetic", description: "", private: true,
+      }), { ok: true });
+      // Script-generated input events have no trusted browser gesture.
+      assert.equal(serialized("check"), true);
+      for (const listener of listeners) listener({ isTrusted: true });
+      assert.equal(serialized("check"), false);
+      assert.equal(serialized("claim"), false);
+      form.isConnected = false;
+      mutation();
+      assert.equal(Object.hasOwn(globalThis, "__blooketCreateSetWatch"),
+        false);
+      assert.equal(listeners.size, 0);
+      assert.equal(serialized("check"), false);
+    }, false);
+  } finally {
+    const world = globalThis as typeof globalThis & {
+      __blooketCreateSetWatch?: { dispose: () => void };
+    };
+    world.__blooketCreateSetWatch?.dispose();
+    if (before)
+      Object.defineProperty(globalThis, "MutationObserver", before);
+    else Reflect.deleteProperty(globalThis, "MutationObserver");
+  }
+  },
+);
+
+test("Create Set watch refuses stale and ambiguous forms", () => {
+  const page = fixture(true);
+  const form = page.form as FixtureNode & { isConnected: boolean };
+  form.isConnected = true;
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    page.document.selectors["form#question-set-form"] = [form, form];
+    assert.equal(runBlooketCreateSetOwnership("claim"), false);
+    page.document.selectors["form#question-set-form"] = [form];
+    page.document.selectors['input[type="password"]'] = [node("INPUT")];
+    assert.equal(runBlooketCreateSetOwnership("claim"), false);
+    page.document.selectors['input[type="password"]'] = [];
+    page.document.selectors['[role="dialog"][aria-modal="true"]'] = [
+      node("DIV"),
+    ];
+    assert.equal(runBlooketCreateSetOwnership("claim"), false);
+  });
+});
+
+test("Create Set fills and submits only while its form watch still owns work",
+  () => {
+  const expected = { title: "Synthetic", description: "Draft", private: true };
+  for (const state of ["dirty", "lost", "foreign", "detached"] as const) {
+    const page = fixture(true);
+    const submit = page.form.selectors["button"]![0]!;
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      const world = globalThis as typeof globalThis & {
+        __blooketCreateSetWatch?: {
+          document: unknown; form: unknown; dirty: boolean;
+        };
+      };
+      const watch = world.__blooketCreateSetWatch!;
+      if (state === "dirty") watch.dirty = true;
+      if (state === "lost")
+        Reflect.deleteProperty(globalThis, "__blooketCreateSetWatch");
+      if (state === "foreign") watch.form = node("FORM");
+      if (state === "detached")
+        (page.form as FixtureNode & { isConnected: boolean })
+          .isConnected = false;
+      assert.deepEqual(prepareBlooketCreateSetForm(expected), {
+        ok: false, code: "blooket-browser-failed",
+      });
+      assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+      assert.equal(page.title.value, "");
+      assert.equal(page.description.value, "");
+      assert.equal(submit.clicked, 0);
+    });
+  }
+  const page = fixture(true);
+  const submit = page.form.selectors["button"]![0]!;
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    const world = globalThis as typeof globalThis & {
+      __blooketCreateSetWatch?: { dirty: boolean };
+    };
+    assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
+    world.__blooketCreateSetWatch!.dirty = true;
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submit.clicked, 0);
+  });
+  },
+);
+
+test("Create Set claim releases partial listeners when observation fails",
+  () => {
+  const page = fixture(true);
+  Object.assign(page.form, { isConnected: true });
+  const listeners = new Set<unknown>();
+  const doc = page.document as FixtureNode & {
+    addEventListener: (type: string, callback: unknown) => void;
+    removeEventListener: (type: string, callback: unknown) => void;
+  };
+  doc.addEventListener = (_type, callback) => { listeners.add(callback); };
+  doc.removeEventListener = (_type, callback) => {
+    listeners.delete(callback);
+  };
+  const previous = Object.getOwnPropertyDescriptor(globalThis,
+    "MutationObserver");
+  Object.defineProperty(globalThis, "MutationObserver", {
+    configurable: true,
+    value: class { constructor() { throw new Error("synthetic-observer"); } },
+  });
+  try {
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(runBlooketCreateSetOwnership("claim"), false);
+      assert.equal(listeners.size, 0);
+      assert.equal(Object.hasOwn(globalThis, "__blooketCreateSetWatch"),
+        false);
+    }, false);
+  } finally {
+    if (previous)
+      Object.defineProperty(globalThis, "MutationObserver", previous);
+    else Reflect.deleteProperty(globalThis, "MutationObserver");
+  }
+  },
+);

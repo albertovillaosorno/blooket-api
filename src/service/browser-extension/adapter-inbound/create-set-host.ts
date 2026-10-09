@@ -36,10 +36,13 @@ import {
   observeBlooketCreateSetSuccess,
   prepareBlooketCreateSetForm,
   submitBlooketCreateSetForm,
+  runBlooketCreateSetOwnership,
 } from
   "../../../platforms/blooket-browser/adapter-outbound/create-set-page.ts";
 import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import { canLeaveBlooketPageForRead } from
+  "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 
 interface BrowserTab {
   readonly url?: string;
@@ -148,8 +151,19 @@ export function createExtensionCreateSetHost(
         const current = await chrome.tabs.get(tabId);
         if (current.status !== "complete" || current.url !== before.url)
           return browserFailure();
-        if (current.url !== CREATE_URL)
+        // A form already on Create may contain unsaved teacher-authored work.
+        // Only a freshly navigated product form may be populated and saved.
+        if (current.url === CREATE_URL) return browserFailure();
+        if (current.url !== CREATE_URL) {
+          const canLeave = await script(
+            canLeaveBlooketPageForRead as (...args: never[]) => unknown,
+          );
+          if (canLeave !== true) return browserFailure();
+          const afterGuard = await chrome.tabs.get(tabId);
+          if (afterGuard.status !== "complete" ||
+              afterGuard.url !== current.url) return browserFailure();
           await chrome.tabs.update(tabId, { url: CREATE_URL });
+        }
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
           if (tab.status === "complete") {
@@ -158,7 +172,14 @@ export function createExtensionCreateSetHost(
             if (tab.url !== CREATE_URL) return browserFailure();
             const observed = await observe(script);
             if (!await createTabReady()) return browserFailure();
-            if (observed === "create") return { ok: true };
+            if (observed === "create") {
+              const claimed = await script(
+                runBlooketCreateSetOwnership as (...args: never[]) => unknown,
+                ["claim"],
+              );
+              return claimed === true && await createTabReady()
+                ? { ok: true } : browserFailure();
+            }
             if (observed !== undefined)
               return navigationFailure(normalizeUnexpected(observed));
           }
@@ -173,12 +194,22 @@ export function createExtensionCreateSetHost(
     prepareCreateSet: async (input) => {
       try {
         if (!await createTabReady()) return browserFailure();
+        const owned = await script(
+          runBlooketCreateSetOwnership as (...args: never[]) => unknown,
+          ["check"],
+        );
+        if (owned !== true || !await createTabReady())
+          return browserFailure();
         const result = await script(
           prepareBlooketCreateSetForm as (...args: never[]) => unknown,
           [input],
         );
-        return await createTabReady() && exactOk(result)
-          ? { ok: true } : browserFailure();
+        const stillOwned = await script(
+          runBlooketCreateSetOwnership as (...args: never[]) => unknown,
+          ["check"],
+        );
+        return await createTabReady() && stillOwned === true &&
+          exactOk(result) ? { ok: true } : browserFailure();
       } catch {
         return browserFailure();
       }
@@ -187,6 +218,12 @@ export function createExtensionCreateSetHost(
     submitCreateSet: async (expected) => {
       try {
         if (!await createTabReady()) return browserFailure();
+        const owned = await script(
+          runBlooketCreateSetOwnership as (...args: never[]) => unknown,
+          ["check"],
+        );
+        if (owned !== true || !await createTabReady())
+          return browserFailure();
         const result = await script(
           submitBlooketCreateSetForm as (...args: never[]) => unknown,
           [expected],

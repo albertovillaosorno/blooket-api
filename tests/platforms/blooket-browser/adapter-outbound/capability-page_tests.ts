@@ -211,6 +211,16 @@ test("capability navigation leaves all teacher-owned editors untouched", () => {
   )() as typeof canLeaveBlooketPageForRead;
   withPage(page.document, () => {
     assert.equal(injected(), true);
+    // A blank, unfocused Create Set page is still an unowned draft.
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: new URL("https://dashboard.blooket.com/create"),
+    });
+    assert.equal(injected(), false);
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: new URL("https://dashboard.blooket.com/edit?id=set-fixture"),
+    });
     const draft = node("INPUT");
     draft.getBoundingClientRect = () => ({ width: 0, height: 0 });
     const selector =

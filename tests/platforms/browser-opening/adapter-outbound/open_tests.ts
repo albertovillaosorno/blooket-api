@@ -39,6 +39,8 @@ test("browser opening excludes application and tunnel credentials", () => {
     PATH: "/usr/bin",
     HOME: "/home/fixture",
     DISPLAY: ":1",
+    XDG_ACTIVATION_TOKEN: "synthetic-activation",
+    DESKTOP_STARTUP_ID: "synthetic-startup",
     DBUS_SESSION_BUS_ADDRESS: "unix:path=/fixture",
     BLOOKET_PASSWORD: "do-not-forward",
     CLOUDFLARE_TUNNEL_TOKEN: "do-not-forward",
@@ -49,6 +51,8 @@ test("browser opening excludes application and tunnel credentials", () => {
     PATH: "/usr/bin",
     HOME: "/home/fixture",
     DISPLAY: ":1",
+    XDG_ACTIVATION_TOKEN: "synthetic-activation",
+    DESKTOP_STARTUP_ID: "synthetic-startup",
     DBUS_SESSION_BUS_ADDRESS: "unix:path=/fixture",
   });
 });
