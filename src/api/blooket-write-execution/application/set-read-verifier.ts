@@ -179,6 +179,9 @@ async function verifyQuestion(
   const listed = await safeQuestions(reads, target.remoteSetId);
   if (!listed.ok) return listed;
   const currentBaseline = questionBaselineFor(listed.value);
+  if (currentBaseline === null) {
+    return { ok: true, outcome: "inconclusive" };
+  }
   if (sameBlooketWriteVerificationBaseline(currentBaseline, baseline)) {
     return { ok: true, outcome: "not-confirmed" };
   }
@@ -330,12 +333,26 @@ function setBaselineFor(
 
 function questionBaselineFor(
   questions: readonly BlooketQuestionRead[],
-): BlooketWriteVerificationBaseline {
+): BlooketWriteVerificationBaseline | null {
+  // An image replacement must not pass as an unchanged prior collection.
+  // Legacy presence-only reads and unreadable images cannot establish this.
+  if (questions.some(question => question.hasAudio ||
+      question.answers.some(answer => answer.kind === "image") ||
+      (question.hasImage &&
+        (question.schemaVersion !== 4 || question.imageEvidence === null))))
+    return null;
   const items = questions.map(questionBaselineItem);
   return baselineFor("question-list", items);
 }
 
 function questionBaselineItem(question: BlooketQuestionRead): string {
+  if (question.hasImage && question.schemaVersion === 4) {
+    return JSON.stringify([
+      "v4", question.number, question.question, question.equation,
+      question.qType, question.random, question.timeLimit, question.answers,
+      question.hasImage, question.hasAudio, question.imageEvidence,
+    ]);
+  }
   if (question.equation !== null) {
     return JSON.stringify([
       "v3",

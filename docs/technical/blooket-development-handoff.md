@@ -172,6 +172,37 @@ prepared byte snapshot, validate the live form/slot, and prove the resulting
 remote identity before reporting publication. Avoid opening a native chooser.
 Do not treat `hasImage`, a URL hash, or a local preview as content equality.
 
+On 2026-10-09, the emitted product image reader ran in the authenticated
+Chrome tab's isolated world against an owned existing question modal. Its
+credential-free CORS GET read 82,377 bytes from the saved test image and
+reproduced the independently observed SHA-256 digest. The modal was canceled
+without saving; the owner's separate question photo was preserved.
+
+`question-image-page.ts` now performs this bounded read behind the existing
+question inspection host. It admits only the exact HTTPS media origin, omits
+credentials and referrers, refuses redirects, bypasses the browser cache, and
+bounds time, bytes, and stream chunks. Check current Fetch behavior against
+[MDN RequestInit][request-init], inspected on 2026-10-09.
+
+Version-four question reads carry `imageEvidence` as byte length plus digest,
+or explicit null when media is unreadable. Version-one/two migration and
+version-three text reads preserve their existing representation; they never
+gain fabricated identity. The reader rechecks its owned form, exact raw value,
+human-interaction watch, authentication, route, and question facts across
+asynchronous image extraction.
+
+Differential write baselines now include saved question-image identity.
+An image replacement cannot masquerade as an unchanged prior question;
+presence-only images, unreadable images, audio, and answer images without
+identity cannot establish a preservation baseline. Plain-text baselines retain
+their old digest for existing recovery journals.
+
+The authorized observation proves the emitted image reader on one saved
+question, not a newly loaded extension, file upload, or canonical publication.
+The prepared-file transport and immutable expected-media identity still need
+composition before enabling media writes. Never remove the publication media
+gate based on this read evidence alone.
+
 Media transport remains unsupported by the bridge surfaces. Review the actual
 request/response byte limits and serialization before adding prepared files:
 base64 expands bytes, and accepted image size is not an envelope size allowance.
@@ -280,6 +311,8 @@ unavailability must not block completion of P2/P3 functional work.
   https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/files
 
 [child-process]: https://nodejs.org/api/child_process.html
+
+[request-init]: https://developer.mozilla.org/en-US/docs/Web/API/RequestInit
 
 <!-- jig-ignore-next-line: Preserve the official browser-support source URL. -->
 [challenge-browsers]: https://developers.cloudflare.com/cloudflare-challenges/reference/supported-browsers/

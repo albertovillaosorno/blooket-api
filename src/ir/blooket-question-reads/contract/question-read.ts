@@ -39,7 +39,8 @@ import {
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 
-export const BLOOKET_QUESTION_READ_VERSION = 3 as const;
+export const BLOOKET_QUESTION_READ_VERSION = 4 as const;
+const NORMALIZED_BLOOKET_QUESTION_READ_VERSION = 3 as const;
 const PREVIOUS_BLOOKET_QUESTION_READ_VERSION = 2 as const;
 const LEGACY_BLOOKET_QUESTION_READ_VERSION = 1 as const;
 const LEGACY_IMAGE_ANSWER_MARKER = "`~`";
@@ -55,8 +56,12 @@ export interface BlooketAnswerRead {
   readonly match: BlooketAnswerMatch | null;
 }
 
-export interface BlooketQuestionRead {
-  readonly schemaVersion: typeof BLOOKET_QUESTION_READ_VERSION;
+export interface BlooketQuestionImageEvidence {
+  readonly byteLength: number;
+  readonly sha256: string;
+}
+
+interface BlooketQuestionReadFields {
   readonly number: number;
   readonly question: string;
   readonly equation: string | null;
@@ -67,6 +72,14 @@ export interface BlooketQuestionRead {
   readonly hasImage: boolean;
   readonly hasAudio: boolean;
 }
+
+export type BlooketQuestionRead = BlooketQuestionReadFields & (
+  | { readonly schemaVersion: 3; readonly imageEvidence?: never }
+  | {
+      readonly schemaVersion: 4;
+      readonly imageEvidence: BlooketQuestionImageEvidence | null;
+    }
+);
 
 const QUESTION_KEYS = new Set([
   "schemaVersion",
@@ -83,6 +96,7 @@ const QUESTION_KEYS = new Set([
 const PREVIOUS_QUESTION_KEYS = new Set(
   [...QUESTION_KEYS].filter((key) => key !== "equation"),
 );
+const IMAGE_QUESTION_KEYS = new Set([...QUESTION_KEYS, "imageEvidence"]);
 const LEGACY_QUESTION_KEYS = new Set([
   ...PREVIOUS_QUESTION_KEYS,
   "correctAnswers",
@@ -108,12 +122,13 @@ export function decodeBlooketQuestionRead(
   if (
     version !== LEGACY_BLOOKET_QUESTION_READ_VERSION
     && version !== PREVIOUS_BLOOKET_QUESTION_READ_VERSION
+    && version !== NORMALIZED_BLOOKET_QUESTION_READ_VERSION
     && version !== BLOOKET_QUESTION_READ_VERSION
   ) {
     issues.push({
       path: path + ".schemaVersion",
       code: "unsupported-version",
-      message: "Expected Blooket question read version 1, 2, or 3.",
+      message: "Expected Blooket question read version 1, 2, 3, or 4.",
     });
   }
   issues.push(...unknownFieldIssues(
@@ -122,7 +137,8 @@ export function decodeBlooketQuestionRead(
       ? LEGACY_QUESTION_KEYS
       : version === PREVIOUS_BLOOKET_QUESTION_READ_VERSION
         ? PREVIOUS_QUESTION_KEYS
-        : QUESTION_KEYS,
+        : version === BLOOKET_QUESTION_READ_VERSION
+          ? IMAGE_QUESTION_KEYS : QUESTION_KEYS,
     path,
   ));
 
@@ -144,7 +160,8 @@ export function decodeBlooketQuestionRead(
   const normalizedQuestion =
     rawQuestion === undefined || rawQuestion.length > 20_000
     ? undefined
-    : version === BLOOKET_QUESTION_READ_VERSION
+    : version === BLOOKET_QUESTION_READ_VERSION ||
+        version === NORMALIZED_BLOOKET_QUESTION_READ_VERSION
       ? decodeCurrentQuestion(
           rawQuestion,
           value["equation"],
@@ -180,6 +197,19 @@ export function decodeBlooketQuestionRead(
     path + ".hasAudio",
     issues,
   );
+  let imageEvidence: BlooketQuestionImageEvidence | null = null;
+  if (version === BLOOKET_QUESTION_READ_VERSION) {
+    const evidence = decodeBlooketQuestionImageEvidence(
+      value["imageEvidence"], path + ".imageEvidence",
+    );
+    if (!evidence.ok) issues.push(...evidence.issues);
+    else imageEvidence = evidence.value;
+    if (hasImage === false && imageEvidence !== null) issues.push({
+      path: path + ".imageEvidence",
+      code: "unexpected-image-evidence",
+      message: "Image evidence requires an observed question image.",
+    });
+  }
 
   if (
     normalizedQuestion !== undefined &&
@@ -213,7 +243,9 @@ export function decodeBlooketQuestionRead(
   return {
     ok: true,
     value: {
-      schemaVersion: BLOOKET_QUESTION_READ_VERSION,
+      ...(version === BLOOKET_QUESTION_READ_VERSION
+        ? { schemaVersion: BLOOKET_QUESTION_READ_VERSION, imageEvidence }
+        : { schemaVersion: NORMALIZED_BLOOKET_QUESTION_READ_VERSION }),
       number,
       question: normalizedQuestion.question,
       equation: normalizedQuestion.equation,
@@ -224,6 +256,32 @@ export function decodeBlooketQuestionRead(
       hasImage,
       hasAudio,
     },
+  };
+}
+
+export function decodeBlooketQuestionImageEvidence(
+  value: unknown,
+  path = "$",
+): DecodeResult<BlooketQuestionImageEvidence | null> {
+  if (value === null) return { ok: true, value: null };
+  if (!isRecord(value)) return failure(
+    path, "invalid-image-evidence", "Expected null or bounded image evidence.",
+  );
+  const issues: ValidationIssue[] = [...unknownFieldIssues(
+    value, new Set(["byteLength", "sha256"]), path,
+  )];
+  const byteLength = value["byteLength"];
+  const sha256 = value["sha256"];
+  if (!Number.isSafeInteger(byteLength) || typeof byteLength !== "number" ||
+      byteLength < 1 || byteLength >= 2_500_000 ||
+      typeof sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(sha256))
+    issues.push({
+      path, code: "invalid-image-evidence",
+      message: "Expected a bounded byte count and lowercase SHA-256 digest.",
+    });
+  return issues.length > 0 ? { ok: false, issues } : {
+    ok: true,
+    value: { byteLength: byteLength as number, sha256: sha256 as string },
   };
 }
 

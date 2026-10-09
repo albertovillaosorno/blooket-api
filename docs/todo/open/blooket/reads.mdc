@@ -204,6 +204,19 @@ validated.
 
 ## Evidence
 
+On 2026-10-09, an emitted product helper read an owned saved question image
+in the authenticated Chrome isolated world. A bounded credential-free CORS
+request returned 82,377 bytes and the previously observed SHA-256 digest;
+the read modal was canceled without saving. This proves one real image reader,
+not the loaded extension, canonical CLI/MCP flow, or a new image publication.
+
+The question inspection host now adds exact version-four byte/digest evidence
+or explicit unknown within its existing overall deadline. Synthetic coverage
+checks URL authority, response bounds, cancellation, human interaction, route
+drift, and question-content changes during image extraction. Differential
+baselines include image identity and cannot confirm preservation from presence
+alone; legacy plain-text baselines keep their existing recovery digest.
+
 On 2026-10-08, authorized Chrome inspection of the live dashboard revealed
 that the account menu keeps its unique Logout link mounted but hidden while
 closed. The visible account link points to the identity login route and has
