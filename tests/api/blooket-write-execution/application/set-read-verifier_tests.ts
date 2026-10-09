@@ -348,6 +348,57 @@ function remoteTyping(
   };
 }
 
+test("prior question images must retain their exact bytes during text writes",
+  async () => {
+    const sets: BlooketSetReadPort = {
+      list: async () => ({ ok: true, value: [], completeness: "complete" }),
+      get: async () => ({ ok: true, value: {} }),
+    };
+    const prior = {
+      schemaVersion: 4, number: 1, question: "Existing image question.",
+      equation: null, qType: "typing", random: true, timeLimit: 10,
+      answers: [{
+        kind: "text", content: "sun", correct: true, match: "exactly",
+      }],
+      hasImage: true, hasAudio: false,
+      imageEvidence: { byteLength: 42, sha256: "a".repeat(64) },
+    };
+    const operation = typingOperation();
+    assert.equal(operation.kind, "question");
+    if (operation.kind !== "question") return;
+    const expected = { ...operation, questionNumber: 2 };
+    const target = { remoteSetId: "remote-set-1" };
+    for (const [imageEvidence, outcome] of [
+      [prior.imageEvidence, "confirmed"],
+      [{ byteLength: 42, sha256: "b".repeat(64) }, "inconclusive"],
+      [{ byteLength: 43, sha256: "a".repeat(64) }, "inconclusive"],
+      [null, "inconclusive"],
+    ] as const) {
+      const verifier = blooketSetReadWriteVerifier(sets, questionReads([
+        [prior],
+        [{ ...prior, imageEvidence }, remoteTyping({ number: 2 })],
+      ]));
+      const captured = await verifier.captureBaseline(expected, target);
+      assert.ok(captured.ok && captured.baseline);
+      if (!captured.ok) return;
+      assert.deepEqual(await verifier.verify(
+        expected, target, captured.baseline,
+      ), outcome === "confirmed"
+        ? { ok: true, outcome, receipt: null } : { ok: true, outcome });
+    }
+    for (const image of [
+      remoteTyping({ hasImage: true }), { ...prior, imageEvidence: null },
+    ]) {
+      const verifier = blooketSetReadWriteVerifier(
+        sets, questionReads([[image]]),
+      );
+      assert.deepEqual(await verifier.captureBaseline(expected, target), {
+        ok: true, baseline: null,
+      });
+    }
+  },
+);
+
 function questionReads(
   values: readonly (readonly unknown[])[],
 ): BlooketQuestionReadPort {

@@ -29,8 +29,14 @@
 // - Defaults:
 //   - Ambiguous shape, list drift, or deadline exhaustion fails closed.
 //
-import { decodeBlooketQuestionRead, type BlooketQuestionRead } from
+import {
+  decodeBlooketQuestionRead,
+  decodeBlooketQuestionImageEvidence,
+  type BlooketQuestionRead,
+} from
   "../../../ir/blooket-question-reads/contract/question-read.ts";
+import { inspectOpenedBlooketQuestionImage } from
+  "../../../platforms/blooket-browser/adapter-outbound/question-image-page.ts";
 import {
   closeBlooketQuestionPanel,
   inspectOpenedBlooketQuestion,
@@ -243,6 +249,42 @@ export function createExtensionQuestionInspectionHost(
                 ) invalid = true;
               }
             } else invalid = true;
+            if (decoded?.hasImage && !invalid && await ready(url, deadline)) {
+              // Saved image identity is optional evidence, never inferred from
+              // a URL or presence. Keep the existing overall read deadline.
+              const evidence = await script(
+                inspectOpenedBlooketQuestionImage as
+                  (...args: never[]) => unknown,
+                [setId, number, Math.min(5_000, deadline - now())],
+              );
+              if (!await ready(url, deadline) || !evidence ||
+                  typeof evidence !== "object" || Array.isArray(evidence) ||
+                  Object.keys(evidence).sort().join() !== "ok,value" ||
+                  !("ok" in evidence) || evidence.ok !== true ||
+                  !("value" in evidence)) invalid = true;
+              else {
+                const image = decodeBlooketQuestionImageEvidence(
+                  evidence.value,
+                );
+                if (!image.ok) invalid = true;
+                else {
+                  // The form may have changed before the image script began.
+                  // Never combine old question facts with newer image bytes.
+                  const afterImage = await script(
+                    inspectOpenedBlooketQuestion as
+                      (...args: never[]) => unknown,
+                    [setId, number],
+                  );
+                  const confirmed = decodeInspectedQuestion(afterImage, number);
+                  if (!await ready(url, deadline) || !confirmed ||
+                      JSON.stringify(decoded) !== JSON.stringify(confirmed))
+                    invalid = true;
+                  else decoded = {
+                    ...decoded, schemaVersion: 4, imageEvidence: image.value,
+                  };
+                }
+              }
+            }
           } finally {
             closed = await close(setId, url, deadline);
           }

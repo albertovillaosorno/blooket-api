@@ -74,6 +74,9 @@ interface Scenario {
   readonly switchOnOpen?: boolean;
   readonly switchOnCancel?: boolean;
   readonly switchOnInspection?: boolean;
+  readonly imageEvidence?: unknown;
+  readonly imageLatencyMs?: number;
+  readonly switchOnImage?: boolean;
 }
 
 function synthetic(options: Scenario = {}) {
@@ -147,6 +150,15 @@ function synthetic(options: Scenario = {}) {
             currentUrl = "https://dashboard.blooket.com/create";
           return [{ result: options.canceled ?? true }];
         }
+        if (name === "inspectOpenedBlooketQuestionImage") {
+          assert.equal(request.args?.[1], 1);
+          assert.ok((request.args?.[2] as number) > 0);
+          assert.ok((request.args?.[2] as number) <= 5_000);
+          tick += options.imageLatencyMs ?? 0;
+          if (options.switchOnImage)
+            currentUrl = "https://dashboard.blooket.com/my-sets";
+          return [{ result: options.imageEvidence }];
+        }
         if (name === "isBlooketQuestionPanelClosed")
           return [{ result: options.panelClosed ?? true }];
         throw new Error("unexpected-script");
@@ -173,6 +185,64 @@ function synthetic(options: Scenario = {}) {
 }
 
 const failed = { ok: false, code: "blooket-browser-failed" };
+
+test("question scans attach validated saved-image evidence within the budget",
+  async () => {
+    const imageEvidence = { byteLength: 42, sha256: "a".repeat(64) };
+    const question = { ...validQuestion, hasImage: true };
+    for (const value of [imageEvidence, null]) {
+      const fixture = synthetic({
+        inspected: { ok: true, value: question },
+        imageEvidence: { ok: true, value },
+      });
+      assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
+        ok: true,
+        value: [{ ...question, schemaVersion: 4, imageEvidence: value }],
+      });
+      assert.equal(fixture.calls.filter(name =>
+        name === "inspectOpenedBlooketQuestionImage").length, 1);
+      assert.ok(fixture.calls.includes("closeBlooketQuestionPanel"));
+    }
+  },
+);
+
+test("bad image evidence, deadline expiry, and image-route drift fail closed",
+  async () => {
+    for (const scenario of [
+      { imageEvidence: failed },
+      { imageEvidence: { ok: true, value: { byteLength: 1, sha256: "bad" } } },
+      { imageEvidence: { ok: true, value: null, extra: true } },
+      { imageEvidence: { ok: true, value: null }, imageLatencyMs: 1_000 },
+      { imageEvidence: { ok: true, value: null }, switchOnImage: true },
+    ]) {
+      const fixture = synthetic({
+        ...scenario,
+        inspected: { ok: true, value: { ...validQuestion, hasImage: true } },
+      });
+      assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+      assert.equal(fixture.calls.filter(name =>
+        name === "inspectOpenedBlooketQuestionImage").length, 1);
+      if (!scenario.switchOnImage)
+        assert.ok(fixture.calls.includes("closeBlooketQuestionPanel"));
+      else assert.ok(!fixture.calls.includes("closeBlooketQuestionPanel"));
+    }
+  },
+);
+
+test("image evidence cannot be combined with changed question facts",
+  async () => {
+    const question = { ...validQuestion, hasImage: true };
+    const fixture = synthetic({
+      inspectedReplies: [
+        { ok: true, value: question }, { ok: true, value: question },
+        { ok: true, value: { ...question, timeLimit: 30 } },
+      ],
+      imageEvidence: { ok: true, value: null },
+    });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.ok(fixture.calls.includes("closeBlooketQuestionPanel"));
+  },
+);
 
 test(
   "a stable question scan requires cancellation and a second list",

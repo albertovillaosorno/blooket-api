@@ -34,6 +34,7 @@ import test from "node:test";
 import {
   decodeBlooketQuestionRead,
   decodeBlooketQuestionReadList,
+  decodeBlooketQuestionImageEvidence,
 } from
   "../../../../src/ir/blooket-question-reads/contract/question-read.ts";
 
@@ -50,6 +51,50 @@ const question = {
   hasImage: false,
   hasAudio: false,
 } as const;
+
+test("version-four question images carry exact content evidence or unknown",
+  () => {
+    const old = decodeBlooketQuestionRead(question);
+    assert.ok(old.ok);
+    if (!old.ok) return;
+    for (const imageEvidence of [
+      null, { byteLength: 42, sha256: "a".repeat(64) },
+    ]) {
+      const candidate = {
+        ...old.value, schemaVersion: 4, hasImage: true, imageEvidence,
+      };
+      assert.deepEqual(decodeBlooketQuestionRead(candidate), {
+        ok: true, value: candidate,
+      });
+    }
+    assert.equal(decodeBlooketQuestionRead({
+      ...old.value, schemaVersion: 4, hasImage: true,
+    }).ok, false);
+    assert.equal(decodeBlooketQuestionRead({
+      ...old.value, schemaVersion: 4,
+      imageEvidence: { byteLength: 42, sha256: "a".repeat(64) },
+    }).ok, false);
+    assert.equal(decodeBlooketQuestionRead({
+      ...old.value, imageEvidence: null,
+    }).ok, false);
+  },
+);
+
+test("image identity decoding rejects URLs, bounds, and malformed hashes",
+  () => {
+    const valid = { byteLength: 42, sha256: "a".repeat(64) };
+    for (const value of [
+      undefined, [], {}, { ...valid, url: "https://provider.invalid/media" },
+      { ...valid, path: "/private" }, { ...valid, byteLength: 0 },
+      { ...valid, byteLength: 2_500_000 }, { ...valid, byteLength: 1.5 },
+      { ...valid, sha256: "A".repeat(64) },
+      { ...valid, sha256: "a".repeat(63) },
+    ]) assert.equal(decodeBlooketQuestionImageEvidence(value).ok, false);
+    assert.deepEqual(decodeBlooketQuestionImageEvidence(null), {
+      ok: true, value: null,
+    });
+  },
+);
 
 test("version-one question reads migrate to normalized answer facts", () => {
   assert.deepEqual(decodeBlooketQuestionRead(question), {
