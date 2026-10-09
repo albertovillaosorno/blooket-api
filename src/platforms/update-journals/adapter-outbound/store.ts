@@ -145,26 +145,31 @@ export async function openUpdateInstallationStore(directory: string):
   }
   return { ok: true, store: {
     read: () => admit(read),
-    create: value => admit(async () => {
+    create: async value => {
+      // Own exact intent before queue admission or filesystem awaits.
       const journal = decode(value);
       if (journal.phase !== "prepared")
         throw new Error("update-journal-invalid");
-      // Even malformed existing work is preserved; only exclusive creation
-      // may start a new installation record.
-      await read();
-      return writeDurableFileIfAbsent(path, bytes(journal));
-    }),
-    replace: (expected, next) => admit(async () => {
+      return admit(async () => {
+        // Even malformed existing work is preserved; only exclusive creation
+        // may start a new installation record.
+        await read();
+        return writeDurableFileIfAbsent(path, bytes(journal));
+      });
+    },
+    replace: async (expected, next) => {
       const previous = decode(expected), journal = decode(next);
       const advanced = advanceUpdateInstallationJournal(previous,
         journal.phase);
       if (!advanced.ok || bytes(advanced.value) !== bytes(journal))
         throw new Error("update-journal-transition-invalid");
-      const current = await read();
-      if (!current || bytes(current) !== bytes(previous))
-        throw new Error("update-journal-conflict");
-      await writeAtomicFile(path, bytes(journal));
-    }),
+      return admit(async () => {
+        const current = await read();
+        if (!current || bytes(current) !== bytes(previous))
+          throw new Error("update-journal-conflict");
+        await writeAtomicFile(path, bytes(journal));
+      });
+    },
     close() {
       closed = true;
       closing ??= pending.then(() => acquired.lock.release()).catch(() => {

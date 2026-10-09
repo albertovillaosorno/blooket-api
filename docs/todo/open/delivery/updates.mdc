@@ -590,6 +590,23 @@ end-to-end update composition remain pending. This portable prerequisite does
 not enable installation or assert publisher trust, actual provider publication,
 or native macOS acceptance.
 
+### Exact queued installation intent (2026-10-09)
+
+Regressions reproduced caller mutation before queued journal I/O: creation
+could persist changed directory identities and signed-envelope facts,
+replacement could reinterpret its selected phase, and invalid inputs could
+become admitted after the call. The journal adapter now decodes and copies both
+creation and compare-and-replace inputs synchronously before queue admission or
+filesystem awaits. Invalid initial phases remain rejected, and queued writes
+retain exactly the original decoded intent.
+
+The focused suite also retains the real Linux exchange/inverse rollback test,
+private storage, compare-and-replace, cross-process exclusion, and close-drain
+coverage. These are portable journal guarantees, not publisher authentication,
+service restart, native Mac acceptance, or an enabled product installer. The
+remaining application composition and production trust requirements are
+unchanged.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,
