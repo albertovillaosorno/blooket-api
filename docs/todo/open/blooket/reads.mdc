@@ -1114,10 +1114,11 @@ the application diagnostic, and actual CLI/MCP subprocess projection.
 The current extension must still be loaded and its real reads accepted;
 recognizing an old response is not successful account enumeration.
 
-**Installation blocker:** the browser-control URL policy rejects
-`chrome://extensions/` and forbids bypassing it through another control surface.
-The human loaded the development extension manually. Future reloads during
-development also need that browser action. The real `.env` is unchanged.
+**Browser-tool limitation:** its URL policy rejects `chrome://extensions/`.
+That tool cannot manage extension installation or reload. The owner later
+explicitly supplied and authorized a dedicated Chrome DevTools CLI extension
+reload operation; its separate browser profile requires independent acceptance.
+The real `.env` is unchanged.
 
 <!-- jig-ignore-next-line: Exact official documentation URL is indivisible. -->
 [worker-doc]: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers
@@ -1145,3 +1146,24 @@ through browser control, but that website observation is separate from
 canonical product acceptance. The owner additionally supplied an installed
 Chrome DevTools CLI with extension reload support; its separate controlled
 profile must be verified rather than assumed to share the existing session.
+
+
+The clean committed `2a9853b` passed all 1,092 portable tests, TypeScript,
+roadmap integrity, Jig local validation, and actual Linux package assembly and
+extracted verification. The verified session-owned 416 MiB package output was
+removed; the small committed extension projection remains for development.
+
+Chrome DevTools CLI 1.10.1 successfully installed and reloaded that extension
+in its separate Chrome for Testing 155.0.8059.39 profile. Canonical CLI session
+inspection then reported signed-out through the actual worker. My Sets and
+capabilities stopped with `blooket-authentication-required`, without replay or
+fabricated remote state; the popup exposed its attention-required status.
+
+An authorized existing session-establishment path used the ephemeral
+credential boundary without logging credentials. Blooket's login page showed
+"Could not get CSRF token", and its token-initialization request returned 403.
+This is not a confirmed login or CAPTCHA; no security bypass was attempted.
+
+The owner was asked to complete the site's access manually in that profile.
+The other browser's existing authenticated session and quiz contents remain
+untouched; account enumeration and publication acceptance are still pending.

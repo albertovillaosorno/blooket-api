@@ -473,6 +473,28 @@ writer quiescence, independent helper lifecycle, health-confirmed restart,
 rollback/recovery, production publisher provisioning, and UI integration remain
 required before functional completion.
 
+### Publication exclusion foundation
+
+The canonical publication command now holds a shared cross-process boundary
+before resolving publication paths, snapshot creation, capability reads, or
+remote work. Update composition can acquire that same exclusive ownership and
+retain it through service quiescence, exchange, restart, or recovery. This
+serializes publication commands while preserving their per-draft journal locks.
+
+Before granting an update boundary, a bounded directory observer refuses any
+remaining attempt file, including malformed or confirmed journals. It does not
+read lesson content, alter the journal, or replay a write. Symbolic storage,
+unknown directories/files, stale inner locks, oversized catalogs, and I/O
+failures cannot authorize installation; failed admission releases its ownership.
+
+Portable tests exercise active publication refusal, blocked new commands,
+retained uncertain attempts, explicit reconciliation, lock lifetime, and unsafe
+storage. Node's [directory iteration contract][directory-iteration], checked on
+2026-10-08, establishes bounded streaming and iterator-owned directory closure.
+This boundary is a composition prerequisite, not an enabled updater; other
+persistent writers, install journals, independent helper lifecycle, production
+publisher trust, safe restart/rollback, and UI integration remain pending.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,
@@ -499,3 +521,6 @@ native acceptance belong to task blooket-15.
 [swap-support]: https://developer.apple.com/documentation/foundation/urlresourcekey/volumesupportsswaprenamingkey
 <!-- jig-ignore-next-line: Preserve the canonical Darwin syscall header URL. -->
 [swap-header]: https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/stdio.h
+
+[directory-iteration]:
+  https://nodejs.org/download/release/v24.20.0/docs/api/fs.html

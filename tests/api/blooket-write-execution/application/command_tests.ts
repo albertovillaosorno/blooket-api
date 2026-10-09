@@ -52,6 +52,9 @@ import { publicationFiles } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/write-checkpoint-files/adapter-outbound/publication.ts";
 
+import { acquireUpdatePublicationBoundary } from
+  "../../../../src/api/application-updates/application/publication-boundary.ts";
+
 const capabilities = JSON.parse(await readFile(new URL(
   "../../../ir/capability-snapshots/contract/" +
     "blooket-official-2026-10-05.json", import.meta.url,
@@ -362,5 +365,75 @@ test("concurrent publication steps cannot submit the same operation twice",
       assert.ok(!second.ok);
       assert.equal(second.issues[0]?.code, "blooket-publication-busy");
     } finally { release(); await first; }
+    assert.equal(state.writes(), 1);
+  }); });
+
+
+test("held update ownership blocks publication until explicitly released",
+  async () => { await fixture(async state => {
+    const boundary = await acquireUpdatePublicationBoundary(state.root);
+    assert.ok(boundary.ok);
+    try {
+      const stopped = await executeBlooketPublicationCommand(
+        command("step", state.revision), state.host,
+      );
+      assert.ok(!stopped.ok);
+      assert.equal(stopped.issues[0]?.code, "blooket-publication-busy");
+      assert.equal(state.capabilities(), 0);
+      assert.equal(state.writes(), 0);
+      const files = await publicationFiles(state.root, "fixture");
+      await assert.rejects(readFile(files.snapshot));
+    } finally { await boundary.release(); }
+    value(await executeBlooketPublicationCommand(
+      command("step", state.revision), state.host,
+    ));
+    assert.equal(state.writes(), 1);
+  }); });
+
+test("active remote publication prevents update ownership",
+  async () => { await fixture(async state => {
+    let notify!: () => void, resume!: () => void;
+    const started = new Promise<void>(resolve => { notify = resolve; });
+    const finished = new Promise<void>(resolve => { resume = resolve; });
+    const original = state.host.writes.execute;
+    const host = { ...state.host, writes: { execute: async (...args:
+      Parameters<typeof original>) => {
+      notify();
+      await finished;
+      return original(...args);
+    } } };
+    const pending = executeBlooketPublicationCommand(
+      command("step", state.revision), host,
+    );
+    try {
+      await started;
+      assert.deepEqual(await acquireUpdatePublicationBoundary(state.root), {
+        ok: false, reason: "publication-busy",
+      });
+    } finally { resume(); }
+    value(await pending);
+    const boundary = await acquireUpdatePublicationBoundary(state.root);
+    assert.ok(boundary.ok);
+    await boundary.release();
+  }); });
+
+test("uncertain attempts block updates and survive until reconciliation",
+  async () => { await fixture(async state => {
+    state.ambiguous(true);
+    value(await executeBlooketPublicationCommand(
+      command("step", state.revision), state.host,
+    ));
+    const files = await publicationFiles(state.root, "fixture");
+    const journal = await readFile(files.attempt, "utf8");
+    assert.deepEqual(await acquireUpdatePublicationBoundary(state.root), {
+      ok: false, reason: "publication-recovery-required",
+    });
+    assert.equal(await readFile(files.attempt, "utf8"), journal);
+    assert.equal(state.writes(), 1);
+    value(await executeBlooketPublicationCommand(command("reconcile"),
+      state.host));
+    const boundary = await acquireUpdatePublicationBoundary(state.root);
+    assert.ok(boundary.ok);
+    await boundary.release();
     assert.equal(state.writes(), 1);
   }); });
