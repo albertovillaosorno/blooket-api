@@ -134,6 +134,24 @@ returned 403. The site
 reported "Could not get CSRF token". This requires a normal confirmed session,
 not a security bypass or a fabricated token.
 
+A later check on 2026-10-08 confirmed the owner's original Chrome session
+still displayed its development sets while the local workspace reported an
+incompatible extension. The dedicated CLI reconnected to an empty browser with
+no extension worker. Do not confuse successful administration in its separate
+profile with reloading the authenticated window.
+
+The owner reported a Cloudflare verification in the separate testing workflow.
+[Cloudflare's supported-browser guidance][challenge-browsers], checked on
+2026-10-08, says automated browsers are unsupported for solving production
+challenges; this does not establish the cause of this particular 403. Prefer
+the existing confirmed session and preserve every provider/human stop.
+
+Current acceptance needs a current worker in the authenticated window.
+Browser control cannot administer its blocked internal extensions page, and
+the dedicated CLI has not established control of that window. Do not copy
+cookies, reuse clearance tokens, disguise automation, or relax compatibility
+to substitute for the owner's normal extension update.
+
 Browser-tool extension-management restrictions
 remain applicable to that tool; use an explicitly authorized dedicated reload
 operation rather than navigating a blocked internal browser page.
@@ -262,3 +280,6 @@ unavailability must not block completion of P2/P3 functional work.
   https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/files
 
 [child-process]: https://nodejs.org/api/child_process.html
+
+<!-- jig-ignore-next-line: Preserve the official browser-support source URL. -->
+[challenge-browsers]: https://developers.cloudflare.com/cloudflare-challenges/reference/supported-browsers/

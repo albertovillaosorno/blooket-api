@@ -1167,3 +1167,11 @@ This is not a confirmed login or CAPTCHA; no security bypass was attempted.
 The owner was asked to complete the site's access manually in that profile.
 The other browser's existing authenticated session and quiz contents remain
 untouched; account enumeration and publication acceptance are still pending.
+
+On 2026-10-08, the original Chrome session still showed the development sets;
+its local workspace reported an incompatible worker. The dedicated CLI then
+reconnected to an empty browser without extension workers, so its earlier
+successful reload cannot establish the authenticated window's loaded code.
+The owner was asked to load the current projection in that existing window.
+Canonical authenticated acceptance remains pending; no session was copied and
+no compatibility or provider-security gate was relaxed.
