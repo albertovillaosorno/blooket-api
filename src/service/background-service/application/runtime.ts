@@ -69,18 +69,10 @@ export async function startManagedBackgroundService(
           failure ??= error;
         }
       };
+      const draining = service
+        ? cleanup(() => service!.quiesce()) : Promise.resolve();
       await cleanup(() => online.stop());
-      if (service) {
-        await cleanup(
-          () =>
-            new Promise<void>((resolve, reject) => {
-              service!.server.close((error) =>
-                error ? reject(error) : resolve(),
-              );
-              service!.server.closeAllConnections();
-            }),
-        );
-      }
+      await draining;
       await cleanup(() =>
         removeDurableFile(join(root, "service-runtime.json")),
       );

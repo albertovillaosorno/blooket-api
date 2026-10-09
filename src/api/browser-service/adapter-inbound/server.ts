@@ -193,14 +193,53 @@ export async function startBrowserService(
     "../../../ui/teacher-workspace/adapter-inbound/",
     import.meta.url,
   );
+  const handlers = new Set<Promise<void>>();
+  let quiescing = false;
+  let closing: Promise<void> | undefined;
+  let resourcesClosed = false;
+  let closingFailure: unknown;
+  function closeResources() {
+    if (resourcesClosed) return;
+    resourcesClosed = true;
+    for (const close of [() => browserBridge.close(), () => updates.close()]) {
+      try { close(); } catch (error) { closingFailure ??= error; }
+    }
+  }
   const server = createServer((request, response) => {
-    void handle(request, response).catch((error: unknown) => {
-      if (response.destroyed) return;
-      if (!response.headersSent)
-        json(response, 400, { ok: false, code: safeCode(error) });
-      else response.end();
-    });
+    if (quiescing) {
+      json(response, 503, { ok: false, code: "service-stopping" });
+      return;
+    }
+    const task = Promise.resolve().then(() => handle(request, response))
+      .catch((error: unknown) => {
+        if (response.destroyed) return;
+        if (!response.headersSent)
+          json(response, 400, { ok: false, code: safeCode(error) });
+        else response.end();
+      }).finally(() => { handlers.delete(task); });
+    handlers.add(task);
   });
+  function quiesce(): Promise<void> {
+    quiescing = true;
+    closing ??= (async () => {
+      closeResources();
+      const closed = new Promise<void>(resolve => {
+        server.close(error => {
+          if (error && !("code" in error &&
+              error.code === "ERR_SERVER_NOT_RUNNING"))
+            closingFailure ??= error;
+          resolve();
+        });
+        server.closeAllConnections();
+      });
+      // Disconnecting a socket does not stop a file or native writer. Keep
+      // service ownership until every already-admitted handler has settled.
+      await Promise.allSettled([...handlers]);
+      await closed;
+      if (closingFailure) throw closingFailure;
+    })();
+    return closing;
+  }
   server.requestTimeout = 30_000;
   server.headersTimeout = 15_000;
   let active = 0;
@@ -534,8 +573,7 @@ export async function startBrowserService(
           if (options.stop) void options.stop();
           else
             void Promise.resolve(options.online?.stop()).finally(() => {
-              server.close();
-              server.closeAllConnections();
+              void quiesce();
             });
         });
         json(response, 200, { ok: true });
@@ -723,16 +761,14 @@ export async function startBrowserService(
     });
     throw new Error("settings-save-failed");
   }
-  server.once("close", () => {
-    browserBridge.close();
-    updates.close();
-  });
+  server.once("close", closeResources);
   return {
     server,
     origin,
     root,
     port: localPort,
     browserBridge,
+    quiesce,
     operationId: () => "http:" + randomUUID(),
   };
 }
