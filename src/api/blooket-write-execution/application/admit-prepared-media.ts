@@ -43,6 +43,12 @@ import type {
   BlooketPreparedMediaReadPort,
 } from "../contract/prepared-media.ts";
 
+import {
+  decodePreparedMediaIdentities, identifyPreparedMedia,
+  samePreparedMediaIdentity, type PreparedMediaIdentities,
+} from
+  "../../../projects/blooket-write-plans/domain/prepared-media-identities.ts";
+
 export type AdmitBlooketPreparedMediaResult =
   | {
       readonly ok: true;
@@ -61,7 +67,19 @@ export type AdmitBlooketPreparedMediaResult =
 export async function admitBlooketPreparedMedia(
   operation: BlooketWriteOperation,
   media: BlooketPreparedMediaReadPort,
+  expected?: PreparedMediaIdentities,
 ): Promise<AdmitBlooketPreparedMediaResult> {
+  const required = operationMediaIds(operation);
+  const snapshot = expected === undefined ? undefined
+    : decodePreparedMediaIdentities(expected);
+  if (expected !== undefined && snapshot === undefined)
+    return { ok: false, code: "blooket-media-invalid",
+      mediaId: required[0] ?? "snapshot" };
+  if (snapshot && required.some(id =>
+      !snapshot.items.some(item => item.mediaId === id)))
+    return { ok: false, code: "blooket-media-stale",
+      mediaId: required.find(id =>
+        !snapshot.items.some(item => item.mediaId === id))! };
   const admitted: BlooketPreparedMedia[] = [];
   for (const mediaId of operationMediaIds(operation)) {
     let read: Awaited<ReturnType<BlooketPreparedMediaReadPort["read"]>>;
@@ -84,7 +102,23 @@ export async function admitBlooketPreparedMedia(
         mediaId,
       };
     }
-    admitted.push(read.value);
+    // The port can reuse its buffers while another stable-ID read awaits.
+    // Own both bytes and scalar facts before yielding or opening a journal.
+    const owned: BlooketPreparedMedia = Object.freeze({
+      mediaId: read.value.mediaId, revision: read.value.revision,
+      format: read.value.format, bytes: new Uint8Array(read.value.bytes),
+    });
+    if (!validPreparedMedia(owned, mediaId))
+      return { ok: false, code: "blooket-media-invalid", mediaId };
+    if (snapshot) {
+      const expectedIdentity = snapshot.items.find(item =>
+        item.mediaId === mediaId);
+      const actual = identifyPreparedMedia(owned);
+      if (!expectedIdentity || !actual ||
+          !samePreparedMediaIdentity(actual, expectedIdentity))
+        return { ok: false, code: "blooket-media-stale", mediaId };
+    }
+    admitted.push(owned);
   }
   return { ok: true, media: admitted };
 }

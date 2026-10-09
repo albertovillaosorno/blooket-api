@@ -63,10 +63,21 @@ import type {
 } from "../contract/write-verification.ts";
 import { lowerBlooketWriteSubmission } from "./lower-submission.ts";
 
+import {
+  decodePreparedMediaIdentities, type PreparedMediaIdentities,
+  type PreparedMediaIdentity,
+} from
+  "../../../projects/blooket-write-plans/domain/prepared-media-identities.ts";
+
 export function blooketSetReadWriteVerifier(
   reads: BlooketSetReadPort,
   questionReads?: BlooketQuestionReadPort,
+  expectedMedia?: PreparedMediaIdentities,
 ): BlooketWriteVerificationPort {
+  // Never fetch current library bytes to decide an old ambiguous attempt.
+  // Clone the exact admitted durable identity before any browser awaits.
+  const media = expectedMedia === undefined ? undefined
+    : decodePreparedMediaIdentities(expectedMedia);
   return {
     captureBaseline: async (operation, target) => {
       if (operation.kind === "question") {
@@ -96,12 +107,15 @@ export function blooketSetReadWriteVerifier(
     },
 
     verify: async (operation, target, baseline) => {
+      if (expectedMedia !== undefined && media === undefined)
+        return { ok: true, outcome: "inconclusive" };
       if (operation.kind === "question") {
         return verifyQuestion(
           questionReads,
           operation,
           target,
           baseline,
+          media,
         );
       }
       if (baseline === null || baseline.kind !== "set-list") {
@@ -166,6 +180,7 @@ async function verifyQuestion(
   operation: BlooketQuestionOperation,
   target: BlooketWriteTarget,
   baseline: BlooketWriteVerificationBaseline | null,
+  media?: PreparedMediaIdentities,
 ): Promise<BlooketWriteVerificationResult> {
   if (
     reads === undefined
@@ -193,17 +208,22 @@ async function verifyQuestion(
   if (
     !lowered.ok
     || lowered.value.kind !== "add-question"
-    || lowered.value.image !== null
     || lowered.value.answers.some((answer) => answer.kind !== "text")
   ) {
     return { ok: true, outcome: "inconclusive" };
   }
 
+  const expectedImageId = lowered.value.image?.mediaId;
+  const expectedImage = expectedImageId === undefined ? undefined
+    : media?.items.find(item => item.mediaId === expectedImageId);
+  if (lowered.value.image !== null && expectedImage === undefined)
+    return { ok: true, outcome: "inconclusive" };
   const candidates = listed.value
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => questionMatches(
       question,
       lowered.value,
+      expectedImage,
     ))
     .filter(({ index }) => sameBlooketWriteVerificationBaseline(
       questionBaselineFor(withoutIndex(listed.value, index)),
@@ -220,8 +240,19 @@ export function questionMatches(
     ReturnType<typeof lowerBlooketWriteSubmission>,
     { readonly ok: true }
   >["value"],
+  expectedImage?: PreparedMediaIdentity,
 ): boolean {
   if (expected.kind !== "add-question") return false;
+  const identity = expectedImage === undefined ? undefined
+    : decodePreparedMediaIdentities({ schemaVersion: 1,
+      items: [expectedImage] })?.items[0];
+  const imageMatches = expected.image === null
+    ? !actual.hasImage && expectedImage === undefined
+    : identity !== undefined && identity.mediaId === expected.image.mediaId &&
+      actual.hasImage && actual.schemaVersion === 4 &&
+      actual.imageEvidence !== null &&
+      actual.imageEvidence.byteLength === identity.byteLength &&
+      actual.imageEvidence.sha256 === identity.sha256;
   const answers = expected.answers.flatMap((answer, index) =>
     answer.kind === "text"
       ? [{
@@ -241,7 +272,7 @@ export function questionMatches(
     && actual.random === expected.random
     && actual.timeLimit === expected.timeLimit
     && equalQuestionAnswers(actual.answers, answers)
-    && actual.hasImage === false
+    && imageMatches
     && actual.hasAudio === false;
 }
 

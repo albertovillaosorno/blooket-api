@@ -702,3 +702,52 @@ test(
     assert.equal(details, 0);
   },
 );
+
+
+test("image reconciliation matches a copied durable identity, not presence",
+  async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => { throw new Error("must not list sets"); },
+    get: async () => { throw new Error("must not read set"); },
+  };
+  const identity = { mediaId: "sun", revision: 3, format: "png" as const,
+    byteLength: 42, sha256: "a".repeat(64) };
+  const operation = typingOperation("sun");
+  const target = { remoteSetId: "remote-set-1" };
+  for (const [imageEvidence, outcome] of [
+    [{ byteLength: 42, sha256: "a".repeat(64) }, "confirmed"],
+    [{ byteLength: 42, sha256: "b".repeat(64) }, "inconclusive"],
+    [{ byteLength: 43, sha256: "a".repeat(64) }, "inconclusive"],
+    [null, "inconclusive"],
+  ] as const) {
+    const expected = { schemaVersion: 1 as const, items: [{ ...identity }] };
+    const remote = {
+      schemaVersion: 4, number: 1, question: "Type sun.", equation: null,
+      qType: "typing", random: true, timeLimit: 10,
+      answers: [{ kind: "text", content: "sun", correct: true,
+        match: "exactly" }], hasImage: true, hasAudio: false, imageEvidence,
+    };
+    const verifier = blooketSetReadWriteVerifier(sets,
+      questionReads([[], [remote]]), expected);
+    expected.items[0]!.sha256 = "b".repeat(64);
+    const captured = await verifier.captureBaseline(operation, target);
+    assert.ok(captured.ok && captured.baseline);
+    assert.deepEqual(await verifier.verify(operation, target,
+      captured.baseline), outcome === "confirmed"
+      ? { ok: true, outcome, receipt: null } : { ok: true, outcome });
+  }
+  for (const expected of [undefined, { schemaVersion: 1 as const, items: [] },
+    { schemaVersion: 1 as const, items: [{ ...identity, mediaId: "moon" }] }]) {
+    const remote = { schemaVersion: 4, number: 1, question: "Type sun.",
+      equation: null, qType: "typing", random: true, timeLimit: 10,
+      answers: [{ kind: "text", content: "sun", correct: true,
+        match: "exactly" }], hasImage: true, hasAudio: false,
+      imageEvidence: { byteLength: 42, sha256: "a".repeat(64) } };
+    const verifier = blooketSetReadWriteVerifier(sets,
+      questionReads([[], [remote]]), expected);
+    const captured = await verifier.captureBaseline(operation, target);
+    assert.ok(captured.ok && captured.baseline);
+    assert.deepEqual(await verifier.verify(operation, target,
+      captured.baseline), { ok: true, outcome: "inconclusive" });
+  }
+});
