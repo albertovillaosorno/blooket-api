@@ -36,6 +36,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { request } from "node:http";
+import { setImmediate as nextTurn } from "node:timers/promises";
 import { createOnlineConnection } from
   "../../../../src/service/online-service/application/connection.ts";
 import { startMcpGateway } from
@@ -250,6 +251,75 @@ test("tunnel stop failure still closes the authenticated gateway", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("online stop closes admission and drains before reporting tunnel failure",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "online-drain-"));
+    let gateway: Awaited<ReturnType<typeof startMcpGateway>> | undefined;
+    let tunnelEntered!: () => void, releaseTunnel!: () => void;
+    let releaseDrain!: () => void;
+    const tunnelStarted = new Promise<void>(resolve => {
+      tunnelEntered = resolve;
+    });
+    const tunnelPending = new Promise<void>(resolve => {
+      releaseTunnel = resolve;
+    });
+    const drainPending = new Promise<void>(resolve => {
+      releaseDrain = resolve;
+    });
+    const controller = createOnlineConnection(root, {
+      read: async () => ({ ok: true, kind: "found", secret: "synthetic" }),
+      write: async () => ({ ok: true }),
+      delete: async () => ({ ok: true }),
+    }, {
+      startGateway: async options => {
+        gateway = await startMcpGateway({ ...options, port: 0 });
+        const quiesce = gateway.quiesce;
+        return { ...gateway, quiesce: () => {
+          const drained = quiesce();
+          return Promise.all([drained, drainPending]).then(() => undefined);
+        } };
+      },
+      startTunnel: () => ({ stop: async () => {
+        tunnelEntered();
+        await tunnelPending;
+        throw new Error("synthetic-tunnel-stop-failure");
+      } }),
+    });
+    try {
+      const preferences = await loadPreferences(root);
+      await savePreferences(root, { ...preferences, online: {
+        ...preferences.online, enabled: true,
+        publicUrl: "https://teacher.example/mcp",
+      } });
+      await controller.reload(35200);
+      let stopped = false;
+      const stopping = controller.stop();
+      void stopping.then(
+        () => { stopped = true; }, () => { stopped = true; },
+      );
+      const failure = assert.rejects(
+        stopping, /synthetic-tunnel-stop-failure/u,
+      );
+      await tunnelStarted;
+      assert.equal(gateway?.server.listening, false);
+      assert.deepEqual(controller.pending(), []);
+      assert.deepEqual(controller.connections(), []);
+      releaseTunnel();
+      await nextTurn();
+      assert.equal(stopped, false);
+      releaseDrain();
+      await failure;
+      assert.equal(stopped, true);
+      await controller.reload(35200);
+      assert.equal(gateway?.server.listening, false);
+    } finally {
+      releaseTunnel();
+      releaseDrain();
+      await controller.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
 test(
   "missing tunnel token and gateway bounds stop before disablement cleanup",

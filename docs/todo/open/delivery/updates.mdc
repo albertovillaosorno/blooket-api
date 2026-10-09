@@ -571,6 +571,25 @@ subprocess. Node's [child-process lifecycle contract][child-completion], checked
 on 2026-10-08, distinguishes those events. This proves closure of the canonical
 child only; independent native descendants require their own completion proof.
 
+### Online admitted-command drain
+
+On 2026-10-08 the authenticated gateway gained a local quiescence operation:
+close admission, revoke grants, close connections, and await all admitted
+handlers before completing. Repeated calls share completion. A disconnected
+client cannot abandon its canonical child command.
+
+Online lifecycle starts that drain before waiting for tunnel shutdown and
+reports tunnel failure only after the gateway drain finishes. Real OAuth/HTTP
+coverage holds a synthetic canonical child through disconnect and process exit,
+then proves shutdown waits for final closure; existing calls still execute the
+real CLI. Composition tests cover a stalled/failing tunnel and prevent reload
+after final stop.
+
+Independent CLI writers, native descendants, staged installer lifecycle, and
+end-to-end update composition remain pending. This portable prerequisite does
+not enable installation or assert publisher trust, actual provider publication,
+or native macOS acceptance.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,

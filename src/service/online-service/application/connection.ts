@@ -72,25 +72,17 @@ export function createOnlineConnection(
         failure ??= error;
       }
     };
+    const activeGateway = gateway;
+    gateway = undefined;
+    // Close gateway admission immediately, even while tunnel stop is pending.
+    const draining = activeGateway
+      ? cleanup(() => activeGateway.quiesce()) : Promise.resolve();
     const activeTunnel = tunnel;
     tunnel = undefined;
     await cleanup(async () => {
       await activeTunnel?.stop();
     });
-    const activeGateway = gateway;
-    gateway = undefined;
-    if (activeGateway) {
-      activeGateway.revokeAll();
-      await cleanup(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            activeGateway.server.close((error) =>
-              error ? reject(error) : resolve(),
-            );
-            activeGateway.server.closeAllConnections();
-          }),
-      );
-    }
+    await draining;
     state = "disabled";
     if (failure) throw failure;
   }
