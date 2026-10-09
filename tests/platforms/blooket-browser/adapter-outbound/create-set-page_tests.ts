@@ -47,6 +47,7 @@ interface FixtureNode {
   value: string;
   labels: FixtureNode[];
   clicked: number;
+  visibility: string;
   disabled?: boolean;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
@@ -69,6 +70,7 @@ function node(
     value: "",
     labels: [],
     clicked: 0,
+    visibility: "visible",
     getBoundingClientRect: () => ({ width: 24, height: 20 }),
     selectors: {},
     attributes,
@@ -105,10 +107,17 @@ function withPage(
     "HTMLInputElement",
     "HTMLTextAreaElement",
     "Event",
+    "getComputedStyle",
     "__blooketCreateSetWatch",
   ])
     descriptors.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
 
+  Object.defineProperty(globalThis, "getComputedStyle", {
+    configurable: true,
+    value: (node: FixtureNode) => ({
+      display: "block", visibility: node.visibility,
+    }),
+  });
   class InputFixture {}
   Object.defineProperty(InputFixture.prototype, "value", {
     configurable: true,
@@ -556,7 +565,23 @@ test("Create Set owner watch refuses human edits and overlapping claims",
       }), { ok: true });
       // Script-generated input events have no trusted browser gesture.
       assert.equal(serialized("check"), true);
-      for (const listener of listeners) listener({ isTrusted: true });
+      const click = page.privacy.click.bind(page.privacy);
+      page.privacy.click = () => {
+        click();
+        for (const type of ["input", "change"]) {
+          for (const listener of listeners) listener({
+            isTrusted: true, type, target: page.privacy,
+          } as { isTrusted: boolean });
+        }
+      };
+      assert.deepEqual(prepareBlooketCreateSetForm({
+        title: "Synthetic", description: "", private: false,
+      }), { ok: true });
+      assert.equal(serialized("check"), true);
+      // The same trusted checkbox event after click returns is a human edit.
+      for (const listener of listeners) listener({
+        isTrusted: true, type: "change", target: page.privacy,
+      } as { isTrusted: boolean });
       assert.equal(serialized("check"), false);
       assert.equal(serialized("claim"), false);
       form.isConnected = false;
@@ -593,6 +618,13 @@ test("Create Set watch refuses stale and ambiguous forms", () => {
       node("DIV"),
     ];
     assert.equal(runBlooketCreateSetOwnership("claim"), false);
+    const dialog = page.document.selectors[
+      '[role="dialog"][aria-modal="true"]'
+    ]![0]!;
+    dialog.visibility = "hidden";
+    assert.equal(runBlooketCreateSetOwnership("check"), true);
+    dialog.visibility = "visible";
+    assert.equal(runBlooketCreateSetOwnership("check"), false);
   });
 });
 

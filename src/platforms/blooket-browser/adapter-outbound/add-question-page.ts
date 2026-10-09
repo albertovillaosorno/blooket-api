@@ -272,7 +272,10 @@ export function runBlooketAddQuestionPageAction(
       ));
       if (dialogs.some(dialog => {
         const bounds = dialog.getBoundingClientRect();
-        return bounds.width > 0 && bounds.height > 0;
+        if (bounds.width <= 0 || bounds.height <= 0) return false;
+        const style = getComputedStyle(dialog);
+        return style.display !== "none" && style.visibility !== "hidden" &&
+          style.visibility !== "collapse";
       })) return false;
       let buttons = Array.from(document.querySelectorAll("button")).filter(
         (button) => normalizedText(button) === "Add Question",

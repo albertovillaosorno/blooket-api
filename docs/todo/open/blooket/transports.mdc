@@ -62,6 +62,27 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-09, canonical text publication prepared the real Create Set form
+but preserved a reconciliation-required attempt instead of asserting success.
+The owned extension context confirmed a connected form, dirty watch, and
+`submitted: false`; the visible form remained on Create with fixture fields.
+No submission was replayed and its journal is retained.
+
+The privacy click activates native checkbox input/change events even when the
+click itself is scripted. The watch now admits only the synchronous input/change
+events on the exact owned privacy target during that click, clearing the target
+in `finally`. Later trusted changes, other controls, pointer and keyboard input
+still relinquish ownership; regressions cover preparation and later edits.
+
+Create ownership and Add Question opening also check computed visibility for
+retained consent dialogs. Visible dialogs still stop writes. These corrections
+require a freshly loaded worker and live publication verification.
+
+The activation contract was checked on 2026-10-09 against
+[WHATWG input activation][input-activation] and
+[MDN Event.isTrusted][trusted-events]. Provider success is separate evidence.
+
+
 On 2026-10-08, an authorized website check selected Upload by URL in the
 question-image drawer and submitted a public repository PNG. No native file
 picker opened. Save Question returned a third card, and a fresh Edit-page
@@ -239,3 +260,7 @@ under `.temp/readme-ui-check/full-tests.log`.
 
 Acceptance remains open until the checks above run through the actual owning
 product surfaces; portable foundations alone do not complete this record.
+
+[input-activation]: https://html.spec.whatwg.org/multipage/input.html
+<!-- jig-ignore-next-line: Exact upstream documentation URL is indivisible. -->
+[trusted-events]: https://developer.mozilla.org/en-US/docs/Web/API/Event/isTrusted
