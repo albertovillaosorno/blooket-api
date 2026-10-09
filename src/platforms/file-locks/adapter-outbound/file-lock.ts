@@ -48,6 +48,7 @@ interface LockOwner {
 
 export interface FileLock {
   readonly path: string;
+  // Concurrent cleanup callers share completion; failed removal may be retried.
   release(): Promise<void>;
 }
 
@@ -188,16 +189,17 @@ async function writeOwnerFile(
 }
 
 function createFileLock(lockPath: string, owner: LockOwner): FileLock {
-  let released = false;
+  let completion: Promise<void> | undefined;
   return {
     path: lockPath,
-    async release(): Promise<void> {
-      if (released) {
-        return;
+    release(): Promise<void> {
+      if (completion === undefined) {
+        completion = removeOwnedLockPath(lockPath, owner).catch((error) => {
+          completion = undefined;
+          throw error;
+        });
       }
-
-      await removeOwnedLockPath(lockPath, owner);
-      released = true;
+      return completion;
     },
   };
 }
