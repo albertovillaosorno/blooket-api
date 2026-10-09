@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-08"
-status: "active"
+status: "completed"
 priority: "p1"
 horizon: "publication"
 order: 80
@@ -25,6 +25,33 @@ validation:
 ---
 
 # TODO - Authenticated Blooket reads
+
+## Functional completion (2026-10-09)
+
+The authenticated Chrome for Testing 155 session loaded the committed product
+extension and used the actual local service and canonical CLI. Session inspect,
+My Sets, private set details, saved questions, and account capabilities all
+returned validated results. The question reads preserved both saved images,
+including the user-authored photo, with byte counts and SHA-256 evidence.
+
+After loading `de24159`, `sets get` returned the exact saved title, description,
+and private visibility, closed its owned Edit Info panel without saving, and
+allowed a subsequent question read. Capability inspection on `61f93b3` confirmed
+question images supported and audio/answer images unsupported for this account.
+My Sets reports observed summaries with completeness unknown, never a fabricated
+complete nonempty collection.
+
+The 1,249-test suite passed on `61f93b3`; the `de24159` correction passed all
+22 detail/page regressions, TypeScript, and Jig local validation after commit.
+Jig doctor remains degraded and Jig check retains its existing repository-graph
+not-evaluated outcome; neither is labeled a clean gate.
+
+The important authentication, challenge, organization, route-change, and
+teacher-edit stops have targeted regression coverage. Earlier pending statements
+below are historical evidence, superseded for this functional read milestone.
+Publication, complete collection enumeration, and platform hardening retain
+their
+own acceptance; unavailable macOS/Safari does not reopen this completed task.
 
 ## Objective
 
@@ -236,7 +263,8 @@ now require exactly one candidate row and matching checked state and visible
 wording.
 
 The 22 page regressions pass, including nested labels, ambiguous rows, changed
-teacher fields, and refusal to save. Corrected live details remain pending.
+teacher fields, and refusal to save. The corrected live details passed as
+recorded in functional completion above.
 
 The CSS contract was checked on 2026-10-09 against
 [MDN visibility][css-visibility] and [MDN getComputedStyle][computed-style].
@@ -1112,7 +1140,7 @@ that route intact instead of guessing whether the click happened. These are
 portable safeguards with emitted-worker and serialized-function coverage;
 current live browser acceptance remains pending.
 
-## Blockers
+## Historical blockers
 
 On 2026-10-08, the owner reported loading the current development extension.
 A fresh workspace reload still produced a legacy bare-array response through

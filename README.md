@@ -423,10 +423,12 @@ service boundaries with a simulated provider. Live canonical publication,
 media upload, and existing-quiz editing remain pending. MCP runs the bundled
 runtime in the background without opening Terminal.
 
-Private details and bounded text-question reads have portable adapters, as does
-the account capability probe. Public details, complete media identity, live
-capability acceptance, and publication remain open. Unsupported page shapes
-fail validation rather than inventing facts.
+Authenticated private details, saved question/image reads, and account
+capabilities work through the actual service and canonical CLI in Chrome.
+Image evidence carries byte length and SHA-256 rather than provider URLs.
+Nonempty set-list completeness remains unknown; public-detail and platform
+hardening retain their own acceptance. Unsupported shapes fail validation
+rather than inventing facts.
 
 Keep the local workspace open for automatic discovery and restart recovery.
 The normal launcher opens it. If the service runs without a browser page, the

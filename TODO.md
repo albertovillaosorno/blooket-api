@@ -12,13 +12,6 @@ The final ongoing maintenance task is intentionally never auto-completed.
 
 ## P2 - Blooket publication
 
-### TODO - Authenticated Blooket reads
-
-Make authenticated My Sets, questions, and capabilities actually readable,
-with clear stops instead of fabricated remote state.
-
-[Record](docs/todo/open/blooket/reads.mdc)
-
 ### TODO - Working Blooket writes and browser fallback
 
 Make real Create Set and question writes work and verify them after reload.
