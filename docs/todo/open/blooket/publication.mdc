@@ -184,3 +184,13 @@ on 2026-10-09, distinguishes copying typed-array contents from sharing its
 underlying ArrayBuffer. The implementation deliberately copies the prepared
 view and hashes those exact owned bytes; a digest proves equality, not publisher
 trust or provider success.
+
+
+A follow-up regression reproduced caller-side expected-identity drift during
+session observation: the initial implementation could accept the newly changed
+bytes. Persisted execution now validates and copies expected identities at
+entry,
+before lock acquisition or session I/O. A malformed context cannot be ignored
+when no media resolver is supplied, and neither failure opens an attempt journal
+or dispatches a write. The synthetic regressions fail against the prior commit
+and pass with this entry-boundary correction.

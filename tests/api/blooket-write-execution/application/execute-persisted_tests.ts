@@ -1915,3 +1915,51 @@ test("changed snapshot media stops before journal, budget or remote write",
       { ok: true, state: null });
   });
 });
+
+
+test("expected media context cannot drift while execution awaits the session",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const { identifyPreparedMedia } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+      "../../../../src/projects/blooket-write-plans/domain/prepared-media-identities.ts"
+    );
+    const original = { mediaId: "cover", revision: 1, format: "png" as const,
+      bytes: new Uint8Array([1, 2, 3]) };
+    const changed = { ...original, bytes: new Uint8Array([3, 2, 1]) };
+    const expected = { schemaVersion: 1 as const,
+      items: [{ ...identifyPreparedMedia(original)! }] };
+    const calls: string[] = [];
+    const session = browser([]);
+    session.observe = async () => {
+      expected.items[0]!.sha256 = identifyPreparedMedia(changed)!.sha256;
+      return { ok: true, state: "dashboard" };
+    };
+    const result = await executePersistedBlooketWrite(
+      persistence(join(directory, "checkpoint.json")), mediaPlan,
+      session, secrets(), writes(SET_SUCCESS, calls),
+      verification({ ok: true, baseline: SET_BASELINE }), {
+        expectedMedia: expected,
+        media: { read: async () => ({ ok: true, value: changed }) },
+      });
+    assert.deepEqual(result, { ok: false, stage: "prepared-media",
+      code: "blooket-media-stale", mediaId: "cover" });
+    assert.deepEqual(calls, []);
+  });
+});
+
+test("malformed expected media context stops without a resolver or session",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const calls: string[] = [];
+    const result = await executePersistedBlooketWrite(
+      persistence(join(directory, "checkpoint.json")), plan,
+      browser(calls), secrets(), writes(SET_SUCCESS, calls),
+      verification({ ok: true, baseline: SET_BASELINE }), {
+        expectedMedia: { schemaVersion: 2, items: [] } as never,
+      });
+    assert.deepEqual(result, { ok: false, stage: "prepared-media",
+      code: "blooket-media-invalid", mediaId: "snapshot" });
+    assert.deepEqual(calls, []);
+  });
+});
