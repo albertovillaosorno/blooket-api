@@ -204,6 +204,25 @@ validated.
 
 ## Evidence
 
+On 2026-10-09, authenticated Chrome for Testing 155 reproduced a read stop
+from a hidden consent dialog on My Sets. Its layout box was nonzero while its
+computed visibility was hidden. Session inspection succeeded, but canonical
+capability and question reads returned `blooket-browser-failed` before
+navigation.
+
+The navigation guard now checks computed display and visibility as well as
+layout bounds. It does not dismiss consent or navigate past a visible modal,
+active input, question editor, drawer, challenge, or Create Set draft.
+Serialized-function regressions cover hidden/collapsed/non-displayed dialogs,
+visible dialogs, and failed style inspection; all 15 page tests pass.
+Live corrected-worker acceptance remains required before completing this task.
+
+The CSS contract was checked on 2026-10-09 against
+[MDN visibility][css-visibility] and [MDN getComputedStyle][computed-style].
+A hidden box can retain layout, and computed visibility includes inherited
+styles; these documents do not establish successful Blooket reads.
+
+
 On 2026-10-09, an emitted product helper read an owned saved question image
 in the authenticated Chrome isolated world. A bounded credential-free CORS
 request returned 82,377 bytes and the previously observed SHA-256 digest;
@@ -1188,3 +1207,8 @@ successful reload cannot establish the authenticated window's loaded code.
 The owner was asked to load the current projection in that existing window.
 Canonical authenticated acceptance remains pending; no session was copied and
 no compatibility or provider-security gate was relaxed.
+
+<!-- jig-ignore-next-line: Exact upstream documentation URL is indivisible. -->
+[css-visibility]: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/visibility
+<!-- jig-ignore-next-line: Exact upstream documentation URL is indivisible. -->
+[computed-style]: https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle
