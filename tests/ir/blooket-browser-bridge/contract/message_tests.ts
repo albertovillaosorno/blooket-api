@@ -34,12 +34,29 @@ import test from "node:test";
 import {
   decodeBlooketBrowserBridgeRequest,
   decodeBlooketBrowserBridgeResponse,
+  decodeBlooketBrowserClient,
 } from "../../../../src/ir/blooket-browser-bridge/contract/message.ts";
 
 const request = (command: unknown) => ({
   schemaVersion: 1,
   id: "fe101cf0-18c3-4f3f-84a3-b9075029e67f",
   command,
+});
+
+test("browser client labels admit only canonical extension roots", () => {
+  for (const value of [
+    "chrome-extension://fixture-extension/",
+    "safari-web-extension://FC730C5C-1446-42CF-A5BB-9097337A63D1/",
+  ]) assert.deepEqual(decodeBlooketBrowserClient(value), { ok: true, value });
+  for (const value of [
+    undefined, null, [], ["chrome-extension://fixture/"],
+    "chrome-extension://fixture", "chrome-extension://fixture/a",
+    "chrome-extension://fixture/?extra=1", "chrome-extension://fixture/#x",
+    "chrome-extension://user@fixture/", "chrome-extension://fixture:12/",
+    "chrome-extension://fixture/\n", "https://fixture/", "file:///",
+    "chrome-extension://" + "a".repeat(201) + "/",
+    "chrome-extension://fixture/, chrome-extension://other/",
+  ]) assert.equal(decodeBlooketBrowserClient(value).ok, false);
 });
 
 test("browser requests admit only bounded exact commands", () => {

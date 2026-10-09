@@ -34,6 +34,9 @@ import { createPackagedLoginItemControl, type LoginItemControl } from
 import { inspectLoginItem, setLoginItemPreference } from
   "../../teacher-configuration/application/login-item.ts";
 import { createBlooketRuntimePorts } from "./blooket-runtime.ts";
+import {
+  BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserClient,
+} from "../../../ir/blooket-browser-bridge/contract/message.ts";
 import { createBlooketMutationPacer } from
   "../../blooket-write-execution/application/mutation-pacing.ts";
 import { isBlooketPublicationCommand } from
@@ -760,7 +763,7 @@ async function handleBrowserBridgeRequest(
   if (request.method === "OPTIONS") {
     response.setHeader(
       "Access-Control-Allow-Headers",
-      "Authorization, Content-Type",
+      "Authorization, Content-Type, " + BLOOKET_BROWSER_CLIENT_HEADER,
     );
     response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     response.writeHead(204);
@@ -776,7 +779,19 @@ async function handleBrowserBridgeRequest(
     json(response, 401, { ok: false, code: "invalid-browser-bridge-token" });
     return;
   }
-  if (extensionOrigin !== undefined && !bridge.compatible(extensionOrigin)) {
+  const client = decodeBlooketBrowserClient(
+    request.headers[BLOOKET_BROWSER_CLIENT_HEADER],
+  );
+  if (!client.ok) {
+    bridge.noteUnidentifiedClient();
+    json(response, 426, { ok: false, code: "blooket-browser-incompatible" });
+    return;
+  }
+  if (extensionOrigin !== undefined && client.value !== extensionOrigin + "/") {
+    json(response, 403, { ok: false, code: "invalid-origin" });
+    return;
+  }
+  if (!bridge.compatible(client.value)) {
     json(response, 426, { ok: false, code: "blooket-browser-incompatible" });
     return;
   }
@@ -787,13 +802,13 @@ async function handleBrowserBridgeRequest(
   }
   if (path === "/api/browser-bridge/next" && request.method === "GET") {
     json(response, 200, {
-      ok: true, job: bridge.next(token, extensionOrigin),
+      ok: true, job: bridge.next(token, client.value),
     });
     return;
   }
   if (path === "/api/browser-bridge/result" && request.method === "POST") {
     const body = await readBody(request, 1_000_000);
-    if (!bridge.complete(token, body, extensionOrigin)) {
+    if (!bridge.complete(token, body, client.value)) {
       json(response, 400, {
         ok: false,
         code: "invalid-browser-bridge-result",

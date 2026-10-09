@@ -33,9 +33,9 @@ const words = {
       "y mantén abierto este espacio.",
     browserConnectionUnknown: "No se pudo comprobar la conexión del navegador.",
     browserIncompatible:
-      "Una copia antigua de la extensión respondió con un formato " +
-      "incompatible y se detuvo. Desactiva las copias antiguas, activa " +
-      "la actual y reinicia Blooket API antes de comprobar de nuevo.",
+      "Se detectó una conexión incompatible del navegador. Actualiza " +
+      "o recarga la extensión, desactiva las copias antiguas y reinicia " +
+      "Blooket API antes de comprobar de nuevo.",
     safariExtensionHelp:
       "Safari viene incluida con Blooket API. Abre la instalación y " +
       "actívala en Safari cuando el sistema te lo pida.",
@@ -275,9 +275,9 @@ const words = {
       "and keep this workspace open.",
     browserConnectionUnknown: "The browser connection could not be checked.",
     browserIncompatible:
-      "An older extension copy replied with an incompatible format and " +
-      "was stopped. Disable old copies, enable the current one, and " +
-      "restart Blooket API before checking again.",
+      "An incompatible browser connection was detected. Update or reload " +
+      "the extension, disable old copies, and restart Blooket API before " +
+      "checking again.",
     safariExtensionHelp:
       "Safari is included with Blooket API. Open setup, then enable it " +
       "in Safari when macOS asks.",
@@ -1514,7 +1514,8 @@ function renderSettingsState() {
         "browserConnectionUnknown",
   );
   $("#browserCompatibilityState").hidden =
-    !(bridge?.incompatibleClients > 0);
+    !(bridge?.incompatibleClients > 0 ||
+      bridge?.requiresExtensionUpdate === true);
   $("#browserCompatibilityState").textContent = t("browserIncompatible");
   const login = bootstrap.service?.loginItem?.state;
   const allowed = ["enabled", "not-registered", "requires-approval"];

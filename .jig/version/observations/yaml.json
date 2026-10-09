@@ -2,7 +2,7 @@
   "authority": "yaml",
   "integrity_kind": "provider-response-sha256",
   "integrity_sha256": "3ace3f8ec5fc9a5784603960fd107d9a9f172d1d74d66c32dfd6a739512a7b24",
-  "observed_on": "2026-10-07",
+  "observed_on": "2026-10-09",
   "provider": "npm-registry",
   "schema_version": 1,
   "source": "https://registry.npmjs.org/yaml/latest",

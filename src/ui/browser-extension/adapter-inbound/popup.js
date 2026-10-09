@@ -8,6 +8,9 @@ const words = {
     connected: "Ready",
     "waiting-for-workspace": "Waiting for the local workspace.",
     "connection-unavailable": "Start Blooket API and open its workspace.",
+    "extension-update-required":
+      "Update or reload Blooket API in your browser, disable older " +
+      "copies, and restart the app.",
     "blooket-attention-required": "Blooket needs your attention. Open its tab.",
     error: "The local service is unavailable.",
   },
@@ -20,6 +23,9 @@ const words = {
     connected: "Listo",
     "waiting-for-workspace": "Esperando el espacio local.",
     "connection-unavailable": "Inicia Blooket API y abre su espacio.",
+    "extension-update-required":
+      "Actualiza o recarga Blooket API en el navegador, desactiva " +
+      "las copias antiguas y reinicia la aplicación.",
     "blooket-attention-required":
       "Blooket necesita tu atención. Abre su pestaña.",
     error: "El servicio local no está disponible.",
