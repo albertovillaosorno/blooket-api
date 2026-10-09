@@ -232,3 +232,51 @@ test(
   assert.deepEqual(calls, ["shared"]);
   },
 );
+
+
+test("admission owns bytes before another media read can reuse a buffer",
+  async () => {
+  const bytes = new Uint8Array([1, 2, 3]);
+  const result = await admitBlooketPreparedMedia(multipleChoice, {
+    read: async mediaId => {
+      if (mediaId === "moon") bytes.fill(9);
+      return { ok: true, value: {
+        mediaId, revision: 3, format: "png", bytes,
+      } };
+    },
+  });
+  assert.ok(result.ok);
+  assert.deepEqual(Array.from(result.media[0]!.bytes), [1, 2, 3]);
+  bytes.fill(0);
+  assert.deepEqual(Array.from(result.media[1]!.bytes), [9, 9, 9]);
+});
+
+test("a durable media identity refuses changed bytes, format or revision",
+  async () => {
+  const { identifyPreparedMedia } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+    "../../../../src/projects/blooket-write-plans/domain/prepared-media-identities.ts"
+  );
+  const prepared = { mediaId: "sun", revision: 3, format: "png" as const,
+    bytes: new Uint8Array([1, 2, 3]) };
+  const expected = { schemaVersion: 1 as const,
+    items: [identifyPreparedMedia(prepared)!] };
+  const operation: BlooketWriteOperation = { ...multipleChoice,
+    kind: "question", localQuestionId: "q1", questionNumber: 1,
+    question: { type: "typing-answer", prompt: "Type sun.",
+      timeLimitSeconds: 10, imageMediaId: "sun", matchMode: "exact",
+      answer: "sun" } };
+  for (const change of [{}, { revision: 4 }, { format: "gif" as const },
+    { bytes: new Uint8Array([3, 2, 1]) }, { bytes: new Uint8Array([1, 2]) }]) {
+    const actual = { ...prepared, ...change };
+    const result = await admitBlooketPreparedMedia(operation,
+      { read: async () => ({ ok: true, value: actual }) }, expected);
+    assert.equal(result.ok, Object.keys(change).length === 0);
+    if (!result.ok) assert.equal(result.code, "blooket-media-stale");
+  }
+  let called = false;
+  assert.equal((await admitBlooketPreparedMedia(operation, {
+    read: async () => { called = true; throw new Error("must not read"); },
+  }, { schemaVersion: 1, items: [] })).ok, false);
+  assert.equal(called, false);
+});

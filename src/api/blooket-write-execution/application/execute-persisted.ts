@@ -101,6 +101,9 @@ import {
 import type { BlooketPreparedMediaReadPort } from
   "../contract/prepared-media.ts";
 
+import type { PreparedMediaIdentities } from
+  "../../../projects/blooket-write-plans/domain/prepared-media-identities.ts";
+
 type PrepareTerminal = Exclude<
   PrepareNextBlooketWriteResult,
   {
@@ -139,6 +142,7 @@ export interface ExecutePersistedBlooketWriteOptions {
   readonly pacer?: BlooketMutationPacer;
   readonly signal?: AbortSignal;
   readonly media?: BlooketPreparedMediaReadPort;
+  readonly expectedMedia?: PreparedMediaIdentities;
   readonly budget?: {
     readonly path: string;
     readonly policy: BlooketMutationTaskBudgetPolicy;
@@ -611,7 +615,9 @@ async function executePersistedBlooketWriteLocked(
   }
   const admittedMedia = options.media === undefined
     ? { ok: true as const, media: [] }
-    : await admitBlooketPreparedMedia(prepared.operation, options.media);
+    : await admitBlooketPreparedMedia(
+      prepared.operation, options.media, options.expectedMedia,
+    );
   if (!admittedMedia.ok) {
     lease?.release();
     return {

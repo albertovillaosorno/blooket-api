@@ -963,7 +963,10 @@ test(
       );
 
       assert.equal(result.ok, true);
-      assert.equal(receivedBytes, bytes);
+      assert.notEqual(receivedBytes, bytes);
+      assert.deepEqual(receivedBytes, bytes);
+      bytes.fill(0);
+      assert.deepEqual(Array.from(receivedBytes ?? []), [9, 8, 7, 6]);
       const attempt = await loadWriteAttemptFile(paths.attempt, mediaPlan);
       assert.equal(attempt.ok, true);
       if (attempt.ok && attempt.kind === "record")
@@ -1875,3 +1878,40 @@ test("cancellation after journal persistence blocks mutation and replay",
       assert.equal(await readFile(paths.attempt, "utf8"), journal);
     });
   });
+
+
+test("changed snapshot media stops before journal, budget or remote write",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const { identifyPreparedMedia } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+      "../../../../src/projects/blooket-write-plans/domain/prepared-media-identities.ts"
+    );
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const budgetPath = join(directory, "budget.json");
+    const calls: string[] = [];
+    const pacing: string[] = [];
+    const original = { mediaId: "cover", revision: 1, format: "png" as const,
+      bytes: new Uint8Array([1, 2, 3]) };
+    const result = await executePersistedBlooketWrite(paths, mediaPlan,
+      browser([]), secrets(), writes(SET_SUCCESS, calls),
+      verification({ ok: true, baseline: SET_BASELINE }), {
+        pacer: immediatePacer(pacing),
+        expectedMedia: { schemaVersion: 1,
+          items: [identifyPreparedMedia(original)!] },
+        media: { read: async () => ({ ok: true,
+          value: { ...original, bytes: new Uint8Array([3, 2, 1]) } }) },
+        budget: { path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          now: () => 96_000 },
+      });
+    assert.deepEqual(result, { ok: false, stage: "prepared-media",
+      code: "blooket-media-stale", mediaId: "cover" });
+    assert.deepEqual(calls, []);
+    assert.deepEqual(pacing, ["acquire", "release"]);
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, mediaPlan),
+      { ok: true, kind: "missing" });
+    assert.deepEqual(await loadMutationBudgetFile(budgetPath, mediaPlan.planId),
+      { ok: true, state: null });
+  });
+});

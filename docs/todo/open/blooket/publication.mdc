@@ -156,3 +156,31 @@ replaced before the current bounded read contracts can verify a real result.
 
 Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
 and does not block this functional record.
+
+
+On 2026-10-09, prepared-media admission began copying every byte buffer and
+scalar fact before awaiting another asset read. A synthetic reusable-buffer
+regression reproduces the previous drift and proves that already admitted
+bytes remain unchanged. A versioned immutable media-identity model now binds
+stable ID, recipe revision, format, actual byte length, and SHA-256; exact
+runtime admission rejects duplicate IDs, arbitrary paths/URLs, malformed
+hashes, and oversized identities.
+
+The persisted write executor can receive that expected identity context. Any
+changed bytes, revision, format, or missing required asset stop before mutation
+budget reservation, the attempt journal, or a remote write. Differential
+question reconciliation can use a copied admitted expected identity and requires
+version-four remote byte evidence plus preservation of the prior collection.
+It never resolves the current library to decide the outcome of an older write.
+
+This is portable execution/verifier composition evidence. Canonical publication
+snapshots do not yet persist this context and their media gate remains closed.
+Persist the model into the immutable saved-draft snapshot, bind write-time
+admission and final verification to the same context, and demonstrate live
+publication before removing that gate or completing this record.
+
+The [Node Buffer documentation](https://nodejs.org/api/buffer.html), checked
+on 2026-10-09, distinguishes copying typed-array contents from sharing its
+underlying ArrayBuffer. The implementation deliberately copies the prepared
+view and hashes those exact owned bytes; a digest proves equality, not publisher
+trust or provider success.
