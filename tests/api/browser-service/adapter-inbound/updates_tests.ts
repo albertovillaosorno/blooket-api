@@ -146,3 +146,53 @@ test(
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("quiescence drains even when owned resource closure fails",
+  { timeout: 10_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "update-service-drain-"));
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let finished = false, closes = 0;
+    const status = { currentVersion: "26.4.0", phase: "idle" as const,
+      checkedAt: null, nextCheckAt: null, result: null };
+    const service = await startBrowserService({ root, port: 0, updates: {
+      status: () => status,
+      check: async () => {
+        entered.resolve();
+        await release.promise;
+        finished = true;
+        return status;
+      },
+      close: () => { closes++; throw new Error("synthetic-close-failure"); },
+    } });
+    let checking: Promise<unknown> | undefined;
+    let closing: Promise<void> | undefined;
+    try {
+      const boot = await (await fetch(
+        service.origin + "/api/bootstrap")).json();
+      checking = fetch(service.origin + "/api/update-check", {
+        method: "POST", headers: { Origin: service.origin,
+          "Content-Type": "application/json", "X-CSRF-Token": boot.csrf },
+        body: "{}",
+      }).then(response => response.json(), () => undefined);
+      await entered.promise;
+      closing = service.quiesce();
+      assert.equal(service.quiesce(), closing);
+      const rejected = assert.rejects(closing, /synthetic-close-failure/);
+      await checking;
+      assert.equal(finished, false);
+      assert.equal(closes, 1);
+      release.resolve();
+      await rejected;
+      assert.equal(finished, true);
+      assert.equal(service.server.listening, false);
+      assert.equal(closes, 1);
+    } finally {
+      release.resolve();
+      await checking;
+      await closing?.catch(() => {});
+      await service.quiesce().catch(() => {});
+      await rm(root, { recursive: true, force: true });
+    }
+  });

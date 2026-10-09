@@ -534,6 +534,29 @@ Independent installer lifecycle, other persistent-writer fencing, candidate
 preparation/Apple reassessment, production publisher trust, actual service
 restart/health, and local UI/opt-in composition remain functional work.
 
+### Managed service writer drain
+
+A regression on 2026-10-08 reproduced managed shutdown releasing its service
+lock while an admitted settings request was still inside an asynchronous secret
+write. The loopback service now closes admission, interrupts pending browser
+and update reads, closes transport connections, and waits for every admitted
+handler before managed lifecycle removes runtime discovery or releases
+ownership.
+Socket closure is never treated as completion of a filesystem/native writer.
+
+Portable real-HTTP tests hold a settings writer across shutdown, verify a second
+service cannot acquire ownership, complete and preserve the settings write,
+and then restart successfully. Another case verifies resource-close failure
+still drains an ignoring request and reports failure only afterward. Node's
+[HTTP shutdown contract][http-shutdown], checked on 2026-10-08, supports closing
+the server before all connections; application handler ownership is tracked
+separately and close attempts are coalesced.
+
+This is a managed local-service prerequisite. Independent CLI writers, the
+online gateway's admitted child operations, staged installer lifetime, publisher
+trust, and end-to-end updater composition still need their own admission and
+recovery guarantees before installation can be enabled.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,
@@ -563,3 +586,6 @@ native acceptance belong to task blooket-15.
 
 [directory-iteration]:
   https://nodejs.org/download/release/v24.20.0/docs/api/fs.html
+
+[http-shutdown]:
+  https://nodejs.org/download/release/v24.20.0/docs/api/http.html
