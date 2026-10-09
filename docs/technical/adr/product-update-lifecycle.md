@@ -102,6 +102,20 @@ retains exclusive ownership until admitted I/O has finished. Recovery assessment
 requires independent native-writer completion and fresh filesystem/health
 observations; persisted healthy state cannot prove current application health.
 
+The installation application controller consumes prepared authority captured
+independently of the journal and coordinates intent, reassessment, quiescence,
+one forward exchange, fresh health, and guarded inverse recovery. It accepts
+only exact completion evidence and freshly durable directory orientations.
+Cancellation and lost acknowledgement cannot release ownership or authorize
+blind replay; a stopped transaction retains both bundles and its journal.
+
+This controller is an internal application operation with no permissive ports
+or UI/MCP entrypoint. Production composition must run independently of the app
+being replaced, retain every writer fence, supervise all descendants, reassess
+publisher trust, and authenticate actual version/nonce health. Portable tests
+exercise actual journals and native Linux exchange with explicitly synthetic
+Apple/lifecycle ports; they do not enable installation or prove product restart.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
