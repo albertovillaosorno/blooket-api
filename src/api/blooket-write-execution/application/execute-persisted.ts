@@ -101,7 +101,7 @@ import {
 import type { BlooketPreparedMediaReadPort } from
   "../contract/prepared-media.ts";
 
-import type { PreparedMediaIdentities } from
+import { decodePreparedMediaIdentities, type PreparedMediaIdentities } from
   "../../../projects/blooket-write-plans/domain/prepared-media-identities.ts";
 
 type PrepareTerminal = Exclude<
@@ -271,6 +271,16 @@ export async function executePersistedBlooketWrite(
   verifier?: BlooketWriteVerificationPort,
   options: ExecutePersistedBlooketWriteOptions = {},
 ): Promise<ExecutePersistedBlooketWriteResult> {
+  // Freeze expected recovery facts before lock acquisition or session I/O.
+  // Later caller mutation cannot redefine which prepared bytes were intended.
+  const expectedMedia = options.expectedMedia === undefined ? undefined
+    : decodePreparedMediaIdentities(options.expectedMedia);
+  if (options.expectedMedia !== undefined && expectedMedia === undefined)
+    return { ok: false, stage: "prepared-media",
+      code: "blooket-media-invalid", mediaId: "snapshot" };
+  const ownedOptions: ExecutePersistedBlooketWriteOptions = {
+    ...options, ...(expectedMedia ? { expectedMedia } : {}),
+  };
   const acquired = await tryAcquireFileLock(
     writeAttemptExecutionLockPath(paths.attempt),
   );
@@ -297,7 +307,7 @@ export async function executePersistedBlooketWrite(
       secrets,
       writes,
       verifier,
-      options,
+      ownedOptions,
     );
   } catch (error: unknown) {
     threw = true;
