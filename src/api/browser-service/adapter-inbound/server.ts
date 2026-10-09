@@ -815,6 +815,7 @@ export async function startBrowserService(
         try {
           const result = await executeCommand(decoded.value, root, blooket, {
             root, blooket, writes: blooket.writeExecution,
+            preparedMedia: blooket.preparedMedia,
             pacer: publicationPacer, signal: controller.signal,
           });
           if (!response.destroyed) json(response, 200, result);

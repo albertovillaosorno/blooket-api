@@ -39,13 +39,17 @@ import {
 } from "../../../ir/blooket-publication-commands/contract/commands.ts";
 import { isRecord } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
-import { decodeProjectDocument, type ProjectDocument } from
+import { decodeProjectDocument } from
   "../../../projects/project-documents/domain/project.ts";
-import { decodeBlooketCapabilitySnapshot,
-  type BlooketCapabilitySnapshot } from
+import type { BlooketCapabilitySnapshot } from
   "../../../ir/capability-snapshots/contract/blooket-capabilities.ts";
-import { buildBlooketWritePlan } from
+import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
+import { decodeBlooketPublicationSnapshot as decodeSnapshot,
+  publicationHasMedia as hasMedia } from
+  "../../../projects/blooket-write-plans/domain/publication-snapshot.ts";
+import type { BlooketPreparedMediaReadPort } from
+  "../contract/prepared-media.ts";
 import { executeLibraryCommand } from
   "../../teacher-library/application/library.ts";
 import { inspectBlooketCapabilities } from
@@ -81,6 +85,7 @@ export interface BlooketPublicationDependencies {
   readonly blooket: BlooketReadDependencies;
   readonly writes: BlooketWriteExecutionPort;
   readonly pacer: BlooketMutationPacer;
+  readonly preparedMedia?: BlooketPreparedMediaReadPort;
   readonly signal?: AbortSignal;
 }
 
@@ -141,7 +146,8 @@ export async function executeBlooketPublicationCommand(
           state: capabilities.state, published: false });
       currentCapabilities = capabilities.value;
       const candidate = {
-        schemaVersion: 1, draftId, revision: expectedRevision,
+        schemaVersion: 2, draftId, revision: expectedRevision,
+        expectedMedia: { schemaVersion: 1, items: [] },
         document: document.value, capabilities: capabilities.value,
       };
       const admitted = decodeSnapshot(candidate, draftId);
@@ -152,7 +158,7 @@ export async function executeBlooketPublicationCommand(
     }
     const prepared = decodeSnapshot(snapshot, draftId);
     if (!prepared) return fail("publication-snapshot-invalid");
-    const { plan, revision } = prepared;
+    const { plan, revision, expectedMedia } = prepared;
     if (expectedRevision !== undefined && expectedRevision !== revision)
       return fail("blooket-publication-draft-conflict");
     const loaded = await loadWriteCheckpointFile(files.checkpoint, plan);
@@ -172,7 +178,7 @@ export async function executeBlooketPublicationCommand(
             ? "writes-complete" : "ready",
       });
     const verifier = blooketSetReadWriteVerifier(
-      blooket.sets, blooket.questions,
+      blooket.sets, blooket.questions, expectedMedia,
     );
     if (command.command === "blooket.publication.reconcile") {
       const result = await verifyPersistedBlooketWrite(
@@ -221,8 +227,14 @@ export async function executeBlooketPublicationCommand(
               const lowered = lowerBlooketWriteSubmission(operation, {
                 remoteSetId: checkpoint.remoteSetId,
               });
+              const imageId = lowered.ok &&
+                lowered.value.kind === "add-question"
+                ? lowered.value.image?.mediaId : undefined;
               return lowered.ok && questions.value[index] !== undefined &&
-                questionMatches(questions.value[index]!, lowered.value);
+                questionMatches(questions.value[index]!, lowered.value,
+                  imageId === undefined ? undefined
+                    : expectedMedia?.items.find(item =>
+                        item.mediaId === imageId));
             }))
           return fail("blooket-publication-remote-conflict");
         const current = JSON.stringify([detail.value, questions.value]);
@@ -236,6 +248,10 @@ export async function executeBlooketPublicationCommand(
       });
     }
     if (signal?.aborted) return fail("blooket-publication-cancelled");
+    // Keep new media mutations closed until the live native upload is proven.
+    // Durable identity verification never consults current library bytes.
+    if (hasMedia(prepared.document))
+      return fail("blooket-publication-media-unsupported");
     // Admission is fresh for each new mutation. Already journaled attempts
     // need local recovery first and cannot create another remote write.
     if (attempt.kind === "missing" &&
@@ -251,13 +267,19 @@ export async function executeBlooketPublicationCommand(
             state: capabilities.state });
         currentCapabilities = capabilities.value;
       }
-      if (!buildBlooketWritePlan(
-        JSON.stringify(prepared.document), "", currentCapabilities,
-      ).ok) return fail("blooket-publication-capabilities-changed");
+      const admission = expectedMedia
+        ? buildPreparedBlooketWritePlan(prepared.document, expectedMedia,
+            currentCapabilities)
+        : buildBlooketWritePlan(JSON.stringify(prepared.document), "",
+            currentCapabilities);
+      if (!admission.ok)
+        return fail("blooket-publication-capabilities-changed");
     }
     const result = await executePersistedBlooketWrite(
       files, plan, blooket.session, blooket.secrets, writes, verifier, {
-        pacer, ...(signal ? { signal } : {}), budget: {
+        pacer, ...(signal ? { signal } : {}),
+        ...(host.preparedMedia ? { media: host.preparedMedia } : {}),
+        ...(expectedMedia ? { expectedMedia } : {}), budget: {
           path: files.budget,
           policy: {
             maximumStarts: Math.min(10_000, plan.operations.length + 5),
@@ -284,30 +306,4 @@ export async function executeBlooketPublicationCommand(
     catch { releaseFailed = true; }
     if (releaseFailed) return fail("publication-lock-release-failed");
   }
-}
-
-function hasMedia(
-  document: ProjectDocument,
-): boolean {
-  return document.coverImage !== null || document.questions.some(question =>
-    question.image !== null || (question.type === "multiple-choice" &&
-      question.answers.some(answer => answer.image !== null)),
-  );
-}
-function decodeSnapshot(value: unknown, draftId: string) {
-  if (!isRecord(value) || Object.keys(value).sort().join() !==
-      "capabilities,document,draftId,revision,schemaVersion" ||
-      value["schemaVersion"] !== 1 || value["draftId"] !== draftId ||
-      typeof value["revision"] !== "string" ||
-      !/^[a-f0-9]{64}$/u.test(value["revision"])) return undefined;
-  const document = decodeProjectDocument(value["document"]);
-  const capabilities = decodeBlooketCapabilitySnapshot(value["capabilities"]);
-  if (!document.ok || !capabilities.ok || hasMedia(document.value))
-    return undefined;
-  const built = buildBlooketWritePlan(
-    JSON.stringify(document.value), "", capabilities.value,
-  );
-  if (!built.ok) return undefined;
-  return { document: document.value, revision: value["revision"],
-    plan: built.value };
 }
