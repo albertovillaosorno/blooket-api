@@ -79,6 +79,24 @@ test("identified legacy workers cannot take subsequent jobs", async () => {
   }
 });
 
+test("unidentified clients warn without retiring a current worker", () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    assert.equal(broker.status().requiresExtensionUpdate, false);
+    broker.next(TOKEN, "chrome-extension://current-fixture/");
+    assert.equal(broker.status().connected, true);
+    broker.noteUnidentifiedClient();
+    assert.equal(broker.status().requiresExtensionUpdate, true);
+    assert.equal(broker.status().connected, true);
+    assert.equal(broker.status().incompatibleClients, 0);
+    broker.resetPairing();
+    assert.equal(broker.status().requiresExtensionUpdate, false);
+    assert.equal(broker.status().connected, false);
+  } finally {
+    broker.close();
+  }
+});
+
 test("another identified worker cannot settle an owned lease", async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
   try {

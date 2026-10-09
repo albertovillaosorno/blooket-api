@@ -1121,3 +1121,27 @@ development also need that browser action. The real `.env` is unchanged.
 
 <!-- jig-ignore-next-line: Exact official documentation URL is indivisible. -->
 [worker-doc]: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers
+
+On 2026-10-08, sanitized live transport tracing reproduced Chrome omitting
+Origin on job GET requests while including it on result POST requests.
+Origin-only correlation therefore admitted an anonymous legacy poll before
+refusing its identified completion. The previous exclusion did not reliably
+prevent that worker from taking another lease.
+
+The bridge now requires a canonical extension-root label on every authenticated
+request, independent of Origin. A missing label receives HTTP 426 before any
+job dispatch; a present Origin must agree with the label. The pairing bearer
+remains the authority, and the label is not authenticated version evidence.
+
+The worker supplies its runtime root consistently, stops an incompatible relay
+without replay, and exposes update/reload instructions. Its 250-millisecond
+poll interval preserves the existing write-dispatch margin; deadlines and
+mutation admission have not been relaxed. Synthetic tests cover omitted GET
+Origin, POST correlation, contradictory labels, old-client refusal, retained
+leases, connection liveness, and initial/active-worker compatibility stops.
+
+The owner's Chrome for Testing 155.0.8059.39 exposes authenticated My Sets
+through browser control, but that website observation is separate from
+canonical product acceptance. The owner additionally supplied an installed
+Chrome DevTools CLI with extension reload support; its separate controlled
+profile must be verified rather than assumed to share the existing session.

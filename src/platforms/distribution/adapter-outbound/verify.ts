@@ -424,6 +424,7 @@ export async function verifyDistribution(
         const next = await request("/api/browser-bridge/next", {
           headers: {
             Authorization: "Bearer " + bootstrap.browserBridge.token,
+            "x-blooket-browser-client": "chrome-extension://package-fixture/",
           },
         });
         assert.equal(next.status, 200);
@@ -452,7 +453,9 @@ export async function verifyDistribution(
           const completion = await request("/api/browser-bridge/result", {
             method: "POST",
             headers: { "Content-Type": "application/json",
-              Authorization: "Bearer " + bootstrap.browserBridge.token },
+              Authorization: "Bearer " + bootstrap.browserBridge.token,
+              "x-blooket-browser-client":
+                "chrome-extension://package-fixture/" },
             body: JSON.stringify({ schemaVersion: 1, id: job.id,
               ok: true, value }),
           });

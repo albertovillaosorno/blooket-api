@@ -117,6 +117,19 @@ Media and editing existing quizzes remain pending. A legacy loaded extension
 returning bare My Sets arrays fails `blooket-browser-incompatible`; replace it
 with the current assembled worker before testing canonical publication.
 
+As checked on 2026-10-08, Chrome can omit Origin on bridge GET while supplying
+it on POST. The current worker sends `x-blooket-browser-client` with its
+canonical runtime root on both requests; the loopback service refuses unlabeled
+workers before dispatch. The bearer token remains the authentication boundary.
+Update synthetic HTTP clients together with the worker, and do not infer a
+verified extension version from this transport label.
+
+The owner supplied Chrome DevTools CLI 1.10.1 for explicit development reloads.
+It controls a separate Chrome for Testing profile, which may not share the
+owner's authenticated window. Browser-tool extension-management restrictions
+remain applicable to that tool; use an explicitly authorized dedicated reload
+operation rather than navigating a blocked internal browser page.
+
 Use `src/api/blooket-write-execution/application/execute-persisted.ts`, the
 shared mutation pacer, task budgets, prepared-media admission, journals,
 checkpoints, and reconciliation. Caller/model data must never choose durable

@@ -45,6 +45,8 @@ test(
   let creates = 0;
   let closed = false;
   let validStatus = true;
+  let incompatibleStatus = false;
+  let incompatiblePoll = false;
   let unsafeReadSource = false;
   let detailOpenSucceeds = true;
   let detailSidebarDrifts = false;
@@ -427,7 +429,14 @@ test(
     assert.equal(options.credentials, "omit");
     assert.equal(options.redirect, "error");
     assert.equal(options.headers.Authorization, "Bearer " + token);
+    assert.equal(options.headers["x-blooket-browser-client"], root);
     requests.push(url);
+    if ((url.endsWith("/status") && incompatibleStatus) ||
+      (url.endsWith("/next") && incompatiblePoll)) {
+      return Response.json({
+        ok: false, code: "blooket-browser-incompatible",
+      }, { status: 426 });
+    }
     let value;
     if (url.endsWith("/status"))
       value = validStatus ? { ok: true, pending: 0, connected: false } : {};
@@ -907,6 +916,24 @@ test(
     assert.deepEqual(scripts.slice(beforeExpiredWrite).filter(
       (name) => name === "runBlooketAddQuestionPageAction",
     ), ["runBlooketAddQuestionPageAction"]);
+
+    const beforeCompatibilityStop = scripts.length;
+    incompatiblePoll = true;
+    const compatibilityDeadline = realNow() + 3000;
+    while ((await message({ kind: "status" })).status !==
+      "extension-update-required") {
+      assert.ok(realNow() < compatibilityDeadline,
+        "worker did not stop its incompatible relay");
+      await pause(20);
+    }
+    assert.deepEqual(stored, {});
+    incompatiblePoll = false;
+    incompatibleStatus = true;
+    assert.deepEqual(await announce({ origin, token }), {
+      ok: false, status: "extension-update-required",
+    });
+    assert.equal(scripts.length, beforeCompatibilityStop);
+    assert.deepEqual(stored, {});
   } finally {
     Date.now = realNow;
     releaseReadScript();

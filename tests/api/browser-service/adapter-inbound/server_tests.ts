@@ -559,22 +559,29 @@ test(
     assert.equal(wrong.status, 401);
 
     const pending = service.browserBridge.request({ kind: "sets.list" });
+    const missingClient = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      { headers: { Authorization: "Bearer " + boot.browserBridge.token } },
+    );
+    assert.equal(missingClient.status, 426);
+    assert.equal(service.browserBridge.status().pending, 1);
+    assert.equal(service.browserBridge.status().connected, false);
+    assert.equal(service.browserBridge.status().requiresExtensionUpdate, true);
+    const identifiedHeaders = {
+      Authorization: "Bearer " + boot.browserBridge.token,
+      "x-blooket-browser-client": extensionOrigin + "/",
+    };
     const statusOnly = await fetch(
       service.origin + "/api/browser-bridge/status",
-      { headers: { Authorization: "Bearer " + boot.browserBridge.token } },
+      { headers: identifiedHeaders },
     );
     assert.equal(statusOnly.status, 200);
     const response = await fetch(service.origin + "/api/browser-bridge/next", {
-      headers: {
-        Authorization: "Bearer " + boot.browserBridge.token,
-        Origin: extensionOrigin,
-      },
+      // Chrome omits Origin on GET but supplies it on result POST.
+      headers: identifiedHeaders,
     });
     assert.equal(response.status, 200);
-    assert.equal(
-      response.headers.get("access-control-allow-origin"),
-      extensionOrigin,
-    );
+    assert.equal(response.headers.get("access-control-allow-origin"), null);
     const next = (await response.json()) as {
       job: { id: string; command: { kind: string } };
     };
@@ -585,7 +592,7 @@ test(
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer " + boot.browserBridge.token,
+          ...identifiedHeaders,
           "Content-Type": "application/json",
           Origin: extensionOrigin,
         },
@@ -605,7 +612,7 @@ test(
     const oldWorker = await fetch(
       service.origin + "/api/browser-bridge/next",
       { headers: {
-        Authorization: "Bearer " + boot.browserBridge.token,
+        ...identifiedHeaders,
         Origin: extensionOrigin,
       } },
     );
@@ -619,7 +626,14 @@ test(
       Authorization: "Bearer " + boot.browserBridge.token,
       "Content-Type": "application/json",
       Origin: currentOrigin,
+      "x-blooket-browser-client": currentOrigin + "/",
     };
+    const contradictory = await fetch(
+      service.origin + "/api/browser-bridge/next",
+      { headers: { ...currentHeaders, Origin: extensionOrigin } },
+    );
+    assert.equal(contradictory.status, 403);
+    assert.equal(service.browserBridge.status().pending, 1);
     const freshPoll = await fetch(
       service.origin + "/api/browser-bridge/next",
       { headers: currentHeaders },
@@ -634,7 +648,10 @@ test(
       service.origin + "/api/browser-bridge/result",
       {
         method: "POST",
-        headers: { ...currentHeaders, Origin: "chrome-extension://other" },
+        headers: {
+          ...currentHeaders, Origin: "chrome-extension://other",
+          "x-blooket-browser-client": "chrome-extension://other/",
+        },
         body: JSON.stringify(reply),
       },
     );
@@ -668,6 +685,7 @@ test(
       body: "{}",
     });
     assert.equal(reset.status, 200);
+    assert.equal(service.browserBridge.status().requiresExtensionUpdate, false);
     const revoked = await fetch(service.origin + "/api/browser-bridge/status", {
       headers: { Authorization: "Bearer " + boot.browserBridge.token },
     });

@@ -51,7 +51,9 @@ import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
 import { confirmBlooketReadNavigation } from "./read-navigation.ts";
-import { decodeBlooketBrowserBridgeRequest } from
+import {
+  BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserBridgeRequest,
+} from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
 
 interface BrowserTab {
@@ -107,6 +109,7 @@ let connection: Connection | undefined;
 let generation = 0;
 let status = "waiting-for-workspace";
 let pendingUiAction = Promise.resolve();
+class BrowserBridgeCompatibilityError extends Error {}
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -174,10 +177,12 @@ async function bridgeFetch(
     signal: AbortSignal.timeout(2000),
     headers: {
       Authorization: "Bearer " + current.token,
+      [BLOOKET_BROWSER_CLIENT_HEADER]: chrome.runtime.getURL(""),
       ...(value === undefined ? {} : { "Content-Type": "application/json" }),
     },
     ...(value === undefined ? {} : { body: JSON.stringify(value) }),
   });
+  if (response.status === 426) throw new BrowserBridgeCompatibilityError();
   return await jsonResponse(response);
 }
 async function script(
@@ -708,11 +713,18 @@ async function relay(current: Connection, activeGeneration: number) {
         });
       }
       if (status === "connection-unavailable") status = "connected";
-    } catch {
+    } catch (error) {
       if (!isOwner()) return;
+      if (error instanceof BrowserBridgeCompatibilityError) {
+        await disconnect();
+        status = "extension-update-required";
+        return;
+      }
       status = "connection-unavailable";
     }
-    await pause(1000);
+    // Write leases need 9.5 seconds of the broker's ten-second window.
+    // A one-second poll can consume that margin before any form is opened.
+    await pause(250);
   }
 }
 async function disconnect() {
@@ -740,7 +752,16 @@ async function connectWorkspace(message: unknown) {
     connection.token === candidate.token
   )
     return { ok: true, status };
-  const verified = await bridgeFetch(candidate, "/api/browser-bridge/status");
+  let verified: unknown;
+  try {
+    verified = await bridgeFetch(candidate, "/api/browser-bridge/status");
+  } catch (error) {
+    if (error instanceof BrowserBridgeCompatibilityError) {
+      status = "extension-update-required";
+      return { ok: false, status };
+    }
+    throw error;
+  }
   if (
     !verified ||
     typeof verified !== "object" ||

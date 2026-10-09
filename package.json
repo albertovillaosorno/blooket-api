@@ -2,7 +2,7 @@
   "name": "@blooket-api/repository",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.9.1",
+  "packageManager": "pnpm@12.10.1",
   "scripts": {
     "check": ".dependencies/pnpm/node_modules/.bin/tsc -p tsconfig.json",
     "test": "node --test --test-concurrency=4 $(find tests -name '*_tests.ts')",

@@ -70,6 +70,7 @@ export interface BlooketBrowserBridgeBroker
   resetPairing(): void;
   authenticated(token: string): boolean;
   compatible(client: string): boolean;
+  noteUnidentifiedClient(): void;
   next(token: string, client?: string): BlooketBrowserBridgeRequest | null;
   complete(token: string, value: unknown, client?: string): boolean;
   close(): void;
@@ -77,6 +78,7 @@ export interface BlooketBrowserBridgeBroker
     readonly pending: number;
     readonly connected: boolean;
     readonly incompatibleClients: number;
+    readonly requiresExtensionUpdate: boolean;
   };
 }
 
@@ -105,6 +107,7 @@ export function createBlooketBrowserBridgeBroker(
   let closed = false;
   let lastPollAt = 0;
   const incompatibleClients = new Set<string>();
+  let unidentifiedClient = false;
 
   function authenticated(candidate: string): boolean {
     const left = Buffer.from(token, "utf8");
@@ -129,11 +132,13 @@ export function createBlooketBrowserBridgeBroker(
     pairingToken: () => token,
     authenticated,
     compatible: (client) => !incompatibleClients.has(client),
+    noteUnidentifiedClient: () => { unidentifiedClient = true; },
     resetPairing: () => {
       if (closed) return;
       token = randomBytes(32).toString("base64url");
       lastPollAt = 0;
       incompatibleClients.clear();
+      unidentifiedClient = false;
       for (const id of [...pending.keys()]) {
         settle(id, { ok: false, code: "blooket-browser-unavailable" });
       }
@@ -283,6 +288,8 @@ export function createBlooketBrowserBridgeBroker(
       pending: pending.size,
       connected: !closed && lastPollAt > 0 && now() - lastPollAt <= timeoutMs,
       incompatibleClients: incompatibleClients.size,
+      requiresExtensionUpdate: unidentifiedClient ||
+        incompatibleClients.size > 0,
     }),
   };
 }
