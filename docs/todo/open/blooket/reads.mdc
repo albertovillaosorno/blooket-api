@@ -224,7 +224,19 @@ Capability inspection still
 failed because the live audio upsell repeats its heading inside a subscription
 link; the reader now excludes interactive labels from heading selection.
 Duplicate noninteractive headings remain ambiguous, with serialized regressions.
-Corrected capability acceptance remains required before completing this task.
+With committed `61f93b3` loaded, canonical capability inspection succeeded:
+question images are supported, while the observed Plus gate reports audio and
+answer images unsupported. My Sets lists observed summaries with completeness
+unknown, preserving the pagination limit honestly.
+
+A subsequent detail read exposed the live privacy control's two nested labels.
+The current inner label sits inside a span, beside the toggle state paragraph;
+the outer field label is not that row. Detail reading and owned cancellation
+now require exactly one candidate row and matching checked state and visible
+wording.
+
+The 22 page regressions pass, including nested labels, ambiguous rows, changed
+teacher fields, and refusal to save. Corrected live details remain pending.
 
 The CSS contract was checked on 2026-10-09 against
 [MDN visibility][css-visibility] and [MDN getComputedStyle][computed-style].

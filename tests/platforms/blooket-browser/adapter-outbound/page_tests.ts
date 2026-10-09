@@ -451,6 +451,19 @@ test("set privacy comes from the recovered visible sibling paragraph", () => {
     assert.equal(inspectBlooketPage({
       kind: "sets.get", setId: "fixture",
     }).ok, false);
+    const outer = node("LABEL", "Privacy Setting");
+    outer.parentElement = node("DIV");
+    const wrapper = node("SPAN");
+    wrapper.parentElement = toggleContainer;
+    switchLabel.parentElement = wrapper;
+    privacy.labels = [outer, switchLabel];
+    const injected = Function(
+      "return (" + inspectBlooketPage.toString() + ")",
+    )() as typeof inspectBlooketPage;
+    assert.equal(injected({ kind: "sets.get", setId: "fixture" }).ok, true);
+    outer.parentElement.selectors[":scope > p"] = [state];
+    assert.equal(injected({ kind: "sets.get", setId: "fixture" }).ok, false);
+    switchLabel.parentElement = toggleContainer;
     privacy.labels = [switchLabel];
     switchLabel.textContent = "Private (Only playable by you)";
     toggleContainer.selectors[":scope > p"] = [];
@@ -1116,6 +1129,17 @@ test("owned Edit Info cancellation closes the read-only metadata panel", () => {
       name === "aria-checked" ? "false" :
         name === "type" ? "checkbox" :
           name === "role" ? "switch" : null;
+    const inner = privacy.labels![0]!;
+    const wrapper = node("SPAN");
+    wrapper.parentElement = inner.parentElement;
+    inner.parentElement = wrapper;
+    const outer = node("LABEL", "Privacy Setting");
+    outer.parentElement = node("DIV");
+    privacy.labels = [outer, inner];
+    outer.parentElement.selectors[":scope > p"] = [node("P", "Private")];
+    assert.equal(close(), false);
+    assert.equal(clicks, 0);
+    outer.parentElement.selectors[":scope > p"] = [];
     assert.equal(close(), true);
     assert.equal(clicks, 1);
     assert.equal(isBlooketDetailPanelClosed("fixture"), true);
