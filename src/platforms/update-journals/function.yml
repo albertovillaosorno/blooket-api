@@ -1,0 +1,9 @@
+identity:
+  id: function:update-journals
+  name: update-journals
+  path: src/platforms/update-journals
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

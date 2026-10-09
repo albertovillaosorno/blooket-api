@@ -95,6 +95,13 @@ no delete/rename fallback is admitted. Application composition must hold the
 installation lock, quiesce writers, journal the operation, and manage health
 and recovery independently; the primitive cannot establish installation success.
 
+The exact local installation journal preserves signed metadata and both
+directory identities through intent, observation, health, and rollback phases.
+Private bounded durable storage rejects conflicting or unsafe records and
+retains exclusive ownership until admitted I/O has finished. Recovery assessment
+requires independent native-writer completion and fresh filesystem/health
+observations; persisted healthy state cannot prove current application health.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
