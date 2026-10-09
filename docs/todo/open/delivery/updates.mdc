@@ -557,6 +557,20 @@ online gateway's admitted child operations, staged installer lifetime, publisher
 trust, and end-to-end updater composition still need their own admission and
 recovery guarantees before installation can be enabled.
 
+### Canonical child completion
+
+Regression coverage on 2026-10-08 reproduced canonical CLI promises settling
+on timeout, oversized output, or spawn errors before child process closure.
+The CLI boundary now retains ownership until `close`, preserves the first
+failure, discards further output, and handles output-stream errors. A late
+successful envelope cannot override an earlier failure or authorize a retry.
+
+Synthetic lifecycle tests distinguish signal delivery, process exit, and final
+closure; existing real CLI/MCP publication coverage still traverses the actual
+subprocess. Node's [child-process lifecycle contract][child-completion], checked
+on 2026-10-08, distinguishes those events. This proves closure of the canonical
+child only; independent native descendants require their own completion proof.
+
 ## Blockers
 
 Production publisher keys/manifest publication, product staging integration,
@@ -589,3 +603,6 @@ native acceptance belong to task blooket-15.
 
 [http-shutdown]:
   https://nodejs.org/download/release/v24.20.0/docs/api/http.html
+
+[child-completion]:
+  https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html

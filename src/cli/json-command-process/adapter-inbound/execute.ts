@@ -63,23 +63,33 @@ export async function executeJsonCommand(
     });
     const chunks: Buffer[] = [];
     let size = 0;
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error("cli-timeout"));
-    }, isBlooketPublicationCommand(command) ? 125_000 : 30_000);
-    child.once("error", () => {
+    let failure: string | undefined;
+    const stop = (code: string, terminate: boolean) => {
+      if (failure !== undefined) return;
+      failure = code;
+      chunks.length = 0;
       clearTimeout(timer);
-      reject(new Error("cli-unavailable"));
-    });
+      if (terminate) child.kill("SIGKILL");
+      // A signal or error is not completion. Retain ownership until close.
+    };
+    const timer = setTimeout(() => {
+      stop("cli-timeout", true);
+    }, isBlooketPublicationCommand(command) ? 125_000 : 30_000);
+    child.on("error", () => stop("cli-unavailable", false));
+    child.stdout.on("error", () => stop("cli-unavailable", true));
     child.stdout.on("data", (chunk: Buffer) => {
+      if (failure !== undefined) return;
       size += chunk.length;
       if (size > 2_000_000) {
-        child.kill("SIGKILL");
-        reject(new Error("cli-result-too-large"));
+        stop("cli-result-too-large", true);
       } else chunks.push(chunk);
     });
     child.once("close", () => {
       clearTimeout(timer);
+      if (failure !== undefined) {
+        reject(new Error(failure));
+        return;
+      }
       try {
         const result = decodeResultEnvelope(
           JSON.parse(Buffer.concat(chunks).toString("utf8")),
