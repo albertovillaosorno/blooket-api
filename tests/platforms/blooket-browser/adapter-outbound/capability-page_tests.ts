@@ -56,6 +56,7 @@ interface FixtureNode {
   parent?: FixtureNode;
   parentElement?: FixtureNode;
   clicked: number;
+  computedStyle: { display: string; visibility: string };
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
   getAttribute(name: string): string | null;
@@ -94,6 +95,7 @@ function node(
         listener({ isTrusted: true });
     },
     clicked: 0,
+    computedStyle: { display: "block", visibility: "visible" },
     selectors: {},
     attributes,
     getAttribute(name) {
@@ -177,6 +179,13 @@ function withPage(document: FixtureNode, run: () => void): void {
   ];
   const priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const priorStyle = Object.getOwnPropertyDescriptor(
+    globalThis, "getComputedStyle",
+  );
+  Object.defineProperty(globalThis, "getComputedStyle", {
+    configurable: true,
+    value: (element: FixtureNode) => element.computedStyle,
+  });
   Object.defineProperty(globalThis, "document", {
     configurable: true,
     value: document,
@@ -195,6 +204,9 @@ function withPage(document: FixtureNode, run: () => void): void {
     };
     if (world.__blooketCapabilityEditWatch?.document === document)
       world.__blooketCapabilityEditWatch.dispose();
+    if (priorStyle)
+      Object.defineProperty(globalThis, "getComputedStyle", priorStyle);
+    else Reflect.deleteProperty(globalThis, "getComputedStyle");
     if (priorDocument)
       Object.defineProperty(globalThis, "document", priorDocument);
     else Reflect.deleteProperty(globalThis, "document");
@@ -268,6 +280,32 @@ test("capability navigation leaves all teacher-owned editors untouched", () => {
     });
     (page.document as FixtureNode & { title?: string }).title =
       "Just a moment...";
+    assert.equal(injected(), false);
+  });
+});
+
+test("read navigation respects computed modal visibility", () => {
+  const page = fixture();
+  const dialog = node("DIV");
+  dialog.getBoundingClientRect = () => ({ width: 845, height: 470 });
+  page.document.selectors['[role="dialog"][aria-modal="true"]'] = [dialog];
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  withPage(page.document, () => {
+    for (const visibility of ["hidden", "collapse"]) {
+      dialog.computedStyle = { display: "flex", visibility };
+      assert.equal(injected(), true);
+    }
+    dialog.computedStyle = { display: "none", visibility: "visible" };
+    assert.equal(injected(), true);
+    dialog.computedStyle = { display: "flex", visibility: "visible" };
+    assert.equal(injected(), false);
+    // Missing or failed style inspection must not authorize navigation.
+    Object.defineProperty(globalThis, "getComputedStyle", {
+      configurable: true,
+      value: () => { throw new Error("style unavailable"); },
+    });
     assert.equal(injected(), false);
   });
 });

@@ -54,7 +54,12 @@ export function canLeaveBlooketPageForRead(): boolean {
         !path.startsWith("/set/")) return false;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      if (bounds.width <= 0 || bounds.height <= 0) return false;
+      // Hidden consent dialogs can retain layout boxes. Computed visibility
+      // includes inherited styles without dismissing any provider controls.
+      const style = getComputedStyle(element);
+      return style.display !== "none" && style.visibility !== "hidden" &&
+        style.visibility !== "collapse";
     };
     const dialogs = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"]',
