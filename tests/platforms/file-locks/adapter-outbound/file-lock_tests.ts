@@ -185,3 +185,59 @@ test("normal acquisition leaves no owner temporary files", async () => {
     assert.deepEqual(await readdir(directory), []);
   });
 });
+
+test("overlapping release callers share one completion", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "project.lock");
+    const acquired = await tryAcquireFileLock(path);
+    assert.equal(acquired.ok, true);
+    if (!acquired.ok) {
+      return;
+    }
+
+    const first = acquired.lock.release();
+    const second = acquired.lock.release();
+    await Promise.allSettled([first, second]);
+    assert.equal(first, second);
+    await first;
+
+    const replacement = await tryAcquireFileLock(path);
+    assert.equal(replacement.ok, true);
+    if (!replacement.ok) {
+      return;
+    }
+    try {
+      await acquired.lock.release();
+      assert.deepEqual(await tryAcquireFileLock(path), {
+        ok: false,
+        reason: "busy",
+      });
+    } finally {
+      await replacement.lock.release();
+    }
+  });
+});
+
+test("release preserves foreign owners and permits retry", async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const path = join(directory, "project.lock");
+    const acquired = await tryAcquireFileLock(path);
+    assert.equal(acquired.ok, true);
+    if (!acquired.ok) {
+      return;
+    }
+    const original = await readFile(path, "utf8");
+    const foreign = JSON.stringify({
+      version: 1,
+      pid: process.pid,
+      token: "replacement-owner",
+    }) + "\n";
+    await writeFile(path, foreign);
+    await assert.rejects(acquired.lock.release(), /another writer/);
+    assert.equal(await readFile(path, "utf8"), foreign);
+
+    await writeFile(path, original);
+    await acquired.lock.release();
+    assert.deepEqual(await readdir(directory), []);
+  });
+});
