@@ -705,3 +705,27 @@ The independent installer supervisor, complete persistent-writer fencing,
 trusted production signing/release artifacts, restart/rollback composition
 and EN/ES installation controls still require implementation and acceptance.
 Native Mac/Safari assurance remains in the final ongoing record.
+
+### Owned shutdown completion (2026-10-10)
+
+The actual service entrypoint now accepts an exact private installer stop
+challenge for its runtime instance. It replies after managed local/online
+writer drainage and then closes its IPC channel. The parent requires a matching
+nonce/version/instance/PID receipt plus successful final child closure; signal
+delivery, disconnect and parent exit alone cannot authorize an exchange.
+
+Deadline or cancelled observation retains an opaque pending completion and its
+listeners until closure. Concurrent identical requests share completion;
+conflicting challenges are refused without sending another stop. No timer
+kills the app or releases installation ownership.
+
+Real service subprocess tests prove silent stop, fresh restart and preserved
+local data. A real managed service with an injected held settings writer keeps
+its lock through the deadline and saves the admitted change before completion.
+Synthetic real-IPC tests reject malformed/foreign receipts and failed exits;
+an inherited open pipe prevents premature completion after parent exit.
+These are portable managed-service guarantees.
+
+Independent CLI-writer fencing,
+installer lifetime, authenticated app selection, production publisher artifacts
+and local opt-in installation/recovery controls remain required.

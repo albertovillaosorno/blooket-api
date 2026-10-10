@@ -196,3 +196,33 @@ native Mac acceptance. Node's current [child-process documentation][node-ipc]
 was consulted on the same date for IPC lifecycle and message delivery semantics.
 
 [node-ipc]: https://github.com/nodejs/node/blob/main/doc/api/child_process.md
+
+### Drained owned service shutdown
+
+Private installer IPC also carries an exact stop challenge for the owned
+runtime instance.
+
+The actual service acknowledges only after managed shutdown
+has drained admitted local writers and online canonical children. Its reply
+contains the fresh nonce, instance, PID and product version. The parent requires
+both that exact drained receipt and successful final child `close` before
+reporting stopped; a sent signal, IPC disconnect or parent process exit is
+insufficient.
+
+A deadline or cancelled observation returns a retained pending completion.
+It does not kill/disconnect the child, send a second shutdown, or release any
+installation fence. The same child/challenge shares the observation; a different
+challenge is refused while ownership is retained. Callers must await final
+completion and require stopped proof before replacing either application tree.
+
+No public IPC capability, CLI/MCP installer command or Terminal window is added.
+
+On 2026-10-10, a real service subprocess stopped and restarted with its data
+marker intact. A real managed service with an injected held secret-store writer
+kept its service lock through the deadline, persisted the admitted settings
+change, and acknowledged only after release. Synthetic child regressions cover
+hostile receipts, cancellation, failed exit and inherited pipes that remain
+open after parent exit. This establishes managed service closure, not exclusion
+of independent CLI writers, an enabled installer, or native Mac acceptance.
+
+The [Node child-process documentation][node-ipc] was checked on the same date.
