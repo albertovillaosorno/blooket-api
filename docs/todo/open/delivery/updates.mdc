@@ -685,3 +685,23 @@ task blooket-15.
   https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html
 
 [child-process-current]: https://nodejs.org/api/child_process.html
+
+### Owned restart health foundation (2026-10-10)
+
+The actual service entrypoint now answers an exact private IPC nonce challenge
+only while ready and after a bounded fresh local runtime check. The installer
+adapter verifies its actual child PID, runtime instance, product version and
+nonce; startup acknowledgements or stale runtime records cannot satisfy it.
+Cancellation and deadlines clean up probe listeners without killing the app
+or releasing installation ownership.
+
+A real silent service subprocess passed the fresh challenge and retained its
+local data marker. Focused tests reject malformed/foreign IPC replies, wrong
+versions/PIDs, overlapping probes, cancelled probes and unresponsive channels.
+The runtime also reports not-ready immediately while shutdown drains a held
+settings writer. These portable checks do not prove a completed update.
+
+The independent installer supervisor, complete persistent-writer fencing,
+trusted production signing/release artifacts, restart/rollback composition
+and EN/ES installation controls still require implementation and acceptance.
+Native Mac/Safari assurance remains in the final ongoing record.

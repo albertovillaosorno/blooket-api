@@ -170,7 +170,9 @@ test("shutdown retains ownership until an admitted settings writer finishes",
           password: "synthetic-test-value", tunnelToken: "" }),
       }).then(response => response.json(), () => undefined);
       await entered.promise;
+      assert.equal(service.isReady(), true);
       stopping = service.stop();
+      assert.equal(service.isReady(), false);
       const outcome = await Promise.race([
         stopping.then(() => "released"),
         new Promise<string>(resolve => setTimeout(() => resolve("pending"),

@@ -98,7 +98,8 @@ export async function startManagedBackgroundService(
       join(root, "service-runtime.json"),
       JSON.stringify(runtime) + "\n",
     );
-    return { ...runtime, stop, server: service.server };
+    return { ...runtime, stop, server: service.server,
+      isReady: () => stopping === undefined && service!.server.listening };
   } catch (error) {
     await stop();
     throw error;
