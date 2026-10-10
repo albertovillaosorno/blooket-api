@@ -781,7 +781,7 @@ test("a valid then unavailable sidebar never confirms from one sample",
   },
 );
 
-test("lost Create Set acknowledgement waits for a late committed redirect",
+test("lost Create Set acknowledgement waits beyond the short redirect window",
   async () => {
   const expected = { title: "Synthetic", description: "", private: true };
   const fake = fakeChrome({
@@ -798,7 +798,7 @@ test("lost Create Set acknowledgement waits for a late committed redirect",
   let pauses = 0;
   const host = createExtensionCreateSetHost(fake.chrome, 7,
     async () => {
-      if (++pauses === 4)
+      if (++pauses === 38)
         fake.setTab({ url:
           "https://dashboard.blooket.com/edit?id=remote-set-1",
           status: "complete" });
@@ -819,7 +819,7 @@ test("lost Create Set acknowledgement waits for a late committed redirect",
   });
   assert.deepEqual(await host.observeCreateSet(expected), observed);
   assert.equal(clicks, 1);
-  assert.ok(pauses >= 4);
+  assert.ok(pauses >= 38);
   },
 );
 
@@ -849,7 +849,7 @@ test("a lost submit ack without any redirect never retries Create Set",
     ok: false, kind: "browser", code: "blooket-browser-failed",
   });
   assert.equal(clicks, 1);
-  assert.equal(sleeps, 14);
+  assert.equal(sleeps, 139);
   assert.equal(fake.calls.filter(x => x === "script").length, 2);
   },
 );

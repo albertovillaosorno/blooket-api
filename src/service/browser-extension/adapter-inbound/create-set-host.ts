@@ -254,14 +254,14 @@ export function createExtensionCreateSetHost(
           // The navigation may not have appeared in tabs.get yet even
           // after the scripting context was destroyed by the submit click.
           // Poll tab state only; never inject or click the form again.
-          for (let attempt = 0; attempt < 15; attempt++) {
+          for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
             const tab = await chrome.tabs.get(tabId);
             if (exactEditRoute(tab))
               return { ok: true, requireMetadataConfirmation: true };
             if (tab.url !== CREATE_URL ||
                 (tab.status !== "complete" && tab.status !== "loading"))
               break;
-            if (attempt < 14) await pause(POLL_MS);
+            if (attempt < MAX_POLLS - 1) await pause(POLL_MS);
           }
           return browserFailure();
         } catch { return browserFailure(); }
