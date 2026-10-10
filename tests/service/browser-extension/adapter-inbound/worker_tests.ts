@@ -75,6 +75,9 @@ test(
   let setListReads = 0;
   let questionPanelCloses = true;
   let addQuestionPanelReady = false;
+  let questionSaved = true;
+  let loseCreateAck = false;
+  let createSidebarMismatch = false;
   let capabilityPanelReady = false;
   let capabilityDrawerOpen = false;
   let holdWriteOpen = false;
@@ -175,6 +178,12 @@ test(
           return [{ result: true }];
         }
         if (func.name === "inspectBlooketDetailSidebar") {
+          if (args?.[0] === "created-set-fixture")
+            return [{ result: { ok: true, value: {
+              title: createSidebarMismatch
+                ? "Another teacher title" : "Synthetic created set",
+              description: "Created through bridge fixture",
+            } } }];
           assert.deepEqual(args, ["opaque id/with spaces"]);
           detailSidebarReadCount++;
           return [{ result: detailSidebarMalformed ? {
@@ -207,7 +216,8 @@ test(
           return [{ result: detailOpenSucceeds }];
         }
         if (func.name === "listBlooketQuestionNumbers")
-          return [{ result: { ok: true, value: [1] } }];
+          return [{ result: { ok: true,
+            value: questionSaved ? [1] : [] } }];
         if (func.name === "openBlooketQuestionPanel")
           return [{ result: args[0] === "set-fixture" && args[1] === 1 }];
         if (func.name === "inspectOpenedBlooketQuestion") {
@@ -249,7 +259,7 @@ test(
             addQuestionPanelReady = true;
             if (expireWriteAtOpen) {
               expireWriteAtOpen = false;
-              Date.now = () => realNow() + 15_000;
+              Date.now = () => realNow() + 35_000;
             }
             if (holdWriteOpen) {
               holdWriteOpen = false;
@@ -263,6 +273,7 @@ test(
           if (args[0] === "prepare") return [{ result: { ok: true } }];
           if (args[0] === "submit") {
             addQuestionPanelReady = false;
+            questionSaved = true;
             return [{ result: { ok: true } }];
           }
           throw new Error("unexpected-add-question-action");
@@ -322,6 +333,8 @@ test(
           });
           tabUrl =
             "https://dashboard.blooket.com/edit?id=created-set-fixture";
+          if (loseCreateAck)
+            throw new Error("context-destroyed-after-submit-click");
           return [{ result: { ok: true } }];
         }
         if (func.name === "observeBlooketCreateSetSuccess")
@@ -494,6 +507,19 @@ test(
     id: randomUUID(),
     command,
   });
+  async function waitForMilestone(
+    milestone: Promise<void>, label: string,
+  ) {
+    const stop = new AbortController();
+    try {
+      await Promise.race([
+        milestone,
+        pause(2_500, undefined, { signal: stop.signal }).then(() => {
+          throw new Error("timed-out-worker-fixture-" + label);
+        }),
+      ]);
+    } finally { stop.abort(); }
+  }
   async function expectReply(command) {
     const request = job(command);
     jobs.push(request);
@@ -813,6 +839,32 @@ test(
     assert.ok(scripts.includes("prepareBlooketCreateSetForm"));
     assert.ok(scripts.includes("observeBlooketCreateSetSuccess"));
 
+    loseCreateAck = true;
+    tabUrl = "https://dashboard.blooket.com/my-sets";
+    const lostAck = await expectReply({
+      kind: "sets.create", title: "Synthetic created set",
+      description: "Created through bridge fixture", private: true,
+    });
+    assert.deepEqual(lostAck.value, {
+      ok: true, remoteSetId: "created-set-fixture",
+    });
+    assert.equal(scripts.filter(name =>
+      name === "submitBlooketCreateSetForm").length, 2);
+    createSidebarMismatch = true;
+    tabUrl = "https://dashboard.blooket.com/my-sets";
+    const unrelated = await expectReply({
+      kind: "sets.create", title: "Synthetic created set",
+      description: "Created through bridge fixture", private: true,
+    });
+    assert.equal(unrelated.value.ok, false);
+    assert.equal(scripts.filter(name =>
+      name === "submitBlooketCreateSetForm").length, 3);
+    createSidebarMismatch = false;
+    loseCreateAck = false;
+    // The fixture's prior read is a separate historical state. Reset its
+    // synthetic cards before testing an initially empty Add Question slot.
+    questionSaved = false;
+
     const added = await expectReply({
       kind: "questions.create",
       setId: "set-fixture",
@@ -967,6 +1019,7 @@ test(
     // A workspace may reconnect while an older write host is awaiting a
     // browser reply. That retired relay must not submit the rest of the form.
     tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    questionSaved = false;
     holdWriteOpen = true;
     const staleJob = job({
       kind: "questions.create",
@@ -981,7 +1034,7 @@ test(
     });
     const beforeRetiredWrite = scripts.length;
     jobs.push(staleJob);
-    await writeOpenStarted;
+    await waitForMilestone(writeOpenStarted, "write-open");
     const nextToken = "b".repeat(43);
     token = nextToken;
     assert.equal((await announce({ origin, token: nextToken })).ok, true);
@@ -996,7 +1049,7 @@ test(
     const staleReadJob = job({ kind: "sets.list" });
     const beforeRetiredRead = scripts.length;
     jobs.push(staleReadJob);
-    await readScriptStarted;
+    await waitForMilestone(readScriptStarted, "read-script");
     const thirdToken = "c".repeat(43);
     token = thirdToken;
     assert.equal((await announce({ origin, token: thirdToken })).ok, true);

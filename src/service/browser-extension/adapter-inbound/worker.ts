@@ -661,15 +661,16 @@ async function relay(current: Connection, activeGeneration: number) {
         const decoded = decodeBlooketBrowserBridgeRequest(next.job);
         if (!decoded.ok) throw new Error("invalid-browser-job");
         const job = decoded.value;
-        // The broker has a ten-second response deadline. Reserve a local
-        // margin so a late page poll cannot trigger another form action after
+        // Read jobs have ten seconds; writes have a bounded thirty-second
+        // budget. Reserve margin so a late browser call cannot mutate after
         // its caller has stopped waiting. In-flight scripts remain ambiguous.
         const budgetMs = job.command.kind === "session.authenticate"
           ? 7_500
-          : job.command.kind === "capabilities.inspect" ||
-              job.command.kind === "sets.create" ||
+          : job.command.kind === "sets.create" ||
               job.command.kind === "questions.create"
-            ? 9_000 : 8_000;
+            ? 27_000
+            : job.command.kind === "capabilities.inspect"
+              ? 9_000 : 8_000;
         const jobBrowser = ownedBrowser(
           current, activeGeneration, Date.now() + budgetMs,
         );
@@ -728,7 +729,7 @@ async function relay(current: Connection, activeGeneration: number) {
                 result = submitted.ok
                   ? {
                       ok: true,
-                      value: await host.observeCreateSet(),
+                      value: await host.observeCreateSet(input),
                     }
                   : { ok: true, value: submitted };
               }

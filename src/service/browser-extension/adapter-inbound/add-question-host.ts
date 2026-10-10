@@ -202,6 +202,15 @@ export function createExtensionAddQuestionHost(
           canLeaveBlooketPageForRead as (...args: never[]) => unknown,
         );
         if (safeToOpen !== true) return browserFailure();
+        // Refuse to add a question over any already-present index. A lost
+        // submit acknowledgement can only be recovered when this position
+        // was proven empty before the single possible Save Question click.
+        const prior = await ownedScript(
+          listBlooketQuestionNumbers as (...args: never[]) => unknown,
+          [input.setId],
+        );
+        if (!exactPreviousQuestionNumbers(prior, input.number))
+          return browserFailure();
         const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
           [input.image ? "open-image" : "open", input.setId],
@@ -259,11 +268,17 @@ export function createExtensionAddQuestionHost(
           }
         }
 
-        const submittedResult = await ownedScript(
-          runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-          ["submit", input],
-        );
-        if (!exactOk(submittedResult)) return browserFailure();
+        try {
+          const submittedResult = await ownedScript(
+            runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+            ["submit", input],
+          );
+          if (!exactOk(submittedResult)) return browserFailure();
+        } catch {
+          // The Save Question click can complete while Chrome loses the
+          // injected script's reply. Never click again: observe the exact
+          // formerly empty card and verify its durable content instead.
+        }
         return await observeQuestion(
           input,
           ownedScript,
@@ -491,6 +506,17 @@ function pageUnavailable(result: unknown): boolean {
     Object.keys(result).sort().join() === "code,ok" &&
     "ok" in result && result.ok === false &&
     "code" in result && result.code === "blooket-browser-failed";
+}
+
+function exactPreviousQuestionNumbers(result: unknown, number: number) {
+  if (!result || typeof result !== "object" || Array.isArray(result) ||
+      Object.keys(result).sort().join() !== "ok,value" ||
+      !("ok" in result) || result.ok !== true ||
+      !("value" in result) || !Array.isArray(result.value) ||
+      result.value.length !== number - 1 || result.value.length > 200)
+    return false;
+  return result.value.every((candidate, index) =>
+    Number.isSafeInteger(candidate) && candidate === index + 1);
 }
 
 function questionNumberPresent(result: unknown, number: number): boolean {

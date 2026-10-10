@@ -66,6 +66,7 @@ function fakeChrome(options: {
   readonly mismatchReadBack?: boolean;
   readonly readBackReplies?: readonly unknown[];
   readonly listReply?: unknown;
+  readonly priorListReply?: unknown;
   readonly closeFails?: boolean;
   readonly prepareFails?: boolean;
   readonly imageReady?: boolean;
@@ -153,10 +154,11 @@ function fakeChrome(options: {
             throw new Error("unexpected-add-question-action");
           case "listBlooketQuestionNumbers":
             return [{
-              result: options.listReply ?? {
-                ok: true,
-                value: questionAdded ? [1] : [],
-              },
+              result: questionAdded && options.listReply !== undefined
+                ? options.listReply
+                : !questionAdded && options.priorListReply !== undefined
+                  ? options.priorListReply
+                  : { ok: true, value: questionAdded ? [1] : [] },
             }];
           case "openBlooketQuestionPanel":
             questionPanel = questionAdded &&
@@ -570,3 +572,97 @@ test("image settlement failure cancels only before a single possible submit",
       "runBlooketAddQuestionPageAction:cancel-image").length, 1);
   }
 });
+
+test("lost Add Question submit acknowledgement confirms exactly one save",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let clicks = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    const response = await original(request);
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "submit") {
+      clicks++;
+      throw new Error("execution-context-lost-after-save-question");
+    }
+    return response;
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.addQuestion(input), { ok: true });
+  assert.equal(clicks, 1);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.readBackReads(), 2);
+  assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
+  },
+);
+
+test("lost Add Question ack before a save does not repeat the click",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let calls = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "submit") {
+      calls++;
+      throw new Error("execution-context-lost-before-save-question");
+    }
+    return await original(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(calls, 1);
+  assert.equal(fake.readBackReads(), 0);
+  assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);
+
+test("an existing target question stops Add Question before opening form",
+  async () => {
+  for (const priorListReply of [
+    { ok: true, value: [1] },
+    { ok: true, value: [1, 1] },
+    { ok: true, value: ["1"] },
+    { ok: false, code: "blooket-browser-failed" },
+    { ok: true, value: [], extra: "untrusted" },
+  ]) {
+    const fake = fakeChrome({ priorListReply });
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.includes(
+      "runBlooketAddQuestionPageAction:open"), false);
+    assert.equal(fake.calls.includes(
+      "runBlooketAddQuestionPageAction:submit"), false);
+  }
+  },
+);
+
+test("a preexisting contiguous question list permits only the next index",
+  async () => {
+  const target: BlooketTextQuestionPageInput = { ...input, number: 2 };
+  const fake = fakeChrome({ priorListReply: { ok: true, value: [1] } });
+  const original = fake.chrome.scripting.executeScript;
+  let opened = false;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "open") opened = true;
+    return await original(request);
+  };
+  // Fixture has no number-two card after submit, so the mutation cannot be
+  // confirmed, but the admission check must allow opening the next form.
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(target);
+  assert.equal(result.ok, false);
+  assert.equal(opened, true);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);

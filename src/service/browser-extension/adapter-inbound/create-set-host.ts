@@ -39,8 +39,10 @@ import {
   runBlooketCreateSetOwnership,
 } from
   "../../../platforms/blooket-browser/adapter-outbound/create-set-page.ts";
-import { inspectBlooketPage } from
-  "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import {
+  inspectBlooketPage,
+  inspectBlooketDetailSidebar,
+} from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 
@@ -80,8 +82,14 @@ export interface ExtensionCreateSetHost {
     readonly title: string;
     readonly description: string;
     readonly private: boolean;
-  }): Promise<{ readonly ok: true } | ExtensionCreateSetFailure>;
-  observeCreateSet(): Promise<
+  }): Promise<
+    | { readonly ok: true; readonly requireMetadataConfirmation?: true }
+    | ExtensionCreateSetFailure
+  >;
+  observeCreateSet(expected?: {
+    readonly title: string;
+    readonly description: string;
+  }): Promise<
     | { readonly ok: true; readonly remoteSetId: unknown }
     | ExtensionCreateSetFailure
   >;
@@ -106,7 +114,8 @@ export interface CreateSetChromePort {
 
 const DASHBOARD_ORIGIN = "https://dashboard.blooket.com";
 const CREATE_URL = DASHBOARD_ORIGIN + "/create";
-const MAX_POLLS = 50;
+// A newly created set can take several seconds to hydrate its Edit redirect.
+const MAX_POLLS = 140;
 const POLL_MS = 100;
 const OBSERVED_STATES: ReadonlySet<string> = new Set(
   BLOOKET_NAVIGATION_STATE_KINDS.filter(
@@ -216,6 +225,7 @@ export function createExtensionCreateSetHost(
     },
 
     submitCreateSet: async (expected) => {
+      let scriptCalled = false;
       try {
         if (!await createTabReady()) return browserFailure();
         const owned = await script(
@@ -224,6 +234,7 @@ export function createExtensionCreateSetHost(
         );
         if (owned !== true || !await createTabReady())
           return browserFailure();
+        scriptCalled = true;
         const result = await script(
           submitBlooketCreateSetForm as (...args: never[]) => unknown,
           [expected],
@@ -234,11 +245,30 @@ export function createExtensionCreateSetHost(
         return exactOk(result) && expectedSubmitRoute(after)
           ? { ok: true } : browserFailure();
       } catch {
-        return browserFailure();
+        if (!scriptCalled) return browserFailure();
+        // Navigation may destroy the injected execution context *after* the
+        // one submit click. Only an exact edit redirect permits observation;
+        // it does not by itself confirm the mutation. Strongly match the
+        // freshly rendered saved sidebar before returning a receipt.
+        try {
+          // The navigation may not have appeared in tabs.get yet even
+          // after the scripting context was destroyed by the submit click.
+          // Poll tab state only; never inject or click the form again.
+          for (let attempt = 0; attempt < 15; attempt++) {
+            const tab = await chrome.tabs.get(tabId);
+            if (exactEditRoute(tab))
+              return { ok: true, requireMetadataConfirmation: true };
+            if (tab.url !== CREATE_URL ||
+                (tab.status !== "complete" && tab.status !== "loading"))
+              break;
+            if (attempt < 14) await pause(POLL_MS);
+          }
+          return browserFailure();
+        } catch { return browserFailure(); }
       }
     },
 
-    observeCreateSet: async () => {
+    observeCreateSet: async (expected) => {
       try {
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
@@ -249,7 +279,8 @@ export function createExtensionCreateSetHost(
               url.pathname === "/edit"
             ) {
               const ids = url.searchParams.getAll("id");
-              if (ids.length !== 1 || !ids[0] || ids[0].length > 512 ||
+              if (ids.length !== 1 || url.searchParams.size !== 1 ||
+                  url.hash || !ids[0] || ids[0].length > 512 ||
                   /[\x00-\x1f\x7f]/u.test(ids[0]))
                 return browserFailure();
               const result = await script(
@@ -277,6 +308,30 @@ export function createExtensionCreateSetHost(
                   !exactRedirectReceipt(again, ids[0]) ||
                   JSON.stringify(result) !== JSON.stringify(again))
                 return browserFailure();
+              if (expected !== undefined) {
+                let matches = 0;
+                for (let poll = 0; poll < 35 && matches < 2; poll++) {
+                  if (poll > 0) await pause(matches ? 0 : POLL_MS);
+                  const sidebar = await script(
+                    inspectBlooketDetailSidebar as
+                      (...args: never[]) => unknown,
+                    [ids[0]],
+                  );
+                  const post = await chrome.tabs.get(tabId);
+                  if (post.status !== "complete" || post.url !== tab.url)
+                    return browserFailure();
+                  if (exactSavedSidebar(sidebar, expected)) {
+                    matches++;
+                  } else if (!exactFailedSidebar(sidebar)) {
+                    // A readable but conflicting teacher-owned sidebar is
+                    // never retried until its content happens to match.
+                    return browserFailure();
+                  } else {
+                    matches = 0;
+                  }
+                }
+                if (matches !== 2) return browserFailure();
+              }
               return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
@@ -325,14 +380,47 @@ function dashboardTab(tab: BrowserTab): boolean {
   }
 }
 
-function expectedSubmitRoute(tab: BrowserTab): boolean {
-  if (!tab.url || (tab.status !== "complete" && tab.status !== "loading"))
+function exactEditRoute(tab: BrowserTab): boolean {
+  if (tab.status !== "complete" && tab.status !== "loading") return false;
+  if (!tab.url) return false;
+  try {
+    const url = new URL(tab.url);
+    const ids = url.searchParams.getAll("id");
+    return url.origin === DASHBOARD_ORIGIN && url.pathname === "/edit" &&
+      ids.length === 1 && url.searchParams.size === 1 &&
+      !!ids[0] && ids[0].length <= 512 &&
+      !/[\x00-\x1f\x7f]/u.test(ids[0]) && !url.hash;
+  } catch { return false; }
+}
+
+function exactFailedSidebar(value: unknown): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value) &&
+    Object.keys(value).sort().join() === "code,ok" &&
+    "ok" in value && value.ok === false && "code" in value &&
+    value.code === "blooket-browser-failed";
+}
+
+function exactSavedSidebar(value: unknown, expected: {
+  readonly title: string;
+  readonly description: string;
+}): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      Object.keys(value).sort().join() !== "ok,value" ||
+      !("ok" in value) || value.ok !== true ||
+      !("value" in value) || !value.value ||
+      typeof value.value !== "object" || Array.isArray(value.value) ||
+      Object.keys(value.value).sort().join() !== "description,title")
     return false;
-  if (tab.url === CREATE_URL) return true;
-  const url = new URL(tab.url);
-  const ids = url.searchParams.getAll("id");
-  return url.origin === DASHBOARD_ORIGIN && url.pathname === "/edit" &&
-    ids.length === 1 && !!ids[0] && ids[0].length <= 512;
+  const saved = value.value as { title?: unknown; description?: unknown };
+  return saved.title === expected.title &&
+    saved.description === expected.description;
+}
+
+function expectedSubmitRoute(tab: BrowserTab): boolean {
+  if (tab.url === CREATE_URL &&
+      (tab.status === "complete" || tab.status === "loading"))
+    return true;
+  return exactEditRoute(tab);
 }
 
 function exactRedirectReceipt(

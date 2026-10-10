@@ -63,6 +63,7 @@ interface PendingJob {
   readonly resolve: (result: BlooketBrowserBridgeTransportResult) => void;
   readonly timer: ReturnType<typeof setTimeout>;
   readonly createdAt: number;
+  readonly expiresAt: number;
   dispatched: boolean;
   client?: string;
 }
@@ -89,16 +90,24 @@ export interface BlooketBrowserBridgeBroker
 export function createBlooketBrowserBridgeBroker(
   options: {
     readonly timeoutMs?: number;
+    readonly writeTimeoutMs?: number;
     readonly maxPending?: number;
     readonly token?: string;
     readonly now?: () => number;
   } = {},
 ): BlooketBrowserBridgeBroker {
   const timeoutMs = options.timeoutMs ?? 10_000;
+  // A real Create Set redirect can outlive the ten-second read budget.
+  // Explicit test overrides retain their original bounded behavior.
+  const writeTimeoutMs = options.writeTimeoutMs ??
+    (options.timeoutMs === undefined ? 30_000 : timeoutMs);
   const maxPending = options.maxPending ?? 8;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
     throw new Error("invalid-browser-bridge-timeout");
   }
+  if (!Number.isSafeInteger(writeTimeoutMs) || writeTimeoutMs < 1 ||
+      writeTimeoutMs > 60_000)
+    throw new Error("invalid-browser-bridge-write-timeout");
   if (!Number.isSafeInteger(maxPending) || maxPending < 1) {
     throw new Error("invalid-browser-bridge-capacity");
   }
@@ -114,9 +123,15 @@ export function createBlooketBrowserBridgeBroker(
   const incompatibleClients = new Set<string>();
   let unidentifiedClient = false;
 
+  function inFlightClient(client: string): boolean {
+    return [...pending.values()].some(job => job.dispatched &&
+      job.client === client && now() < job.expiresAt);
+  }
+
   function pruneClients() {
     for (const [client, at] of activeClients)
-      if (now() - at >= timeoutMs) activeClients.delete(client);
+      if (now() - at >= timeoutMs && !inFlightClient(client))
+        activeClients.delete(client);
   }
 
   function authenticated(candidate: string): boolean {
@@ -179,18 +194,23 @@ export function createBlooketBrowserBridgeBroker(
         return { ok: false, code: "blooket-browser-failed" };
       return await new Promise<BlooketBrowserBridgeTransportResult>(
         (resolve) => {
+          const startedAt = now();
+          const write = request.command.kind === "sets.create" ||
+            request.command.kind === "questions.create";
+          const lifetimeMs = write ? writeTimeoutMs : timeoutMs;
           const timer = setTimeout(() => {
             settle(id, {
               ok: false,
               code: "blooket-browser-unavailable",
             });
-          }, timeoutMs);
+          }, lifetimeMs);
           timer.unref?.();
           pending.set(id, {
             request,
             resolve,
             timer,
-            createdAt: now(),
+            createdAt: startedAt,
+            expiresAt: startedAt + lifetimeMs,
             dispatched: false,
           });
         },
@@ -212,7 +232,7 @@ export function createBlooketBrowserBridgeBroker(
       // Polling can be concurrent after extension reconnection. Expire stale
       // leases first, then keep at most one job in the browser at a time.
       for (const job of pending.values()) {
-        if (job.createdAt + timeoutMs <= lastPollAt) {
+        if (job.expiresAt <= lastPollAt) {
           settle(job.request.id, {
             ok: false,
             code: "blooket-browser-unavailable",
@@ -221,21 +241,22 @@ export function createBlooketBrowserBridgeBroker(
       }
       if ([...pending.values()].some((job) => job.dispatched)) return null;
       for (const job of pending.values()) {
-        const remainingMs = job.createdAt + timeoutMs - lastPollAt;
+        const remainingMs = job.expiresAt - lastPollAt;
         const kind = job.request.command.kind;
         const minimumMs = kind === "session.authenticate"
           ? MIN_AUTH_DISPATCH_MS
           : kind === "capabilities.inspect"
             ? MIN_CAPABILITY_DISPATCH_MS
             : kind === "sets.create" || kind === "questions.create"
-              ? MIN_WRITE_DISPATCH_MS
+              ? Math.max(MIN_WRITE_DISPATCH_MS, writeTimeoutMs - 500)
               : kind === "session.observe" || kind === "sets.list" ||
                 kind === "sets.get" || kind === "questions.list"
               ? MIN_READ_DISPATCH_MS
               : 0;
         if (
           remainingMs <= 0 ||
-          remainingMs < Math.min(minimumMs, timeoutMs)
+          remainingMs < Math.min(minimumMs,
+            job.expiresAt - job.createdAt)
         ) {
           settle(job.request.id, {
             ok: false,
@@ -263,7 +284,7 @@ export function createBlooketBrowserBridgeBroker(
       const job = pending.get(value.id);
       if (!job || !job.dispatched) return false;
       if (job.client !== undefined && job.client !== client) return false;
-      if (now() >= job.createdAt + timeoutMs) {
+      if (now() >= job.expiresAt) {
         settle(job.request.id, {
           ok: false,
           code: "blooket-browser-unavailable",
@@ -315,7 +336,9 @@ export function createBlooketBrowserBridgeBroker(
       return {
       pending: pending.size,
       connected: !closed && !multipleBrowserClients &&
-        lastPollAt > 0 && now() - lastPollAt < timeoutMs,
+        (lastPollAt > 0 && now() - lastPollAt < timeoutMs ||
+          [...pending.values()].some(job => job.dispatched &&
+            now() < job.expiresAt)),
       multipleBrowserClients,
       incompatibleClients: incompatibleClients.size,
       requiresExtensionUpdate: unidentifiedClient ||

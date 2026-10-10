@@ -247,6 +247,7 @@ test("timeouts and close never replay pending browser jobs", async () => {
   const closing = createBlooketBrowserBridgeBroker({
     token: TOKEN,
     timeoutMs: 5_000,
+    now: () => 10_000,
   });
   const pending = closing.request({
     kind: "questions.list",
@@ -741,3 +742,99 @@ test("a client is offline at its exact heartbeat deadline", () => {
     assert.equal(broker.status().multipleBrowserClients, false);
   } finally { broker.close(); }
 });
+
+test("an in-flight slow write keeps its owning profile leased",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    const owner = "chrome-extension://owner-profile/";
+    const other = "chrome-extension://different-profile/";
+    try {
+      const request = broker.request({ kind: "sets.create",
+        title: "Synthetic", description: "", private: true });
+      const leased = broker.next(TOKEN, owner);
+      assert.ok(leased);
+      tick += 12_000;
+      assert.equal(broker.status().connected, true);
+      assert.equal(broker.status().multipleBrowserClients, false);
+      assert.equal(broker.next(TOKEN, other), null);
+      assert.equal(broker.status().multipleBrowserClients, true);
+      assert.equal(broker.status().connected, false);
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: leased.id, ok: true,
+        value: { ok: true, remoteSetId: "synthetic-set" },
+      }, owner), true);
+      assert.deepEqual(await request, {
+        ok: true, value: { ok: true, remoteSetId: "synthetic-set" },
+      });
+      tick += 10_100;
+      assert.equal(broker.status().multipleBrowserClients, false);
+      assert.equal(broker.status().connected, false);
+    } finally { broker.close(); }
+  },
+);
+
+test("default writes remain correlated after the ten-second read deadline",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    try {
+      const create = broker.request({
+        kind: "sets.create", title: "Synthetic", description: "",
+        private: true,
+      });
+      const lease = broker.next(TOKEN, "chrome-extension://fixture/");
+      assert.ok(lease);
+      assert.equal(lease.command.kind, "sets.create");
+      tick += 11_000;
+      const response = {
+        schemaVersion: 1, id: lease.id, ok: true,
+        value: { ok: true, remoteSetId: "synthetic-set" },
+      };
+      assert.equal(broker.complete(TOKEN, response,
+        "chrome-extension://fixture/"), true);
+      assert.deepEqual(await create, {
+        ok: true, value: response.value,
+      });
+      // A stale answer cannot confirm another operation, even when the
+      // previous mutation has a longer observation deadline.
+      assert.equal(broker.complete(TOKEN, response,
+        "chrome-extension://fixture/"), false);
+      const read = broker.request({ kind: "sets.list" });
+      const readLease = broker.next(TOKEN, "chrome-extension://fixture/");
+      assert.ok(readLease);
+      tick += 10_100;
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: readLease.id, ok: true,
+        value: { items: [], completeness: "complete" },
+      }, "chrome-extension://fixture/"), false);
+      assert.deepEqual(await read, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally { broker.close(); }
+  },
+);
+
+test("late queued writes expire before dispatch without any mutation",
+  async () => {
+    let tick = 200_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    try {
+      const write = broker.request({ kind: "sets.create",
+        title: "Synthetic", description: "", private: true });
+      tick += 650;
+      assert.equal(broker.next(TOKEN, "chrome-extension://fixture/"),
+        null);
+      assert.deepEqual(await write, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+      assert.equal(broker.status().pending, 0);
+    } finally { broker.close(); }
+  },
+);
