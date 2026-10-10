@@ -43,8 +43,10 @@ import { decodeProjectDocument } from
   "../../../projects/project-documents/domain/project.ts";
 import type { BlooketCapabilitySnapshot } from
   "../../../ir/capability-snapshots/contract/blooket-capabilities.ts";
-import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
-  "../../../projects/blooket-write-plans/domain/write-plan.ts";
+import {
+  buildBlooketWritePlan, buildPreparedBlooketWritePlan,
+  sameRemoteCreateSetMetadata,
+} from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import { decodeBlooketPublicationSnapshot as decodeSnapshot,
   publicationHasMedia as hasMedia } from
   "../../../projects/blooket-write-plans/domain/publication-snapshot.ts";
@@ -56,10 +58,11 @@ import { inspectBlooketCapabilities } from
   "../../blooket-capability-inspection/application/inspect-capabilities.ts";
 import type { BlooketReadDependencies } from
   "../../blooket-set-reads/application/command.ts";
-import { getBlooketSet, listBlooketQuestions } from
+import { getBlooketSet, listBlooketQuestions, listBlooketSets } from
   "../../blooket-set-reads/application/read-sets.ts";
 import {
   publicationFiles, readPublicationSnapshot, createPublicationSnapshot,
+  readOtherPublicationSnapshots,
 } from
   "../../../platforms/write-checkpoint-files/adapter-outbound/publication.ts";
 import { loadWriteCheckpointFile } from
@@ -94,8 +97,15 @@ export async function executeBlooketPublicationCommand(
 ) {
   const fail = (code: string) => commandFailure(command.operationId, [{
     path: "$.publication", code,
-    message: "Publication stopped. Keep the saved draft and inspect its " +
-      "publication status before another step or reconciliation.",
+    message: code === "blooket-publication-remote-conflict"
+      ? "Publication stopped: an existing set or previously started " +
+        "identical plan may conflict. Inspect the original publication " +
+        "and remote quiz before any new Create Set attempt."
+      : code === "publication-storage-unavailable"
+        ? "Publication stopped: local journal evidence could not be " +
+          "safely inspected. Preserve it and repair storage before retrying."
+        : "Publication stopped. Keep the saved draft and inspect its " +
+          "publication status before another step or reconciliation.",
   }]);
   if (!isBlooketPublicationCommand(command.command))
     return fail("unknown-command");
@@ -176,6 +186,10 @@ export async function executeBlooketPublicationCommand(
         phase: attempt.kind === "record" ? "reconciliation-required"
           : checkpoint.nextOperationIndex === plan.operations.length
             ? "writes-complete" : "ready",
+        ...(attempt.kind === "record" ? {
+          reason: attempt.record.baseline === null
+            ? "baseline-unavailable" : "ambiguous-attempt",
+        } : {}),
       });
     const verifier = blooketSetReadWriteVerifier(
       blooket.sets, blooket.questions, expectedMedia,
@@ -189,6 +203,7 @@ export async function executeBlooketPublicationCommand(
           : "blooket-publication-recovery-required");
       return success({ ...progress, phase: result.kind,
         ...("state" in result ? { state: result.state } : {}),
+        ...("reason" in result ? { reason: result.reason } : {}),
         completedOperations: result.checkpoint.nextOperationIndex,
         remoteSetId: result.checkpoint.remoteSetId,
       });
@@ -275,6 +290,128 @@ export async function executeBlooketPublicationCommand(
       if (!admission.ok)
         return fail("blooket-publication-capabilities-changed");
     }
+    // Separate drafts can create the same set even with different planned
+    // questions. Match the remote Create Set payload, not a whole-plan hash.
+    // The lock prevents two local publications from starting simultaneously;
+    // the potentially partial My Sets list cannot prove global absence.
+    if (attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex === 0) {
+      let others;
+      try { others = await readOtherPublicationSnapshots(root, draftId); }
+      catch { return fail("publication-storage-unavailable"); }
+      for (const other of others) {
+        const candidate = decodeSnapshot(other.data, other.draftId);
+        if (!candidate)
+          return fail("publication-storage-unavailable");
+        const ownSet = plan.operations[0];
+        const otherSet = candidate.plan.operations[0];
+        if (!ownSet || !otherSet || ownSet.kind !== "set" ||
+            otherSet.kind !== "set")
+          return fail("publication-storage-unavailable");
+        if (!sameRemoteCreateSetMetadata(ownSet, otherSet)) continue;
+        const paths = await publicationFiles(root, other.draftId)
+          .catch(() => undefined);
+        if (!paths) return fail("publication-storage-unavailable");
+        const prior = await loadWriteCheckpointFile(
+          paths.checkpoint, candidate.plan,
+        );
+        const inFlight = await loadWriteAttemptFile(
+          paths.attempt, candidate.plan,
+        );
+        if (!prior.ok || !inFlight.ok)
+          return fail("publication-storage-unavailable");
+        if (prior.checkpoint.nextOperationIndex > 0 ||
+            inFlight.kind === "record")
+          return fail("blooket-publication-remote-conflict");
+      }
+    }
+    // Even an incomplete My Sets list can prove a positive collision.
+    // This prevents another draft from reproducing a matching private quiz
+    // after a prior uncertain Create Set; absence is never taken as proof.
+    if (attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex === 0) {
+      const planned = plan.operations[0];
+      if (!planned || planned.kind !== "set")
+        return fail("blooket-publication-remote-conflict");
+      const listed = await listBlooketSets(
+        blooket.session, blooket.secrets, blooket.sets,
+        { readOnly: true },
+      );
+      if (!listed.ok) return fail(listed.code);
+      if (listed.kind !== "sets")
+        return success({ ...progress, phase: listed.kind,
+          state: listed.state });
+      const matching = listed.value.filter(set =>
+        set.title === planned.title);
+      if (matching.length > 3)
+        return fail("blooket-publication-remote-conflict");
+      for (const candidate of matching) {
+        const detail = await getBlooketSet(
+          blooket.session, blooket.secrets, blooket.sets,
+          candidate.id, { readOnly: true },
+        );
+        if (!detail.ok) return fail(detail.code);
+        if (detail.kind !== "set")
+          return success({ ...progress, phase: detail.kind,
+            state: detail.state });
+        if (detail.value.id === candidate.id &&
+            detail.value.title === planned.title &&
+            detail.value.description === planned.description &&
+            detail.value.visibility === planned.visibility)
+          return fail("blooket-publication-remote-conflict");
+      }
+    }
+    // An earlier Create Set receipt alone must not authorize changes to an
+    // unrelated existing quiz if the user or provider switched edit routes.
+    // Read the exact remote metadata again before any subsequent question
+    // mutation; a human stop or unknown route cannot authorize a write.
+    if (checkpoint.nextOperationIndex > 0 &&
+        checkpoint.nextOperationIndex < plan.operations.length) {
+      const expected = plan.operations[0];
+      if (!expected || expected.kind !== "set" ||
+          checkpoint.remoteSetId === null)
+        return fail("blooket-publication-remote-conflict");
+      const detail = await getBlooketSet(
+        blooket.session, blooket.secrets, blooket.sets,
+        checkpoint.remoteSetId, { readOnly: true },
+      );
+      if (!detail.ok) return fail(detail.code);
+      if (detail.kind !== "set")
+        return success({ ...progress, phase: detail.kind,
+          state: detail.state });
+      if (detail.value.id !== checkpoint.remoteSetId ||
+          detail.value.title !== expected.title ||
+          detail.value.description !== expected.description ||
+          detail.value.visibility !== expected.visibility)
+        return fail("blooket-publication-remote-conflict");
+      {
+        const existing = await listBlooketQuestions(
+          blooket.session, blooket.secrets, blooket.questions,
+          checkpoint.remoteSetId, { readOnly: true },
+        );
+        if (!existing.ok) return fail(existing.code);
+        if (existing.kind !== "questions")
+          return success({ ...progress, phase: existing.kind,
+            state: existing.state });
+        const prior = plan.operations.slice(1,
+          checkpoint.nextOperationIndex);
+        if (existing.value.length !== prior.length ||
+            !prior.every((operation, index) => {
+              const lowered = lowerBlooketWriteSubmission(operation, {
+                remoteSetId: checkpoint.remoteSetId,
+              });
+              const mediaId = lowered.ok &&
+                lowered.value.kind === "add-question"
+                ? lowered.value.image?.mediaId : undefined;
+              return lowered.ok && existing.value[index] !== undefined &&
+                questionMatches(existing.value[index]!, lowered.value,
+                  mediaId === undefined ? undefined
+                    : expectedMedia?.items.find(item =>
+                        item.mediaId === mediaId));
+            }))
+          return fail("blooket-publication-remote-conflict");
+      }
+    }
     const result = await executePersistedBlooketWrite(
       files, plan, blooket.session, blooket.secrets, writes, verifier, {
         pacer, ...(signal ? { signal } : {}),
@@ -293,6 +430,7 @@ export async function executeBlooketPublicationCommand(
         : "blooket-publication-recovery-required");
     return success({ ...progress, phase: result.kind,
       ...("state" in result ? { state: result.state } : {}),
+      ...("reason" in result ? { reason: result.reason } : {}),
       completedOperations: result.checkpoint.nextOperationIndex,
       remoteSetId: result.checkpoint.remoteSetId,
     });

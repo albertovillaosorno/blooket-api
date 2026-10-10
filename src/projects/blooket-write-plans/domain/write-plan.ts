@@ -76,6 +76,16 @@ export interface BlooketSetOperation {
   readonly coverMediaId: string | null;
 }
 
+// The set-creation browser payload exposes these exact metadata fields.
+// Covers are not a reliable identity signal from partial My Sets reads.
+export function sameRemoteCreateSetMetadata(
+  a: BlooketSetOperation,
+  b: BlooketSetOperation,
+): boolean {
+  return a.title === b.title && a.description === b.description &&
+    a.visibility === b.visibility;
+}
+
 export interface BlooketQuestionOperation {
   readonly operationId: string;
   readonly kind: "question";
