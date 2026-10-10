@@ -218,6 +218,10 @@ test(
       assert.match(app, /preparationController[?]\.abort\(\)/u);
       assert.match(app, /\/api\/blooket-readiness-check/u);
       assert.match(app, /readInterrupted/u);
+      assert.match(app, /debug\.blooket\.com/u);
+      assert.match(app, /pestaña nueva del Chrome conectado/u);
+      assert.match(app, /connected Chrome profile/u);
+      assert.match(app, /rerun them in a new/u);
       assert.match(app, /controller\.signal/u);
       assert.match(app, /\/api\/media-admission/u);
       assert.match(app, /schedulePreparationAdmission\(\)/u);

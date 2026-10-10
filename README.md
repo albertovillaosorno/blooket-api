@@ -45,14 +45,14 @@ CI is configured to build its Safari WebExtension companion into `Blooket
 API.app`. Native Mac acceptance and signing/notarization remain in ongoing
 platform hardening; safe application replacement remains unfinished.
 
-The Chrome extension can be assembled locally. It reads observed set summaries
-and private set details in a dedicated Blooket tab. Bounded question reads and a
-capability probe have portable implementations, but verified automatic quiz
-publication is not ready.
+The Chrome extension can be assembled locally. Authenticated set summaries,
+private details, saved questions with bounded image evidence, and capabilities
+have passed real service and CLI reads in the authorized Chrome session.
+Ordinary automatic quiz publication still requires live acceptance.
 
-Non-empty collection completeness, pagination, public set details, complete
-question media, and live capability/login acceptance remain open. A
-Chrome-for-Testing check confirmed the real signed-out login page only.
+Non-empty collection completeness, pagination, public set details, and
+unsupported media variants remain unknown or pending. Keep these limits
+explicit when using the observed account capabilities.
 
 See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
 cannot establish Keychain or native macOS compatibility. Chrome is the initial
@@ -136,6 +136,17 @@ system browser. Enable Blooket API in that browser and open the local workspace
 there. Separate Chrome profiles have separate sessions; verification in one
 profile does not authenticate another. When multiple profiles connect, the app
 stops and asks you to close the extra profiles before trying again.
+
+For browser and firewall diagnostics, open the
+[Blooket system debugger](https://debug.blooket.com/) in a **new tab of the
+same regular Chrome profile** that runs the connected extension. A result
+copied from Firefox, a different profile, or an isolated automated Chrome
+browser is not proof of this session's readiness. `IP not Geoblocked` alone
+is also not proof that all browser checks or a provider challenge passed.
+
+If any debugger checks fail, follow Blooket's school IT guidance; if they
+pass but access still fails, Blooket requests a problem description and a
+browser-console screenshot. Never share passwords, session cookies, or tokens.
 
 These controls do not run a CAPTCHA solver or change browser security settings.
 They also do not configure Cloudflare Tunnel, which is the separate online MCP
@@ -418,10 +429,17 @@ tools. Supply the saved draft ID and exact revision for each step; each call
 performs at most one journaled write. Final fresh verification alone reports
 `published: true`; local progress does not prove remote state.
 
-This path has portable integration coverage across actual MCP, CLI, and local
-service boundaries with a simulated provider. Live canonical publication,
-media upload, and existing-quiz editing remain pending. MCP runs the bundled
-runtime in the background without opening Terminal.
+A second draft with matching Create Set metadata cannot replay an already
+started or confirmed creation, even when its planned questions differ.
+Inspect the original publication instead of retrying a timed-out create.
+
+This path has portable integration coverage across MCP, CLI, and local
+service boundaries with a simulated provider. A private development quiz with
+one typing question was also created and freshly verified on Blooket through
+the canonical CLI, after an explicitly witnessed journal reconciliation.
+Ordinary automatic Create Set confirmation without that developer recovery,
+media upload, and existing-quiz editing still require live acceptance.
+MCP runs the bundled runtime in the background without opening Terminal.
 
 Authenticated private details, saved question/image reads, and account
 capabilities work through the actual service and canonical CLI in Chrome.

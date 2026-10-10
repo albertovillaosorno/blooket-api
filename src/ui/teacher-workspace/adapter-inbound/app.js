@@ -38,7 +38,9 @@ const words = {
       "No se ha podido confirmar la sesión; no se ha leído Mis Sets.",
     readChallenge:
       "Cloudflare sigue requiriendo intervención. Pulsa Mostrar pestaña " +
-      "conectada, verifica allí y vuelve a comprobar Mis Sets.",
+      "conectada, verifica allí y vuelve a comprobar Mis Sets. Si el " +
+      "diagnóstico de debug.blooket.com pasó en Firefox, repítelo en una " +
+      "pestaña nueva del Chrome conectado: son sesiones distintas.",
     readSignedOut: "Inicia sesión en la pestaña conectada.",
     readOrganization:
       "Selecciona la organización en la pestaña conectada.",
@@ -321,7 +323,9 @@ const words = {
       "The session could not be confirmed; My Sets was not read.",
     readChallenge:
       "Cloudflare still needs attention. Select Show connected tab, " +
-      "complete verification there, then check My Sets again.",
+      "complete verification there, then check My Sets again. If the " +
+      "debug.blooket.com checks passed in Firefox, rerun them in a new " +
+      "tab of the connected Chrome profile: browser sessions differ.",
     readSignedOut: "Sign in using the connected tab.",
     readOrganization:
       "Choose the organization in the connected tab.",
