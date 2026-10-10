@@ -331,6 +331,10 @@ test(
       { ok: true, remoteSetId: "remote-set-1", secret: "private" }],
     ["https://dashboard.blooket.com/edit?id=remote-set-1&id=another-set",
       { ok: true, remoteSetId: "remote-set-1" }],
+    ["https://dashboard.blooket.com/edit?id=remote-set-1&source=other",
+      { ok: true, remoteSetId: "remote-set-1" }],
+    ["https://dashboard.blooket.com/edit?id=remote-set-1#teacher",
+      { ok: true, remoteSetId: "remote-set-1" }],
     ["https://dashboard.blooket.com/edit?id=remote-set-1",
       { ok: true, remoteSetId: 7 }],
   ] as const) {
@@ -423,6 +427,8 @@ test(
     "https://dashboard.blooket.com/my-sets",
     "https://id.blooket.com/login",
     "https://dashboard.blooket.com/edit?id=one&id=two",
+    "https://dashboard.blooket.com/edit?id=one&source=other",
+    "https://dashboard.blooket.com/edit?id=one#teacher",
     "https://example.invalid/",
   ]) {
     const fake = fakeChrome({
@@ -556,5 +562,320 @@ test("Create Set refuses ownership after a page or teacher state change",
     title: "Synthetic", description: "", private: true,
   })).ok, false);
   assert.equal(changed.calls.filter(x => x === "script").length, 1);
+  },
+);
+
+test("slow provider edit redirect stays inside the longer write budget",
+  async () => {
+    const fake = fakeChrome({ scripts: [observed, observed] });
+    fake.setTab({ url: "https://dashboard.blooket.com/create",
+      status: "loading" });
+    let polls = 0;
+    const host = createExtensionCreateSetHost(fake.chrome, 7,
+      async () => {
+        polls++;
+        // A real provider can navigate well after the former five-second
+        // 50-poll ceiling; no second click or additional form mutation occurs.
+        if (polls === 87) fake.setTab({
+          url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+          status: "complete",
+        });
+      });
+    assert.deepEqual(await host.observeCreateSet(), observed);
+    assert.ok(polls >= 87);
+    assert.equal(fake.calls.filter(call => call === "script").length, 2);
+    assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("lost Chrome submit acknowledgement can confirm the exact saved set",
+  async () => {
+  const expected = { title: "Synthetic set", description: "Description",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [createState, prepared,
+      observed, observed, sidebar, sidebar],
+  });
+  const host = createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  );
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  assert.deepEqual(await host.prepareCreateSet(expected), { ok: true });
+  const original = fake.chrome.scripting.executeScript;
+  let clicked = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "submitBlooketCreateSetForm") {
+      clicked++;
+      fake.setTab({ url:
+        "https://dashboard.blooket.com/edit?id=remote-set-1",
+        status: "complete" });
+      throw new Error("execution-context-destroyed-on-redirect");
+    }
+    return await original(request);
+  };
+  const submission = await host.submitCreateSet(expected);
+  assert.deepEqual(submission, {
+    ok: true, requireMetadataConfirmation: true,
+  });
+  assert.deepEqual(await host.observeCreateSet(expected), observed);
+  assert.equal(clicked, 1);
+  assert.equal(fake.calls.filter(call => call === "script").length, 6);
+  },
+);
+
+test("lost submit acknowledgement cannot adopt a different saved sidebar",
+  async () => {
+  const expected = { title: "Synthetic set", description: "Description",
+    private: true };
+  for (const value of [
+    { ok: true, value: { title: "Teacher set", description: "Description" } },
+    { ok: true, value: { title: expected.title, description: "Other" } },
+    { ok: true, value: { title: expected.title,
+      description: expected.description, extra: "untrusted" } },
+    { ok: false, code: "blooket-browser-failed" },
+  ]) {
+    const fake = fakeChrome({ scripts: [observed, observed, value] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    const host = createExtensionCreateSetHost(fake.chrome, 7,
+      async () => undefined);
+    assert.deepEqual(await host.observeCreateSet(expected), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  }
+  },
+);
+
+test("lost submit ack on an unrelated route is not recovered",
+  async () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  for (const route of [
+    "https://dashboard.blooket.com/my-sets",
+    "https://dashboard.blooket.com/edit?id=one&id=two",
+    "https://dashboard.blooket.com/edit?id=one#teacher",
+    "https://unrelated.invalid/edit?id=one",
+  ]) {
+    const fake = fakeChrome({
+      afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+        status: "complete" }],
+      scripts: [createState, prepared],
+    });
+    const host = createExtensionCreateSetHost(fake.chrome, 7,
+      async () => undefined);
+    assert.deepEqual(await host.openCreateSet(), { ok: true });
+    const original = fake.chrome.scripting.executeScript;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "submitBlooketCreateSetForm") {
+        fake.setTab({ url: route, status: "complete" });
+        throw new Error("lost-submit-ack");
+      }
+      return await original(request);
+    };
+    assert.equal((await host.submitCreateSet(expected)).ok, false);
+  }
+  },
+);
+
+test("lost Chrome acknowledgement tolerates a loading Create-to-Edit turn",
+  async () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [createState, prepared,
+      observed, observed, sidebar, sidebar],
+  });
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => {
+      fake.setTab({ url:
+        "https://dashboard.blooket.com/edit?id=remote-set-1",
+        status: "complete" });
+    });
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  assert.deepEqual(await host.prepareCreateSet(expected), { ok: true });
+  const old = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "submitBlooketCreateSetForm") {
+      fake.setTab({ url: "https://dashboard.blooket.com/create",
+        status: "loading" });
+      throw Error("context-destroyed-before-redirect-status-updated");
+    }
+    return await old(request);
+  };
+  assert.deepEqual(await host.submitCreateSet(expected), {
+    ok: true, requireMetadataConfirmation: true,
+  });
+  assert.deepEqual(await host.observeCreateSet(expected), observed);
+  },
+);
+
+test("lost-click metadata must be stable across both readbacks",
+  async () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  const fake = fakeChrome({ scripts: [observed, observed,
+    { ok: true, value: { title: expected.title,
+      description: expected.description } },
+    { ok: true, value: { title: expected.title,
+      description: "Teacher changed description" } },
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  },
+);
+
+test("post-navigation sidebar may hydrate before two stable receipts",
+  async () => {
+  const expected = { title: "Synthetic", description: "" };
+  const incomplete = { ok: false, code: "blooket-browser-failed" };
+  const valid = { ok: true, value: { ...expected } };
+  const fake = fakeChrome({ scripts: [observed, observed,
+    incomplete, incomplete, valid, valid,
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const pauses: number[] = [];
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async ms => { pauses.push(ms); },
+  ).observeCreateSet(expected);
+  assert.deepEqual(result, observed);
+  assert.equal(pauses.filter(ms => ms === 100).length, 2);
+  assert.equal(fake.calls.filter(call => call === "script").length, 6);
+  },
+);
+
+test("a valid then unavailable sidebar never confirms from one sample",
+  async () => {
+  const expected = { title: "Synthetic", description: "" };
+  const valid = { ok: true, value: { ...expected } };
+  const fake = fakeChrome({ scripts: [observed, observed, valid,
+    { ok: false, code: "blooket-browser-failed" },
+    ...Array.from({ length: 33 }, () => ({
+      ok: false, code: "blooket-browser-failed",
+    })),
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.deepEqual(result, {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  },
+);
+
+test("lost Create Set acknowledgement waits for a late committed redirect",
+  async () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [createState, prepared,
+      observed, observed,
+      { ok: true, value: { title: expected.title,
+        description: expected.description } },
+      { ok: true, value: { title: expected.title,
+        description: expected.description } },
+    ],
+  });
+  let pauses = 0;
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => {
+      if (++pauses === 4)
+        fake.setTab({ url:
+          "https://dashboard.blooket.com/edit?id=remote-set-1",
+          status: "complete" });
+    });
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  assert.deepEqual(await host.prepareCreateSet(expected), { ok: true });
+  let clicks = 0;
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "submitBlooketCreateSetForm") {
+      clicks++;
+      throw Error("lost-browser-injection-reply");
+    }
+    return await execute(request);
+  };
+  assert.deepEqual(await host.submitCreateSet(expected), {
+    ok: true, requireMetadataConfirmation: true,
+  });
+  assert.deepEqual(await host.observeCreateSet(expected), observed);
+  assert.equal(clicks, 1);
+  assert.ok(pauses >= 4);
+  },
+);
+
+test("a lost submit ack without any redirect never retries Create Set",
+  async () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [createState, prepared],
+  });
+  let sleeps = 0;
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => { sleeps++; });
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  assert.deepEqual(await host.prepareCreateSet(expected), { ok: true });
+  let clicks = 0;
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "submitBlooketCreateSetForm") {
+      clicks++;
+      throw Error("lost-browser-injection-reply");
+    }
+    return await original(request);
+  };
+  assert.deepEqual(await host.submitCreateSet(expected), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(clicks, 1);
+  assert.equal(sleeps, 14);
+  assert.equal(fake.calls.filter(x => x === "script").length, 2);
+  },
+);
+
+test("late tab switch after lost submit acknowledgement stops recovery",
+  async () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [createState, prepared],
+  });
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => fake.setTab({ url:
+      "https://dashboard.blooket.com/my-sets", status: "complete" }));
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  assert.deepEqual(await host.prepareCreateSet(expected), { ok: true });
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "submitBlooketCreateSetForm")
+      throw Error("lost-browser-injection-reply");
+    return await original(request);
+  };
+  assert.deepEqual(await host.submitCreateSet(expected), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(fake.calls.filter(x => x === "script").length, 2);
   },
 );

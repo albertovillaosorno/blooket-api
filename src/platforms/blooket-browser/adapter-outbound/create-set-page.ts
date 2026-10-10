@@ -363,7 +363,8 @@ export function observeBlooketCreateSetSuccess():
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
-      url.pathname !== "/edit"
+      url.pathname !== "/edit" || url.hash ||
+      url.searchParams.size !== 1
     )
       return failed();
     const id = url.searchParams.get("id");

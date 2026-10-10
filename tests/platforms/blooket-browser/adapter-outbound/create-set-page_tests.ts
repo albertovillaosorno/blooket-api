@@ -379,6 +379,14 @@ test("success observation accepts only one exact edit ID", () => {
       { ok: false, code: "blooket-browser-failed" },
     ],
     [
+      "https://dashboard.blooket.com/edit?id=one&filter=private",
+      { ok: false, code: "blooket-browser-failed" },
+    ],
+    [
+      "https://dashboard.blooket.com/edit?id=one#teacher",
+      { ok: false, code: "blooket-browser-failed" },
+    ],
+    [
       "https://dashboard.blooket.com/create?id=fixture",
       { ok: false, code: "blooket-browser-failed" },
     ],
