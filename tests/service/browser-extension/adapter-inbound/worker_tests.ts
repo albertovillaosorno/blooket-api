@@ -45,6 +45,8 @@ test(
   let onTabUpdated;
   let tabUrl = "https://dashboard.blooket.com/my-sets";
   let creates = 0;
+  let documentOrigin = 1_000;
+  let readReloads = 0;
   const foregroundedTabs: number[] = [];
   const focusedWindows: number[] = [];
   let closed = false;
@@ -134,9 +136,18 @@ test(
       },
       update: async (id, { url, active }) => {
         assert.equal(id, 7);
-        if (url !== undefined) tabUrl = url;
+        if (url !== undefined) {
+          tabUrl = url;
+          documentOrigin += 1_000;
+        }
         if (active === true) foregroundedTabs.push(id);
         return { id, url: tabUrl, status: "complete", windowId: 3 };
+      },
+      reload: async (id, options) => {
+        assert.equal(id, 7);
+        assert.deepEqual(options, { bypassCache: true });
+        documentOrigin += 1_000;
+        readReloads++;
       },
     },
     windows: {
@@ -171,6 +182,10 @@ test(
         }
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
+        if (func.name === "inspectBlooketDocumentOrigin") {
+          assert.deepEqual(args, [tabUrl]);
+          return [{ result: documentOrigin }];
+        }
         if (func.name === "canLeaveBlooketPageForRead")
           return [{ result: !unsafeReadSource }];
         if (func.name === "runBlooketCreateSetOwnership") {
@@ -622,6 +637,12 @@ test(
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
     assert.equal(setListReads, 2);
+    assert.equal(readReloads, 1);
+    // Never reload an active editor even when already on the target route.
+    unsafeReadSource = true;
+    const beforeSameRouteReload = readReloads;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(readReloads, beforeSameRouteReload);
     // Never leave an active teacher editor just to answer a set-list query.
     unsafeReadSource = true;
     tabUrl = "https://dashboard.blooket.com/edit?id=teacher-draft";
@@ -741,7 +762,9 @@ test(
     assert.equal(rejectedDetail.ok, false);
     assert.equal(scripts.slice(beforeRejectedOpen).every(
       (name) => name === "openBlooketDetailPanel" ||
-        name === "inspectBlooketDetailSidebar",
+        name === "inspectBlooketDetailSidebar" ||
+        name === "canLeaveBlooketPageForRead" ||
+        name === "inspectBlooketDocumentOrigin",
     ), true);
     detailOpenSucceeds = true;
     detailMalformedReply = true;
@@ -770,6 +793,8 @@ test(
       "https://dashboard.blooket.com/edit?id=another-set");
     assert.deepEqual(scripts.slice(beforeSwitchedOpen), [
       "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin",
+      "inspectBlooketDocumentOrigin",
       "inspectBlooketDetailSidebar",
       "inspectBlooketDetailSidebar",
       "openBlooketDetailPanel",
@@ -1177,6 +1202,8 @@ test("worker startup only restores a live, admitted Blooket tab",
   let removed = 0;
   let gets = 0;
   let creates = 0;
+  let documentOrigin = 1_000;
+  let readReloads = 0;
   Object.defineProperty(globalThis, "chrome", {
     configurable: true,
     value: {

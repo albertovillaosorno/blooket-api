@@ -14,8 +14,8 @@
 //   - Infer authentication, inspect cookies, or wait past the read budget.
 // - Allows:
 //   - Inputs: One owned tab, optional exact route, and a shared deadline.
-//   - Outputs: The confirmed complete tab or an unverified result.
-//   - Side effects: At most one requested tab navigation and bounded polling.
+//   - Outputs: A complete fresh document or an unverified result.
+//   - Side effects: At most one navigation or reload and bounded polling.
 // - Split-When:
 //   - Another browser requires materially different navigation mechanics.
 // - Merge-When:
@@ -37,6 +37,7 @@ interface ReadTab {
 interface ReadTabsPort {
   get(tabId: number): Promise<ReadTab>;
   update(tabId: number, options: { url: string }): Promise<ReadTab>;
+  reload(tabId: number, options: { bypassCache: true }): Promise<void>;
 }
 
 const NAVIGATION_BUDGET_MS = 5_000;
@@ -49,29 +50,56 @@ export async function confirmBlooketReadNavigation(
   target: string | null,
   readDeadline: number,
   pause: (ms: number) => Promise<void>,
+  documentOrigin: (url: string) => Promise<unknown>,
   now: () => number = Date.now,
 ): Promise<ReadTab | undefined> {
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (now() >= deadline) return undefined;
-  if (target && previous.url !== target) {
+  let previousOrigin: number | undefined;
+  if (target) {
     // The caller's previous tab snapshot may be obsolete if the user moved.
     // Re-check its exact route before allowing a navigation request.
     const current = await tabs.get(tabId);
-    if (now() >= deadline ||
-        (current.url !== previous.url && current.url !== target))
+    if (now() >= deadline || !current.url ||
+        current.url !== previous.url || current.status !== "complete")
       return undefined;
-    if (current.url !== target) {
+    const origin = await documentOrigin(current.url);
+    if (now() >= deadline || !validOrigin(origin)) return undefined;
+    previousOrigin = origin;
+    const checked = await tabs.get(tabId);
+    if (now() >= deadline || checked.url !== current.url ||
+        checked.status !== "complete") return undefined;
+    if (current.url === target) {
+      await tabs.reload(tabId, { bypassCache: true });
+    } else {
       await tabs.update(tabId, { url: target });
-      if (now() >= deadline) return undefined;
     }
+    if (now() >= deadline) return undefined;
   }
   while (now() < deadline) {
     const tab = await tabs.get(tabId);
     // A delayed tabs.get result cannot prove that the budget was respected.
     if (now() >= deadline) return undefined;
-    if (tab.status === "complete" && (!target || tab.url === target))
-      return tab;
+    if (tab.status === "complete" && (!target || tab.url === target)) {
+      if (!target) return tab;
+      // Chrome may still report the old complete document immediately after
+      // reload/update. Only a changed native document epoch admits a read.
+      let origin: unknown;
+      try { origin = await documentOrigin(target); }
+      catch { origin = null; }
+      if (now() >= deadline) return undefined;
+      if (validOrigin(origin) && origin !== previousOrigin) {
+        const checked = await tabs.get(tabId);
+        if (now() >= deadline || checked.url !== target ||
+            checked.status !== "complete") return undefined;
+        return checked;
+      }
+    }
     await pause(Math.min(POLL_MS, deadline - now()));
   }
   return undefined;
+}
+
+function validOrigin(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }

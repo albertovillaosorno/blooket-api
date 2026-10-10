@@ -45,11 +45,16 @@ function fixture(options: {
   readonly updateLatency?: number;
   readonly readLatency?: number;
   readonly keepOldUrl?: boolean;
+  readonly keepOldOrigin?: boolean;
+  readonly invalidOrigin?: boolean;
+  readonly originLatency?: number;
 } = {}) {
   let tick = 0;
   let url = options.initialUrl ?? SETS;
   let gets = 0;
   let updates = 0;
+  let reloads = 0;
+  let origin = 1_000;
   const statuses = options.statuses ?? ["complete"];
   const tabs = {
     get: async (id: number) => {
@@ -63,40 +68,56 @@ function fixture(options: {
       updates++;
       tick += options.updateLatency ?? 0;
       if (!options.keepOldUrl) url = input.url;
+      if (!options.keepOldOrigin) origin += 1_000;
       return { url, status: "loading" };
+    },
+    reload: async (id: number, input: { bypassCache: true }) => {
+      assert.equal(id, 7);
+      assert.deepEqual(input, { bypassCache: true });
+      reloads++;
+      tick += options.updateLatency ?? 0;
+      if (!options.keepOldOrigin) origin += 1_000;
     },
   };
   return {
     tabs,
     previous: { url, status: "complete" },
     pause: async (ms: number) => { tick += ms; },
+    documentOrigin: async (expectedUrl: string) => {
+      tick += options.originLatency ?? 0;
+      return expectedUrl === url && !options.invalidOrigin ? origin : null;
+    },
     now: () => tick,
     elapsed: () => tick,
     gets: () => gets,
     updates: () => updates,
+    reloads: () => reloads,
   };
 }
 
-test("an already loaded route needs no navigation", async () => {
+test("an already loaded route reloads before a fresh read", async () => {
   const page = fixture();
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, SETS, 8_000,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.deepEqual(result, { url: SETS, status: "complete" });
   assert.equal(page.updates(), 0);
-  assert.equal(page.gets(), 1);
+  assert.equal(page.reloads(), 1);
+  assert.equal(page.gets(), 4);
 });
 
 test("an exact route is confirmed only after loading completes", async () => {
-  const page = fixture({ statuses: ["complete", "loading", "complete"] });
+  const page = fixture({
+    statuses: ["complete", "complete", "loading", "complete"],
+  });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, EDIT, 8_000,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.deepEqual(result, { url: EDIT, status: "complete" });
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 3);
+  assert.equal(page.gets(), 5);
   assert.equal(page.elapsed(), 100);
 });
 
@@ -104,31 +125,31 @@ test("a late Chrome update never gains a new five-second window", async () => {
   const page = fixture({ updateLatency: 7_900 });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, EDIT, 8_000,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.equal(result, undefined);
   assert.equal(page.elapsed(), 7_900);
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 1);
+  assert.equal(page.gets(), 2);
 });
 
 test("the shared deadline wins over the local navigation window", async () => {
-  const page = fixture({ statuses: ["loading"] });
+  const page = fixture({ statuses: ["complete", "complete", "loading"] });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, EDIT, 250,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.equal(result, undefined);
   assert.equal(page.elapsed(), 250);
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 4);
+  assert.equal(page.gets(), 5);
 });
 
 test("a late completed tabs.get reply does not prove navigation", async () => {
   const page = fixture({ readLatency: 800 });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, SETS, 700,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.equal(result, undefined);
   assert.equal(page.updates(), 0);
@@ -139,7 +160,7 @@ test("a completed but wrong route is never accepted", async () => {
   const page = fixture({ keepOldUrl: true });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, EDIT, 300,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.equal(result, undefined);
   assert.equal(page.elapsed(), 300);
@@ -151,7 +172,7 @@ test("session observation does not navigate when no route is required",
   const page = fixture();
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, null, 8_000,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.deepEqual(result, { url: SETS, status: "complete" });
   assert.equal(page.updates(), 0);
@@ -163,21 +184,22 @@ test("a stale tab snapshot must not overwrite manual navigation", async () => {
   const page = fixture({ initialUrl: manuallySelected });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, { url: SETS, status: "complete" }, EDIT, 8_000,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.equal(result, undefined);
   assert.equal(page.updates(), 0);
   assert.equal(page.gets(), 1);
 });
 
-test("an independently reached target needs no duplicate update", async () => {
+test("manual navigation invalidates the admitted source", async () => {
   const page = fixture({ initialUrl: EDIT });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, { url: SETS, status: "complete" }, EDIT, 8_000,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
-  assert.deepEqual(result, { url: EDIT, status: "complete" });
+  assert.equal(result, undefined);
   assert.equal(page.updates(), 0);
+  assert.equal(page.reloads(), 0);
 });
 
 test(
@@ -186,10 +208,80 @@ test(
   const page = fixture({ readLatency: 500 });
   const result = await confirmBlooketReadNavigation(
     page.tabs, 7, page.previous, EDIT, 250,
-    page.pause, page.now,
+    page.pause, page.documentOrigin, page.now,
   );
   assert.equal(result, undefined);
   assert.equal(page.elapsed(), 500);
   assert.equal(page.updates(), 0);
   },
 );
+test("a stale complete document after reload never admits a read", async () => {
+  const page = fixture({ keepOldOrigin: true });
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, SETS, 250,
+    page.pause, page.documentOrigin, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.reloads(), 1);
+  assert.equal(page.elapsed(), 250);
+});
+
+test("missing document identity stops before any navigation", async () => {
+  const page = fixture({ invalidOrigin: true });
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 250,
+    page.pause, page.documentOrigin, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.updates(), 0);
+  assert.equal(page.reloads(), 0);
+});
+
+test("late document inspection cannot extend the read deadline", async () => {
+  const page = fixture({ originLatency: 500 });
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, SETS, 250,
+    page.pause, page.documentOrigin, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.reloads(), 0);
+  assert.equal(page.elapsed(), 500);
+});
+
+test("a late fresh origin still cannot admit a saved-state read", async () => {
+  const page = fixture();
+  let observations = 0;
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, SETS, 250, page.pause,
+    async url => {
+      const origin = await page.documentOrigin(url);
+      if (++observations === 2) await page.pause(250);
+      return origin;
+    }, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.reloads(), 1);
+  assert.equal(page.elapsed(), 250);
+});
+
+test("manual navigation after a fresh origin invalidates a read", async () => {
+  const page = fixture();
+  let observations = 0;
+  let moved = false;
+  const tabs = {
+    ...page.tabs,
+    get: async (id: number) => moved
+      ? { url: EDIT, status: "complete" }
+      : await page.tabs.get(id),
+  };
+  const result = await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, SETS, 250, page.pause,
+    async url => {
+      const origin = await page.documentOrigin(url);
+      if (++observations === 2) moved = true;
+      return origin;
+    }, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.reloads(), 1);
+});
