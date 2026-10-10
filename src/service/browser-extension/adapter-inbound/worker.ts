@@ -51,6 +51,8 @@ import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
 import { confirmBlooketReadNavigation } from "./read-navigation.ts";
+import { inspectBlooketDocumentOrigin } from
+  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 import {
   BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserBridgeRequest,
 } from
@@ -92,6 +94,7 @@ declare const chrome: {
     query(options: { url: string[] }): Promise<BrowserTab[]>;
     create(options: { url: string; active: boolean }): Promise<BrowserTab>;
     get(id: number): Promise<BrowserTab>;
+    reload(id: number, options: { bypassCache: true }): Promise<void>;
     update(
       id: number,
       options: { url?: string; active?: boolean },
@@ -271,9 +274,9 @@ async function read(
       : origin !== "https://dashboard.blooket.com"
   )
     throw new Error("manual-blooket-sign-in-required");
-  if (target !== null && tab.url !== target) {
+  if (target !== null) {
     // The teacher may be editing a question, metadata, or a fresh set in
-    // the current tab. Refuse the navigation before changing its route.
+    // the current tab. Refuse navigation or a same-route reload first.
     if (tab.status !== "complete")
       throw new Error("browser-navigation-unsafe");
     const safe = await script(
@@ -287,6 +290,8 @@ async function read(
   }
   const confirmed = await confirmBlooketReadNavigation(
     browser.tabs, current.tabId, tab, target, readDeadline, pause,
+    async url => await script(current, browser,
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [url]),
   );
   if (!confirmed) throw new Error("browser-navigation-timeout");
   tab = confirmed;
@@ -603,6 +608,11 @@ function ownedBrowser(
         const result = await chrome.tabs.update(id, options);
         requireOwner();
         return result;
+      },
+      reload: async (id: number, options: { bypassCache: true }) => {
+        requireOwner();
+        await chrome.tabs.reload(id, options);
+        requireOwner();
       },
     },
     scripting: {

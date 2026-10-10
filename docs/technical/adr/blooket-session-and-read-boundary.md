@@ -64,6 +64,22 @@ My Sets evidence does not prove server-side completeness. Higher callers may
 return those observational rows, but unknown collections cannot establish a
 publication baseline or a reconciliation outcome.
 
+Saved set and question reads require a fresh document even when the owned tab
+already has the requested URL. Before navigation or reload, the worker checks
+the existing unsaved-form guard on the exact source route. A same-route reload
+bypasses the browser cache; a changed route uses ordinary tab navigation.
+
+The host compares positive native `performance.timeOrigin` observations before
+and after the operation. A stale `complete` tab reply, unchanged document
+origin, late inspection, or manual route change cannot admit a saved-state read.
+Session observation remains non-navigating and does not need document
+replacement.
+
+The implementation was checked on 2026-10-10 against
+[Chrome tabs][chrome-tabs] and [MDN timeOrigin][document-origin]. These sources
+establish browser primitives, not successful Blooket publication. Synthetic
+tests cover reload admission, stale document refusal, and unsaved-form guards.
+
 Question payloads, cover-image read representation, remote-ID syntax, and other
 set fields remain outside the read contract until authenticated browser evidence
 establishes their shape.
@@ -106,3 +122,7 @@ Capability-inspection tests prove session gating, strict snapshot decoding, and
 raw invalid-value containment. Set-read tests prove request-first validation,
 opaque-ID preservation, strict list/detail decoding, mismatch detection, and
 failure before side effects for invalid request IDs.
+
+[chrome-tabs]: https://developer.chrome.com/docs/extensions/reference/api/tabs
+<!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
+[document-origin]: https://developer.mozilla.org/en-US/docs/Web/API/Performance/timeOrigin
