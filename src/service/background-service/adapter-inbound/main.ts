@@ -38,6 +38,8 @@ import { startManagedBackgroundService } from "../application/runtime.ts";
 import { fileURLToPath } from "node:url";
 import { PRODUCT_VERSION } from
   "../../../ir/product-version/contract/version.ts";
+import { installServiceStopResponder } from
+  "../../../platforms/service-lifecycle/adapter-outbound/stop.ts";
 import { installServiceHealthResponder } from
   "../../../platforms/service-lifecycle/adapter-outbound/health.ts";
 
@@ -83,10 +85,16 @@ try {
     runtime, PRODUCT_VERSION, service.isReady,
   );
   service.server.once("close", disposeHealth);
+  const disposeStop = installServiceStopResponder(
+    runtime, PRODUCT_VERSION, service.stop,
+  );
   process.send?.(runtime);
   for (const signal of ["SIGINT", "SIGTERM"] as const)
     process.once(signal, () => {
-      void service.stop();
+      void service.stop().catch(() => { process.exitCode = 1; }).finally(() => {
+        disposeStop();
+        if (process.connected) process.disconnect?.();
+      });
     });
 } catch {
   process.stderr.write(
