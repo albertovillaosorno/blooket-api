@@ -594,3 +594,228 @@ Cloudflare challenge. This confirms restored browser access, not the cause of
 the earlier challenge or successful corrected image upload. The CLI's managed
 extension list was empty even though its page inventory exposed the existing
 extension worker; reloading that unmanaged extension by ID was refused.
+
+## Live private fixture write and bounded confirmation (2026-10-09)
+
+A real authenticated browser-backed CLI Create Set step returned
+`reconciliation-required` even though a fresh My Sets read found one new
+private development fixture matching the exact unique title and description.
+An independent detail read confirmed the private visibility and zero saved
+questions. A second read-only reconciliation remained inconclusive because
+the provider list reports unknown nonempty collection completeness and the
+write attempt's baseline is null. This is not a successful journal receipt.
+
+The earlier named CLI fixture also remains privately saved with zero
+questions and an unresolved attempt. Neither the old attempts nor the new
+fixture were automatically replayed, cleared, or adopted; the new write was
+performed exactly once. No personal-photo question set was changed.
+
+The provider may take longer than the broker's former ten-second write
+response deadline to hydrate the Create Set edit redirect. The broker now
+budgets thirty seconds specifically for create-question/create-set writes,
+while ordinary reads retain ten seconds. The extension reserves a bounded
+27-second local write window; late queued writes still expire before dispatch.
+Create Set redirect observation allows up to fourteen seconds with two
+matching receipts and route checks, without a second submit attempt.
+
+This longer bound is a plausible fix for the observed false-negative write;
+confirmation on the real account with the newly compiled extension and a
+restarted local service remains unverified. Synthetic broker tests prove that
+a dispatched write can still reply after the read deadline and that delayed
+queued writes do not begin. A simulated slow Edit redirect now produces two
+matching observations rather than an erroneous timeout.
+
+The next question step also performs a fresh read-only metadata comparison of
+the exact recorded remote set before writing anything. If its ID, title,
+description, or privacy diverge from the saved plan, publication stops without
+creating a question attempt. Reconciliation now exposes the safe stable reason
+`verification-inconclusive` to make an unresolved journal actionable without
+claiming success from a matching title alone.
+
+The newer unpacked extension was staged at the existing repo-local manual
+installation path, preserving a separately named backup. It requires a real
+manual extension reload and service restart before it can validate the longer
+write budget against the actual provider. Only the native Linux package and
+portable tests have passed since that source change; do not mark TODO 09
+complete until a real saved question and a fresh full quiz read verify it.
+
+## Authenticated private CLI publication acceptance (2026-10-09, 07:15 session)
+
+The owner-reloaded extension reconnected automatically after the actual
+localhost service was gracefully restarted against its **existing** data root.
+The service instance changed and the extension reported one connected profile,
+zero pending jobs, and no extension-update warning. Authenticated
+`session inspect` and `capabilities inspect` remained functional; no cookies,
+profile data, or provider secrets were transferred to the agent.
+
+One newly created, uniquely suffixed **private** development set was already
+remote-persisted but its Create Set attempt had no receipt and a null baseline.
+The normal `publication reconcile` correctly refused to infer a receipt from
+an incompletely observed nonempty My Sets collection. For this exact owned
+synthetic fixture only, a human-authorized developer recovery compared saved
+pre/post collection snapshots, confirmed exactly one new random-title
+candidate, and independently reread its exact ID, title, description,
+privacy and empty question list twice.
+
+After one additional detail read,
+`reconcilePersistedBlooketWrite` was used with the externally verified exact
+set receipt. This path made **no** remote write and advanced only that one
+journal from operation zero to one. The two unrelated ambiguous journals were
+left intact. This externally witnessed repair is **not** automatic recovery,
+and must not be generalized to teacher-authored titles or unknown baselines.
+
+The canonical `publication step` CLI then added the fixture's fictional
+`typing` question **once** and advanced to operation two of two. A separate
+`publication verify` performed fresh remote detail and question observations
+twice and returned `phase: verified`, `published: true`. A later standalone
+fresh set-detail and question-list read confirmed the set was still private
+and had precisely one saved typing question. No personal-photo set was touched.
+
+The service broker was further hardened to keep the actual in-flight writer's
+profile leased during a bounded write longer than the ten-second heartbeat,
+without treating a second profile as authorized. Multi-question publication
+now compares all earlier saved question bodies with the frozen plan before
+starting each next question; the first question also requires a genuinely
+empty remote question list. An unrelated edit or new manual question stops
+publication before any write-attempt journal is started.
+
+This establishes a **real single-question private CLI write and verified
+read-back**, after an explicit externally witnessed recovery. It does not
+prove new Create Set receipts always arrive on the fresh thirty-second
+transport budget, automatic reconciliation without a complete baseline,
+media-backed writes, arbitrary classroom quiz editing, or Mac/Safari release
+acceptance. Keep the write/publication TODO records active until these
+remaining ordinary-user paths work without developer-only intervention.
+
+### Prepublication collision and interruption handling
+
+Before starting a new Create Set operation, canonical publication checks the
+currently observed My Sets summaries for a matching title. It independently
+reads details for the small number of candidates and refuses an exact
+same-title, same-description, same-visibility match before reserving a remote
+write attempt. Nonempty collection completeness remains unknown: the check
+uses only *positive* presence evidence, never an absence claim. A distinct
+set sharing a title but differing in content can still be authored.
+
+The command also exposes `reason: write-not-confirmed` when a write step
+becomes ambiguous and `reason: verification-inconclusive` when reconciliation
+cannot establish an outcome. Neither is converted into a successful receipt.
+These guards have synthetic regressions and have not themselves been used to
+start additional real provider writes after the confirmed private smoke test.
+
+## Lost post-submit Chrome acknowledgement (2026-10-09, 07:50 session)
+
+An injected Create Set click can trigger provider navigation before Chrome
+returns the script response. A destroyed execution context after the single
+submit is an **ambiguous acknowledgement**, not proof of a failed mutation.
+The new browser host does **not** click Create Set again. If it sees an exact
+same-origin Edit redirect after the lost script response, it permits only
+additional read-only confirmation of that one redirected set ID.
+
+The recovered redirect must be observed twice with the same exact URL and
+validated ID. The sidebar must also report the originally submitted title
+and description in two successive independent scripts; incomplete hydration
+may retry for a small bounded window, but a readable mismatch stops the
+confirmation immediately. A loading Create-to-Edit transition is supported,
+while foreign routes, duplicated IDs, a changed second sidebar, and one-sided
+confirmation remain failures. These checks do not infer privacy from the
+URL; final publication verification still rereads the full remote metadata.
+
+The canonical extension worker now requires the same exact saved-sidebar
+readbacks for ordinary acknowledged Create Set redirects as well. Synthetic
+Chrome tests exercise the lost acknowledgement, partial hydration and refusal
+paths. This is portable evidence only: the real user account already has a
+verified private quiz from an explicitly externally reconciled attempt, but
+normal automatic Create Set acceptance on this newer build is still unproved.
+The old ambiguous attempt journals remain untouched.
+
+### Final local acceptance for lost-ack recovery
+
+The expected Create Set redirect admits only one opaque `id` query and no
+other search entries or URL fragment. Both the page runner and Chrome host
+reject additional parameters, duplicate IDs, and unrelated routes. The
+ordinary worker path also requires two saved-sidebar observations before it
+can pass a newly created set ID to the journal.
+
+An integration fixture now exercises the complete worker when Chrome destroys
+the execution context after the submit click. A matching title and description
+produce a read-only recovered receipt without another submit, whereas a
+mismatched sidebar refuses it. Other tests cover the initial loading route,
+slow sidebar hydration, and a disappearing or changing second readback.
+
+The product remains connected to the real owner-authorized Chrome browser,
+but those new lost-ack cases were verified through portable fixtures only.
+The previously published fictional private fixture still independently verifies
+as `published: true`, while the other two ambiguous journals remain untouched.
+The updated unpacked extension files are staged at the existing installation
+path with the prior build backed up; the currently loaded browser worker must
+still be reloaded manually before these new changes take effect.
+
+## Cross-draft duplicate publication prevention (2026-10-09, 08:25)
+
+A matching quiz can be present even when My Sets reports `unknown`
+completeness. A second saved draft with the *same Create Set metadata* must
+not start another remote Create Set after the first has begun a mutation,
+even when planned questions or local cover-media IDs differ.
+
+Canonical publication checks owned immutable snapshots while holding the
+publication-wide lock. If matching set metadata has an attempt journal or a
+confirmed nonzero checkpoint, the second draft is stopped **before** opening
+a remote write attempt. A snapshot without an attempt and with zero checkpoint
+does not block other work: merely planning a quiz is not a remote mutation.
+A set with genuinely different metadata remains eligible, subject to remote
+collision checks.
+
+This is an additional local idempotency guard, not a claim that provider My Sets
+is complete or that Blooket has global server-side uniqueness constraints.
+The filesystem adapter scans only hashed publication folders. It validates
+that each snapshot's draft ID hashes back to its directory, rejects symbolic
+entries and unsafe files, and caps both entry visits and aggregate bytes.
+
+Unknown unrelated metadata files are ignored without opening them. A corrupt
+owned publication snapshot fails closed instead of being overwritten.
+
+Focused tests cover confirmed and ambiguous prior attempts, concurrent
+identical drafts, distinct plans, unused snapshots, malformed IDs, symbolic
+links, oversized files and aggregate size limits. A read-only scan of the
+actual three existing journals found three valid, distinct set metadata intents;
+there were **no account mutations** in these checks.
+
+## Provider debug page: browser-specific evidence (2026-10-10)
+
+A teacher supplied output from `https://debug.blooket.com/` identifying
+Firefox 157 on Linux and an `allowed` geolocation check with country `MX`.
+The public IP value in that user-provided output was empty. This supports
+only the reported geolocation result, **not** successful authentication,
+WAF clearance, or completion of every WebSocket and third-party check.
+
+A newly built unpacked extension connected to an isolated local Blooket API
+service in Chrome for Testing 155. The real local Quizzes readiness UI
+correctly reported a Cloudflare `security-challenge` and offered the manual
+tab handoff. A separate direct visit to the official `debug.blooket.com`
+page in that same isolated Chrome browser also stopped at the provider's
+`Just a moment...` interstitial, before its browser/network tests ran.
+
+A local-origin capability probe in this test browser reported cookies enabled,
+localStorage usable and a working WebGL context; its user agent disclosed
+headless Chrome. These facts cannot identify the signal behind the provider's
+challenge. Cloudflare's public documentation states that browser automation
+frameworks are unsupported for solving production challenges. Do not spoof
+browser fingerprints, automate challenge clicking, reuse unrelated browser
+cookies, or misreport an authenticated result.
+
+The local UI now states in Spanish and English that a test in Firefox does
+not verify the separate Chrome profile. It instructs the teacher to open
+`debug.blooket.com` in a **new tab** of the connected regular Chrome profile,
+so any in-progress Blooket editor remains untouched. The user must complete
+provider verification manually if prompted; the product cannot guarantee
+that Cloudflare will never appear. Two synthetic UI response variants were
+verified in a real isolated Chrome service, and no user account was modified.
+
+The synthetic worker integration fixture had a historical question numbered 1
+already present when testing read operations; it accidentally carried that
+state into a new Add Question write for index 1, which the production duplicate
+preflight correctly refused. The fixture now resets its mock question list
+before that write and before the stale-pairing test. Milestones awaiting a
+held browser script now have an explicit 2.5-second failure timeout instead
+of hanging the entire Node test file. The corrected worker suite passes.
