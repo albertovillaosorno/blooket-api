@@ -82,6 +82,13 @@ still report `unknown` and cannot unlock create/reconciliation baselines.
 Live loaded-extension verification, a separately justified complete
 nonempty collection, and Create/Add acceptance remain pending.
 
+A second 2026-10-10 extension-worker regression checks the same native
+`performance.timeOrigin` after paired DOM and model scripts. A background
+replacement of the same My Sets URL now invalidates the response rather than
+mixing documents; the actual assembled worker also rejects a synthetic
+model/visible-card mismatch without returning raw model data. These are
+portable tests, not a loaded Chrome extension observation.
+
 On 2026-10-10, saved browser reads began requiring a new native document before
 inspecting the requested route. An already loaded route now uses a
 cache-bypassed reload, with the same unsaved-form guard as a route change.

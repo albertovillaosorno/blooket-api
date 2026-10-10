@@ -71,6 +71,11 @@ This comparison does not prove pagination or remote collection completeness;
 raw Flight and non-identity props remain inside the extension. Other builds
 and unavailable initial model data cannot upgrade `unknown`.
 
+The extension worker compares the native document time origin before and after
+each paired DOM/initial-model observation, including after the second stable
+read. A same-route replacement between injected scripts invalidates the
+candidate even when the URL and set cards appear unchanged.
+
 Saved set and question reads require a fresh document even when the owned tab
 already has the requested URL. Before navigation or reload, the worker checks
 the existing unsaved-form guard on the exact source route. A same-route reload

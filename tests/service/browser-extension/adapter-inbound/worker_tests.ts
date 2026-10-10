@@ -33,6 +33,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { setTimeout as pause } from "node:timers/promises";
+import { libraryModelFixture } from
+  "../../../ir/blooket-flight-records/contract/library-model-fixture.ts";
+import { BLOOKET_LIBRARY_MODEL_BUILD } from
+  "../../../../src/ir/blooket-flight-records/contract/library-model.ts";
 
 test(
   "worker admits explicit local reads and refuses arbitrary execution",
@@ -74,6 +78,8 @@ test(
   let listEmpty = false;
   let listEmptyDrifts = false;
   let listInvalidEnvelope = false;
+  let listModelSource: string | null = null;
+  let listReloadDuringCapture = false;
   let setListReads = 0;
   let questionPanelCloses = true;
   let addQuestionPanelReady = false;
@@ -188,8 +194,17 @@ test(
         }
         if (func.name === "canLeaveBlooketPageForRead")
           return [{ result: !unsafeReadSource }];
-        if (func.name === "captureBlooketLibraryModel")
-          return [{ result: null }];
+        if (func.name === "captureBlooketLibraryModel") {
+          if (listReloadDuringCapture) {
+            listReloadDuringCapture = false;
+            // A background navigation may replace this exact URL's document
+            // between the DOM and initial-model inspections.
+            documentOrigin += 1_000;
+          }
+          return [{ result: listModelSource === null ? null : {
+            build: BLOOKET_LIBRARY_MODEL_BUILD, source: listModelSource,
+          } }];
+        }
         if (func.name === "runBlooketCreateSetOwnership") {
           assert.ok(args?.[0] === "claim" || args?.[0] === "check");
           return [{ result: true }];
@@ -640,6 +655,18 @@ test(
     assert.equal(firstSets.value.completeness, "unknown");
     assert.equal(setListReads, 2);
     assert.equal(readReloads, 1);
+    // The assembled worker must compare a real model envelope, not just
+    // exercise the pure comparator in isolation.
+    listModelSource = libraryModelFixture();
+    const matchedModel = await expectReply({ kind: "sets.list" });
+    assert.equal(matchedModel.ok, true);
+    assert.equal(matchedModel.value.completeness, "unknown");
+    assert.equal(JSON.stringify(matchedModel).includes("allSets"), false);
+    listModelSource = libraryModelFixture({ props: { allSets: [] } });
+    const conflictingModel = await expectReply({ kind: "sets.list" });
+    assert.equal(conflictingModel.ok, false);
+    assert.equal(JSON.stringify(conflictingModel).includes("source"), false);
+    listModelSource = null;
     // Never reload an active editor even when already on the target route.
     unsafeReadSource = true;
     const beforeSameRouteReload = readReloads;
@@ -672,6 +699,10 @@ test(
     assert.equal(delayedSets.value.completeness, "unknown");
     assert.equal(setListReads, 4);
     assert.equal(listFailuresRemaining, 0);
+    listReloadDuringCapture = true;
+    setListReads = 0;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(setListReads, 1);
     listDrifts = true;
     setListReads = 0;
     const changedSets = await expectReply({ kind: "sets.list" });

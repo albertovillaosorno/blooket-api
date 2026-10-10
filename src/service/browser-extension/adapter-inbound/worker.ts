@@ -305,11 +305,24 @@ async function read(
     return await host.inspect(operation.setId, readDeadline);
   }
   if (operation.kind === "sets.list") {
+    const expectedOrigin = await script(current, browser,
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [target]);
+    if (typeof expectedOrigin !== "number" ||
+        !Number.isFinite(expectedOrigin) || expectedOrigin <= 0 ||
+        Date.now() >= readDeadline)
+      throw new Error("browser-set-list-unavailable");
     const observe = async () => {
       const observed = await script(current, browser,
         inspectBlooketPage as (...args: never[]) => unknown, [operation]);
       const captured = await script(current, browser,
         captureBlooketLibraryModel as (...args: never[]) => unknown);
+      const afterOrigin = await script(current, browser,
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [target]);
+      // Both scripts must belong to the same native document. A same-route
+      // replacement cannot make two unrelated snapshots look consistent.
+      if (afterOrigin !== expectedOrigin || Date.now() >= readDeadline)
+        throw new Error("browser-set-list-unavailable");
       // Raw initial model text remains inside this local extension call.
       return checkBlooketLibraryObservation(observed, captured);
     };
