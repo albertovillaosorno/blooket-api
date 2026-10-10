@@ -104,8 +104,13 @@ export async function executeBlooketPublicationCommand(
       : code === "publication-storage-unavailable"
         ? "Publication stopped: local journal evidence could not be " +
           "safely inspected. Preserve it and repair storage before retrying."
-        : "Publication stopped. Keep the saved draft and inspect its " +
-          "publication status before another step or reconciliation.",
+        : code === "blooket-write-baseline-not-captured"
+          ? "Publication stopped before sending a new write: the current " +
+            "Blooket collection could not be fully verified for recovery. " +
+            "Keep the saved draft; repeating this step cannot repair " +
+            "missing collection evidence."
+          : "Publication stopped. Keep the saved draft and inspect its " +
+            "publication status before another step or reconciliation.",
   }]);
   if (!isBlooketPublicationCommand(command.command))
     return fail("unknown-command");
@@ -414,6 +419,7 @@ export async function executeBlooketPublicationCommand(
     }
     const result = await executePersistedBlooketWrite(
       files, plan, blooket.session, blooket.secrets, writes, verifier, {
+        requireVerificationBaseline: true,
         pacer, ...(signal ? { signal } : {}),
         ...(host.preparedMedia ? { media: host.preparedMedia } : {}),
         ...(expectedMedia ? { expectedMedia } : {}), budget: {

@@ -135,6 +135,60 @@ const QUESTION_BASELINE = {
   sha256: "b".repeat(64),
 };
 
+test("required baseline stops before pacing, budget, journal, or mutation",
+  async () => {
+  for (const verifier of [undefined,
+    verification({ ok: true, baseline: null })]) {
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const budgetPath = join(directory, "budget.json");
+      const events: string[] = [], calls: string[] = [];
+      const result = await executePersistedBlooketWrite(
+        paths, plan, browser([]), secrets(), writes(SET_SUCCESS, calls),
+        verifier, { requireVerificationBaseline: true,
+          pacer: immediatePacer(events), budget: {
+            path: budgetPath,
+            policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+          } },
+      );
+      assert.deepEqual(result, { ok: false,
+        stage: "verification-baseline",
+        code: "blooket-write-baseline-not-captured" });
+      assert.deepEqual(calls, []);
+      assert.deepEqual(events, []);
+      assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+        { ok: true, kind: "missing" });
+      assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId),
+        { ok: true, state: null });
+      assert.equal(existsSync(paths.checkpoint), false);
+    });
+  }
+});
+
+test("baseline disappearing during pacing releases without a remote write",
+  async () => { await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const budgetPath = join(directory, "budget.json");
+    const events: string[] = [], calls: string[] = [];
+    const result = await executePersistedBlooketWrite(
+      paths, plan, browser([]), secrets(), writes(SET_SUCCESS, calls),
+      verificationSequence([{ ok: true, baseline: SET_BASELINE },
+        { ok: true, baseline: null }]),
+      { requireVerificationBaseline: true, pacer: immediatePacer(events),
+        budget: { path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 } } },
+    );
+    assert.deepEqual(result, { ok: false, stage: "verification-baseline",
+      code: "blooket-write-baseline-not-captured" });
+    assert.deepEqual(calls, []);
+    assert.deepEqual(events, ["acquire", "release"]);
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" });
+    assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null });
+  }); },
+);
+
 function browser(calls: string[]): BlooketBrowserSessionPort {
   return {
     observe: async () => {

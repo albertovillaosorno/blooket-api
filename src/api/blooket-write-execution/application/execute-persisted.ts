@@ -139,6 +139,7 @@ export interface BlooketWritePersistencePaths {
 }
 
 export interface ExecutePersistedBlooketWriteOptions {
+  readonly requireVerificationBaseline?: boolean;
   readonly pacer?: BlooketMutationPacer;
   readonly signal?: AbortSignal;
   readonly media?: BlooketPreparedMediaReadPort;
@@ -435,9 +436,16 @@ async function captureVerificationBaseline(
   verifier: BlooketWriteVerificationPort | undefined,
   operation: Parameters<BlooketWriteVerificationPort["captureBaseline"]>[0],
   checkpoint: BlooketWriteCheckpoint,
+  required = false,
 ): Promise<CapturedVerificationBaseline> {
+  const missing = (): CapturedVerificationBaseline => required ? {
+    ok: false, result: {
+      ok: false, stage: "verification-baseline",
+      code: "blooket-write-baseline-not-captured",
+    },
+  } : { ok: true, value: null };
   if (verifier === undefined) {
-    return { ok: true, value: null };
+    return missing();
   }
 
   let captured: BlooketWriteVerificationBaselineResult;
@@ -458,7 +466,7 @@ async function captureVerificationBaseline(
   }
   if (captured.ok) {
     if (captured.baseline === null) {
-      return { ok: true, value: null };
+      return missing();
     }
     const decoded = decodeBlooketWriteVerificationBaseline(
       captured.baseline,
@@ -568,6 +576,7 @@ async function executePersistedBlooketWriteLocked(
     verifier,
     prepared.operation,
     prepared.checkpoint,
+    options.requireVerificationBaseline,
   );
   if (!baseline.ok) {
     return baseline.result;
@@ -642,6 +651,7 @@ async function executePersistedBlooketWriteLocked(
     verifier,
     prepared.operation,
     prepared.checkpoint,
+    options.requireVerificationBaseline,
   );
   if (!currentBaseline.ok) {
     lease?.release();

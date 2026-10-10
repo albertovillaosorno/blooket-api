@@ -250,7 +250,7 @@ test("uncertain writes preserve their journal and never replay on a step",
     assert.equal(state.writes(), 2);
   }); });
 
-test("reconcile reports inconclusive baseline without replaying writes",
+test("unknown collection stops new publication and preserves legacy recovery",
   async () => { await fixture(async state => {
     let mutations = 0;
     const host = { ...state.host, blooket: { ...state.host.blooket,
@@ -265,22 +265,40 @@ test("reconcile reports inconclusive baseline without replaying writes",
       return { ok: false as const, kind: "browser" as const,
         code: "blooket-browser-failed" as const };
     } } };
-    const attempted = value(await executeBlooketPublicationCommand(
+    const attempted = await executeBlooketPublicationCommand(
       command("step", state.revision), host,
-    ));
-    assert.equal(attempted["phase"], "reconciliation-required");
+    );
+    assert.ok(!attempted.ok);
+    assert.equal(attempted.issues[0]?.code,
+      "blooket-write-baseline-not-captured");
+    assert.match(attempted.issues[0]?.message ?? "",
+      /before sending a new write/u);
+    assert.equal(mutations, 0);
+    const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.attempt));
+    await assert.rejects(readFile(files.budget));
+    await assert.rejects(readFile(files.checkpoint));
+    // An older version could have dispatched without a baseline. Such
+    // evidence still needs reconciliation; upgrading never authorizes replay.
+    const source = JSON.parse(await readFile(files.snapshot, "utf8"));
+    const decoded = decodeBlooketPublicationSnapshot(source, "fixture");
+    assert.ok(decoded);
+    const begun = await beginWriteAttempt(files.attempt, decoded.plan, 0);
+    assert.ok(begun.ok);
+    const original = await readFile(files.attempt, "utf8");
     const pending = value(await executeBlooketPublicationCommand(
       command("status"), host,
     ));
     assert.equal(pending["reason"], "baseline-unavailable");
-    assert.equal(mutations, 1);
+    assert.equal(mutations, 0);
     const result = value(await executeBlooketPublicationCommand(
       command("reconcile"), host,
     ));
     assert.equal(result["phase"], "reconciliation-required");
     assert.equal(result["reason"], "verification-inconclusive");
     assert.equal(result["completedOperations"], 0);
-    assert.equal(mutations, 1);
+    assert.equal(mutations, 0);
+    assert.equal(await readFile(files.attempt, "utf8"), original);
   }); },
 );
 
@@ -318,7 +336,7 @@ test("a different set with the same title does not impersonate a match",
       ...state.host.blooket, sets: {
         ...state.host.blooket.sets,
         list: async () => ({ ok: true as const,
-          completeness: "unknown" as const,
+          completeness: "complete" as const,
           value: [{ schemaVersion: 1 as const, id: "unrelated-set",
             title: document.title }] }),
         get: async () => ({ ok: true as const, value: {
@@ -865,7 +883,9 @@ test("a different frozen plan can publish even with another snapshot",
     const host = { ...state.host, blooket: {
       ...state.host.blooket, sets: { ...state.host.blooket.sets,
         list: async () => ({ ok: true as const,
-          completeness: "unknown" as const, value: [] }),
+          completeness: "complete" as const,
+          value: [{ schemaVersion: 1 as const, id: "synthetic-remote",
+            title: document.title }] }),
       },
     } };
     const second = value(await executeBlooketPublicationCommand({
