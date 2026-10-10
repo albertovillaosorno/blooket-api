@@ -89,7 +89,11 @@ export function decodeBlooketLibraryModel(
         props["folders"].length !== 0 ||
         typeof props["hasPlus"] !== "boolean" ||
         typeof props["isStudent"] !== "boolean" ||
-        props["numSets"] !== 0 || props["numQuestions"] !== 0)
+        !["numSets", "numQuestions"].every(key => {
+          const value = props[key];
+          return typeof value === "number" && Number.isSafeInteger(value) &&
+            value >= 0;
+        }))
       return undefined;
 
     function resolve(value: unknown, visited = new Set<string>()): unknown {

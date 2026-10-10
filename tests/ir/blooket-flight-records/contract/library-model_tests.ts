@@ -49,6 +49,13 @@ test("the library model returns only normalized identity candidates", () => {
   assert.deepEqual(decode(libraryModelFixture({ props: {
     allSets: [], sets: [],
   } })), { allSets: [], displayedSets: [] });
+  // Account totals are counters, not guaranteed zeros or a completeness gate.
+  assert.deepEqual(decode(libraryModelFixture({ props: {
+    numSets: 7, numQuestions: 31,
+  } })), {
+    allSets: [{ id: "set-fixture", title: "Synthetic" }],
+    displayedSets: [{ id: "set-fixture", title: "Synthetic" }],
+  });
 });
 
 test("page metadata never weakens action response framing", () => {
@@ -95,8 +102,10 @@ test("only the exact unfiltered library prop shape is admitted", () => {
     { type: "FAVORITES" }, { isMerging: true }, { hasFolderOrSearch: true },
     { query: "sun" }, { query: null }, { query: "$$undefined" },
     { filter: "recent" }, { setsFolder: {} }, { folders: [{}] },
-    { hasPlus: "false" }, { isStudent: null }, { numSets: 1 },
-    { numQuestions: 1 }, { extra: true }, { allSets: null },
+    { hasPlus: "false" }, { isStudent: null }, { numSets: -1 },
+    { numQuestions: -1 }, { numSets: 0.5 }, { numQuestions: "31" },
+    { numSets: Number.MAX_SAFE_INTEGER + 1 }, { numQuestions: null },
+    { extra: true }, { allSets: null },
   ]) assert.equal(decode(libraryModelFixture({ props })), undefined);
 });
 
