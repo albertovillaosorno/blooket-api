@@ -226,3 +226,30 @@ open after parent exit. This establishes managed service closure, not exclusion
 of independent CLI writers, an enabled installer, or native Mac acceptance.
 
 The [Node child-process documentation][node-ipc] was checked on the same date.
+
+
+### Canonical persistent command ownership
+
+Canonical user-data commands register individual private leases before first-use
+initialization or mutable work. They release only their own lease after awaited
+command/native completion. A bounded short registration lock permits admitted
+commands to complete independently. Profile retrieval does not access user data.
+
+Update admission retains a separate installation marker after proving that no
+command leases remain. The marker excludes new commands across service shutdown
+and survives supervisor death; neither a dead PID nor a disappeared service
+proves native descendant completion. Orphaned leases and foreign storage remain
+recovery stops. No lease is cleared by catalog observation.
+
+Compose publication exclusion before command admission, then independently
+fence/drain direct UI, settings and startup writers. The command boundary alone
+cannot authorize bundle exchange. Ownership must survive until every native
+writer settles, with trusted artifacts and controlled recovery of interrupted
+installation markers; enabled installation remains pending.
+
+Real CLI and separate-process regressions on 2026-10-10 prove save refusal,
+preserved data, concurrent command registration and retained ownership after
+writer/installer death. The [Node filesystem documentation][node-filesystem]
+was checked on that date for directory iteration/closure semantics.
+
+[node-filesystem]: https://github.com/nodejs/node/blob/main/doc/api/fs.md

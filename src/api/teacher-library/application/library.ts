@@ -30,6 +30,8 @@
 //   - Unsupported or invalid requests fail closed.
 //
 import { randomUUID, createHash } from "node:crypto";
+import { withCanonicalDataWriter } from
+  "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import { readFile, readdir, mkdir, rm, lstat } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -125,174 +127,177 @@ export async function executeLibraryCommand(
       return commandSuccess(command.operationId, { text: source });
     }
     const root = dataRoot ?? userDataRoot();
-    const preferences = await loadPreferences(root);
-    await initializeLibrary(preferences.mediaRoot);
-    if (command.command.startsWith("library.")) {
-      const records = await withLibraryLock(preferences.mediaRoot, () =>
-        listLibrary(preferences.mediaRoot),
-      );
-      if (payload.kind === "list" || payload.kind === "search") {
-        const query = payload.query.toLocaleLowerCase();
-        const matches = records
-          .filter((record) =>
-            JSON.stringify([
-              record.id,
-              record.original,
-              record.topics,
-              record.generatedEnglish,
-            ])
-              .toLocaleLowerCase()
-              .includes(query),
-          )
-          .sort((a, b) => (a.id < b.id ? -1 : a.id === b.id ? 0 : 1));
-        if (payload.kind === "list") {
-          if (
-            matches.length > 100 ||
-            Buffer.byteLength(JSON.stringify(matches)) > 750_000
-          )
-            throw new Error("use-paginated-library-search");
-          return commandSuccess(
-            command.operationId,
-            matches.map((record) =>
+    return await withCanonicalDataWriter(root, async () => {
+      const preferences = await loadPreferences(root);
+      await initializeLibrary(preferences.mediaRoot);
+      if (command.command.startsWith("library.")) {
+        const records = await withLibraryLock(preferences.mediaRoot, () =>
+          listLibrary(preferences.mediaRoot),
+        );
+        if (payload.kind === "list" || payload.kind === "search") {
+          const query = payload.query.toLocaleLowerCase();
+          const matches = records
+            .filter((record) =>
+              JSON.stringify([
+                record.id,
+                record.original,
+                record.topics,
+                record.generatedEnglish,
+              ])
+                .toLocaleLowerCase()
+                .includes(query),
+            )
+            .sort((a, b) => (a.id < b.id ? -1 : a.id === b.id ? 0 : 1));
+          if (payload.kind === "list") {
+            if (
+              matches.length > 100 ||
+              Buffer.byteLength(JSON.stringify(matches)) > 750_000
+            )
+              throw new Error("use-paginated-library-search");
+            return commandSuccess(
+              command.operationId,
+              matches.map((record) =>
+                libraryRecordView(record, preferences.defaults),
+              ),
+            );
+          }
+          const remaining = matches.filter(
+            (item) => payload.after === null || item.id > payload.after,
+          );
+          const page: LibraryMetadata[] = [];
+          let bytes = 0;
+          for (const item of remaining) {
+            const size = Buffer.byteLength(JSON.stringify(item));
+            if (page.length >= payload.limit || bytes + size > 750_000) break;
+            page.push(item);
+            bytes += size;
+          }
+          if (remaining.length > 0 && page.length === 0)
+            throw new Error("media-metadata-response-too-large");
+          return commandSuccess(command.operationId, {
+            records: page.map((record) =>
               libraryRecordView(record, preferences.defaults),
             ),
+            nextCursor: remaining.length > page.length ? page.at(-1)!.id : null,
+            total: matches.length,
+          });
+        }
+        if (payload.kind !== "get" && payload.kind !== "enrich")
+          throw new Error("invalid-command");
+        if (payload.kind === "get") {
+          const record = records.find((item) => item.id === payload.id);
+          if (!record) throw new Error("media-not-found");
+          return commandSuccess(
+            command.operationId,
+            libraryRecordView(record, preferences.defaults),
           );
         }
-        const remaining = matches.filter(
-          (item) => payload.after === null || item.id > payload.after,
-        );
-        const page: LibraryMetadata[] = [];
-        let bytes = 0;
-        for (const item of remaining) {
-          const size = Buffer.byteLength(JSON.stringify(item));
-          if (page.length >= payload.limit || bytes + size > 750_000) break;
-          page.push(item);
-          bytes += size;
-        }
-        if (remaining.length > 0 && page.length === 0)
-          throw new Error("media-metadata-response-too-large");
-        return commandSuccess(command.operationId, {
-          records: page.map((record) =>
-            libraryRecordView(record, preferences.defaults),
-          ),
-          nextCursor: remaining.length > page.length ? page.at(-1)!.id : null,
-          total: matches.length,
+        return await withLibraryLock(preferences.mediaRoot, async () => {
+          const record = (await listLibrary(preferences.mediaRoot)).find(
+            (item) => item.id === payload.id,
+          );
+          if (!record) throw new Error("media-not-found");
+          if (record.revision !== payload.revision)
+            throw new Error("revision-conflict");
+          const updated = {
+            ...record,
+            revision: record.revision + 1,
+            original: {
+              ...record.original,
+              language: payload.language,
+            },
+            topics: payload.topics,
+            generatedEnglish: {
+              name: payload.name,
+              description: payload.description,
+              generatedBy: "ai" as const,
+              sourceRevision: record.original.revision,
+              verified: false as const,
+            },
+          };
+          await saveMetadata(preferences.mediaRoot, updated);
+          return commandSuccess(
+            command.operationId,
+            libraryRecordView(updated, preferences.defaults),
+          );
         });
       }
-      if (payload.kind !== "get" && payload.kind !== "enrich")
+      const folder = command.command.startsWith("skills.")
+        ? "skills" : "drafts";
+      const directory = join(root, folder);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      if (payload.kind === "list") {
+        return commandSuccess(
+          command.operationId,
+          (await readdir(directory))
+            .filter((file) =>
+              file.endsWith(folder === "skills" ? ".md" : ".json"),
+            )
+            .map((file) => file.slice(0, file.lastIndexOf("."))),
+        );
+      }
+      if (
+        payload.kind !== "get" &&
+        payload.kind !== "skill-put" &&
+        payload.kind !== "draft-put"
+      )
         throw new Error("invalid-command");
-      if (payload.kind === "get") {
-        const record = records.find((item) => item.id === payload.id);
-        if (!record) throw new Error("media-not-found");
-        return commandSuccess(
-          command.operationId,
-          libraryRecordView(record, preferences.defaults),
-        );
-      }
-      return await withLibraryLock(preferences.mediaRoot, async () => {
-        const record = (await listLibrary(preferences.mediaRoot)).find(
-          (item) => item.id === payload.id,
-        );
-        if (!record) throw new Error("media-not-found");
-        if (record.revision !== payload.revision)
-          throw new Error("revision-conflict");
-        const updated = {
-          ...record,
-          revision: record.revision + 1,
-          original: {
-            ...record.original,
-            language: payload.language,
-          },
-          topics: payload.topics,
-          generatedEnglish: {
-            name: payload.name,
-            description: payload.description,
-            generatedBy: "ai" as const,
-            sourceRevision: record.original.revision,
-            verified: false as const,
-          },
-        };
-        await saveMetadata(preferences.mediaRoot, updated);
-        return commandSuccess(
-          command.operationId,
-          libraryRecordView(updated, preferences.defaults),
-        );
-      });
-    }
-    const folder = command.command.startsWith("skills.") ? "skills" : "drafts";
-    const directory = join(root, folder);
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    if (payload.kind === "list") {
-      return commandSuccess(
-        command.operationId,
-        (await readdir(directory))
-          .filter((file) =>
-            file.endsWith(folder === "skills" ? ".md" : ".json"),
-          )
-          .map((file) => file.slice(0, file.lastIndexOf("."))),
+      const path = await safeLibraryPath(
+        root,
+        folder + "/" + payload.id + (folder === "skills" ? ".md" : ".json"),
       );
-    }
-    if (
-      payload.kind !== "get" &&
-      payload.kind !== "skill-put" &&
-      payload.kind !== "draft-put"
-    )
-      throw new Error("invalid-command");
-    const path = await safeLibraryPath(
-      root,
-      folder + "/" + payload.id + (folder === "skills" ? ".md" : ".json"),
-    );
-    if (payload.kind === "get") {
-      if ((await lstat(path)).size > 1_000_000)
-        throw new Error("document-too-large");
-      const source = await readFile(path, "utf8");
-      let document: unknown;
-      if (folder === "drafts") {
-        const decoded = decodeProjectDocument(JSON.parse(source));
-        if (!decoded.ok) throw new Error("invalid-saved-draft");
-        document = decoded.value;
+      if (payload.kind === "get") {
+        if ((await lstat(path)).size > 1_000_000)
+          throw new Error("document-too-large");
+        const source = await readFile(path, "utf8");
+        let document: unknown;
+        if (folder === "drafts") {
+          const decoded = decodeProjectDocument(JSON.parse(source));
+          if (!decoded.ok) throw new Error("invalid-saved-draft");
+          document = decoded.value;
+        }
+        return commandSuccess(command.operationId, {
+          id: payload.id,
+          revision: hash(source),
+          ...(folder === "skills" ? { text: source } : { document }),
+        });
       }
-      return commandSuccess(command.operationId, {
-        id: payload.id,
-        revision: hash(source),
-        ...(folder === "skills" ? { text: source } : { document }),
-      });
-    }
-    const lock = await tryAcquireFileLock(path + ".lock");
-    if (!lock.ok) throw new Error("document-busy");
-    try {
-      let old: string | undefined;
+      const lock = await tryAcquireFileLock(path + ".lock");
+      if (!lock.ok) throw new Error("document-busy");
       try {
-        old = await readFile(path, "utf8");
-      } catch (error) {
-        if (
-          !(
-            error instanceof Error &&
-            "code" in error &&
-            error.code === "ENOENT"
+        let old: string | undefined;
+        try {
+          old = await readFile(path, "utf8");
+        } catch (error) {
+          if (
+            !(
+              error instanceof Error &&
+              "code" in error &&
+              error.code === "ENOENT"
+            )
           )
-        )
-          throw error;
+            throw error;
+        }
+        if ((old === undefined ? null : hash(old)) !== payload.expectedRevision)
+          throw new Error("revision-conflict");
+        let source: string;
+        if (payload.kind === "draft-put") {
+          const decoded = decodeProjectDocument(payload.document);
+          if (!decoded.ok)
+            return commandFailure(command.operationId, decoded.issues);
+          source = JSON.stringify(decoded.value, null, 2) + "\n";
+        } else source = payload.text;
+        await writeAtomicFile(path, source, { backupPath: path + ".previous" });
+        return commandSuccess(command.operationId, {
+          id: payload.id,
+          revision: hash(source),
+          saved: true,
+          published: false,
+        });
+      } finally {
+        await lock.lock.release();
       }
-      if ((old === undefined ? null : hash(old)) !== payload.expectedRevision)
-        throw new Error("revision-conflict");
-      let source: string;
-      if (payload.kind === "draft-put") {
-        const decoded = decodeProjectDocument(payload.document);
-        if (!decoded.ok)
-          return commandFailure(command.operationId, decoded.issues);
-        source = JSON.stringify(decoded.value, null, 2) + "\n";
-      } else source = payload.text;
-      await writeAtomicFile(path, source, { backupPath: path + ".previous" });
-      return commandSuccess(command.operationId, {
-        id: payload.id,
-        revision: hash(source),
-        saved: true,
-        published: false,
-      });
-    } finally {
-      await lock.lock.release();
-    }
+    });
   } catch (error) {
     return commandFailure(command.operationId, [
       {

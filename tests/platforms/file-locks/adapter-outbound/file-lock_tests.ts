@@ -241,3 +241,17 @@ test("release preserves foreign owners and permits retry", async () => {
     assert.deepEqual(await readdir(directory), []);
   });
 });
+
+
+test("nonreclaimable installer ownership survives its parent process",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const path = join(directory, "installation.lock");
+      const source = '{"version":1,"pid":2147483647,"token":"retained"}\n';
+      await writeFile(path, source, { mode: 0o600 });
+      assert.deepEqual(await tryAcquireFileLock(path,
+        { reclaimDeadOwner: false }), { ok: false, reason: "busy" });
+      assert.equal(await readFile(path, "utf8"), source);
+    });
+  },
+);
