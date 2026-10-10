@@ -169,3 +169,30 @@ not establish Safari, Keychain, signing, notarization, or recipient acceptance.
 [apple]:   https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
 [api]: https://docs.github.com/en/rest/releases/releases
+
+### Fresh owned runtime health
+
+The updater's runtime proof uses the existing private parent-child IPC channel,
+with an exact UUID challenge and a bounded response. The response must match
+its owned child PID, startup instance and expected product version; stale
+runtime files, successful spawn or sent messages alone are insufficient.
+
+The service responds only after a fresh bounded read of its exact local runtime
+status and readiness checks before and after that read. Shutdown relinquishes
+readiness immediately, including while persistent writers are draining.
+No public health-challenge endpoint or remote installation tool is added.
+
+The local installer must retain its actual spawned ChildProcess capability;
+`probeOwnedServiceHealth` cannot recover that authority from an arbitrary PID.
+Cancellation or a probe deadline removes listeners without killing the app or
+releasing any installation fences. The independent supervisor still owns
+quiescence, descendant drainage, restart and recovery.
+
+On 2026-10-10, a real background-service subprocess passed the private IPC
+version/nonce challenge and preserved its data marker. Synthetic hostile IPC
+receipts, different versions/PIDs, cancellation and deadlines were refused.
+This is portable service health evidence, not a completed installation or
+native Mac acceptance. Node's current [child-process documentation][node-ipc]
+was consulted on the same date for IPC lifecycle and message delivery semantics.
+
+[node-ipc]: https://github.com/nodejs/node/blob/main/doc/api/child_process.md

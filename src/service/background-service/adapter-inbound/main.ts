@@ -36,6 +36,10 @@ import {
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
 import { startManagedBackgroundService } from "../application/runtime.ts";
 import { fileURLToPath } from "node:url";
+import { PRODUCT_VERSION } from
+  "../../../ir/product-version/contract/version.ts";
+import { installServiceHealthResponder } from
+  "../../../platforms/service-lifecycle/adapter-outbound/health.ts";
 
 import { createHostSecretStore } from
   "../../../platforms/host-secret-store/adapter-outbound/host-secret-store.ts";
@@ -69,12 +73,17 @@ if (process.argv.includes("--development")) {
 try {
   const service = await startManagedBackgroundService(root, secrets);
   process.stdout.write(service.origin + "\n");
-  process.send?.({
+  const runtime = {
     version: service.version,
     pid: service.pid,
     instance: service.instance,
     origin: service.origin,
-  });
+  };
+  const disposeHealth = installServiceHealthResponder(
+    runtime, PRODUCT_VERSION, service.isReady,
+  );
+  service.server.once("close", disposeHealth);
+  process.send?.(runtime);
   for (const signal of ["SIGINT", "SIGTERM"] as const)
     process.once(signal, () => {
       void service.stop();
