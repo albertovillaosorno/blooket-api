@@ -148,6 +148,17 @@ collection; `unknown` completeness produces no baseline and cannot confirm or
 disconfirm an ambiguous write. Multiple candidates, concurrent changes, absent
 baselines, or weak page matches remain `inconclusive`.
 
+Canonical publication requires a valid verification baseline before admitting
+a new remote attempt, including a second capture after pacing and media
+admission. Missing evidence stops before the budget reservation, attempt
+journal, and remote mutation. A normal receipt might otherwise advance, but
+a lost receipt would leave an unrecoverable new set on a nonempty account.
+The trusted low-level executor retains optional baseline policy for existing
+receipt-only callers; CLI and MCP publication always enable the requirement.
+
+Legacy journals without a baseline remain ambiguous and retain their exact
+evidence. This admission rule cannot repair or replay an older attempt.
+
 Subsequent question writes receive the checkpoint's remote set ID explicitly.
 Recovery refuses legacy advanced checkpoints, legacy confirmed Create Set
 journals, premature bindings, and receipt/checkpoint mismatches instead of

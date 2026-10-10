@@ -62,6 +62,22 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the authenticated canonical My Sets read returned five
+development sets with `completeness: unknown`. The current DOM reader and
+browser adapter admit complete collection evidence only for the exact empty
+account banner. Thus a new Create Set on a nonempty account could be sent
+without a usable differential recovery baseline; a lost reply left a visible
+empty set and an attempt that ordinary reconciliation could not confirm.
+
+Canonical publication now refuses missing baseline evidence before a new
+mutation, budget reservation, or attempt journal. A second baseline disappearing
+after pacing also releases the lease without writing. Tests retain legacy
+baseline-less journals unchanged and never replay them.
+
+Completion still needs an authenticated, independently justified complete
+collection read, plus the normal create/add/edit acceptance. Returning
+`complete` merely because cards are visible is not sufficient evidence.
+
 On 2026-10-09, canonical text publication prepared the real Create Set form
 but preserved a reconciliation-required attempt instead of asserting success.
 The owned extension context confirmed a connected form, dirty watch, and
