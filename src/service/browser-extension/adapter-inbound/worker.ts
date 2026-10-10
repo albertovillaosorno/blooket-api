@@ -53,6 +53,9 @@ import { createExtensionSessionAuthenticationHost } from
 import { confirmBlooketReadNavigation } from "./read-navigation.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
+import { captureBlooketLibraryModel } from
+  "../../../platforms/blooket-browser/adapter-outbound/library-model-page.ts";
+import { checkBlooketLibraryObservation } from "./library-observation.ts";
 import {
   BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserBridgeRequest,
 } from
@@ -302,6 +305,14 @@ async function read(
     return await host.inspect(operation.setId, readDeadline);
   }
   if (operation.kind === "sets.list") {
+    const observe = async () => {
+      const observed = await script(current, browser,
+        inspectBlooketPage as (...args: never[]) => unknown, [operation]);
+      const captured = await script(current, browser,
+        captureBlooketLibraryModel as (...args: never[]) => unknown);
+      // Raw initial model text remains inside this local extension call.
+      return checkBlooketLibraryObservation(observed, captured);
+    };
     let initial: unknown;
     let captured = false;
     // React can hydrate after the document reaches the complete state.
@@ -310,12 +321,7 @@ async function read(
       const currentTab = await browser.tabs.get(current.tabId);
       if (currentTab.status !== "complete" || currentTab.url !== target)
         throw new Error("browser-set-list-unavailable");
-      const result = await script(
-        current,
-        browser,
-        inspectBlooketPage as (...args: never[]) => unknown,
-        [operation],
-      );
+      const result = await observe();
       if (
         result && typeof result === "object" && !Array.isArray(result) &&
         Object.keys(result).sort().join() === "code,ok" &&
@@ -356,12 +362,7 @@ async function read(
     const tabAfter = await browser.tabs.get(current.tabId);
     if (tabAfter.status !== "complete" || tabAfter.url !== target)
       throw new Error("browser-set-list-unavailable");
-    const after = await script(
-      current,
-      browser,
-      inspectBlooketPage as (...args: never[]) => unknown,
-      [operation],
-    );
+    const after = await observe();
     if (
       Date.now() >= readDeadline ||
       JSON.stringify(initial) !== JSON.stringify(after)

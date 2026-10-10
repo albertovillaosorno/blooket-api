@@ -64,6 +64,13 @@ My Sets evidence does not prove server-side completeness. Higher callers may
 return those observational rows, but unknown collections cannot establish a
 publication baseline or a reconciliation outcome.
 
+For the specifically observed 2026-10-10 build, an extension-local
+decoder can compare the initial unfiltered `LIBRARY` component's `allSets`
+and `sets` identities against visible cards.
+This comparison does not prove pagination or remote collection completeness;
+raw Flight and non-identity props remain inside the extension. Other builds
+and unavailable initial model data cannot upgrade `unknown`.
+
 Saved set and question reads require a fresh document even when the owned tab
 already has the requested URL. Before navigation or reload, the worker checks
 the existing unsaved-form guard on the exact source route. A same-route reload
