@@ -188,6 +188,8 @@ test(
         }
         if (func.name === "canLeaveBlooketPageForRead")
           return [{ result: !unsafeReadSource }];
+        if (func.name === "captureBlooketLibraryModel")
+          return [{ result: null }];
         if (func.name === "runBlooketCreateSetOwnership") {
           assert.ok(args?.[0] === "claim" || args?.[0] === "check");
           return [{ result: true }];

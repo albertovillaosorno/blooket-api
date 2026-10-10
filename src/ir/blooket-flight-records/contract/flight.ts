@@ -53,6 +53,10 @@ export interface FlightActionResponseMetadata {
   readonly redirect: FlightActionRedirect | null;
   readonly revalidated: FlightActionRevalidated;
 }
+export interface FlightPageRows {
+  readonly models: ReadonlyMap<string, unknown>;
+  readonly modules: ReadonlyMap<string, unknown>;
+}
 
 const MAX_FLIGHT_BYTES = 5_000_000;
 const MAX_FLIGHT_ROWS = 20_000;
@@ -64,12 +68,44 @@ const MAX_FIELD_ERRORS = 200;
 const MAX_FIELD_MESSAGES = 100;
 
 export function decodeFlightRows(source: string): ReadonlyMap<string, unknown> {
+  return decodeRows(source, false).models;
+}
+
+// Page metadata is explicitly separate from action response admission.
+export function decodeFlightPageRows(source: string): FlightPageRows {
+  return decodeRows(source, true);
+}
+
+function decodeRows(source: string, page: boolean): FlightPageRows {
   const data = new TextEncoder().encode(source);
   if (data.length > MAX_FLIGHT_BYTES) throw new Error("flight-too-large");
   const rows = new Map<string, unknown>();
+  const modules = new Map<string, unknown>();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let offset = 0;
+  let hints = 0;
   while (offset < data.length) {
+    // Resource hints in a server-rendered page use an ID-less :H row.
+    // Action responses never admit these framing records.
+    if (page && data[offset] === 58) {
+      const next = data.indexOf(10, offset);
+      if (next < 0) throw new Error("unterminated-flight-row");
+      const content = decoder.decode(data.subarray(offset + 1, next));
+      if (!content.startsWith("HL"))
+        throw new Error("unsupported-flight-hint");
+      let hint: unknown;
+      try {
+        hint = JSON.parse(content.slice(2));
+      } catch {
+        throw new Error("invalid-flight-metadata");
+      }
+      if (!Array.isArray(hint))
+        throw new Error("invalid-flight-metadata");
+      offset = next + 1;
+      if (++hints + rows.size > MAX_FLIGHT_ROWS)
+        throw new Error("flight-row-limit");
+      continue;
+    }
     const colon = data.indexOf(58, offset);
     if (colon < 0 || colon === offset || colon - offset > 12)
       throw new Error("invalid-flight-row");
@@ -100,13 +136,31 @@ export function decodeFlightRows(source: string): ReadonlyMap<string, unknown> {
       );
       offset = comma + 1 + length;
     } else {
-      if (tag !== undefined && tag >= 65 && tag <= 90 && tag !== 69)
+      if (tag !== undefined && tag >= 65 && tag <= 90 && tag !== 69 &&
+          !(page && (tag === 73 || tag === 72)))
         throw new Error("unsupported-flight-tag");
       const next = data.indexOf(10, offset);
       if (next < 0) throw new Error("unterminated-flight-row");
       const content = decoder.decode(data.subarray(offset, next));
       offset = next + 1;
-      if (tag === 69) {
+      if (page && (tag === 73 || tag === 72)) {
+        // Only the observed HL resource-hint variant is admitted. Hints are
+        // framing metadata and can never masquerade as an account model.
+        if (tag === 72 && content[1] !== "L")
+          throw new Error("unsupported-flight-hint");
+        let metadata: unknown;
+        try {
+          metadata = JSON.parse(content.slice(tag === 73 ? 1 : 2));
+        } catch {
+          throw new Error("invalid-flight-metadata");
+        }
+        if (!Array.isArray(metadata))
+          throw new Error("invalid-flight-metadata");
+        if (tag === 73) modules.set(id, metadata);
+        // Retain the ID for duplicate detection without exposing metadata as
+        // an ordinary model or permitting a direct model reference to it.
+        rows.set(id, undefined);
+      } else if (tag === 69) {
         rows.set(id, decodeErrorRecord(content.slice(1)));
       } else {
         try {
@@ -116,9 +170,10 @@ export function decodeFlightRows(source: string): ReadonlyMap<string, unknown> {
         }
       }
     }
-    if (rows.size > MAX_FLIGHT_ROWS) throw new Error("flight-row-limit");
+    if (rows.size + hints > MAX_FLIGHT_ROWS)
+      throw new Error("flight-row-limit");
   }
-  return rows;
+  return { models: rows, modules };
 }
 
 export function flightObjects(

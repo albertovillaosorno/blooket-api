@@ -62,6 +62,26 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, a private extension-local candidate decoder was added for
+My Sets server-rendered Flight data. It is gated on the specific observed
+`349b82c80fc4a5a2001e609136cfed32747ba3f4` build, the client module
+`52644` with chunk `1958-3beff819112074ac.js`, and exact unfiltered
+`LIBRARY` props. Only normalized set IDs and titles are compared with the
+visible cards; the Flight text and unrelated model props remain local to the
+extension and are never returned over the browser bridge. Wrong builds retain
+unknown completeness; malformed matching-build models fail closed.
+
+The Flight page reader accepts ID-less `:HL` resource hints without enabling
+them in action-response parsing. This framing distinction was checked on
+2026-10-10 against the [React Server Components documentation][react-rsc]
+and [Next.js maintainer explanation][next-flight].
+
+Tests remain synthetic. The client field named `allSets` is not an
+authoritative collection-total contract. Matched nonempty collections
+still report `unknown` and cannot unlock create/reconciliation baselines.
+Live loaded-extension verification, a separately justified complete
+nonempty collection, and Create/Add acceptance remain pending.
+
 On 2026-10-10, saved browser reads began requiring a new native document before
 inspecting the requested route. An already loaded route now uses a
 cache-bypassed reload, with the same unsaved-form guard as a route change.
@@ -291,3 +311,6 @@ product surfaces; portable foundations alone do not complete this record.
 [input-activation]: https://html.spec.whatwg.org/multipage/input.html
 <!-- jig-ignore-next-line: Exact upstream documentation URL is indivisible. -->
 [trusted-events]: https://developer.mozilla.org/en-US/docs/Web/API/Event/isTrusted
+
+[react-rsc]: https://react.dev/reference/rsc/server-components
+[next-flight]: https://github.com/vercel/next.js/discussions/42170
