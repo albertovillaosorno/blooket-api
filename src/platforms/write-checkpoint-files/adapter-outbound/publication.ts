@@ -31,7 +31,7 @@
 //
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { open } from "node:fs/promises";
+import { open, opendir, lstat } from "node:fs/promises";
 import { safeLibraryPath } from "../../user-library/adapter-outbound/files.ts";
 import { writeDurableFileIfAbsent } from
   "../../atomic-files/adapter-outbound/atomic-file.ts";
@@ -80,4 +80,77 @@ export async function createPublicationSnapshot(path: string, value: unknown) {
     throw new Error("publication-snapshot-invalid");
   if (await writeDurableFileIfAbsent(path, source) !== "created")
     throw new Error("publication-snapshot-conflict");
+}
+
+
+export async function readOtherPublicationSnapshots(
+  root: string,
+  excludedDraftId: string,
+): Promise<readonly { readonly draftId: string; readonly data: unknown }[]> {
+  // The global publication boundary must already be held by the caller.
+  // Never trust directory aliases, symbolic entries, or a copied snapshot's
+  // internal draft ID to authorize a new remote mutation.
+  const folder = await safeLibraryPath(root, "publications");
+  let directory;
+  try { directory = await opendir(folder); }
+  catch (error) {
+    if (error instanceof Error && "code" in error &&
+        error.code === "ENOENT") return [];
+    throw new Error("publication-storage-unavailable");
+  }
+  const excluded = createHash("sha256").update(excludedDraftId)
+    .digest("hex");
+  const result: { draftId: string; data: unknown }[] = [];
+  let totalBytes = 0;
+  let visited = 0;
+  for await (const entry of directory) {
+    if (++visited > 4_096)
+      throw new Error("publication-snapshot-limit");
+    if (entry.isSymbolicLink())
+      throw new Error("publication-storage-unavailable");
+    if (!/^[a-f0-9]{64}$/u.test(entry.name)) {
+      // Unrelated Finder metadata is not a publication; never descend it.
+      continue;
+    }
+    if (!entry.isDirectory())
+      throw new Error("publication-storage-unavailable");
+    if (entry.name === excluded) continue;
+    const source = await safeLibraryPath(
+      root, "publications/" + entry.name + "/snapshot.json",
+    );
+    const bytes = await lstat(source).catch((error: unknown) => {
+      if (error instanceof Error && "code" in error &&
+          error.code === "ENOENT") return undefined;
+      throw new Error("publication-storage-unavailable");
+    });
+    if (bytes === undefined) {
+      // An interrupted snapshot creation can leave an empty directory, but
+      // never ignore a directory holding write-attempt or budget evidence.
+      for (const evidence of ["attempt.json", "checkpoint.json",
+        "budget.json"]) {
+        const path = await safeLibraryPath(root,
+          "publications/" + entry.name + "/" + evidence);
+        const present = await lstat(path).catch((error: unknown) => {
+          if (error instanceof Error && "code" in error &&
+              error.code === "ENOENT") return undefined;
+          throw new Error("publication-storage-unavailable");
+        });
+        if (present !== undefined)
+          throw new Error("publication-storage-unavailable");
+      }
+      continue;
+    }
+    totalBytes += bytes.size;
+    if (!bytes.isFile() || bytes.size > 1_500_000 ||
+        totalBytes > 24_000_000)
+      throw new Error("publication-storage-unavailable");
+    const data = await readPublicationSnapshot(source);
+    if (!data || typeof data !== "object" ||
+        !("draftId" in data) ||
+        typeof data.draftId !== "string" ||
+        createHash("sha256").update(data.draftId).digest("hex") !==
+          entry.name) throw new Error("publication-storage-unavailable");
+    result.push({ draftId: data.draftId, data });
+  }
+  return result.sort((a, b) => a.draftId.localeCompare(b.draftId));
 }

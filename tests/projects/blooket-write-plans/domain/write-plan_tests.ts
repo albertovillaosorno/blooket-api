@@ -72,8 +72,10 @@ const capabilities = {
 
 import { decodeOperationId } from
   "../../../../src/ir/operation-identifiers/domain/operation-id.ts";
-import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
-  "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
+import {
+  buildBlooketWritePlan, buildPreparedBlooketWritePlan,
+  sameRemoteCreateSetMetadata,
+} from "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
 
 const media = [
   {
@@ -414,3 +416,23 @@ test("empty prepared context preserves all legacy text plan identities", () => {
     { schemaVersion: 1, items: [] }, capabilities),
   buildBlooketWritePlan(JSON.stringify(text), "", capabilities));
 });
+
+
+test("set creation identity ignores cover IDs but not teacher metadata",
+  () => {
+    const a = { kind: "set" as const, operationId: "a",
+      title: "Synthetic quiz", description: "Private test",
+      visibility: "private" as const, coverMediaId: "image-one" };
+    const b = { ...a, operationId: "b", coverMediaId: "image-two" };
+    assert.equal(sameRemoteCreateSetMetadata(a, b), true);
+    assert.equal(sameRemoteCreateSetMetadata(a, {
+      ...b, title: "A different quiz",
+    }), false);
+    assert.equal(sameRemoteCreateSetMetadata(a, {
+      ...b, description: "Another lesson",
+    }), false);
+    assert.equal(sameRemoteCreateSetMetadata(a, {
+      ...b, visibility: "public",
+    }), false);
+  },
+);
