@@ -729,3 +729,35 @@ These are portable managed-service guarantees.
 Independent CLI-writer fencing,
 installer lifetime, authenticated app selection, production publisher artifacts
 and local opt-in installation/recovery controls remain required.
+
+
+### Canonical user-data writer exclusion (2026-10-10)
+
+Canonical library, personal-skill and draft commands now retain a private
+per-operation lease from before preference/library initialization until actual
+command completion. This includes read commands whose first use creates local
+state. Pure instruction-profile retrieval remains independent of user storage.
+Registered commands can complete concurrently; only bounded registration
+metadata contention is retried before any command/native writer starts.
+
+The local updater can acquire exclusive command admission only after a bounded
+private lease scan finds no admitted or orphaned writer. Its installation
+marker is never reclaimed merely because the supervisor PID is dead; a retained
+native descendant may still be writing. Unknown, symbolic, publicly accessible
+and oversized lease storage refuses installation without deleting evidence.
+
+Real CLI tests refuse a personal-skill save while update admission is held and
+preserve teacher data. Separate child processes demonstrate active command
+exclusion, retained leases after abrupt writer death, and blocked commands after
+installer death. Concurrent registrations remain independently usable.
+The [Node filesystem documentation][node-filesystem-current] was checked on
+the same date for bounded directory iteration and iterator-owned closure.
+
+This fences canonical user-data commands, not every persistent writer.
+Composition still must fence direct UI/settings/startup writers, hold the
+publication boundary first, supervise the installer independently, authenticate
+production artifacts, and implement opt-in install/recovery controls before
+enabling replacement. Native platform-only assurance remains in blooket-15.
+
+[node-filesystem-current]:
+  https://github.com/nodejs/node/blob/main/doc/api/fs.md

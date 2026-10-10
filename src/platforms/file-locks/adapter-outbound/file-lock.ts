@@ -61,7 +61,9 @@ export type FileLockAcquireResult =
 
 export async function tryAcquireFileLock(
   lockPath: string,
+  options: { readonly reclaimDeadOwner?: boolean } = {},
 ): Promise<FileLockAcquireResult> {
+  const reclaimDeadOwner = options.reclaimDeadOwner !== false;
   const directory = dirname(lockPath);
   const token = randomUUID();
   const owner: LockOwner = {
@@ -92,6 +94,9 @@ export async function tryAcquireFileLock(
         }
       }
 
+      // Installer ownership survives a dead supervisor: an unknown native
+      // descendant may still be writing. Presence alone refuses acquisition.
+      if (!reclaimDeadOwner) return { ok: false, reason: "busy" };
       const existing = await readLockOwner(lockPath);
       if (existing.kind === "missing") {
         continue;
