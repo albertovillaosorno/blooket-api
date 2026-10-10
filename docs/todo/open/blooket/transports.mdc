@@ -89,6 +89,13 @@ mixing documents; the actual assembled worker also rejects a synthetic
 model/visible-card mismatch without returning raw model data. These are
 portable tests, not a loaded Chrome extension observation.
 
+The `numSets` and `numQuestions` component props are bounded, nonnegative
+integer counters rather than hardcoded zeros. A nonempty set collection can
+have positive counters; zero-only admission was not supported by the recovered
+My Sets client, which uses these props for a product limit check. Tests verify
+positive totals and reject invalid counter types, fractions, and overflows.
+No total is treated as independent completeness evidence.
+
 On 2026-10-10, saved browser reads began requiring a new native document before
 inspecting the requested route. An already loaded route now uses a
 cache-bypassed reload, with the same unsaved-form guard as a route change.

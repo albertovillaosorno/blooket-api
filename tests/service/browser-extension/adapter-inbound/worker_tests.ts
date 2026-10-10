@@ -657,7 +657,9 @@ test(
     assert.equal(readReloads, 1);
     // The assembled worker must compare a real model envelope, not just
     // exercise the pure comparator in isolation.
-    listModelSource = libraryModelFixture();
+    listModelSource = libraryModelFixture({ props: {
+      numSets: 5, numQuestions: 12,
+    } });
     const matchedModel = await expectReply({ kind: "sets.list" });
     assert.equal(matchedModel.ok, true);
     assert.equal(matchedModel.value.completeness, "unknown");
