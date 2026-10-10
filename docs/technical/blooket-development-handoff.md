@@ -819,3 +819,29 @@ preflight correctly refused. The fixture now resets its mock question list
 before that write and before the stale-pairing test. Milestones awaiting a
 held browser script now have an explicit 2.5-second failure timeout instead
 of hanging the entire Node test file. The corrected worker suite passes.
+
+## Automatic Create Set follow-up (2026-10-10)
+
+The existing service root was restarted without opening a terminal window.
+Refreshing its already-open local workspace restored the extension connection;
+canonical session inspection returned an authenticated My Sets state.
+One uniquely named private two-question draft was saved through the CLI.
+
+Its first publication step created a remotely visible empty set but returned
+`reconciliation-required`, `reason: write-not-confirmed`, with zero completed
+operations. No second Create Set was sent and its journal remains intact.
+The currently loaded extension build could not be independently established,
+so this result does not validate the newly compiled worker.
+
+The lost-acknowledgement recovery had a separate 1.4-second redirect wait,
+despite ordinary observation allowing almost fourteen seconds. That narrow
+window is now aligned with the bounded ordinary redirect wait. A regression
+delays the exact committed redirect beyond three seconds and verifies one
+submit, two metadata observations, and no replay; a missing redirect still
+expires without another click.
+
+The current browser controller rejects extension-page navigation by policy.
+The owner-authorized DevTools CLI also did not establish a responsive browser
+connection through the existing endpoint. Do not circumvent either boundary
+or label staged extension files as a proven loaded worker. Continue portable
+work while preserving the ambiguous real attempt and the user-selected photo.
