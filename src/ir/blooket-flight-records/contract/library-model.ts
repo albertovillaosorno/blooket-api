@@ -91,8 +91,11 @@ export function decodeBlooketLibraryModel(
         typeof props["isStudent"] !== "boolean" ||
         !["numSets", "numQuestions"].every(key => {
           const value = props[key];
-          return typeof value === "number" && Number.isSafeInteger(value) &&
-            value >= 0;
+          // Module 52644 falls back to zero for absent count props. Flight
+          // serializes undefined as a tagged value, not JSON undefined.
+          return value === null || value === "$undefined" ||
+            (typeof value === "number" && Number.isSafeInteger(value) &&
+              value >= 0);
         }))
       return undefined;
 

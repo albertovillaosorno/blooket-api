@@ -51,6 +51,12 @@ test("matched model evidence preserves unknown completeness and containment",
   () => {
   assert.strictEqual(checkBlooketLibraryObservation(observed, captured),
     observed);
+  assert.strictEqual(checkBlooketLibraryObservation(observed, {
+    build: BLOOKET_LIBRARY_MODEL_BUILD,
+    source: libraryModelFixture({ props: {
+      numSets: null, numQuestions: "$undefined",
+    } }),
+  }), observed);
   const result = JSON.stringify(
     checkBlooketLibraryObservation(observed, captured),
   );
