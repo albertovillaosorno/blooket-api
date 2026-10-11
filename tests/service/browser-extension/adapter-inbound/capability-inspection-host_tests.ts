@@ -369,6 +369,7 @@ test("existing unsaved editor blocks capability navigation", async () => {
   assert.equal(page.navigations.length, 0);
   assert.deepEqual(page.scripts, [
     "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+    "inspectBlooketDocumentOrigin", "inspectBlooketDocumentOrigin",
   ]);
 });
 
@@ -1211,7 +1212,7 @@ test("capability navigation never leaves a reloaded source document",
   assert.deepEqual(page.scripts, [
     "inspectBlooketDocumentOrigin",
     "canLeaveBlooketPageForRead",
-    "inspectBlooketDocumentOrigin",
+    "inspectBlooketDocumentOrigin", "inspectBlooketDocumentOrigin",
   ]);
   },
 );

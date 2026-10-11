@@ -419,11 +419,10 @@ export function createExtensionCapabilityInspectionHost(
           // Once evidence is collected, an unexpected reload is not ours.
           const unclaimedListing = current?.url === MY_SETS_URL &&
             setId === undefined && !origins.has(MY_SETS_URL);
-          const canRestore = current?.url === originalUrl ||
-            unclaimedListing ||
-            (typeof current?.url === "string" &&
-              await ownsDocument(current.url, finishDeadline)
-                .catch(() => false));
+          const ownedRestoration = typeof current?.url === "string" &&
+            await ownsDocument(current.url, finishDeadline)
+              .catch(() => false);
+          const canRestore = unclaimedListing || ownedRestoration;
           const restored = canRestore && await restore(
             chrome,
             tabId,
@@ -434,6 +433,8 @@ export function createExtensionCapabilityInspectionHost(
             pause,
             finishDeadline,
             now,
+            unclaimedListing ? undefined : async () =>
+              await ownsDocument(current!.url!, finishDeadline),
           ).catch(() => false);
           if (!restored) outcome = browserFailure();
         }
@@ -482,6 +483,7 @@ async function restore(
   pause: (ms: number) => Promise<void>,
   deadline: number,
   now: () => number,
+  sourceDocument?: () => Promise<boolean>,
 ): Promise<boolean> {
   if (new URL(url).origin !== DASHBOARD_ORIGIN) return false;
   // The user may have navigated the tab independently. An unfamiliar route,
@@ -490,13 +492,15 @@ async function restore(
   if (current.url !== url && !ownedRoutes.includes(current.url ?? ""))
     return false;
   if (now() >= deadline) {
-    // Best-effort restoration after timeout is permitted only on a route the
-    // probe navigated itself; it cannot be confirmed as a successful result.
+    // Only an unclaimed My Sets route can be restored after the deadline.
+    // A previously claimed document cannot be checked at this point.
+    if (sourceDocument) return false;
     if (current.url !== url) await chrome.tabs.update(tabId, { url });
     return false;
   }
   return await navigate(
     chrome, tabId, url, current.url ?? url, pause, deadline, now,
+    sourceDocument,
   );
 }
 
