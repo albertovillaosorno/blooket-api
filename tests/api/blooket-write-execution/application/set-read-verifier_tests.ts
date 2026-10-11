@@ -629,7 +629,7 @@ test("question media and concurrent edits remain inconclusive", async () => {
   );
 
   const existing = remoteTyping({
-    number: 2,
+    number: 1,
     question: "Existing",
     answers: ["old"],
     correctAnswers: ["old"],
@@ -639,7 +639,7 @@ test("question media and concurrent edits remain inconclusive", async () => {
     sets,
     questionReads([
       [existing],
-      [changed, remoteTyping()],
+      [changed, remoteTyping({ number: 2 })],
     ]),
   );
   const concurrentBaseline = await concurrentVerifier.captureBaseline(

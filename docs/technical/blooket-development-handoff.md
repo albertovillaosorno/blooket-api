@@ -994,3 +994,27 @@ They do not show a completed authenticated loaded-extension write,
 real Blooket persistence, or native macOS/Safari acceptance. Existing
 ambiguous journals must still be reconciled by fresh remote evidence
 without replaying a write, and no teacher account was mutated.
+
+## Browser input and canonical list admission (2026-10-11)
+
+Both My Sets snapshots in the extension worker now pass the same exact
+collection admission and versioned row decoder. The Flight-backed library
+capture also rejects hidden or symbol-owned envelope fields before
+comparing rendered set identities. The shared IR unknown-field validator
+inspects all own keys, not only enumerable string keys.
+
+Set and question collections now require dense array indices without
+extra named or symbol-owned properties. Normalized and legacy question
+answer and match arrays share that rule. Saved-question collections must
+retain contiguous slot order, and publication reconciliation still
+refuses to confirm changes to existing questions made concurrently.
+
+The injected Create Set and Add Question helpers require CSS-visible
+owned controls at each fill or click, and Create Set requires the exact
+`/create` route. The login preparer also refuses CSS-hidden credential
+fields without changing its supported login URL behavior.
+
+These results come from portable Fedora tests and do not establish
+successful authenticated provider publication or native Safari support.
+Ambiguous remote attempt journals remain durable and must never be
+replayed without independent reconciliation evidence.
