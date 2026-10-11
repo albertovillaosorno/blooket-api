@@ -251,6 +251,26 @@ export function createExtensionCapabilityInspectionHost(
             async () => await ownsDocument(MY_SETS_URL, probeDeadline),
           ))
             return browserFailure();
+          // The selected edit route may equal the original teacher tab URL.
+          // Our explicit My Sets-to-Edit navigation must create a new native
+          // document; retire the old identity only after confirming that.
+          const priorEditOrigin = origins.get(editUrl);
+          const entered = await chrome.tabs.get(tabId);
+          if (entered.status !== "complete" || entered.url !== editUrl ||
+              now() >= probeDeadline) return browserFailure();
+          const enteredOrigin = await script(
+            inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+            [editUrl],
+          );
+          const afterEnter = await chrome.tabs.get(tabId);
+          if (afterEnter.status !== "complete" || afterEnter.url !== editUrl ||
+              now() >= probeDeadline ||
+              typeof enteredOrigin !== "number" ||
+              !Number.isFinite(enteredOrigin) || enteredOrigin <= 0 ||
+              enteredOrigin === priorEditOrigin ||
+              enteredOrigin === origins.get(MY_SETS_URL))
+            return browserFailure();
+          origins.set(editUrl, enteredOrigin);
           expectedReadUrl = editUrl;
           const editState = await readScript(
             inspectBlooketPage as (...args: never[]) => unknown,

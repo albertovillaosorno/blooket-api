@@ -62,14 +62,23 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, capability inspection also began admitting a fresh
+returned edit document when the probed set shares the original teacher tab
+URL. The original epoch cannot authorize the new editor after an explicit
+My Sets-to-Edit navigation, even though both URLs are identical. The host
+rebinds the edit route only to a positive, changed native origin and keeps
+that origin through its modal probes. Synthetic regressions verify both
+normal same-URL round trips and rejection of a stale target document.
+
 On 2026-10-10, read-only capability inspection also began pinning a
 positive native source-document origin before and after permission to leave,
 then rechecking it at the exact tab navigation call. This prevents a same-URL
 reload from turning approval to leave one teacher editor into authority over
 another document. The My Sets-to-Edit probe carries the same owned My Sets
 origin into its navigation guard. Synthetic tests verify that a source reload
-or unavailable document identity cannot initiate the probe. No account
-capability status is inferred.
+or unavailable document identity cannot initiate the probe.
+
+No account capability status is inferred.
 
 On 2026-10-10, the extension worker's read navigation also began
 binding the safe-to-leave approval to one native source-document origin.
