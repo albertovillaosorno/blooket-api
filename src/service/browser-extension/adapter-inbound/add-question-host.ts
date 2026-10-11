@@ -48,6 +48,8 @@ import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
+import { inspectBlooketDocumentOrigin } from
+  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 import {
   closeBlooketQuestionPanel,
   inspectOpenedBlooketQuestion,
@@ -182,17 +184,38 @@ export function createExtensionAddQuestionHost(
         );
         if (!ready.ok) return ready;
 
+        const nativeOrigin = await script(
+          inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+          [editUrl],
+        );
+        if (typeof nativeOrigin !== "number" ||
+            !Number.isFinite(nativeOrigin) || nativeOrigin <= 0)
+          return browserFailure();
+        const sameEditDocument = async (): Promise<boolean> => {
+          const beforeOrigin = await chrome.tabs.get(tabId);
+          if (beforeOrigin.status !== "complete" ||
+              beforeOrigin.url !== editUrl) return false;
+          const current = await script(
+            inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+            [editUrl],
+          );
+          const afterOrigin = await chrome.tabs.get(tabId);
+          return afterOrigin.status === "complete" &&
+            afterOrigin.url === editUrl && current === nativeOrigin;
+        };
+        if (!await sameEditDocument()) return browserFailure();
+
         // An acknowledged injected function may finish on a different route.
         // Confirm ownership around *every* subsequent browser interaction.
         const ownedScript: Script = async (func, args) => {
           const beforeScript = await chrome.tabs.get(tabId);
           if (beforeScript.status !== "complete" ||
-              beforeScript.url !== editUrl)
+              beforeScript.url !== editUrl || !await sameEditDocument())
             throw new Error("browser-write-tab-changed");
           const result = await script(func, args);
           const afterScript = await chrome.tabs.get(tabId);
           if (afterScript.status !== "complete" ||
-              afterScript.url !== editUrl)
+              afterScript.url !== editUrl || !await sameEditDocument())
             throw new Error("browser-write-tab-changed");
           return result;
         };
