@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the reusable text Create Set browser surface began
+forwarding the exact submitted title and description to its separate remote
+observation call. Previously that composition admitted a host receipt
+without even providing the expected saved metadata. Synthetic surface tests
+verify forwarding and reject a mismatched persisted-detail confirmation.
+
 On 2026-10-10, persisted write execution began validating the exact
 mutation-pacing lease and cancellation envelopes before any further work.
 Previously a truthy but malformed pacer reply could skip lease acquisition

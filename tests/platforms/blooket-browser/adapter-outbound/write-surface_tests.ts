@@ -67,8 +67,8 @@ function host(
       calls.push("submit");
       return { ok: true };
     },
-    observeCreateSet: async () => {
-      calls.push("observe");
+    observeCreateSet: async expected => {
+      calls.push("observe:" + JSON.stringify(expected));
       return { ok: true, remoteSetId: "remote-set-1" };
     },
     ...overrides,
@@ -89,7 +89,8 @@ test(
     'prepare:{"title":"Synthetic set",' +
       '"description":"Synthetic description","private":true}',
     "submit",
-    "observe",
+    'observe:{"title":"Synthetic set",' +
+      '"description":"Synthetic description"}',
   ]);
   },
 );
@@ -205,4 +206,25 @@ test("host exceptions never become observed success", async () => {
     calls.map((value) => value.startsWith("prepare") ? "prepare" : value),
     ["open", "prepare", "submit"],
   );
+});
+
+test("Create Set confirmation checks exact submitted metadata", async () => {
+  const calls: string[] = [];
+  const surface = createBlooketBrowserWriteSurface(host(calls, {
+    observeCreateSet: async expected => {
+      calls.push("observe-confirmation");
+      return expected.title === submission.title &&
+          expected.description === submission.description
+        ? { ok: true, remoteSetId: "remote-set-1" }
+        : { ok: false, kind: "browser",
+          code: "blooket-browser-failed" };
+    },
+  }));
+  const result = await surface.createSet({
+    ...submission, description: "Changed by this submission",
+  }, []);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.deepEqual(calls.filter(item => item === "observe-confirmation"),
+    ["observe-confirmation"]);
 });
