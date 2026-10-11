@@ -557,6 +557,35 @@ export function runBlooketAddQuestionPageAction(
         if (picker.files?.length !== 1 || picker.files[0] !== file)
           return failed();
         picker.dispatchEvent(new Event("change", { bubbles: true }));
+        const current = questionForm(input.setId);
+        if (!current || current.form !== resolved.form ||
+            current.question !== resolved.question ||
+            world.__blooketAddQuestionFormWatch !== watch ||
+            watch.document !== document || watch.dirty || watch.submitted ||
+            document.title === "Just a moment..." ||
+            document.querySelector('input[type="password"]') !== null ||
+            !visibleUnique("main") ||
+            !visibleUnique('nav a[href="/my-sets"]') ||
+            document.querySelectorAll(logoutSelector).length !== 1 ||
+            document.querySelector(logoutSelector)?.textContent?.trim() !==
+              "Logout" ||
+            !(visibleUnique(logoutSelector) ||
+              (visibleUnique(accountSelector) &&
+                !!document.querySelector(accountSelector)?.textContent?.trim())))
+          return failed();
+        const visibleStop = (node: Element): boolean => {
+          const bounds = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          return bounds.width > 0 && bounds.height > 0 &&
+            style.display !== "none" && style.visibility === "visible";
+        };
+        if (Array.from(document.querySelectorAll(
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+        )).some(visibleStop) || Array.from(document.querySelectorAll(
+          '[role="dialog"][aria-modal="true"] h3',
+        )).some(node => visibleStop(node) &&
+          node.textContent?.trim() === "Select your organization"))
+          return failed();
         return { ok: true };
       }
       if (watch.form !== resolved.form ||
