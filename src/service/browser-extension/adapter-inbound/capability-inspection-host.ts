@@ -184,20 +184,26 @@ export function createExtensionCapabilityInspectionHost(
         const before = await chrome.tabs.get(tabId);
         if (!before.url || !dashboardTab(before)) return browserFailure();
         originalUrl = before.url;
+        const sourceUrl = before.url;
         // Before navigating to My Sets, reject a teacher-owned editor or
         // modal on the current tab. The guard runs in the page itself.
-        if (before.status !== "complete") return browserFailure();
+        if (before.status !== "complete" ||
+            !await ownsDocument(originalUrl, probeDeadline, true))
+          return browserFailure();
         const safe = await script(
           canLeaveBlooketPageForRead as
             (...args: never[]) => unknown,
         );
         const checked = await chrome.tabs.get(tabId);
         if (safe !== true || checked.status !== "complete" ||
-            checked.url !== originalUrl) return browserFailure();
+            checked.url !== originalUrl ||
+            !await ownsDocument(originalUrl, probeDeadline))
+          return browserFailure();
 
         if (!await navigate(
           chrome, tabId, MY_SETS_URL, originalUrl, pause,
           probeDeadline, now,
+          async () => await ownsDocument(sourceUrl, probeDeadline),
         ))
           return browserFailure();
         const observed = await readScript(
@@ -242,6 +248,7 @@ export function createExtensionCapabilityInspectionHost(
           if (!await navigate(
             chrome, tabId, editUrl, MY_SETS_URL, pause,
             probeDeadline, now,
+            async () => await ownsDocument(MY_SETS_URL, probeDeadline),
           ))
             return browserFailure();
           expectedReadUrl = editUrl;
@@ -425,12 +432,17 @@ async function navigate(
   pause: (ms: number) => Promise<void>,
   deadline: number,
   now: () => number,
+  sourceDocument?: () => Promise<boolean>,
 ): Promise<boolean> {
   if (now() >= deadline) return false;
   const current = await chrome.tabs.get(tabId);
   if (now() >= deadline ||
       (current.url !== url && current.url !== allowedPreviousUrl))
     return false;
+  if (sourceDocument && !await sourceDocument()) return false;
+  const checked = await chrome.tabs.get(tabId);
+  if (now() >= deadline || checked.url !== current.url ||
+      (sourceDocument && checked.status !== "complete")) return false;
   if (current.url !== url) await chrome.tabs.update(tabId, { url });
   for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
     attempt++) {

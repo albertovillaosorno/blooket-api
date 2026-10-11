@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, read-only capability inspection also began pinning a
+positive native source-document origin before and after permission to leave,
+then rechecking it at the exact tab navigation call. This prevents a same-URL
+reload from turning approval to leave one teacher editor into authority over
+another document. The My Sets-to-Edit probe carries the same owned My Sets
+origin into its navigation guard. Synthetic tests verify that a source reload
+or unavailable document identity cannot initiate the probe. No account
+capability status is inferred.
+
 On 2026-10-10, the extension worker's read navigation also began
 binding the safe-to-leave approval to one native source-document origin.
 Previously the worker could validate that leaving a teacher editor was safe,
