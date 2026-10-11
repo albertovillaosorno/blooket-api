@@ -73,6 +73,7 @@ function fakeChrome(options: {
   readonly finalizeFails?: boolean;
   readonly imageProbeReply?: unknown;
   readonly canLeave?: unknown;
+  readonly savePersists?: boolean;
 }) {
   let tab = {
     url: options.initialUrl ??
@@ -80,6 +81,7 @@ function fakeChrome(options: {
     status: "complete",
   };
   let navigated = false;
+  let reloaded = false;
   let modalOpen = false;
   let questionAdded = false;
   let questionPanel = false;
@@ -105,6 +107,13 @@ function fakeChrome(options: {
         navigated = true;
         return tab;
       },
+      reload: async () => {
+        calls.push("reload");
+        tab = { ...tab, status: "loading" };
+        navigated = true;
+        reloaded = true;
+        if (options.savePersists === false) questionAdded = false;
+      },
     },
     scripting: {
       executeScript: async ({ func, args }) => {
@@ -116,7 +125,7 @@ function fakeChrome(options: {
           case "inspectBlooketDocumentOrigin":
             return [{ result: tab.url ===
               "https://dashboard.blooket.com/edit?id=set-fixture"
-              ? 2_000 : 1_000 }];
+              ? (reloaded ? 3_000 : 2_000) : 1_000 }];
           case "canLeaveBlooketPageForRead":
             return [{ result: options.canLeave === undefined
               ? true : options.canLeave }];
@@ -243,7 +252,7 @@ test("host confirms Add Question only after exact read-back", async () => {
   );
   assert.ok(fake.calls.includes("inspectOpenedBlooketQuestion"));
   assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
-  assert.equal(fake.readBackReads(), 2);
+  assert.equal(fake.readBackReads(), 4);
 });
 
 test("image write requires a matching persisted byte digest", async () => {
@@ -260,7 +269,7 @@ test("image write requires a matching persisted byte digest", async () => {
   ), true);
   assert.equal(fake.calls.includes("inspectOpenedBlooketQuestionImage"),
     true);
-  assert.equal(fake.readBackReads(), 3);
+  assert.equal(fake.readBackReads(), 6);
 });
 
 test("image write refuses absent, altered, or malformed byte evidence",
@@ -597,7 +606,7 @@ test("lost Add Question submit acknowledgement confirms exactly one save",
   assert.equal(clicks, 1);
   assert.equal(fake.calls.filter(call =>
     call === "runBlooketAddQuestionPageAction:submit").length, 1);
-  assert.equal(fake.readBackReads(), 2);
+  assert.equal(fake.readBackReads(), 4);
   assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
   },
 );
@@ -859,6 +868,61 @@ test("a new row during read-only inspection invalidates Add Question",
   assert.equal(listReads, 3);
   assert.equal(fake.readBackReads(), 2);
   assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("optimistic Add Question cards require persistence across reload",
+  async () => {
+  const fake = fakeChrome({ savePersists: false });
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.readBackReads(), 2);
+  },
+);
+
+test("post-save user work blocks the confirmation reload",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "canLeaveBlooketPageForRead" &&
+        fake.calls.includes("closeBlooketQuestionPanel"))
+      return [{ result: false }];
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("reload"), false);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("a same-document reload cannot confirm Add Question persistence",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin" &&
+    request.args?.[0] ===
+      "https://dashboard.blooket.com/edit?id=set-fixture"
+      ? [{ result: 2_000 }] : await original(request);
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   assert.equal(fake.calls.filter(call =>
     call === "runBlooketAddQuestionPageAction:submit").length, 1);
   },
