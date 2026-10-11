@@ -872,3 +872,34 @@ these new checks establishes a fresh authenticated loaded-extension
 Create Set or Add Question acceptance run. The previously observed
 ambiguous remote attempt remains subject to its original journal; no
 account content was changed while implementing these guards.
+
+## Browser admission and recovery boundary follow-up (2026-10-10)
+
+The isolated-world Add Question runner now rechecks both the contiguous
+prior question cards and the independently rendered `N Questions` counter
+synchronously at Open and at the final Save Question click. It rejects
+hidden cards, mismatched counters, and a concurrent card that hydrates
+while the hidden question or media field is prepared. These checks cannot
+prove real provider saves without the separate post-reload read-back.
+
+Prepared-media resolution now accepts only exact successful and failed
+port envelopes, validates nested media facts, and owns byte copies before
+journaling. Unknown failure codes, extra fields, unreadable values, and
+malformed successful responses stop before budget reservation or remote
+mutation. Persisted-execution regressions assert no write-attempt journal
+or mutation-budget start is created for these responses.
+
+Session observation, login submission, capability inspection, and set,
+detail, and question reads now reject hidden and symbol-owned extra
+properties in their browser-adapter envelopes. The local bridge also
+requires the extension's exact `null` login-submit acknowledgement and
+validates write result fields independently. No such acknowledgement by
+itself proves an authenticated session or a saved provider mutation.
+
+The portable full validation reached 1,447 passing tests at this point;
+focused browser-extension and write/reconciliation suites passed 197 and
+164 tests respectively. The Linux x64 development package was built and
+verified without producing a macOS release asset. There was no new live
+Create Set, Add Question, browser-worker reload, or native macOS/Safari
+acceptance, so task blooket-09 remains open and earlier ambiguous
+journals retain their existing recovery requirements.
