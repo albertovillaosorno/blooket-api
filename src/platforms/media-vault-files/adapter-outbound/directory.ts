@@ -30,7 +30,8 @@
 //   - Originals are immutable; the index retains one previous-value backup.
 //
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -1272,53 +1273,79 @@ async function readIndex(directory: string): Promise<IndexReadResult> {
     : { kind: "invalid" };
 }
 
-async function readOwnedTextFile(
-  path: string,
-): Promise<
+// Bounded legacy media-index/recovery text and original/rendition bytes.
+// Existing intake is limited to 25 MB; permit historical assets up to 64 MiB
+// for local recovery without allocating an unbounded input buffer.
+const MAX_VAULT_TEXT_BYTES = 16 * 1_024 * 1_024;
+const MAX_VAULT_BINARY_BYTES = 64 * 1_024 * 1_024;
+
+type OwnedBinaryRead =
+  | { readonly kind: "bytes"; readonly value: Uint8Array }
+  | { readonly kind: "missing" }
+  | { readonly kind: "unsafe" }
+  | { readonly kind: "unreadable" }
+  | { readonly kind: "too-large" };
+
+async function readOwnedTextFile(path: string): Promise<
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "missing" }
   | { readonly kind: "unsafe" }
   | { readonly kind: "unreadable" }
 > {
-  try {
-    const metadata = await lstat(path);
-    if (metadata.isSymbolicLink() || !metadata.isFile()) {
-      return { kind: "unsafe" };
-    }
-    return { kind: "text", value: await readFile(path, "utf8") };
-  } catch (error: unknown) {
-    if (isMissingPathError(error)) {
-      return { kind: "missing" };
-    }
-    return { kind: "unreadable" };
-  }
+  const result = await readOwnedBinaryFile(path, MAX_VAULT_TEXT_BYTES);
+  if (result.kind === "bytes")
+    return { kind: "text", value: Buffer.from(result.value).toString("utf8") };
+  return result.kind === "too-large" ? { kind: "unsafe" } : result;
 }
 
 async function readOwnedBinaryFile(
   path: string,
-  maxBytes?: number,
-): Promise<
-  | { readonly kind: "bytes"; readonly value: Uint8Array }
-  | { readonly kind: "missing" }
-  | { readonly kind: "unsafe" }
-  | { readonly kind: "unreadable" }
-  | { readonly kind: "too-large" }
-> {
+  maxBytes = MAX_VAULT_BINARY_BYTES,
+): Promise<OwnedBinaryRead> {
+  let handle;
   try {
-    const metadata = await lstat(path);
-    if (metadata.isSymbolicLink() || !metadata.isFile()) {
-      return { kind: "unsafe" };
-    }
-    if (maxBytes !== undefined && metadata.size > maxBytes) {
-      return { kind: "too-large" };
-    }
-    return { kind: "bytes", value: await readFile(path) };
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch (error: unknown) {
-    if (isMissingPathError(error)) {
-      return { kind: "missing" };
-    }
+    if (isMissingPathError(error)) return { kind: "missing" };
+    if (error instanceof Error && "code" in error &&
+        error.code === "ELOOP") return { kind: "unsafe" };
     return { kind: "unreadable" };
   }
+  let result: OwnedBinaryRead = { kind: "unreadable" };
+  try {
+    const before = await handle.stat();
+    const bound = Math.min(maxBytes, MAX_VAULT_BINARY_BYTES);
+    if (!before.isFile()) result = { kind: "unsafe" };
+    else if (!Number.isSafeInteger(bound) || bound < 1 ||
+        !Number.isSafeInteger(before.size) || before.size > bound)
+      result = { kind: "too-large" };
+    else {
+      const buffer = Buffer.alloc(before.size + 1);
+      let length = 0;
+      let complete = false;
+      while (length < buffer.length) {
+        const part = await handle.read(buffer, length,
+          buffer.length - length, null);
+        if (part.bytesRead === 0) {
+          complete = true;
+          break;
+        }
+        length += part.bytesRead;
+      }
+      const after = await handle.stat();
+      if (complete && before.dev === after.dev &&
+          before.ino === after.ino && before.size === after.size &&
+          before.mtimeMs === after.mtimeMs &&
+          before.ctimeMs === after.ctimeMs)
+        result = { kind: "bytes", value: buffer.subarray(0, length) };
+      else result = { kind: "unsafe" };
+    }
+  } catch {
+    // Unreadable or changing assets do not provide recovery evidence.
+  }
+  try { await handle.close(); }
+  catch { return { kind: "unreadable" }; }
+  return result;
 }
 
 async function fileState(path: string): Promise<FileState> {

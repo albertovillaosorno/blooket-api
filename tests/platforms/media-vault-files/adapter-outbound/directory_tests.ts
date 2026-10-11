@@ -40,6 +40,7 @@ import {
   readdir,
   rm,
   symlink,
+  truncate,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1051,3 +1052,56 @@ async function pathExists(path: string): Promise<boolean> {
       : Promise.reject(error);
   }
 }
+
+test("media index file-size overflow stops without changing vault data",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    await importMediaVaultAsset(directory, firstImport);
+    const index = join(directory, "media.jsonl");
+    await truncate(index, 16 * 1_024 * 1_024 + 1);
+    assert.deepEqual(await loadMediaVault(directory), {
+      ok: false, kind: "io", code: "media-vault-unsafe",
+    });
+    assert.deepEqual(await importMediaVaultAsset(directory, secondImport), {
+      ok: false, kind: "io", code: "media-vault-unsafe",
+    });
+    assert.equal((await lstat(index)).size, 16 * 1_024 * 1_024 + 1);
+    assert.deepEqual(await readFile(join(directory, "originals", "sun.jpg")),
+      Buffer.from(firstImport.originalBytes));
+  });
+  },
+);
+
+test("oversized and symbolic legacy renditions cannot enter read-back",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    await importMediaVaultAsset(directory, firstImport);
+    const rendition = join(directory, "media", "sun.png");
+    await truncate(rendition, 64 * 1_024 * 1_024 + 1);
+    assert.deepEqual(await loadMediaVaultOriginal(directory, "sun", 3), {
+      ok: false, kind: "io", code: "media-vault-unreadable",
+    });
+    assert.equal((await lstat(rendition)).size, 64 * 1_024 * 1_024 + 1);
+    await rm(rendition);
+    const target = join(directory, "unrelated.png");
+    await writeFile(target, Uint8Array.of(123));
+    await symlink(target, rendition);
+    assert.deepEqual(await loadMediaVaultOriginal(directory, "sun", 3), {
+      ok: false, kind: "io", code: "media-vault-unsafe",
+    });
+    assert.deepEqual(await readFile(target), Buffer.from([123]));
+  });
+  },
+);
+
+test("a byte-exact original-source read limit keeps normal media readable",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    await importMediaVaultAsset(directory, firstImport);
+    const loaded = await loadMediaVaultOriginal(directory, "sun", 3);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok)
+      assert.deepEqual(loaded.bytes, Buffer.from(firstImport.originalBytes));
+  });
+  },
+);
