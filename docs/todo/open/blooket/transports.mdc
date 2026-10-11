@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the Create Set ownership claim, preparation and
+single-submit page functions began requiring the exact `/create`
+route without search or fragment. Preparation refuses CSS-hidden
+form inputs, the privacy switch, authenticated shell, or a nonclickable
+Create Set button *before* modifying the provider form. The final
+submit rechecks computed visibility before its only Save click.
+Portable DOM regressions cover query/fragment variants and concealed
+controls without a provider mutation.
+
 On 2026-10-11, the injected Add Question write runner gained
 computed-style checks at the final Open, Save Question, Remove Image
 and read-owned media Cancel controls, as well as its visible set

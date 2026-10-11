@@ -163,7 +163,7 @@ function withPage(
     configurable: true,
     value: EventFixture,
   });
-  if (withSyntheticOwner && href.endsWith("/create")) {
+  if (withSyntheticOwner && new URL(href).pathname === "/create") {
     const form = document.querySelector("form#question-set-form");
     if (form) {
       Object.assign(form, { isConnected: true });
@@ -360,7 +360,8 @@ test("submit refuses stale privacy and ambiguous submit controls", () => {
 
 test("hidden or disabled Create Set buttons cannot be clicked", () => {
   const input = { title: "Synthetic", description: "", private: true };
-  for (const reason of ["disabled", "aria", "hidden", "wrong-tag"] as const) {
+  for (const reason of ["disabled", "aria", "hidden", "css-hidden",
+    "wrong-tag"] as const) {
     const page = fixture(true);
     const button = page.form.selectors["button"]![0]!;
     withPage(page.document, "https://dashboard.blooket.com/create", () => {
@@ -369,6 +370,7 @@ test("hidden or disabled Create Set buttons cannot be clicked", () => {
       if (reason === "aria") button.attributes["aria-disabled"] = "true";
       if (reason === "hidden")
         button.getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (reason === "css-hidden") button.visibility = "hidden";
       if (reason === "wrong-tag") button.tagName = "DIV";
       assert.equal(submitBlooketCreateSetForm(input).ok, false);
       assert.equal(button.clicked, 0);
@@ -796,6 +798,49 @@ test("Create Set refuses hidden ambiguous or inconsistent privacy rows",
       assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
       assert.equal(submitBlooketCreateSetForm(expected).ok, false);
       assert.equal(page.form.selectors["button"]?.[0]?.clicked, 0);
+    });
+  }
+  },
+);
+
+
+test("Create Set refuses query and fragment variants at every write step",
+  () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  for (const suffix of ["?source=teacher", "#teacher-editor"]) {
+    const page = fixture(true);
+    withPage(page.document,
+      "https://dashboard.blooket.com/create" + suffix, () => {
+        assert.equal(runBlooketCreateSetOwnership("claim"), false);
+        assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+        page.title.value = expected.title;
+        assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+        assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+      });
+  }
+  },
+);
+
+test("Create Set form refuses CSS-hidden inputs and Save before mutation",
+  () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  for (const target of ["form", "title", "description", "privacy",
+    "submit", "main", "navigation"] as const) {
+    const page = fixture(true);
+    const element = target === "form" ? page.form :
+      target === "title" ? page.title :
+        target === "description" ? page.description :
+          target === "privacy" ? page.privacy :
+            target === "submit" ? page.form.selectors["button"]![0]! :
+              target === "main" ? page.document.selectors["main"]![0]! :
+                page.document.selectors['nav a[href="/my-sets"]']![0]!;
+    element.visibility = "hidden";
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+      assert.equal(page.title.value, "");
+      assert.equal(page.description.value, "");
+      assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
     });
   }
   },
