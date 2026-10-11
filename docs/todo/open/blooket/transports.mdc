@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the newly added read-only Create Set privacy inspection
+began distinguishing a genuinely not-yet-hydrated Edit Info panel from
+a readable but conflicting saved detail. Only the exact temporary
+`blooket-browser-failed` panel probe may retry: changed set IDs,
+descriptions, malformed envelopes, and unsupported visibility values
+cannot later become successful receipts if the panel updates. A
+portable regression proves the reader stops after the first conflict.
+
 On 2026-10-11, Create Set preparation and final single-click submission
 began reading the switch's *visible sibling privacy paragraph* instead
 of inferring its state from the associated toggle label. The recovered
