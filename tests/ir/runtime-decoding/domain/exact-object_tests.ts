@@ -131,3 +131,23 @@ test("dense arrays reject own index getters and hidden numeric slots",
   assert.equal(isExactDenseArray(hidden), false);
   },
 );
+
+
+test("declared fields require enumerable owned data descriptors", () => {
+  let accessorReads = 0;
+  const value = { ordinary: "ok" } as Record<string, unknown>;
+  Object.defineProperty(value, "hidden", {
+    value: "not-admitted", enumerable: false,
+  });
+  Object.defineProperty(value, "accessor", {
+    enumerable: true,
+    get() { accessorReads++; return "not-admitted"; },
+  });
+  const result = unknownFieldIssues(
+    value, new Set(["ordinary", "hidden", "accessor"]), "$",
+  );
+  assert.deepEqual(result.map(issue => issue.path), [
+    "$.accessor", "$.hidden",
+  ]);
+  assert.equal(accessorReads, 0);
+});

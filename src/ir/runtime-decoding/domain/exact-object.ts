@@ -64,11 +64,20 @@ export function unknownFieldIssues(
   path: string,
 ): readonly ValidationIssue[] {
   return Reflect.ownKeys(value)
-    .filter((key) => typeof key !== "string" || !allowed.has(key))
-    .map((key) => typeof key === "string" ? key : "[symbol]")
-    .sort()
-    .map((key) => ({
-      path: `${path}.${key}`,
+    .map(key => {
+      const name = typeof key === "string" ? key : "[symbol]";
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return {
+        name,
+        admitted: typeof key === "string" && allowed.has(key) &&
+          descriptor !== undefined && descriptor.enumerable &&
+          "value" in descriptor,
+      };
+    })
+    .filter(field => !field.admitted)
+    .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+    .map(field => ({
+      path: `${path}.${field.name}`,
       code: "unknown-field",
       message: "Field is not admitted by this contract.",
     }));
