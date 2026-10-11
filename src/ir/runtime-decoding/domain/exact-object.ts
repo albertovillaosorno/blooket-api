@@ -43,7 +43,8 @@ export function isExactDenseArray(value: unknown): value is unknown[] {
   if (keys.length !== value.length + 1 ||
       !Object.hasOwn(value, "length")) return false;
   for (let index = 0; index < value.length; index++) {
-    if (!Object.hasOwn(value, String(index))) return false;
+    const slot = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!slot || !("value" in slot) || !slot.enumerable) return false;
   }
   return true;
 }

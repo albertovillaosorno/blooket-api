@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, saved-set and question list validation began
+requiring enumerable data descriptors for each dense array index.
+Accessor-backed rows, legacy answers and hidden index properties now
+fail before any index getter executes or influences a publication
+baseline. Synthetic IR tests cover getter traps and nonenumerable
+slots without using account data.
+
 On 2026-10-11, Add Question image preparation began rechecking
 the exact owned question form, visible authenticated shell and
 human-stop evidence after dispatching the provider's file change.

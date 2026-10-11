@@ -304,3 +304,12 @@ test("saved set reads reject inherited and accessor-backed required facts",
   }
   },
 );
+
+
+test("saved-set collection getters cannot run during decoding", () => {
+  const list = Object.defineProperty([{}], "0", {
+    enumerable: true,
+    get() { throw new Error("unexpected set getter"); },
+  });
+  assert.equal(decodeBlooketSetList(list).ok, false);
+});

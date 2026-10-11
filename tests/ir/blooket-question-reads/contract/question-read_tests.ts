@@ -595,3 +595,20 @@ test("question reads require directly owned data, never inherited getters",
   assert.equal(decodeBlooketQuestionImageEvidence(digest).ok, false);
   },
 );
+
+
+test("saved-question collection getters cannot run during decoding",
+  () => {
+  const list = Object.defineProperty([{}], "0", {
+    enumerable: true,
+    get() { throw new Error("unexpected question getter"); },
+  });
+  assert.equal(decodeBlooketQuestionReadList(list).ok, false);
+  const answers = Object.defineProperty(["sun"], "0", {
+    enumerable: true,
+    get() { throw new Error("unexpected answer getter"); },
+  });
+  assert.equal(decodeBlooketQuestionRead({ ...question, answers }).ok,
+    false);
+  },
+);
