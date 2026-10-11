@@ -361,7 +361,7 @@ async function safeListProbe(
       return browserReadFailure();
     if (result.ok === false) return validateReadFailure(result);
     if (result.ok === true &&
-        Object.keys(result).sort().join() === "completeness,ok,value" &&
+        exactProbeKeys(result, "completeness,ok,value") &&
         (result.completeness === "complete" ||
           result.completeness === "unknown"))
       return {
@@ -384,7 +384,7 @@ async function safeProbe(
       return browserReadFailure();
     if (result.ok === false) return validateReadFailure(result);
     if (result.ok === true &&
-        Object.keys(result).sort().join() === "ok,value")
+        exactProbeKeys(result, "ok,value"))
       return { ok: true, value: result.value };
     return browserReadFailure();
   } catch {
@@ -401,12 +401,20 @@ async function safeQuestionProbe(
 function validateReadFailure(
   result: { readonly ok: false; readonly code: unknown },
 ): Extract<BlooketSetProbeResult, { readonly ok: false }> {
-  if (Object.keys(result).sort().join() === "code,ok" &&
+  if (exactProbeKeys(result, "code,ok") &&
       (result.code === "blooket-browser-failed" ||
         result.code === "blooket-browser-incompatible" ||
         result.code === "blooket-browser-unavailable"))
     return { ok: false, code: result.code };
   return browserReadFailure();
+}
+
+function exactProbeKeys(value: unknown, expected: string): boolean {
+  try {
+    return !!value && typeof value === "object" &&
+      !Array.isArray(value) &&
+      Reflect.ownKeys(value).sort().join() === expected;
+  } catch { return false; }
 }
 
 function browserReadFailure(): Extract<
