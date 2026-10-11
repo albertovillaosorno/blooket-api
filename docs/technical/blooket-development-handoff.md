@@ -1059,3 +1059,27 @@ These are synthetic Fedora browser/IR checks, not evidence of actual
 authenticated Create Set or Add Question persistence. The prior ambiguous
 account publication journal remains preserved, and no new live write was
 performed. Task `blooket-09` stays open until loaded-extension acceptance.
+
+## Read-only capability identity and Chrome receipts (2026-10-11)
+
+The first verified Add Question capability panel pins its exact form
+and hidden question input. A later same-set form replacement latches
+loss of ownership: Audio inspection and either Cancel action cannot
+transfer to teacher work. A repeated opener cannot replace a pending
+same-document capability watch or reopen behind an Audio drawer.
+
+The first verified Audio Plus drawer also pins its element identity.
+A new drawer with identical labels cannot inherit read-owned Cancel
+authority. Unrecognized query/fragment state prevents the initial
+capability navigation from leaving a teacher-selected route.
+
+Capability inspection now validates both saved-set views and Plus-gate
+observations as exact enumerable own-data envelopes before comparing
+snapshots. Chrome scripting results must also expose a direct,
+enumerable `result` data field; hidden fields and accessor getters never
+become read evidence in the capability host or the main worker.
+
+These changes are supported by synthetic browser and host regressions.
+They do not establish live loaded-extension publication, remote quiz
+persistence, or native macOS/Safari acceptance. Task `blooket-09` stays
+open; old ambiguous publication attempts must not be replayed.
