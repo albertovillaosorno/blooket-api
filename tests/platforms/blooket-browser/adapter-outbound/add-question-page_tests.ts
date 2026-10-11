@@ -1309,3 +1309,35 @@ test("hidden image-envelope fields cannot reach provider File controls",
   });
   },
 );
+
+
+test("Add Question preparation rejects changes inside provider events",
+  () => {
+  const variants = ["form", "raw", "challenge", "security", "sidebar"] as const;
+  for (const kind of variants) {
+    const page = fixture();
+    page.hidden.dispatchEvent = event => {
+      if (event.type !== "input") return true;
+      if (kind === "form")
+        page.document.selectors['input#question[name="question"]'] =
+          [node("INPUT", "", { type: "hidden" })];
+      if (kind === "raw") page.hidden.value += " ";
+      if (kind === "challenge")
+        page.document.selectors[
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        ] = [node("IFRAME")];
+      if (kind === "security")
+        Object.assign(page.document, { title: "Just a moment..." });
+      if (kind === "sidebar")
+        page.document.selectors['nav a[href="/my-sets"]'] = [];
+      return true;
+    };
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+        assert.equal(prepareBlooketAddQuestionForm(typing).ok, false, kind);
+        assert.equal(submitBlooketAddQuestionForm(typing).ok, false, kind);
+        assert.equal(page.submit.clicked, 0, kind);
+      });
+  }
+  },
+);
