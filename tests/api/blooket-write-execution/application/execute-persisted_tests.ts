@@ -2123,3 +2123,33 @@ test("forged browser write acknowledgements keep the durable ambiguity",
   }
   },
 );
+
+test("untrusted pacing responses cannot bypass an execution lease",
+  async () => {
+  const bad: unknown[] = [
+    { ok: "true", lease: { startedAtMs: 0, release() {} } },
+    { ok: true, lease: { startedAtMs: 0 } },
+    { ok: true, lease: { startedAtMs: NaN, release() {} } },
+    { ok: true, lease: { startedAtMs: 0, release() {} }, extra: true },
+    { ok: false, code: "unrecognized" },
+    { ok: false, code: "mutation-pacing-cancelled", extra: true },
+    null,
+  ];
+  for (const reply of bad) await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const mutations: string[] = [];
+    const pacer: BlooketMutationPacer = {
+      acquire: async () => reply as Awaited<ReturnType<
+        BlooketMutationPacer["acquire"]>>,
+    };
+    const result = await executePersistedBlooketWrite(
+      paths, plan, browser([]), secrets(), writes(SET_SUCCESS, mutations),
+      verification({ ok: true, baseline: SET_BASELINE }), { pacer },
+    );
+    assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-failed" });
+    assert.deepEqual(mutations, []);
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" });
+  });
+});

@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, persisted write execution began validating the exact
+mutation-pacing lease and cancellation envelopes before any further work.
+Previously a truthy but malformed pacer reply could skip lease acquisition
+while still proceeding to reserve budget, journal an attempt, and mutate.
+Synthetic tests verify unknown codes, missing release methods, and malformed
+lease timestamps stop before mutation or durable attempt creation.
+
 On 2026-10-10, explicit reconciliation began requiring exact
 `not-confirmed` and `confirmed` resolution envelopes. Previously the public
 reconciliation entrypoint could accept a negative result with extra or
