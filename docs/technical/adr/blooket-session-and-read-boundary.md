@@ -92,6 +92,11 @@ origin, late inspection, or manual route change cannot admit a saved-state read.
 Session observation remains non-navigating and does not need document
 replacement.
 
+Read-only capability inspection pins separate native origins for My Sets and
+the subsequently navigated edit route. All question modal, Audio drawer, and
+cleanup helpers must remain in that same edit document; a replacement is
+not eligible for automated Cancel or route restoration.
+
 Saved Set Detail reads likewise pin the native document origin through the
 sidebar baseline, metadata editor, and cancellation check. Their cleanup must
 never click a replacement document at an unchanged edit URL.

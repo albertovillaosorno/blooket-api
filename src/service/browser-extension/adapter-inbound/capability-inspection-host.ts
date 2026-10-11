@@ -47,6 +47,8 @@ import {
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import { inspectBlooketDocumentOrigin } from
+  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 
 interface BrowserTab {
   readonly url?: string;
@@ -114,6 +116,30 @@ export function createExtensionCapabilityInspectionHost(
       const probeDeadline = startedAt + PROBE_BUDGET_MS;
       const finishDeadline = startedAt + TOTAL_BUDGET_MS;
       let expectedReadUrl = MY_SETS_URL;
+      const origins = new Map<string, number>();
+      const ownsDocument = async (
+        url: string, deadline: number, first = false,
+      ): Promise<boolean> => {
+        if (now() >= deadline) return false;
+        const before = await chrome.tabs.get(tabId);
+        if (before.status !== "complete" || before.url !== url ||
+            now() >= deadline) return false;
+        const observed = await script(
+          inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+          [url],
+        );
+        const after = await chrome.tabs.get(tabId);
+        if (after.status !== "complete" || after.url !== url ||
+            now() >= deadline || typeof observed !== "number" ||
+            !Number.isFinite(observed) || observed <= 0) return false;
+        const prior = origins.get(url);
+        if (prior === undefined) {
+          if (!first) return false;
+          origins.set(url, observed);
+          return true;
+        }
+        return observed === prior;
+      };
       const readScript = async (
         func: (...args: never[]) => unknown,
         args: unknown[] = [],
@@ -125,9 +151,12 @@ export function createExtensionCapabilityInspectionHost(
           now() >= probeDeadline || beforeScript.status !== "complete" ||
           beforeScript.url !== expectedReadUrl
         ) throw new Error("browser-capability-tab-changed");
+        if (!await ownsDocument(expectedReadUrl, probeDeadline, true))
+          throw new Error("browser-capability-document-changed");
         const result = await script(func, args);
-        if (now() >= probeDeadline)
-          throw new Error("browser-capability-deadline");
+        if (now() >= probeDeadline ||
+            !await ownsDocument(expectedReadUrl, probeDeadline))
+          throw new Error("browser-capability-document-changed");
         const afterScript = await chrome.tabs.get(tabId);
         if (
           now() >= probeDeadline || afterScript.status !== "complete" ||
@@ -138,8 +167,8 @@ export function createExtensionCapabilityInspectionHost(
       const editorReady = async (url: string): Promise<boolean> => {
         if (now() >= probeDeadline) return false;
         const tab = await chrome.tabs.get(tabId);
-        return now() < probeDeadline &&
-          tab.status === "complete" && tab.url === url;
+        return now() < probeDeadline && tab.status === "complete" &&
+          tab.url === url && await ownsDocument(url, probeDeadline);
       };
       let originalUrl: string | undefined;
       let setId: string | undefined;
@@ -307,7 +336,8 @@ export function createExtensionCapabilityInspectionHost(
           .catch(() => undefined);
         const canClean = cleanupUrl !== undefined &&
           tabBeforeCleanup?.status === "complete" &&
-          tabBeforeCleanup.url === cleanupUrl;
+          tabBeforeCleanup.url === cleanupUrl &&
+          await ownsDocument(cleanupUrl, finishDeadline).catch(() => false);
         // Chrome serializes each cleanup helper independently. The initial
         // route check does not own later scripts if the user navigates during
         // Cancel or a closure poll, so recheck around every helper.
@@ -318,9 +348,12 @@ export function createExtensionCapabilityInspectionHost(
           const before = await chrome.tabs.get(tabId);
           if (before.status !== "complete" || before.url !== cleanupUrl)
             throw new Error("browser-capability-tab-changed");
+          if (!await ownsDocument(cleanupUrl!, finishDeadline))
+            throw new Error("browser-capability-document-changed");
           const result = await script(func, args);
           const after = await chrome.tabs.get(tabId);
-          if (after.status !== "complete" || after.url !== cleanupUrl)
+          if (after.status !== "complete" || after.url !== cleanupUrl ||
+              !await ownsDocument(cleanupUrl!, finishDeadline))
             throw new Error("browser-capability-tab-changed");
           return result;
         };
@@ -353,7 +386,18 @@ export function createExtensionCapabilityInspectionHost(
         if (!drawerCleaned || !questionCleaned)
           outcome = browserFailure();
         if (originalUrl !== undefined && drawerCleaned && questionCleaned) {
-          const restored = await restore(
+          const current = await chrome.tabs.get(tabId).catch(() => undefined);
+          // An unhydrated My Sets page that this probe navigated to may
+          // safely be left before any question editor or document was claimed.
+          // Once evidence is collected, an unexpected reload is not ours.
+          const unclaimedListing = current?.url === MY_SETS_URL &&
+            setId === undefined && !origins.has(MY_SETS_URL);
+          const canRestore = current?.url === originalUrl ||
+            unclaimedListing ||
+            (typeof current?.url === "string" &&
+              await ownsDocument(current.url, finishDeadline)
+                .catch(() => false));
+          const restored = canRestore && await restore(
             chrome,
             tabId,
             originalUrl,
