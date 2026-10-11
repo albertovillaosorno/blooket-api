@@ -1399,7 +1399,9 @@ test("My Sets refuses filtered and fragmented collection routes", () => {
 test("Create and Edit status refuses extra URL state", () => {
   const { document, main } = base();
   document.selectors["form#question-set-form"] = [node("FORM")];
-  document.selectors["form#question-set-form button"] = [node("BUTTON", "Create Set")];
+  document.selectors["form#question-set-form button"] = [
+    node("BUTTON", "Create Set"),
+  ];
   for (const suffix of ["", "?draft=1", "#draft"]) {
     page(document, "https://dashboard.blooket.com/create" + suffix, () => {
       const result = inspectBlooketPage({ kind: "session.observe" });
