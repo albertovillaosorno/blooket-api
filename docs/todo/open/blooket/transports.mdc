@@ -62,6 +62,16 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, explicit login hosting began pinning one positive native
+identity-page document origin before forwarding credential input, during
+prepared-state polling, and immediately before its only possible submit.
+Previously a reload to the exact same `/login` URL could reuse stale proof
+from another document and send credentials to a replacement form.
+
+Synthetic tests replace the document during preparation and polling, and
+reject missing, nonnumeric, and nonpositive origins before any credentials
+are supplied. No login success or challenge bypass is inferred.
+
 On 2026-10-10, the read-only capability probe began tracking a positive
 native document origin separately on My Sets and on the probed edit route.
 The previous URL/status checks could mix separate documents, dismiss an

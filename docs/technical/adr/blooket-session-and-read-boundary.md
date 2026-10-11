@@ -45,6 +45,11 @@ trigger security-domain credential retrieval. The application passes those
 credentials directly to the browser-session port, discards them after the call,
 and performs a fresh observation before reporting readiness.
 
+The explicit login host also requires the same native identity-page document
+origin before sending credentials to each prepared-state operation. A reload
+at the same `/login` URL invalidates further credentials and never triggers
+a second submission.
+
 The browser adapter may submit only the exact observed identity login surface;
 submission itself is not evidence that authentication succeeded.
 
