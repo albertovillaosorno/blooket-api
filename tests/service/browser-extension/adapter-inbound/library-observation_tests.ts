@@ -96,3 +96,16 @@ test("unavailable models and unknown builds preserve visible read semantics",
   }
   },
 );
+
+
+test("captured model envelopes reject hidden and symbol-owned fields",
+  () => {
+  for (const malformed of [
+    Object.defineProperty({ ...captured }, "hidden", {
+      enumerable: false, value: "untrusted",
+    }),
+    { ...captured, [Symbol("hidden")]: "untrusted" },
+  ]) assert.deepEqual(checkBlooketLibraryObservation(observed,
+    malformed), failed);
+  },
+);

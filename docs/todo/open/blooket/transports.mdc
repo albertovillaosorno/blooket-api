@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the browser worker began applying the same strict
+set-list admission to both initial and second My Sets observations.
+Malformed rows and nonenumerable fields in the final snapshot cannot
+pass a JSON string comparison into publication reconciliation. The
+shared versioned runtime object decoder also rejects symbol-owned and
+hidden extra fields, and the captured initial-library model envelope
+is checked by all own keys. Synthetic worker, IR, and library-model
+regressions cover these contradictions; no account mutation occurred.
+
 On 2026-10-11, question-panel read and cleanup helpers also began
 requiring a CSS-visible authenticated shell and Cancel control.
 A CSS-hidden read-owned Cancel button with nonzero layout bounds
