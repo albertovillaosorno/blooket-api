@@ -92,6 +92,8 @@ test(
   let listEmptyDrifts = false;
   let listInvalidEnvelope = false;
   let listSecondHiddenEnvelope = false;
+  let listSecondAccessorEnvelope = false;
+  let listSecondNonEnumerableField = false;
   let listSecondHiddenRow = false;
   let listFirstInvalidRow = false;
   let listModelSource: string | null = null;
@@ -545,6 +547,15 @@ test(
             Object.defineProperty(reply, "hidden", {
               value: "untrusted", enumerable: false,
             });
+          if (setListReads === 2 && listSecondAccessorEnvelope)
+            Object.defineProperty(reply, "value", {
+              enumerable: true,
+              get() { throw new Error("untrusted worker getter"); },
+            });
+          if (setListReads === 2 && listSecondNonEnumerableField)
+            Object.defineProperty(reply, "value", {
+              enumerable: false, value: reply.value,
+            });
           if (setListReads === 2 && listSecondHiddenRow)
             Object.defineProperty(reply.value.items[0], "hidden", {
               value: "untrusted", enumerable: false,
@@ -846,10 +857,13 @@ test(
     assert.equal(setListReads, 1);
     listInvalidEnvelope = false;
     for (const kind of ["first-invalid-row", "second-hidden-envelope",
+      "second-accessor-envelope", "second-nonenumerable-value",
       "second-hidden-row"]) {
       setListReads = 0;
       listFirstInvalidRow = kind === "first-invalid-row";
       listSecondHiddenEnvelope = kind === "second-hidden-envelope";
+      listSecondAccessorEnvelope = kind === "second-accessor-envelope";
+      listSecondNonEnumerableField = kind === "second-nonenumerable-value";
       listSecondHiddenRow = kind === "second-hidden-row";
       const rejected = await expectReply({ kind: "sets.list" });
       assert.equal(rejected.ok, false, kind);
@@ -858,6 +872,8 @@ test(
     }
     listFirstInvalidRow = false;
     listSecondHiddenEnvelope = false;
+    listSecondAccessorEnvelope = false;
+    listSecondNonEnumerableField = false;
     listSecondHiddenRow = false;
     listEmpty = true;
     setListReads = 0;
