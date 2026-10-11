@@ -254,6 +254,16 @@ export function createExtensionAddQuestionHost(
         );
         if (!exactPreviousQuestionNumbers(prior, input.number))
           return browserFailure();
+        // The teacher or provider may append a question between preflight
+        // and modal acquisition. Two exact independent reads are required.
+        await pause(0);
+        const priorAgain = await ownedScript(
+          listBlooketQuestionNumbers as (...args: never[]) => unknown,
+          [input.setId],
+        );
+        if (!exactPreviousQuestionNumbers(priorAgain, input.number) ||
+            JSON.stringify(priorAgain) !== JSON.stringify(prior))
+          return browserFailure();
         const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
           [input.image ? "open-image" : "open", input.setId],

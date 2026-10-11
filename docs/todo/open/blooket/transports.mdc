@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Add Question also began reading the exact prior
+question-number collection twice, with an event-loop yield, before
+opening its form. A newly appeared or malformed card between preflight
+and modal acquisition now blocks the write without a click. Synthetic
+regressions verify no form opens and no mutation begins on this race.
+
 On 2026-10-10, Add Question stopped accepting a same-document card as
 saved remote confirmation. After a single Save and exact owned-modal
 inspection, the host checks that no teacher draft can be lost, reloads
