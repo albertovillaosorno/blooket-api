@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the journaled verification boundary stopped translating
+a generic `not-confirmed` verifier verdict into automatic attempt cleanup.
+Only positive provider evidence can advance this read-only reconciliation
+path: negative labels are still inconclusive because delayed writes cannot
+be ruled out by a bounded browser observation. Explicit, separately
+supported reconciliation remains available for independently established
+negative evidence; portable tests protect the pending journal.
+
 On 2026-10-10, canonical publication tests also began enforcing
 that an unchanged collection during an uncertain Create Set does not
 release the journal, authorize a subsequent publication step, or allow

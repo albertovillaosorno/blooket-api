@@ -244,7 +244,9 @@ async function verifyPersistedBlooketWriteUnderLock(
     }
     return mapNavigationStop(verified.state, recovery);
   }
-  if (verified.outcome === "inconclusive") {
+  if (verified.outcome !== "confirmed") {
+    // A generic read-only verifier cannot prove that a delayed provider
+    // mutation will never commit. Do not clear its journal automatically.
     return {
       ok: true,
       kind: "reconciliation-required",
@@ -258,16 +260,8 @@ async function verifyPersistedBlooketWriteUnderLock(
     paths.checkpoint,
     paths.attempt,
     plan,
-    verified.outcome === "confirmed"
-      ? {
-          operationId: operation.operationId,
-          outcome: "confirmed",
-          receipt: verified.receipt,
-        }
-      : {
-          operationId: operation.operationId,
-          outcome: "not-confirmed",
-        },
+    { operationId: operation.operationId, outcome: "confirmed",
+      receipt: verified.receipt },
   );
 }
 
