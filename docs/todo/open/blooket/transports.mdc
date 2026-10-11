@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, a synthetic Flight normalization regression exposed a direct
+object/array cycle bypass: the memoized output was returned while its source
+object was still resolving. The normalizer now checks active recursion before
+the completed-object memo. Shared acyclic objects remain reusable. This guards
+programmatic row inputs; ordinary decoded JSON cannot itself encode cycles.
+
 On 2026-10-10, a private extension-local candidate decoder was added for
 My Sets server-rendered Flight data. It is gated on the specific observed
 `349b82c80fc4a5a2001e609136cfed32747ba3f4` build, the client module

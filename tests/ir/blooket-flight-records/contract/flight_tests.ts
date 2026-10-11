@@ -96,6 +96,23 @@ test("Flight references reject missing unsupported and cyclic graphs", () => {
   );
 });
 
+test("direct cyclic object graphs cannot bypass Flight cycle checks", () => {
+  const object: { self?: unknown } = {};
+  object.self = object;
+  const array: unknown[] = [];
+  array.push(array);
+  const mixed: { children: unknown[] } = { children: [] };
+  mixed.children.push(mixed);
+  for (const value of [object, array, mixed]) {
+    assert.throws(() => flightObjects(new Map([["0", value]])),
+      /flight-cycle/u);
+  }
+  // Reusing a fully resolved object is not a cycle and preserves identity.
+  const shared = { title: "Fictional" };
+  const resolved = flightObjects(new Map([["0", [shared, shared]]]));
+  assert.deepEqual(resolved, [{ title: "Fictional" }]);
+});
+
 test("action state validation is exact and never coerces primitives", () => {
   const row = (value: unknown) => "0:" + JSON.stringify(value) + "\n";
   assert.deepEqual(flightActionState(row(action)), action);
