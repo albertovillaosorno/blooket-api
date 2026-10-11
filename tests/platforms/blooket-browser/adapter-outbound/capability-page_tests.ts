@@ -751,3 +751,64 @@ test("capability modal and Audio controls refuse disabled actions", () => {
     assert.equal(page.cancel.clicked, 1);
   });
 });
+
+test("capability probing refuses noncanonical Edit query and fragment", () => {
+  for (const suffix of ["&source=teacher", "#teacher-panel"]) {
+    const page = fixture();
+    withPage(page.document, () => {
+      Object.defineProperty(globalThis, "location", {
+        configurable: true,
+        value: new URL("https://dashboard.blooket.com/edit?id=set-fixture" +
+          suffix),
+      });
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(page.add.clicked, 0);
+    });
+  }
+});
+
+test("CSS-hidden capability opener and Audio controls never click", () => {
+  for (const selector of ["main", 'nav a[href="/my-sets"]']) {
+    const page = fixture();
+    withPage(page.document, () => {
+      const shell = page.document.selectors[selector]![0]!;
+      shell.computedStyle.visibility = "hidden";
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(page.add.clicked, 0);
+    });
+  }
+  const page = fixture();
+  withPage(page.document, () => {
+    page.add.computedStyle.display = "none";
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    page.add.computedStyle.display = "block";
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    page.audio.computedStyle.visibility = "hidden";
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(page.audio.clicked, 0);
+    page.cancel.computedStyle.display = "none";
+    assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.cancel.clicked, 0);
+  });
+});
+
+test("hidden Audio drawers are not capability evidence", () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    const panel = drawer("supported");
+    page.document.selectors['aside[data-drawer-open="true"]'] = [panel];
+    panel.computedStyle.visibility = "hidden";
+    assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok, false);
+    panel.computedStyle.visibility = "visible";
+    assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
+      ok: true, value: "supported",
+    });
+  });
+});

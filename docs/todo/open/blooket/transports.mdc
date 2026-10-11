@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the read-only account capability helpers began
+requiring an exact `/edit?id=<set-id>` route and CSS-visible shell
+and click controls for Add Question, Audio and owned cancellation.
+A hidden Audio drawer also cannot prove Plus entitlement merely
+from retained DOM. Synthetic tests cover altered edit routes and
+concealed controls without saving, uploading or contacting an account.
+
 On 2026-10-11, the native My Sets reader and session-state probe
 began rejecting route variants with query parameters or fragments.
 A filtered folder page cannot become a complete saved collection,

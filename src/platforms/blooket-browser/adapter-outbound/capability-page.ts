@@ -90,7 +90,9 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -135,6 +137,7 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       !setId ||
       setId.length > 512 ||
       /[\x00-\x1f\x7f]/u.test(setId) ||
+      url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -159,7 +162,10 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
     if (buttons.length !== 1) return false;
     const control = buttons[0] as HTMLButtonElement;
     const bounds = control.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+    const style = getComputedStyle(control);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
     // Only this read may cancel the question form; any trusted human action
     // relinquishes ownership, including interactions in its Audio drawer.
@@ -211,7 +217,9 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -261,6 +269,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       !setId ||
       setId.length > 512 ||
       /[\x00-\x1f\x7f]/u.test(setId) ||
+      url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -295,7 +304,9 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -345,6 +356,7 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
       /[\x00-\x1f\x7f]/u.test(setId) ||
+      url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId ||
       document.querySelectorAll('aside[data-drawer-open="true"]').length !== 0
@@ -374,7 +386,10 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     if (buttons.length !== 1) return false;
     const control = buttons[0] as HTMLButtonElement;
     const bounds = control.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+    const style = getComputedStyle(control);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
     control.click();
     return true;
@@ -397,7 +412,9 @@ export function inspectBlooketAudioCapabilityDrawer(
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -447,6 +464,7 @@ export function inspectBlooketAudioCapabilityDrawer(
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
       /[\x00-\x1f\x7f]/u.test(setId) ||
+      url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -473,6 +491,11 @@ export function inspectBlooketAudioCapabilityDrawer(
     );
     if (drawers.length !== 1) return failed();
     const drawer = drawers[0]!;
+    const drawerBounds = drawer.getBoundingClientRect();
+    const drawerStyle = getComputedStyle(drawer);
+    if (drawerBounds.width <= 0 || drawerBounds.height <= 0 ||
+        drawerStyle.display === "none" ||
+        drawerStyle.visibility !== "visible") return failed();
     const titles = Array.from(drawer.querySelectorAll("span"))
       // The live upsell repeats its title inside the subscription link.
       // Interactive labels are not drawer headings; duplicate headings stop.
@@ -514,7 +537,9 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -562,6 +587,7 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
       /[\x00-\x1f\x7f]/u.test(setId) ||
+      url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
     )
@@ -593,7 +619,10 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     if (cancels.length !== 1) return false;
     const control = cancels[0] as HTMLButtonElement;
     const bounds = control.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+    const style = getComputedStyle(control);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
     control.click();
     return true;
@@ -610,7 +639,9 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -668,6 +699,7 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
       !/[\x00-\x1f\x7f]/u.test(setId) &&
+      !url.hash && url.searchParams.size === 1 &&
       url.searchParams.getAll("id").length === 1 &&
       url.searchParams.get("id") === setId &&
       document.querySelectorAll(
@@ -687,7 +719,9 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -737,6 +771,7 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       url.origin !== "https://dashboard.blooket.com" ||
       url.pathname !== "/edit" ||
       /[\x00-\x1f\x7f]/u.test(setId) ||
+      url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId ||
       document.querySelectorAll('aside[data-drawer-open="true"]').length !== 0
@@ -765,7 +800,10 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     if (cancels.length !== 1) return false;
     const control = cancels[0] as HTMLButtonElement;
     const bounds = control.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || control.disabled ||
+    const style = getComputedStyle(control);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
     control.click();
     const owned = (globalThis as typeof globalThis & {
@@ -786,7 +824,9 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -827,6 +867,7 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
       !/[\x00-\x1f\x7f]/u.test(setId) &&
+      !url.hash && url.searchParams.size === 1 &&
       url.searchParams.getAll("id").length === 1 &&
       url.searchParams.get("id") === setId &&
       document.querySelector('input#question[name="question"]') === null &&
