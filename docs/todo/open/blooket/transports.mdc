@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, Create Set form preparation began rechecking the
+same owned document, form, visible controls, privacy row and provider
+human-stop gates after each input/change dispatch. A synchronous
+React remount, new CAPTCHA or organization prompt, hidden description,
+or changed privacy state now stops before the next input or toggle.
+Synthetic tests inject these changes between title, description and
+privacy mutations without submitting a provider form.
+
 On 2026-10-11, saved-set and saved-question versioned decoders
 began accepting only directly owned data fields for required metadata,
 answers and image identities. Prototype-inherited values and
