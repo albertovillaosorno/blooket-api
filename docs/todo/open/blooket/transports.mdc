@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the portable Create Set browser surface began requiring
+exact host acknowledgements at Open, Prepare, Submit, and saved-receipt
+observation boundaries. Previously a truthy malformed success could trigger
+the next mutation step, while an extra-field receipt could become a reported
+set ID. Synthetic regressions reject malformed intermediate and final host
+replies without treating them as saved provider state.
+
 On 2026-10-10, the reusable text Create Set browser surface began
 forwarding the exact submitted title and description to its separate remote
 observation call. Previously that composition admitted a host receipt
