@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, canonical publication tests also began enforcing
+that an unchanged collection during an uncertain Create Set does not
+release the journal, authorize a subsequent publication step, or allow
+an application update. Former tests assumed the opposite and would have
+allowed a delayed provider save to race a duplicate retry. The full
+portable suite passes with the stricter recovery requirement.
+
 On 2026-10-10, differential Create Set and Add Question reconciliation
 began requiring two independently read, identical positive collections
 before confirming a pending attempt. Create Set also repeats the saved
