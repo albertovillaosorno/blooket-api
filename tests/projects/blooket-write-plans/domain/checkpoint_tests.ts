@@ -469,3 +469,33 @@ test("checkpoint decoding rejects unknown fields and invalid bounds", () => {
     );
   }
 });
+
+test("durable set IDs obey the canonical bounded opaque ID decoder",
+  () => {
+  const value = plan();
+  const next = value.operations[0]!;
+  for (const invalidId of [
+    "x".repeat(513), "set\nnewline", "set\0null", "set\u007fdelete",
+  ]) {
+    const receipt = { kind: "set-created" as const,
+      remoteSetId: invalidId };
+    const decodedReceipt = decodeBlooketWriteReceipt(receipt);
+    assert.equal(decodedReceipt.ok, false);
+    if (!decodedReceipt.ok)
+      assert.ok(decodedReceipt.issues.some(issue =>
+        issue.code === "invalid-set-id"));
+    assert.deepEqual(advanceBlooketWriteCheckpoint(
+      value, initialBlooketWriteCheckpoint(value), next.operationId,
+      receipt,
+    ), { ok: false, code: "missing-set-receipt" });
+    const restored = decodeBlooketWriteCheckpoint({
+      schemaVersion: 2, planId: value.planId, nextOperationIndex: 1,
+      remoteSetId: invalidId,
+    }, value);
+    assert.equal(restored.ok, false);
+    if (!restored.ok)
+      assert.ok(restored.issues.some(issue =>
+        issue.code === "invalid-set-id"));
+  }
+  },
+);

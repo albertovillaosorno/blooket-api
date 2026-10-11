@@ -38,6 +38,8 @@ import {
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
+import { decodeBlooketSetId } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
 import type {
   BlooketWriteOperation,
   BlooketWritePlan,
@@ -312,6 +314,11 @@ export function decodeBlooketWriteReceipt(
     path + ".remoteSetId",
     issues,
   );
+  if (remoteSetId !== undefined) {
+    const decoded = decodeBlooketSetId(remoteSetId,
+      path + ".remoteSetId");
+    if (!decoded.ok) issues.push(...decoded.issues);
+  }
   if (value["kind"] !== "set-created") {
     issues.push({
       path: path + ".kind",
@@ -346,10 +353,14 @@ function decodeNullableRemoteSetId(
   if (value === null) {
     return null;
   }
-  const decoded = requiredString(value, path, issues);
-  return decoded;
+  const id = decodeBlooketSetId(value, path);
+  if (!id.ok) {
+    issues.push(...id.issues);
+    return undefined;
+  }
+  return id.value;
 }
 
 function isRemoteSetId(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
+  return decodeBlooketSetId(value).ok;
 }
