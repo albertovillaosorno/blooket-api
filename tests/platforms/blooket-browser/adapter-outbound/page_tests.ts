@@ -48,6 +48,8 @@ interface FixtureNode {
   tagName: string;
   textContent: string;
   value?: string;
+  display?: string;
+  visibility?: string;
   labels?: FixtureNode[];
   parentElement?: FixtureNode;
   selectors: Record<string, FixtureNode[]>;
@@ -100,6 +102,15 @@ function node(
 function page(document: FixtureNode, href: string, run: () => void): void {
   const priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const priorStyle = Object.getOwnPropertyDescriptor(globalThis,
+    "getComputedStyle");
+  Object.defineProperty(globalThis, "getComputedStyle", {
+    configurable: true,
+    value: (element: FixtureNode) => ({
+      display: element.display ?? "block",
+      visibility: element.visibility ?? "visible",
+    }),
+  });
   Object.defineProperty(globalThis, "document", {
     configurable: true,
     value: document,
@@ -124,6 +135,9 @@ function page(document: FixtureNode, href: string, run: () => void): void {
     if (priorLocation)
       Object.defineProperty(globalThis, "location", priorLocation);
     else Reflect.deleteProperty(globalThis, "location");
+    if (priorStyle)
+      Object.defineProperty(globalThis, "getComputedStyle", priorStyle);
+    else Reflect.deleteProperty(globalThis, "getComputedStyle");
   }
 }
 function base() {
@@ -190,14 +204,23 @@ test(
       true,
     );
     const shown = main.selectors["article"]![0]!;
+    shown.display = "none";
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    delete shown.display;
     shown.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     shown.getBoundingClientRect = () => ({ width: 20, height: 20 });
     const heading = shown.selectors["h3"]![0]!;
+    heading.visibility = "hidden";
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    delete heading.visibility;
     heading.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     heading.getBoundingClientRect = () => ({ width: 20, height: 20 });
     const editLink = shown.selectors["a[href]"]![0]!;
+    editLink.visibility = "collapse";
+    assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    delete editLink.visibility;
     editLink.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
     editLink.getBoundingClientRect = () => ({ width: 20, height: 20 });
@@ -843,6 +866,13 @@ test("read routes encode IDs and panel opening never submits a form", () => {
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);
+    button.visibility = "hidden";
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    delete button.visibility;
+    button.display = "none";
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    delete button.display;
+    assert.equal(clicks, 1);
     (button as FixtureNode & { disabled?: boolean }).disabled = true;
     assert.equal(openBlooketDetailPanel("fixture"), false);
     (button as FixtureNode & { disabled?: boolean }).disabled = false;
@@ -1113,6 +1143,18 @@ test("owned Edit Info cancellation closes the read-only metadata panel", () => {
       '[role="dialog"][aria-modal="true"] h3'
     ] = [];
     assert.equal(clicks, 0);
+    cancel.visibility = "hidden";
+    assert.equal(close(), false);
+    delete cancel.visibility;
+    title.display = "none";
+    assert.equal(close(), false);
+    delete title.display;
+    const privacyParagraph = privacy.labels![0]!
+      .parentElement!.selectors[":scope > p"]![0]!;
+    privacyParagraph.visibility = "hidden";
+    assert.equal(close(), false);
+    delete privacyParagraph.visibility;
+    assert.equal(clicks, 0);
     title.value = "Unsaved teacher title";
     assert.equal(close(), false);
     assert.equal(clicks, 0);
@@ -1182,6 +1224,19 @@ test("detail baseline requires the original visible unedited sidebar", () => {
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.deepEqual(inspectBlooketDetailSidebar("fixture"), baseline);
     assert.deepEqual(serialized("fixture"), baseline);
+    title.visibility = "hidden";
+    assert.equal(serialized("fixture").ok, false);
+    delete title.visibility;
+    sidebar.display = "none";
+    assert.equal(serialized("fixture").ok, false);
+    delete sidebar.display;
+    description.visibility = "collapse";
+    assert.equal(serialized("fixture").ok, false);
+    delete description.visibility;
+    const opener = main.selectors["button"]![0]!;
+    opener.display = "none";
+    assert.equal(serialized("fixture").ok, false);
+    delete opener.display;
     title.textContent = "  Synthetic fixture  ";
     assert.deepEqual(serialized("fixture"), {
       ok: true, value: {
