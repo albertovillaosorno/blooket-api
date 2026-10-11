@@ -48,7 +48,9 @@ export async function inspectOpenedBlooketQuestionImage(
     // Chrome serializes each injected helper without its module imports.
     const visible = (node: Element): boolean => {
       const bounds = node.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(node);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const uniqueVisible = (selector: string): boolean => {
       const nodes = Array.from(document.querySelectorAll(selector));

@@ -46,6 +46,7 @@ const serialized = (0, eval)("(" +
 function node(tagName: string, textContent = "", type = "") {
   return {
     tagName, textContent, disabled: false, value: "",
+    visibility: "visible", display: "block",
     getBoundingClientRect: () => ({ width: 10, height: 10 }),
     getAttribute: (name: string) => name === "type" ? type : null,
   };
@@ -55,11 +56,14 @@ async function fixture(
   run: (state: ReturnType<typeof setup>) => Promise<void>,
 ): Promise<void> {
   const state = setup();
-  const names = ["document", "location", "fetch", "__blooketQuestionEditWatch"];
+  const names = ["document", "location", "fetch", "getComputedStyle",
+    "__blooketQuestionEditWatch"];
   const previous = names.map(name =>
     Object.getOwnPropertyDescriptor(globalThis, name));
-  const values = [state.document, state.location,
-    state.fetch, state.watch];
+  const values = [state.document, state.location, state.fetch,
+    (node: ReturnType<typeof setup>["save"]) => ({
+      display: node.display, visibility: node.visibility,
+    }), state.watch];
   for (const [i, name] of names.entries()) Object.defineProperty(
     globalThis, name, { configurable: true, writable: true, value: values[i] },
   );
@@ -112,7 +116,8 @@ function setup() {
   const watch = { document, setId: "fixture", number: 1, dirty: false };
   const calls: { url: string; init: RequestInit }[] = [];
   const state = {
-    document, watch, hidden, identity, extra, save, logout, calls,
+    document, watch, hidden, identity, extra, save, cancel, main, nav,
+    logout, calls,
     location: new URL("https://dashboard.blooket.com/edit?id=fixture"),
     response: async () => new Response(png),
     fetch: async (url: string, init: RequestInit) => {
@@ -272,6 +277,31 @@ test("a timed-out image remains unknown and never extends its budget",
         reject(new Error("synthetic-abort")), { once: true });
     });
     assert.deepEqual(await serialized("fixture", 1, 5), unknown);
+    assert.equal(state.calls.length, 1);
+  }),
+);
+
+
+test("CSS-hidden saved-image read controls refuse credential-free fetch",
+  async () => {
+    const controls = ["main", "nav", "logout", "save", "cancel"] as const;
+    for (const control of controls) {
+      await fixture(async state => {
+        state[control].visibility = "hidden";
+        assert.deepEqual(await serialized("fixture", 1, 1_000), failed);
+        assert.equal(state.calls.length, 0);
+      });
+    }
+  },
+);
+
+test("an owned question panel hidden during image fetch loses evidence",
+  async () => fixture(async state => {
+    state.response = async () => {
+      state.cancel.display = "none";
+      return new Response(png);
+    };
+    assert.deepEqual(await serialized("fixture", 1, 1_000), failed);
     assert.equal(state.calls.length, 1);
   }),
 );
