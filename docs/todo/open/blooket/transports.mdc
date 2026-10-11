@@ -62,6 +62,16 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, session inspection began binding both stable navigation
+observations to one native document origin, including the exact
+`https://id.blooket.com/login` identity page. A separate read-only helper
+admits only the dashboard and Blooket identity origins; the saved-data origin
+helper remains dashboard-only.
+
+A synthetic same-route reload now invalidates two otherwise identical session
+replies. The emitted extension helper is also serialized and evaluated without
+its module lexical scope. Neither establishes an authenticated product session.
+
 On 2026-10-10, the extension worker's saved Set Detail path began pinning
 one positive native `performance.timeOrigin` across its sidebar baseline,
 metadata editor open, panel reads, and Cancel confirmation. Checking only the

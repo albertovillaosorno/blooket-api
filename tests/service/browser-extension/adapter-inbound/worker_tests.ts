@@ -75,6 +75,7 @@ test(
   let sessionSwitchAfterScript: string | null = null;
   let observedSessionOverride: string | null = null;
   let driftSessionAtSameRoute = false;
+  let reloadSessionAtSameRoute = false;
   let sessionObservations = 0;
   let listFailuresRemaining = 0;
   let listDrifts = false;
@@ -191,6 +192,10 @@ test(
         }
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
+        if (func.name === "inspectBlooketSessionDocumentOrigin") {
+          assert.deepEqual(args, [tabUrl]);
+          return [{ result: documentOrigin }];
+        }
         if (func.name === "inspectBlooketDocumentOrigin") {
           assert.deepEqual(args, [tabUrl]);
           return [{ result: documentOrigin }];
@@ -392,6 +397,11 @@ test(
         if (operation.kind === "session.observe" &&
             observedSessionOverride !== null) {
           return [{ result: { ok: true, value: observedSessionOverride } }];
+        }
+        if (operation.kind === "session.observe" &&
+            reloadSessionAtSameRoute) {
+          reloadSessionAtSameRoute = false;
+          documentOrigin += 1_000;
         }
         if (operation.kind === "session.observe" &&
             driftSessionAtSameRoute) {
@@ -1080,6 +1090,11 @@ test(
     observedSessionOverride = null;
     assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
     assert.equal((await message({ kind: "status" })).status, "connected");
+    reloadSessionAtSameRoute = true;
+    const afterSameRouteReload = await expectReply({
+      kind: "session.observe",
+    });
+    assert.equal(afterSameRouteReload.ok, false);
     driftSessionAtSameRoute = true;
     sessionObservations = 0;
     const changingSession = await expectReply({ kind: "session.observe" });
