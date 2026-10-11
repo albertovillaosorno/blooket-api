@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, differential Create Set and Add Question reconciliation
+began requiring two independently read, identical positive collections
+before confirming a pending attempt. Create Set also repeats the saved
+metadata detail probe. A transient post-submit card or a concurrently edited
+detail therefore remains inconclusive instead of advancing the durable
+checkpoint. Portable regressions cover disappearing candidates and changed
+saved descriptions.
+
 On 2026-10-10, unchanged My Sets and question collections stopped
 counting as negative proof of an ambiguous write. A provider save may
 become visible only after its first post-submit read; clearing the journal
