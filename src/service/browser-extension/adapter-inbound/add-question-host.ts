@@ -536,6 +536,7 @@ async function observe(script: Script): Promise<string | undefined> {
     [{ kind: "session.observe" }],
   );
   if (
+    !exactKeys(result, "ok,value") ||
     !result ||
     typeof result !== "object" ||
     !("ok" in result) ||
@@ -553,7 +554,7 @@ function matchingQuestion(
   input: BlooketTextQuestionPageInput,
 ): BlooketQuestionRead | undefined {
   if (!result || typeof result !== "object" || Array.isArray(result) ||
-      Object.keys(result).sort().join() !== "ok,value" ||
+      !exactKeys(result, "ok,value") ||
       !("ok" in result) || result.ok !== true ||
       !("value" in result)) return undefined;
   const decoded = decodeBlooketQuestionRead(result.value);
@@ -581,11 +582,11 @@ function imageMatches(
   expected: { readonly byteLength: number; readonly sha256: string },
 ): boolean {
   if (!result || typeof result !== "object" || Array.isArray(result) ||
-      Object.keys(result).sort().join() !== "ok,value" ||
+      !exactKeys(result, "ok,value") ||
       !("ok" in result) || result.ok !== true || !("value" in result) ||
       !result.value || typeof result.value !== "object" ||
       Array.isArray(result.value) ||
-      Object.keys(result.value).sort().join() !== "byteLength,sha256")
+      !exactKeys(result.value, "byteLength,sha256"))
     return false;
   return "byteLength" in result.value && "sha256" in result.value &&
     result.value.byteLength === expected.byteLength &&
@@ -595,14 +596,14 @@ function imageMatches(
 function pageUnavailable(result: unknown): boolean {
   return !!result && typeof result === "object" &&
     !Array.isArray(result) &&
-    Object.keys(result).sort().join() === "code,ok" &&
+    exactKeys(result, "code,ok") &&
     "ok" in result && result.ok === false &&
     "code" in result && result.code === "blooket-browser-failed";
 }
 
 function exactPreviousQuestionNumbers(result: unknown, number: number) {
   if (!result || typeof result !== "object" || Array.isArray(result) ||
-      Object.keys(result).sort().join() !== "ok,value" ||
+      !exactKeys(result, "ok,value") ||
       !("ok" in result) || result.ok !== true ||
       !("value" in result) || !Array.isArray(result.value) ||
       result.value.length !== number - 1 || result.value.length > 200)
@@ -649,13 +650,8 @@ function exactKeys(result: unknown, expected: string): boolean {
 }
 
 function exactOk(value: unknown): boolean {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    Object.keys(value).length === 1 &&
-    "ok" in value &&
-    value.ok === true
-  );
+  return exactKeys(value, "ok") && !!value &&
+    typeof value === "object" && "ok" in value && value.ok === true;
 }
 
 function dashboardTab(tab: BrowserTab): boolean {

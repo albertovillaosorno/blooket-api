@@ -1050,3 +1050,66 @@ test("post-save hidden and symbol fields do not become question evidence",
   }
   },
 );
+
+test("hidden and symbol fields cannot acknowledge Add Question preparation",
+  async () => {
+  for (const unexpected of [
+    Object.defineProperty({ ok: true }, "private", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ok: true, [Symbol("hidden")]: "untrusted" },
+    Object.assign(Object.create({ ok: true }), { extra: "untrusted" }),
+  ]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "runBlooketAddQuestionPageAction" &&
+          request.args?.[0] === "prepare") return [{ result: unexpected }];
+      return await original(request);
+    };
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input)).ok, false);
+    assert.equal(fake.calls.includes(
+      "runBlooketAddQuestionPageAction:submit"), false);
+  }
+  },
+);
+
+test("question read-back rejects hidden or symbol-owned wrapper fields",
+  async () => {
+  for (const envelope of [
+    Object.defineProperty({ ok: true, value: canonicalReadBack },
+      "hidden", { value: "untrusted", enumerable: false }),
+    { ok: true, value: canonicalReadBack,
+      [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fake = fakeChrome({ readBackReplies: [envelope] });
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input)).ok, false);
+    assert.equal(fake.readBackReads(), 1);
+    assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
+    assert.equal(fake.calls.includes("reload"), false);
+  }
+  },
+);
+
+test("image identity refuses hidden and symbol-owned success fields",
+  async () => {
+  const digest = createHash("sha256").update(imageBytes).digest("hex");
+  const value = { byteLength: imageBytes.length, sha256: digest };
+  for (const response of [
+    { ok: true, value: Object.defineProperty({ ...value },
+      "hidden", { value: "untrusted", enumerable: false }) },
+    { ok: true, value, [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fake = fakeChrome({ imageProbeReply: response });
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion({ ...input, image })).ok, false);
+    assert.equal(fake.calls.includes("reload"), false);
+    assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
+  }
+  },
+);
