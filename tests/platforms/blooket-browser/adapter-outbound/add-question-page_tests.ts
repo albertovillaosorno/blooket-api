@@ -1001,3 +1001,49 @@ test("lost text question ownership cannot authorize a hidden form write",
     });
   },
 );
+
+test("Add Question click rechecks the exact prior cards atomically",
+  () => {
+  const selector = '[role="button"][aria-label^="Edit question "]';
+  for (const [number, cards, allowed] of [
+    [1, [], true],
+    [1, ["Edit question 1"], false],
+    [2, ["Edit question 1"], true],
+    [2, [], false],
+    [2, ["Edit question 2"], false],
+    [2, ["Edit question 1", "Edit question 1"], false],
+    [3, ["Edit question 1", "Edit question 3"], false],
+  ] as const) {
+    const page = fixture();
+    closedQuestionEditor(page);
+    page.document.selectors[selector] = cards.map(label =>
+      node("DIV", "", { "aria-label": label }));
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(runBlooketAddQuestionPageAction(
+        "open", "set-fixture", number,
+      ), allowed);
+      assert.equal(page.add.clicked, allowed ? 1 : 0);
+    });
+  }
+  },
+);
+
+test("hidden and malformed prior cards never authorize Add Question",
+  () => {
+  const selector = '[role="button"][aria-label^="Edit question "]';
+  const page = fixture();
+  closedQuestionEditor(page);
+  const hidden = node("DIV", "", { "aria-label": "Edit question 1" });
+  hidden.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  page.document.selectors[selector] = [hidden];
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    for (const number of [-1, 0, 2, 201, 1.5, Infinity])
+      assert.equal(runBlooketAddQuestionPageAction(
+        "open", "set-fixture", number,
+      ), false);
+    assert.equal(page.add.clicked, 0);
+  });
+  },
+);
