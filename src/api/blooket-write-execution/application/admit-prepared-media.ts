@@ -92,24 +92,32 @@ export async function admitBlooketPreparedMedia(
         mediaId,
       };
     }
-    if (!read.ok) {
-      return { ...read, mediaId };
+    let owned: BlooketPreparedMedia;
+    try {
+      if (!read || typeof read !== "object" || Array.isArray(read))
+        return invalidMedia(mediaId);
+      if (read.ok === false) {
+        if (!exactKeys(read, "code,ok") ||
+            (read.code !== "blooket-media-not-prepared" &&
+             read.code !== "blooket-media-stale" &&
+             read.code !== "blooket-media-invalid" &&
+             read.code !== "blooket-media-unavailable"))
+          return invalidMedia(mediaId);
+        return { ok: false, code: read.code, mediaId };
+      }
+      if (read.ok !== true || !exactKeys(read, "ok,value") ||
+          !validPreparedMedia(read.value, mediaId))
+        return invalidMedia(mediaId);
+      // Own the exact validated bytes before another asynchronous lookup.
+      owned = Object.freeze({
+        mediaId: read.value.mediaId, revision: read.value.revision,
+        format: read.value.format, bytes: new Uint8Array(read.value.bytes),
+      });
+      if (!validPreparedMedia(owned, mediaId))
+        return invalidMedia(mediaId);
+    } catch {
+      return invalidMedia(mediaId);
     }
-    if (!validPreparedMedia(read.value, mediaId)) {
-      return {
-        ok: false,
-        code: "blooket-media-invalid",
-        mediaId,
-      };
-    }
-    // The port can reuse its buffers while another stable-ID read awaits.
-    // Own both bytes and scalar facts before yielding or opening a journal.
-    const owned: BlooketPreparedMedia = Object.freeze({
-      mediaId: read.value.mediaId, revision: read.value.revision,
-      format: read.value.format, bytes: new Uint8Array(read.value.bytes),
-    });
-    if (!validPreparedMedia(owned, mediaId))
-      return { ok: false, code: "blooket-media-invalid", mediaId };
     if (snapshot) {
       const expectedIdentity = snapshot.items.find(item =>
         item.mediaId === mediaId);
@@ -150,11 +158,22 @@ function operationMediaIds(
   return result;
 }
 
+function invalidMedia(mediaId: string): AdmitBlooketPreparedMediaResult {
+  return { ok: false, code: "blooket-media-invalid", mediaId };
+}
+
+function exactKeys(value: unknown, names: string): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value) &&
+    Reflect.ownKeys(value).sort().join() === names;
+}
+
 function validPreparedMedia(
   value: BlooketPreparedMedia,
   expectedMediaId: string,
 ): boolean {
   return (
+    !!value && typeof value === "object" && !Array.isArray(value) &&
+    exactKeys(value, "bytes,format,mediaId,revision") &&
     decodeMediaId(value.mediaId).ok
     && value.mediaId === expectedMediaId
     && Number.isSafeInteger(value.revision)
