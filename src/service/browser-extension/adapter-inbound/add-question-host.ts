@@ -166,6 +166,7 @@ export function createExtensionAddQuestionHost(
         const current = await chrome.tabs.get(tabId);
         if (current.status !== "complete" || current.url !== before.url)
           return browserFailure();
+        let sourceOrigin: number | undefined;
         if (current.url !== editUrl) {
           // A write may navigate from My Sets or another dashboard view.
           // Never discard an existing teacher editor to reach its target.
@@ -175,6 +176,7 @@ export function createExtensionAddQuestionHost(
           );
           if (typeof origin !== "number" || !Number.isFinite(origin) ||
               origin <= 0) return browserFailure();
+          sourceOrigin = origin;
           const canLeave = await script(
             canLeaveBlooketPageForRead as (...args: never[]) => unknown,
           );
@@ -205,8 +207,8 @@ export function createExtensionAddQuestionHost(
           [editUrl],
         );
         if (typeof nativeOrigin !== "number" ||
-            !Number.isFinite(nativeOrigin) || nativeOrigin <= 0)
-          return browserFailure();
+            !Number.isFinite(nativeOrigin) || nativeOrigin <= 0 ||
+            nativeOrigin === sourceOrigin) return browserFailure();
         const sameEditDocument = async (): Promise<boolean> => {
           const beforeOrigin = await chrome.tabs.get(tabId);
           if (beforeOrigin.status !== "complete" ||

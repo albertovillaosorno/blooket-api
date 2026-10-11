@@ -179,8 +179,10 @@ export function createExtensionCreateSetHost(
         // A form already on Create may contain unsaved teacher-authored work.
         // Only a freshly navigated product form may be populated and saved.
         if (current.url === CREATE_URL) return browserFailure();
+        let sourceOrigin: number | null = null;
         if (current.url !== CREATE_URL) {
           const origin = await editDocumentOrigin(current.url);
+          sourceOrigin = origin;
           if (origin === null) return browserFailure();
           const canLeave = await script(
             canLeaveBlooketPageForRead as (...args: never[]) => unknown,
@@ -201,14 +203,23 @@ export function createExtensionCreateSetHost(
             // A page-level state alone cannot authorize writes on a different
             // route; a post-script tab check rejects late navigation as well.
             if (tab.url !== CREATE_URL) return browserFailure();
+            // A delayed complete tab can refer to the previous document or
+            // to a page independently reloaded after our navigation. Bind
+            // the page observation and Claim to one newly loaded epoch.
+            const targetOrigin = await editDocumentOrigin(CREATE_URL);
+            if (targetOrigin === null || targetOrigin === sourceOrigin)
+              return browserFailure();
             const observed = await observe(script);
-            if (!await createTabReady()) return browserFailure();
+            if (!await createTabReady() ||
+                await editDocumentOrigin(CREATE_URL) !== targetOrigin)
+              return browserFailure();
             if (observed === "create") {
               const claimed = await script(
                 runBlooketCreateSetOwnership as (...args: never[]) => unknown,
                 ["claim"],
               );
-              return claimed === true && await createTabReady()
+              return claimed === true && await createTabReady() &&
+                await editDocumentOrigin(CREATE_URL) === targetOrigin
                 ? { ok: true } : browserFailure();
             }
             if (observed !== undefined)

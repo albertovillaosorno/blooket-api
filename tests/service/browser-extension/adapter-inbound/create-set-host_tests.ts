@@ -85,7 +85,8 @@ function fakeChrome(options: {
         }
         if (request.func.name === "inspectBlooketDocumentOrigin") {
           calls.push("document-origin");
-          return [{ result: 1_000 }];
+          return [{ result: tab.url ===
+            "https://dashboard.blooket.com/create" ? 2_000 : 1_000 }];
         }
         if (request.func.name === "runBlooketCreateSetOwnership") {
           const action = request.args?.[0];
@@ -966,5 +967,83 @@ test("Create Set refuses navigation without a source document lifetime",
   ).openCreateSet();
   assert.equal(result.ok, false);
   assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("Create Set only claims a freshly navigated target document",
+  async () => {
+  const fake = fakeChrome({
+    afterUpdate: [{
+      url: "https://dashboard.blooket.com/create",
+      status: "complete",
+    }],
+    scripts: [createState],
+  });
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin")
+      return [{ result: 1_000 }];
+    return await execute(request);
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("create-ownership:claim"), false);
+  },
+);
+
+test("Create Set cannot claim a reloaded target during page observation",
+  async () => {
+  const fake = fakeChrome({
+    afterUpdate: [{
+      url: "https://dashboard.blooket.com/create",
+      status: "complete",
+    }],
+    scripts: [createState],
+  });
+  const execute = fake.chrome.scripting.executeScript;
+  let origin = 2_000;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin")
+      return [{ result: request.args?.[0] ===
+        "https://dashboard.blooket.com/my-sets" ? 1_000 : origin }];
+    const result = await execute(request);
+    if (request.func.name === "inspectBlooketPage") origin = 3_000;
+    return result;
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("create-ownership:claim"), false);
+  },
+);
+
+test("Create Set cannot claim a new target document after Claim itself",
+  async () => {
+  const fake = fakeChrome({
+    afterUpdate: [{
+      url: "https://dashboard.blooket.com/create",
+      status: "complete",
+    }],
+    scripts: [createState],
+  });
+  const execute = fake.chrome.scripting.executeScript;
+  let origin = 2_000;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin")
+      return [{ result: request.args?.[0] ===
+        "https://dashboard.blooket.com/my-sets" ? 1_000 : origin }];
+    const result = await execute(request);
+    if (request.func.name === "runBlooketCreateSetOwnership" &&
+        request.args?.[0] === "claim") origin = 3_000;
+    return result;
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("create-ownership:claim"), true);
   },
 );
