@@ -37,6 +37,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
 import {
+  boundedResponseText,
   decodeServiceRuntime,
   existingService,
 } from
@@ -145,5 +146,45 @@ test("service discovery bounds local HTTP status before decoding JSON",
     await new Promise<void>(resolve => server.close(() => resolve()));
     await rm(root, { recursive: true, force: true });
   }
+  },
+);
+
+test("bounded loopback text decodes split UTF-8 within the true byte limit",
+  async () => {
+  let canceled = false;
+  const response = new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(Uint8Array.of(0x63, 0x61, 0x66, 0xc3));
+      controller.enqueue(Uint8Array.of(0xa9));
+      controller.close();
+    },
+    cancel() { canceled = true; },
+  }));
+  assert.equal(await boundedResponseText(response, 5), "café");
+  assert.equal(canceled, false);
+  const overflow = new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(Uint8Array.of(0x63, 0x61, 0x66, 0xc3));
+      controller.enqueue(Uint8Array.of(0xa9));
+    },
+    cancel() { canceled = true; },
+  }));
+  assert.equal(await boundedResponseText(overflow, 4), undefined);
+  assert.equal(canceled, true);
+  },
+);
+
+test("bounded response reader refuses forged size and invalid limits",
+  async () => {
+  const declared = new Response("ignored", {
+    headers: { "Content-Length": "9000" },
+  });
+  assert.equal(await boundedResponseText(declared, 20), undefined);
+  for (const limit of [0, -1, 3.5, NaN, Infinity, 128_001]) {
+    await assert.rejects(boundedResponseText(new Response("ok"), limit),
+      /invalid-response-byte-limit/u);
+  }
+  await assert.rejects(boundedResponseText(new Response(
+    Uint8Array.of(0xc3, 0x28)), 2), /encoded/u);
   },
 );

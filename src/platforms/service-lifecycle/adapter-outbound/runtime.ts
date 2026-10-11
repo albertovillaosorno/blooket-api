@@ -130,6 +130,8 @@ export async function boundedResponseText(
   response: Response,
   maxBytes: number,
 ): Promise<string | undefined> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 ||
+      maxBytes > 128_000) throw new Error("invalid-response-byte-limit");
   const declared = response.headers.get("content-length");
   if (declared !== null && /^[0-9]+$/u.test(declared) &&
       Number(declared) > maxBytes) {

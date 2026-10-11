@@ -152,6 +152,12 @@ stream ceiling, and an exact 43-character base64url token shape.
 A malformed or oversized bootstrap cannot initiate Stop; a synthetic
 loopback launcher subprocess proves both refusal and a normal stop.
 
+The bounded loopback body reader admits only a positive integer ceiling up to
+128 KiB. It counts actual UTF-8 bytes, supports split multibyte sequences,
+and rejects oversized, malformed UTF-8, and claimed oversized responses.
+Portable streamed-response tests verify overflow cancellation before JSON
+admission without exposing any service secrets.
+
 The local service runtime discovery record (`service-runtime.json`) is
 loaded from one `O_NOFOLLOW` descriptor with a 4,096-byte limit. Even the
 localhost status HTTP response is decoded from a bounded stream rather than
