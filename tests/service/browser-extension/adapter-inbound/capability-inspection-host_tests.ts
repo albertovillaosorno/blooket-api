@@ -468,6 +468,40 @@ test(
   },
 );
 
+test("Chrome capability injection results never execute accessors",
+  async () => {
+  let getterCalls = 0;
+  for (const mode of ["getter", "hidden", "missing"] as const) {
+    const page = fixture();
+    const script = page.chrome.scripting.executeScript;
+    page.chrome.scripting.executeScript = async input => {
+      const result = await script(input);
+      if (input.func.name !== "inspectBlooketPage" ||
+          (input.args?.[0] as { kind?: string } | undefined)?.kind !==
+            "sets.list") return result;
+      const wrapper: { result?: unknown } = {};
+      if (mode === "getter") Object.defineProperty(wrapper, "result", {
+        enumerable: true, get: () => {
+          getterCalls++;
+          return result[0]?.result;
+        },
+      });
+      if (mode === "hidden") Object.defineProperty(wrapper, "result", {
+        enumerable: false, value: result[0]?.result,
+      });
+      return [wrapper];
+    };
+    assert.deepEqual(await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect(), { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.scripts.includes(
+      "openBlooketCapabilityQuestionPanel"), false);
+    assert.equal(page.currentUrl(), page.originalUrl);
+  }
+  assert.equal(getterCalls, 0);
+  },
+);
+
 test("unexpected outer list fields fail before edit navigation", async () => {
   const page = fixture({ extraOuterField: true });
   const result = await createExtensionCapabilityInspectionHost(
