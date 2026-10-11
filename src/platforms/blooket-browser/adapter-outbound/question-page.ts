@@ -46,7 +46,9 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -172,7 +174,9 @@ export function openBlooketQuestionPanel(
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -309,7 +313,9 @@ export function inspectOpenedBlooketQuestion(
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -570,7 +576,9 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
@@ -641,7 +649,10 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
     if (buttons.length !== 1) return false;
     const cancel = buttons[0] as HTMLButtonElement;
     const bounds = cancel.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || cancel.disabled ||
+    const style = getComputedStyle(cancel);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        cancel.disabled ||
         cancel.getAttribute("aria-disabled") === "true") return false;
     const world = globalThis as typeof globalThis & {
       __blooketQuestionEditWatch?: {
@@ -682,7 +693,9 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
       const elements = Array.from(document.querySelectorAll(selector));
       if (elements.length !== 1) return false;
       const bounds = elements[0]!.getBoundingClientRect();
+      const style = getComputedStyle(elements[0]!);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         (text === undefined || elements[0]!.textContent?.trim() === text);
     };
     const authenticated =
