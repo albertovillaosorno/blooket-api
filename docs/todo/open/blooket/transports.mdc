@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, capability probe restoration also stopped treating
+mere equality with the original tab URL as proof that the page is still
+owned. After a modal or drawer probe, restoring a claimed route requires a
+stable native document origin both when choosing restoration and immediately
+before the tab update. The legacy best-effort return from an unclaimed,
+still-loading My Sets page is kept separate; it does not claim a successful
+capability snapshot. Synthetic cleanup and round-trip tests remain green.
+
 On 2026-10-10, explicit browser activation began rechecking the tab
 identity, exact URL, and window ownership after Chrome acknowledges its
 foreground request and before the worker focuses a window. Previously a
