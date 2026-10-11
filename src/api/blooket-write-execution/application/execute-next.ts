@@ -38,6 +38,7 @@ import type { ValidationIssue } from
 import {
   advanceBlooketWriteCheckpoint,
   decodeBlooketWriteCheckpoint,
+  decodeBlooketWriteReceipt,
   nextBlooketWriteOperation,
   type BlooketWriteCheckpoint,
 } from "../../../projects/blooket-write-plans/domain/checkpoint.ts";
@@ -336,18 +337,46 @@ async function safeExecute(
   remoteSetId: string | null,
   preparedMedia: readonly BlooketPreparedMedia[],
 ): Promise<BlooketWriteAttemptResult> {
+  const failed = (): BlooketWriteAttemptResult => ({
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
   try {
-    return await writes.execute(
-      operation,
-      { remoteSetId },
-      { preparedMedia },
+    const reply: unknown = await writes.execute(
+      operation, { remoteSetId }, { preparedMedia },
     );
+    if (!reply || typeof reply !== "object" || !("ok" in reply))
+      return failed();
+    const exact = (keys: string) => !Array.isArray(reply) &&
+      Reflect.ownKeys(reply).sort().join() === keys;
+    if (reply.ok === true) {
+      if (!exact("ok,receipt") || !("receipt" in reply))
+        return failed();
+      if (operation.kind === "question" && reply.receipt === null)
+        return { ok: true, receipt: null };
+      if (operation.kind === "set") {
+        const receipt = decodeBlooketWriteReceipt(reply.receipt);
+        if (receipt.ok) return { ok: true, receipt: receipt.value };
+      }
+      return failed();
+    }
+    if (reply.ok !== false || !("kind" in reply)) return failed();
+    if (reply.kind === "browser" && exact("code,kind,ok") &&
+        "code" in reply &&
+        (reply.code === "blooket-browser-failed" ||
+         reply.code === "blooket-browser-unavailable" ||
+         reply.code === "blooket-browser-incompatible"))
+      return { ok: false, kind: "browser", code: reply.code };
+    if (reply.kind === "navigation" && exact("kind,ok,state") &&
+        "state" in reply &&
+        (reply.state === "signed-out" || reply.state === "expired-session" ||
+         reply.state === "organization-prompt" ||
+         reply.state === "rate-limited" ||
+         reply.state === "security-challenge" ||
+         reply.state === "unexpected-page"))
+      return { ok: false, kind: "navigation", state: reply.state };
+    return failed();
   } catch {
-    return {
-      ok: false,
-      kind: "browser",
-      code: "blooket-browser-failed",
-    };
+    return failed();
   }
 }
 
