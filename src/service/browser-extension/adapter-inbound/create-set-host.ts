@@ -45,6 +45,8 @@ import {
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
+import { inspectBlooketDocumentOrigin } from
+  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 
 interface BrowserTab {
   readonly url?: string;
@@ -149,6 +151,20 @@ export function createExtensionCreateSetHost(
   const createTabReady = async (): Promise<boolean> => {
     const tab = await chrome.tabs.get(tabId);
     return tab.status === "complete" && tab.url === CREATE_URL;
+  };
+  // A tab may replace its document while retaining /edit?id= and its title.
+  // Pair every receipt/sidebar script with the same native document lifetime.
+  const editDocumentOrigin = async (url: string): Promise<number | null> => {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.status !== "complete" || tab.url !== url) return null;
+    const observed = await script(
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+      [url],
+    );
+    const after = await chrome.tabs.get(tabId);
+    return after.status === "complete" && after.url === url &&
+        typeof observed === "number" && Number.isFinite(observed) &&
+        observed > 0 ? observed : null;
   };
   return {
     openCreateSet: async () => {
@@ -283,13 +299,16 @@ export function createExtensionCreateSetHost(
                   url.hash || !ids[0] || ids[0].length > 512 ||
                   /[\x00-\x1f\x7f]/u.test(ids[0]))
                 return browserFailure();
+              const origin = await editDocumentOrigin(tab.url);
+              if (origin === null) return browserFailure();
               const result = await script(
                 observeBlooketCreateSetSuccess as
                   (...args: never[]) => unknown,
               );
               const after = await chrome.tabs.get(tabId);
               if (after.status !== "complete" || after.url !== tab.url ||
-                  !exactRedirectReceipt(result, ids[0]))
+                  !exactRedirectReceipt(result, ids[0]) ||
+                  await editDocumentOrigin(tab.url) !== origin)
                 return browserFailure();
               // An edit redirect can hydrate after the first complete page
               // event. One claim is not a stable persisted read-back.
@@ -306,7 +325,8 @@ export function createExtensionCreateSetHost(
               if (afterAgain.status !== "complete" ||
                   afterAgain.url !== tab.url ||
                   !exactRedirectReceipt(again, ids[0]) ||
-                  JSON.stringify(result) !== JSON.stringify(again))
+                  JSON.stringify(result) !== JSON.stringify(again) ||
+                  await editDocumentOrigin(tab.url) !== origin)
                 return browserFailure();
               if (expected !== undefined) {
                 let matches = 0;
@@ -318,7 +338,8 @@ export function createExtensionCreateSetHost(
                     [ids[0]],
                   );
                   const post = await chrome.tabs.get(tabId);
-                  if (post.status !== "complete" || post.url !== tab.url)
+                  if (post.status !== "complete" || post.url !== tab.url ||
+                      await editDocumentOrigin(tab.url) !== origin)
                     return browserFailure();
                   if (exactSavedSidebar(sidebar, expected)) {
                     matches++;
@@ -332,6 +353,8 @@ export function createExtensionCreateSetHost(
                 }
                 if (matches !== 2) return browserFailure();
               }
+              if (await editDocumentOrigin(tab.url) !== origin)
+                return browserFailure();
               return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
