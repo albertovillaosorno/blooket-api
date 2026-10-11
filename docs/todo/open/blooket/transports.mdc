@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, Add Question preparation and image finalization
+began rechecking the owned question form, exact serialized hidden
+value, authenticated shell, and security-stop evidence immediately
+after dispatching provider input/change events. A synchronous form
+replacement, changed question bytes or newly mounted CAPTCHA cannot
+acknowledge a prepared write or authorize the later single Save click.
+Synthetic DOM tests exercise each drift without provider mutation.
+
 On 2026-10-11, the injected login preparer began rechecking exact
 provider form identity and challenge absence after dispatching username
 and password events. If a provider handler replaces the form after the

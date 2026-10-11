@@ -599,6 +599,41 @@ export function runBlooketAddQuestionPageAction(
       descriptor.set.call(resolved.question, JSON.stringify(expected));
       resolved.question.dispatchEvent(new Event("input", { bubbles: true }));
       resolved.question.dispatchEvent(new Event("change", { bubbles: true }));
+      // Provider input handlers may synchronously remount the modal, change
+      // a hidden value, or raise a human stop. A lost prepare ack must not
+      // be considered usable or handed forward to the one-click Save path.
+      const current = questionForm(input.setId);
+      if (!current || current.form !== resolved.form ||
+          current.question !== resolved.question ||
+          world.__blooketAddQuestionFormWatch !== watch ||
+          watch.document !== document || watch.dirty || watch.submitted ||
+          resolved.question.value !== JSON.stringify(expected) ||
+          (watch.expectedNumber !== undefined &&
+            !exactPriorCards(watch.expectedNumber)) ||
+          document.title === "Just a moment..." ||
+          document.querySelector('input[type="password"]') !== null ||
+          !visibleUnique("main") ||
+          !visibleUnique('nav a[href="/my-sets"]') ||
+          document.querySelectorAll(logoutSelector).length !== 1 ||
+          document.querySelector(logoutSelector)?.textContent?.trim() !==
+            "Logout" ||
+          !(visibleUnique(logoutSelector) ||
+            (visibleUnique(accountSelector) &&
+              !!document.querySelector(accountSelector)?.textContent?.trim())))
+        return failed();
+      const visibleStop = (node: Element): boolean => {
+        const bounds = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return bounds.width > 0 && bounds.height > 0 &&
+          style.display !== "none" && style.visibility === "visible";
+      };
+      if (Array.from(document.querySelectorAll(
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+      )).some(visibleStop) || Array.from(document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"] h3',
+      )).some(node => visibleStop(node) &&
+        node.textContent?.trim() === "Select your organization"))
+        return failed();
       watch.prepared = true;
       watch.finalized = !hasImage || action === "finalize-image";
       return { ok: true };
