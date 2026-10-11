@@ -92,6 +92,10 @@ test("changed or ambiguous provider component identities are refused", () => {
     [52644, ["1958", "static/chunks/changed.js"], "default"],
     [52644, ["1958", "static/chunks/1958-3beff819112074ac.js"], "other"],
     [52644, [1958, "static/chunks/1958-3beff819112074ac.js"], "default"],
+    [52644, [
+      "01958", "static/chunks/unexpected.js",
+      "1958", "static/chunks/1958-3beff819112074ac.js",
+    ], "default"],
     [52644, ["1958"], "default"],
     [52644, [
       "1958", "static/chunks/1958-3beff819112074ac.js",

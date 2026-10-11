@@ -75,6 +75,8 @@ test("Flight framing rejects malformed lengths JSON IDs and duplicates", () => {
     "0:{bad}\n",
     "g:{}\n",
     "0:{}\n0:{}\n",
+    "0:{}\n00:{}\n",
+    "00:{}\n",
     "0:{}",
     "0:I{}\n",
   ])
