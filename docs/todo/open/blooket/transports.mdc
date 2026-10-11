@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, durable set receipts, checkpoint restoration, and
+checkpoint advancement began enforcing the same bounded opaque remote-set
+ID contract as Blooket set reads. Previously an adapter could persist a
+nonempty but oversized or control-bearing ID that downstream browser reads
+and writes would always reject. Portable tests verify invalid IDs fail
+before a receipt becomes a durable remote target.
+
 On 2026-10-10, the journaled verification boundary stopped translating
 a generic `not-confirmed` verifier verdict into automatic attempt cleanup.
 Only positive provider evidence can advance this read-only reconciliation
