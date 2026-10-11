@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, explicit browser activation began rechecking the tab
+identity, exact URL, and window ownership after Chrome acknowledges its
+foreground request and before the worker focuses a window. Previously a
+user-initiated redirect after the initial provider-origin check could cause
+an unrelated window to be focused under a Blooket human-stop receipt.
+Synthetic worker tests switch to a foreign route after activation and verify
+that no window focus or successful activation receipt follows.
+
 On 2026-10-10, capability inspection also began admitting a fresh
 returned edit document when the probed set shares the original teacher tab
 URL. The original epoch cannot authorize the new editor after an explicit

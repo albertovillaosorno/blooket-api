@@ -54,6 +54,7 @@ test(
   const foregroundedTabs: number[] = [];
   const focusedWindows: number[] = [];
   let closed = false;
+  let switchAfterActivate = false;
   let validStatus = true;
   let incompatibleStatus = false;
   let incompatiblePoll = false;
@@ -151,7 +152,13 @@ test(
           tabUrl = url;
           documentOrigin += 1_000;
         }
-        if (active === true) foregroundedTabs.push(id);
+        if (active === true) {
+          foregroundedTabs.push(id);
+          if (switchAfterActivate) {
+            switchAfterActivate = false;
+            tabUrl = "https://untrusted.invalid/after-activation";
+          }
+        }
         return { id, url: tabUrl, status: "complete", windowId: 3 };
       },
       reload: async (id, options) => {
@@ -661,18 +668,25 @@ test(
     });
     assert.deepEqual(foregroundedTabs, [7]);
     assert.deepEqual(focusedWindows, [3]);
+    // A late route replacement after activating the Blooket tab must not
+    // additionally focus a foreign destination as a human challenge.
+    switchAfterActivate = true;
+    const switchedFocus = await expectReply({ kind: "browser.activate" });
+    assert.equal(switchedFocus.ok, false);
+    assert.deepEqual(foregroundedTabs, [7, 7]);
+    assert.deepEqual(focusedWindows, [3]);
     tabUrl = "https://untrusted.invalid/unrelated";
     const foreignFocus = await expectReply({ kind: "browser.activate" });
     assert.deepEqual(foreignFocus, {
       schemaVersion: 1, id: foreignFocus.id,
       ok: false, code: "blooket-browser-failed",
     });
-    assert.deepEqual(foregroundedTabs, [7]);
+    assert.deepEqual(foregroundedTabs, [7, 7]);
     assert.deepEqual(focusedWindows, [3]);
     assert.deepEqual(await message({ kind: "open-blooket" }), {
       ok: false, status: "blooket-tab-unavailable",
     });
-    assert.deepEqual(foregroundedTabs, [7]);
+    assert.deepEqual(foregroundedTabs, [7, 7]);
     // The same local workspace must not adopt a tab navigated elsewhere.
     const disconnectedTab = await announce({ origin, token });
     assert.equal(disconnectedTab.ok, true);
