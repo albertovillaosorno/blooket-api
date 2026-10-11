@@ -121,7 +121,7 @@ test("Create Set verifies only one exact post-state addition", async () => {
   );
 });
 
-test("unchanged set collection proves non-confirmation", async () => {
+test("unchanged set list cannot prove delayed write absent", async () => {
   const sets = [summary("old-1", "Existing")];
   const reads: BlooketSetReadPort = {
     list: async () => ({
@@ -149,7 +149,7 @@ test("unchanged set collection proves non-confirmation", async () => {
       { remoteSetId: null },
       captured.baseline,
     ),
-    { ok: true, outcome: "not-confirmed" },
+    { ok: true, outcome: "inconclusive" },
   );
 });
 
@@ -573,7 +573,7 @@ test("answer-image reads cannot confirm an expected text write", async () => {
   );
 });
 
-test("unchanged question collection proves non-confirmation", async () => {
+test("unchanged question list cannot prove delayed write absent", async () => {
   const sets: BlooketSetReadPort = {
     list: async () => ({
       ok: true,
@@ -594,7 +594,7 @@ test("unchanged question collection proves non-confirmation", async () => {
 
   assert.deepEqual(
     await verifier.verify(operation, target, captured.baseline),
-    { ok: true, outcome: "not-confirmed" },
+    { ok: true, outcome: "inconclusive" },
   );
 });
 
@@ -833,5 +833,27 @@ test("malformed question-list envelopes never reconcile a saved question",
     assert.deepEqual(await verifier.verify(op, target, capture.baseline),
       { ok: false, kind: "browser", code: "blooket-browser-failed" });
   }
+  },
+);
+
+
+test("delayed question visibility stays inconclusive until positive evidence",
+  async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => { throw Error("should not list sets"); },
+    get: async () => { throw Error("should not get sets"); },
+  };
+  const question = typingOperation();
+  const target = { remoteSetId: "remote-set-1" };
+  const verifier = blooketSetReadWriteVerifier(
+    sets, questionReads([[], [], [remoteTyping()]]),
+  );
+  const before = await verifier.captureBaseline(question, target);
+  assert.ok(before.ok && before.baseline);
+  if (!before.ok) return;
+  assert.deepEqual(await verifier.verify(question, target, before.baseline),
+    { ok: true, outcome: "inconclusive" });
+  assert.deepEqual(await verifier.verify(question, target, before.baseline),
+    { ok: true, outcome: "confirmed", receipt: null });
   },
 );
