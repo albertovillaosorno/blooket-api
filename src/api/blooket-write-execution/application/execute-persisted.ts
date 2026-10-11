@@ -617,12 +617,32 @@ async function executePersistedBlooketWriteLocked(
       code: "mutation-pacing-failed",
     };
   }
-  if (pacing !== undefined && !pacing.ok) {
-    return {
-      ok: false,
-      stage: "mutation-pacing",
-      code: pacing.code,
+  if (pacing !== undefined) {
+    const exact = (value: unknown, names: string): boolean => {
+      try {
+        return !!value && typeof value === "object" &&
+          !Array.isArray(value) &&
+          Reflect.ownKeys(value).sort().join() === names;
+      } catch { return false; }
     };
+    if (!pacing || (pacing.ok === false &&
+        (!exact(pacing, "code,ok") ||
+         pacing.code !== "mutation-pacing-cancelled")) ||
+        (pacing.ok === true &&
+         (!exact(pacing, "lease,ok") ||
+          !exact(pacing.lease, "release,startedAtMs") ||
+          typeof pacing.lease.release !== "function" ||
+          typeof pacing.lease.startedAtMs !== "number" ||
+          !Number.isFinite(pacing.lease.startedAtMs) ||
+          pacing.lease.startedAtMs < 0)) ||
+        (pacing.ok !== true && pacing.ok !== false)) {
+      return { ok: false, stage: "mutation-pacing",
+        code: "mutation-pacing-failed" };
+    }
+    if (pacing.ok === false) {
+      return { ok: false, stage: "mutation-pacing",
+        code: "mutation-pacing-cancelled" };
+    }
   }
   const lease = pacing?.ok === true ? pacing.lease : undefined;
   if (options.signal?.aborted) {
