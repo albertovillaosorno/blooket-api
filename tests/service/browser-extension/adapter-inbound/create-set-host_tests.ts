@@ -61,6 +61,7 @@ function fakeChrome(options: {
   const transitions = [...(options.afterUpdate ?? [])];
   const scripts = [...(options.scripts ?? [])];
   let navigated = false;
+  let reloaded = false;
   const chrome: CreateSetChromePort = {
     tabs: {
       get: async () => {
@@ -75,6 +76,11 @@ function fakeChrome(options: {
         navigated = true;
         return tab;
       },
+      reload: async () => {
+        calls.push("reload");
+        reloaded = true;
+        tab = { ...tab, status: "complete" };
+      },
     },
     scripting: {
       executeScript: async (request) => {
@@ -86,7 +92,8 @@ function fakeChrome(options: {
         if (request.func.name === "inspectBlooketDocumentOrigin") {
           calls.push("document-origin");
           return [{ result: tab.url ===
-            "https://dashboard.blooket.com/create" ? 2_000 : 1_000 }];
+            "https://dashboard.blooket.com/create" ? 2_000 :
+            reloaded ? 3_000 : 1_000 }];
         }
         if (request.func.name === "runBlooketCreateSetOwnership") {
           const action = request.args?.[0];
@@ -604,7 +611,8 @@ test("lost Chrome submit acknowledgement can confirm the exact saved set",
     afterUpdate: [{ url: "https://dashboard.blooket.com/create",
       status: "complete" }],
     scripts: [createState, prepared,
-      observed, observed, sidebar, sidebar],
+      observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar],
   });
   const host = createExtensionCreateSetHost(
     fake.chrome, 7, async () => undefined,
@@ -629,7 +637,7 @@ test("lost Chrome submit acknowledgement can confirm the exact saved set",
   });
   assert.deepEqual(await host.observeCreateSet(expected), observed);
   assert.equal(clicked, 1);
-  assert.equal(fake.calls.filter(call => call === "script").length, 6);
+  assert.equal(fake.calls.filter(call => call === "script").length, 10);
   },
 );
 
@@ -697,7 +705,8 @@ test("lost Chrome acknowledgement tolerates a loading Create-to-Edit turn",
     afterUpdate: [{ url: "https://dashboard.blooket.com/create",
       status: "complete" }],
     scripts: [createState, prepared,
-      observed, observed, sidebar, sidebar],
+      observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar],
   });
   const host = createExtensionCreateSetHost(fake.chrome, 7,
     async () => {
@@ -750,6 +759,7 @@ test("post-navigation sidebar may hydrate before two stable receipts",
   const valid = { ok: true, value: { ...expected } };
   const fake = fakeChrome({ scripts: [observed, observed,
     incomplete, incomplete, valid, valid,
+    observed, valid, observed, valid,
   ] });
   fake.setTab({ url:
     "https://dashboard.blooket.com/edit?id=remote-set-1",
@@ -760,7 +770,7 @@ test("post-navigation sidebar may hydrate before two stable receipts",
   ).observeCreateSet(expected);
   assert.deepEqual(result, observed);
   assert.equal(pauses.filter(ms => ms === 100).length, 2);
-  assert.equal(fake.calls.filter(call => call === "script").length, 6);
+  assert.equal(fake.calls.filter(call => call === "script").length, 10);
   },
 );
 
@@ -796,6 +806,12 @@ test("lost Create Set acknowledgement waits beyond the short redirect window",
       observed, observed,
       { ok: true, value: { title: expected.title,
         description: expected.description } },
+      { ok: true, value: { title: expected.title,
+        description: expected.description } },
+      observed,
+      { ok: true, value: { title: expected.title,
+        description: expected.description } },
+      observed,
       { ok: true, value: { title: expected.title,
         description: expected.description } },
     ],
@@ -1045,5 +1061,95 @@ test("Create Set cannot claim a new target document after Claim itself",
   ).openCreateSet();
   assert.equal(result.ok, false);
   assert.equal(fake.calls.includes("create-ownership:claim"), true);
+  },
+);
+
+test("optimistic Create Set redirect cannot confirm an unsaved set",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example" };
+  const sidebar = { ok: true, value: expected };
+  for (const afterReload of [
+    { ok: false, code: "blooket-browser-failed" },
+    { ok: true, value: { ...expected, description: "Other" } },
+    { ok: true, value: { ...expected, extra: "untrusted" } },
+  ]) {
+    const fake = fakeChrome({ scripts: [
+      observed, observed, sidebar, sidebar,
+      observed, afterReload,
+    ] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    const result = await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected);
+    assert.deepEqual(result, { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+    assert.equal(fake.calls.includes("can-leave-check"), true);
+  }
+  },
+);
+
+test("teacher activity prevents Create Set confirmation reload",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example" };
+  const sidebar = { ok: true, value: expected };
+  const fake = fakeChrome({ canLeave: false,
+    scripts: [observed, observed, sidebar, sidebar] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
+test("same-document Create Set reload cannot prove saved remote state",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example" };
+  const sidebar = { ok: true, value: expected };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: 1_000 }] : await original(request);
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  },
+);
+
+test("redirect route switch after Create Set reload stops receipt",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example" };
+  const sidebar = { ok: true, value: expected };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  fake.chrome.tabs.reload = async () => {
+    fake.calls.push("reload");
+    fake.setTab({ url: "https://dashboard.blooket.com/my-sets",
+      status: "complete" });
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   },
 );

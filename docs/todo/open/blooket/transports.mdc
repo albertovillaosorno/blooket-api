@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Create Set confirmation gained a separate fresh-document
+read-back. After matching two saved metadata observations on the new Edit
+route, the extension refuses to reload over teacher work, requires a
+changed native document origin, and verifies the exact redirect ID and
+submitted title/description twice again. A redirect with optimistic but
+unpersisted metadata, a stale reload, changed account content, or a
+human-selected route cannot produce a saved-set receipt. Synthetic host
+regressions exercise those failures without any real account mutation.
+
 On 2026-10-10, Add Question also began reading the exact prior
 question-number collection twice, with an event-loop yield, before
 opening its form. A newly appeared or malformed card between preflight
