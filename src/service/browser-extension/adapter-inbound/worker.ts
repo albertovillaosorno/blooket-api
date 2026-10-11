@@ -522,6 +522,20 @@ async function read(
           exactWorkerKeys(result, "ok,value") &&
           "ok" in result && result.ok === true && "value" in result
         ) {
+          // One decoded, matching panel snapshot is sufficient only to
+          // identify an owned Cancel target, never to confirm a remote read.
+          // If the second read conflicts, cleanup still checks this snapshot
+          // against the live panel instead of abandoning a safe close.
+          const decoded = decodeBlooketSetDetail(result.value);
+          if (!decoded.ok || decoded.value.id !== operation.setId ||
+              decoded.value.title !== baseline.title ||
+              decoded.value.description !== baseline.description)
+            throw new Error("browser-details-unavailable");
+          cancellationEvidence = {
+            title: decoded.value.title,
+            description: decoded.value.description,
+            visibility: decoded.value.visibility,
+          };
           if (Date.now() >= readDeadline)
             throw new Error("browser-details-unavailable");
           const confirmed = await browser.tabs.get(current.tabId);
@@ -543,26 +557,16 @@ async function read(
               !("value" in again) ||
               JSON.stringify(result) !== JSON.stringify(again))
             throw new Error("browser-details-unavailable");
-          const decoded = decodeBlooketSetDetail(result.value);
           const againDecoded = decodeBlooketSetDetail(again.value);
-          if (!decoded.ok || !againDecoded.ok ||
+          if (!againDecoded.ok ||
               JSON.stringify(decoded.value) !==
-                JSON.stringify(againDecoded.value) ||
-              decoded.value.id !== operation.setId ||
-              decoded.value.title !== baseline.title ||
-              decoded.value.description !== baseline.description)
+                JSON.stringify(againDecoded.value))
             throw new Error("browser-details-unavailable");
-          const candidate = decoded.value;
           const after = await browser.tabs.get(current.tabId);
           if (
             Date.now() >= readDeadline || after.status !== "complete" ||
             after.url !== target
           ) throw new Error("browser-details-unavailable");
-          cancellationEvidence = {
-            title: candidate.title,
-            description: candidate.description,
-            visibility: candidate.visibility,
-          };
           savedDetail = result;
           break;
         }

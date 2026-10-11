@@ -883,6 +883,8 @@ test(
     })).ok, false);
     assert.equal(scripts.slice(beforeHiddenDetail).filter(name =>
       name === "inspectBlooketPage").length, 2);
+    assert.equal(scripts.slice(beforeHiddenDetail).includes(
+      "closeBlooketDetailPanel"), true);
     detailSecondReadHasHiddenField = false;
     detailReadWrongId = true;
     detailReadCount = 0;
@@ -1010,7 +1012,7 @@ test(
     assert.equal(detailReadCount, 2);
     assert.equal(scripts.slice(beforeDetailDrift).includes(
       "closeBlooketDetailPanel",
-    ), false);
+    ), true);
     detailDrifts = false;
     const questions = await expectReply({
       kind: "questions.list",

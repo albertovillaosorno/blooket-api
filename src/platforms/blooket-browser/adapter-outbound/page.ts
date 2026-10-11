@@ -50,7 +50,9 @@ export function inspectBlooketPage(
     const url = new URL(location.href);
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const visibleChallenges = Array.from(
       document.querySelectorAll(
@@ -396,7 +398,9 @@ export function inspectBlooketDetailSidebar(setId: string): PageReadResult {
         document.querySelector('input[type="password"]')) return failed();
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const mains = Array.from(document.querySelectorAll("main"));
     const nav = Array.from(document.querySelectorAll(
@@ -465,7 +469,9 @@ export function closeBlooketDetailPanel(
         document.querySelector('input[type="password"]')) return false;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const main = Array.from(document.querySelectorAll("main"));
     const nav = Array.from(document.querySelectorAll(
@@ -593,7 +599,9 @@ export function isBlooketDetailPanelClosed(setId: string): boolean {
         document.querySelector('input[type="password"]')) return false;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const mains = Array.from(document.querySelectorAll("main"));
     const nav = Array.from(document.querySelectorAll(
@@ -668,7 +676,9 @@ export function openBlooketDetailPanel(setId: string): boolean {
     const elements = Array.from(document.querySelectorAll(selector));
     if (elements.length !== 1) return false;
     const bounds = elements[0]!.getBoundingClientRect();
+    const style = getComputedStyle(elements[0]!);
     return bounds.width > 0 && bounds.height > 0 &&
+      style.display !== "none" && style.visibility === "visible" &&
       (text === undefined || elements[0]!.textContent?.trim() === text);
   };
   const authenticated =
@@ -740,7 +750,10 @@ export function openBlooketDetailPanel(setId: string): boolean {
   if (buttons.length !== 1) return false;
   const opener = buttons[0] as HTMLButtonElement;
   const openerBounds = opener.getBoundingClientRect();
+  const openerStyle = getComputedStyle(opener);
   if (openerBounds.width <= 0 || openerBounds.height <= 0 ||
+      openerStyle.display === "none" ||
+      openerStyle.visibility !== "visible" ||
       opener.disabled || opener.getAttribute("aria-disabled") === "true")
     return false;
   // A read owns this editor only until the teacher interacts with it.
