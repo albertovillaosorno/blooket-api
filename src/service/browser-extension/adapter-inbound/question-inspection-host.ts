@@ -37,6 +37,8 @@ import {
   "../../../ir/blooket-question-reads/contract/question-read.ts";
 import { inspectOpenedBlooketQuestionImage } from
   "../../../platforms/blooket-browser/adapter-outbound/question-image-page.ts";
+import { inspectBlooketDocumentOrigin } from
+  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 import {
   closeBlooketQuestionPanel,
   inspectOpenedBlooketQuestion,
@@ -94,13 +96,24 @@ export function createExtensionQuestionInspectionHost(
       throw new Error("browser-question-script-failed");
     return replies[0].result;
   };
+  let originalDocumentOrigin: number | null = null;
+  const sameDocument = async (url: string): Promise<boolean> => {
+    const origin = await script(
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+      [url],
+    );
+    if (typeof origin !== "number" || !Number.isFinite(origin) ||
+        origin <= 0) return false;
+    if (originalDocumentOrigin === null) originalDocumentOrigin = origin;
+    return origin === originalDocumentOrigin;
+  };
   const ready = async (url: string, deadline: number): Promise<boolean> => {
     if (now() >= deadline) return false;
     const tab = await chrome.tabs.get(tabId);
     // Chrome may finish a tab request after the caller's read deadline.
     // Never let that late response authorize another page script or click.
-    return now() < deadline &&
-      tab.status === "complete" && tab.url === url;
+    return now() < deadline && tab.status === "complete" &&
+      tab.url === url && await sameDocument(url) && now() < deadline;
   };
   const enumerate = async (
     setId: string, url: string, deadline: number,
@@ -150,7 +163,8 @@ export function createExtensionQuestionInspectionHost(
     // Cleanup is attempted even after a deadline; it cannot confirm success
     // unless the exact tab and panel closure are actually observed.
     const tab = await chrome.tabs.get(tabId).catch(() => undefined);
-    if (tab?.status !== "complete" || tab.url !== url) return false;
+    if (tab?.status !== "complete" || tab.url !== url ||
+        !await sameDocument(url)) return false;
     const canceled = await script(
       closeBlooketQuestionPanel as (...args: never[]) => unknown,
       [setId],
@@ -160,8 +174,8 @@ export function createExtensionQuestionInspectionHost(
       // A route change after Cancel must not authorize a closure probe in
       // the teacher's newly selected page, even during best-effort cleanup.
       const current = await chrome.tabs.get(tabId).catch(() => undefined);
-      if (current?.status !== "complete" || current.url !== url)
-        return false;
+      if (current?.status !== "complete" || current.url !== url ||
+          !await sameDocument(url)) return false;
       const closed = await script(
         isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
         [setId],

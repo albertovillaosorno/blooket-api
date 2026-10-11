@@ -87,6 +87,12 @@ origin, late inspection, or manual route change cannot admit a saved-state read.
 Session observation remains non-navigating and does not need document
 replacement.
 
+The question-inspection host also pins the native document origin through its
+visible enumeration, each saved-question modal, optional image evidence,
+and final question-list comparison. When a document is replaced at the same
+URL, all collected question candidates fail and the host must not click
+Cancel in the replacement document's possible teacher-owned editor.
+
 The implementation was checked on 2026-10-10 against
 [Chrome tabs][chrome-tabs] and [MDN timeOrigin][document-origin]. These sources
 establish browser primitives, not successful Blooket publication. Synthetic
