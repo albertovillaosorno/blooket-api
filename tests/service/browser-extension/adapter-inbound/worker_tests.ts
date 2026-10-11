@@ -856,6 +856,30 @@ test(
     assert.equal(malformedSets.ok, false);
     assert.equal(setListReads, 1);
     listInvalidEnvelope = false;
+    // Chrome owns additional frame metadata on injection replies. An
+    // accessor or concealed result field must not reach the read decoder.
+    const scriptBeforeBadWrapper = browser.scripting.executeScript;
+    let wrapperGetterCalls = 0;
+    for (const mode of ["getter", "hidden", "missing"] as const) {
+      browser.scripting.executeScript = async options => {
+        if (options.func.name !== "inspectBlooketPage" ||
+            options.args?.[0]?.kind !== "sets.list")
+          return await scriptBeforeBadWrapper(options);
+        const bad = {};
+        if (mode === "getter") Object.defineProperty(bad, "result", {
+          enumerable: true,
+          get: () => { wrapperGetterCalls++; return { ok: true }; },
+        });
+        if (mode === "hidden") Object.defineProperty(bad, "result", {
+          enumerable: false, value: { ok: true },
+        });
+        return [bad];
+      };
+      assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+      assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    }
+    browser.scripting.executeScript = scriptBeforeBadWrapper;
+    assert.equal(wrapperGetterCalls, 0);
     for (const kind of ["first-invalid-row", "second-hidden-envelope",
       "second-accessor-envelope", "second-nonenumerable-value",
       "second-hidden-row"]) {

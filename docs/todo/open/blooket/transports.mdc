@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the main browser-extension worker also began
+accepting only an enumerable owned `result` data descriptor from
+Chrome script injection replies. Hidden or accessor-backed wrappers
+cannot supply saved-state proof or run getters, even though native
+Chrome frame metadata is preserved. Synthetic worker integration
+covers getter, hidden and missing injection results without a write.
+
 On 2026-10-11, My Sets capability confirmation now validates the
 second result before any JSON comparison. A malicious accessor in a
 late row cannot run during stringification and cannot turn a drifted
