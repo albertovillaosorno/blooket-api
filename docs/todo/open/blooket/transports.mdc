@@ -74,6 +74,13 @@ Only the actual validated `E` decoder now attaches an internal nonenumerable
 marker. JSON lookalikes stay ordinary models; legitimate error digests retain
 their exact public shape without exposing extra provider fields.
 
+A related 2026-10-10 synthetic payload used `__proto__` as a JSON property.
+The old Flight object copier invoked the inherited setter, hiding that key
+from exact action-state field checks. Normalization now defines own enumerable
+data properties without invoking inherited setters. Regression tests confirm
+that malformed action payloads stay invalid and ordinary object prototypes are
+unchanged; this does not establish a real provider response format.
+
 On 2026-10-10, a private extension-local candidate decoder was added for
 My Sets server-rendered Flight data. It is gated on the specific observed
 `349b82c80fc4a5a2001e609136cfed32747ba3f4` build, the client module
