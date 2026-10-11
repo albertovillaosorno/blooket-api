@@ -283,6 +283,26 @@ test("invalid and symbolic checkpoint files fail closed", async () => {
   });
 });
 
+test("checkpoint reads bound actual bytes and reject dangling aliases",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "checkpoint.json");
+    await writeFile(path, JSON.stringify(checkpoint(0)).padEnd(65_536, " "));
+    const admitted = await loadWriteCheckpointFile(path, plan);
+    assert.equal(admitted.ok, true);
+    await writeFile(path, "x".repeat(65_537));
+    assert.deepEqual(await loadWriteCheckpointFile(path, plan), {
+      ok: false, kind: "io", code: "checkpoint-file-unsafe",
+    });
+    await rm(path);
+    await symlink(join(directory, "missing.json"), path);
+    assert.deepEqual(await loadWriteCheckpointFile(path, plan), {
+      ok: false, kind: "io", code: "checkpoint-file-unsafe",
+    });
+  });
+  },
+);
+
 test("unreadable regular checkpoints fail as write failures", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "write.json");

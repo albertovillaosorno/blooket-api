@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, checkpoint persistence reads began opening the checkpoint
+with `O_NOFOLLOW` and inspecting and reading the same descriptor. This removes
+the pathname-based `lstat`/`readFile` substitution window and bounds checkpoint
+reads to 65,536 bytes, including unexpected file growth. Synthetic filesystem
+regressions cover the exact byte boundary and dangling symlink refusal. This
+protects local recovery evidence without claiming live provider acceptance.
+
 On 2026-10-10, hexadecimal Flight record IDs and decimal chunk IDs began
 requiring canonical digit spellings. A padded `00` row previously coexisted
 with row `0`, while a prefixed `01958` chunk could coexist with the pinned
