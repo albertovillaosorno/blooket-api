@@ -228,3 +228,70 @@ test("Create Set confirmation checks exact submitted metadata", async () => {
   assert.deepEqual(calls.filter(item => item === "observe-confirmation"),
     ["observe-confirmation"]);
 });
+
+test("malformed host acknowledgements cannot authorize the next form step",
+  async () => {
+  const invalidReplies: unknown[] = [
+    { ok: "true" },
+    { ok: true, trace: "untrusted" },
+    { ok: false, kind: "navigation", state: "dashboard" },
+    { ok: false, kind: "navigation", state: "security-challenge",
+      trace: "untrusted" },
+    { ok: false, kind: "browser", code: "unknown-provider-status" },
+    null,
+  ];
+  for (const stage of ["open", "prepare", "submit"] as const) {
+    for (const reply of invalidReplies) {
+      const calls: string[] = [];
+      const overrides: Partial<BlooketCreateSetBrowserHost> = {};
+      if (stage === "open") overrides.openCreateSet = async () => {
+        calls.push("open");
+        return reply as Awaited<ReturnType<
+          BlooketCreateSetBrowserHost["openCreateSet"]>>;
+      };
+      if (stage === "prepare") overrides.prepareCreateSet = async () => {
+        calls.push("prepare");
+        return reply as Awaited<ReturnType<
+          BlooketCreateSetBrowserHost["prepareCreateSet"]>>;
+      };
+      if (stage === "submit") overrides.submitCreateSet = async () => {
+        calls.push("submit");
+        return reply as Awaited<ReturnType<
+          BlooketCreateSetBrowserHost["submitCreateSet"]>>;
+      };
+      const result = await createBlooketBrowserWriteSurface(
+        host(calls, overrides),
+      ).createSet(submission, []);
+      assert.deepEqual(result, { ok: false, kind: "browser",
+        code: "blooket-browser-failed" });
+      assert.deepEqual(calls.map(item => item.startsWith("prepare:")
+        ? "prepare" : item), stage === "open" ? ["open"]
+          : stage === "prepare" ? ["open", "prepare"]
+            : ["open", "prepare", "submit"]);
+    }
+  }
+  },
+);
+
+test("malformed Create Set observations never establish a remote set ID",
+  async () => {
+  for (const reply of [
+    { ok: true, remoteSetId: "remote-1", extra: "untrusted" },
+    { ok: "true", remoteSetId: "remote-1" },
+    { ok: true, remoteSetId: "" },
+    { ok: true },
+    { ok: false, kind: "navigation", state: "dashboard" },
+    null,
+  ]) {
+    const calls: string[] = [];
+    const surface = createBlooketBrowserWriteSurface(host(calls, {
+      observeCreateSet: async () => reply as Awaited<ReturnType<
+        BlooketCreateSetBrowserHost["observeCreateSet"]>>,
+    }));
+    assert.deepEqual(await surface.createSet(submission, []), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+    assert.ok(calls.includes("submit"));
+  }
+  },
+);
