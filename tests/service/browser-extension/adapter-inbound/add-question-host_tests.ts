@@ -856,7 +856,7 @@ test("a new row during read-only inspection invalidates Add Question",
   let listReads = 0;
   fake.chrome.scripting.executeScript = async request => {
     if (request.func.name === "listBlooketQuestionNumbers" &&
-        ++listReads === 3)
+        ++listReads === 4)
       return [{ result: { ok: true, value: [1, 2] } }];
     return await original(request);
   };
@@ -865,7 +865,7 @@ test("a new row during read-only inspection invalidates Add Question",
   ).addQuestion(input);
   assert.deepEqual(result, { ok: false, kind: "browser",
     code: "blooket-browser-failed" });
-  assert.equal(listReads, 3);
+  assert.equal(listReads, 4);
   assert.equal(fake.readBackReads(), 2);
   assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
   assert.equal(fake.calls.filter(call =>
@@ -925,5 +925,33 @@ test("a same-document reload cannot confirm Add Question persistence",
   assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   assert.equal(fake.calls.filter(call =>
     call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("a late existing question blocks form opening before a single Save",
+  async () => {
+  for (const changed of [
+    { ok: true, value: [1] },
+    { ok: true, value: [1], extra: true },
+    { ok: false, code: "blooket-browser-failed" },
+  ]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let reads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "listBlooketQuestionNumbers" &&
+          ++reads === 2) return [{ result: changed }];
+      return await original(request);
+    };
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(reads, 2);
+    assert.equal(fake.calls.some(call =>
+      call === "runBlooketAddQuestionPageAction:open"), false);
+    assert.equal(fake.calls.some(call =>
+      call === "runBlooketAddQuestionPageAction:submit"), false);
+  }
   },
 );
