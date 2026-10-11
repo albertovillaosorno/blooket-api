@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, read-only existing-question scans began confirming
+the saved card collection twice after closing all owned panels.
+An extra or disappearing card between the final observations now
+invalidates the whole read, including for initially empty sets.
+Portable tests exercise both cases without any provider mutation.
+
 On 2026-10-11, read-only question inspection also requires the exact
 contiguous visible question indices beginning at one. Gapped and
 reordered lists now stop before opening any modal. The same host
