@@ -96,7 +96,9 @@ export function createBlooketBrowserBridgeAdapters(
           loginIdentifier: credentials.loginIdentifier,
           password: credentials.password,
         });
-        return result.ok ? { ok: true } : result;
+        return result.ok
+          ? result.value === null ? { ok: true } : browserFailure()
+          : result;
       },
     },
 
@@ -117,7 +119,7 @@ export function createBlooketBrowserBridgeAdapters(
           !result.value ||
           typeof result.value !== "object" ||
           Array.isArray(result.value) ||
-          Object.keys(result.value).sort().join() !== "completeness,items" ||
+           !exactKeys(result.value, "completeness,items") ||
           !("items" in result.value) ||
           !Array.isArray(result.value.items) ||
           !("completeness" in result.value) ||
@@ -203,10 +205,9 @@ async function safeRequest(
     const result = await transport.request(command);
     if (!result || typeof result !== "object" || Array.isArray(result))
       return browserFailure();
-    const keys = Object.keys(result).sort().join();
-    if (result.ok === true && keys === "ok,value")
+    if (result.ok === true && exactKeys(result, "ok,value"))
       return { ok: true as const, value: result.value };
-    if (result.ok === false && keys === "code,ok" &&
+    if (result.ok === false && exactKeys(result, "code,ok") &&
         (result.code === "blooket-browser-failed" ||
           result.code === "blooket-browser-unavailable"))
       return { ok: false as const, code: result.code };
@@ -214,6 +215,14 @@ async function safeRequest(
   } catch {
     return browserFailure();
   }
+}
+
+function exactKeys(value: unknown, names: string): boolean {
+  try {
+    return !!value && typeof value === "object" &&
+      !Array.isArray(value) &&
+      Reflect.ownKeys(value).sort().join() === names;
+  } catch { return false; }
 }
 
 function browserFailure() {
@@ -240,7 +249,7 @@ function decodeCreateSetSurfaceResult(value: unknown) {
   const result = value as Record<string, unknown>;
   if (
     result["ok"] === true &&
-    Object.keys(result).sort().join() === "ok,remoteSetId" &&
+    exactKeys(result, "ok,remoteSetId") &&
     Object.prototype.hasOwnProperty.call(result, "remoteSetId")
   )
     return {
@@ -252,7 +261,7 @@ function decodeCreateSetSurfaceResult(value: unknown) {
     result["kind"] === "navigation" &&
     typeof result["state"] === "string" &&
     OBSERVED_STATES.has(result["state"]) &&
-    Object.keys(result).sort().join() === "kind,ok,state"
+    exactKeys(result, "kind,ok,state")
   )
     return {
       ok: false as const,
@@ -266,7 +275,7 @@ function decodeCreateSetSurfaceResult(value: unknown) {
       result["code"] === "blooket-browser-unavailable" ||
       result["code"] === "blooket-browser-failed"
     ) &&
-    Object.keys(result).sort().join() === "code,kind,ok"
+    exactKeys(result, "code,kind,ok")
   )
     return browserFailureWithKind(result["code"]);
   return browserFailureWithKind();
@@ -277,7 +286,7 @@ function decodeAddQuestionSurfaceResult(value: unknown) {
   const result = value as Record<string, unknown>;
   if (
     result["ok"] === true &&
-    Object.keys(result).sort().join() === "ok"
+    exactKeys(result, "ok")
   )
     return { ok: true as const };
   if (
@@ -285,7 +294,7 @@ function decodeAddQuestionSurfaceResult(value: unknown) {
     result["kind"] === "navigation" &&
     typeof result["state"] === "string" &&
     OBSERVED_STATES.has(result["state"]) &&
-    Object.keys(result).sort().join() === "kind,ok,state"
+    exactKeys(result, "kind,ok,state")
   )
     return {
       ok: false as const,
@@ -299,7 +308,7 @@ function decodeAddQuestionSurfaceResult(value: unknown) {
       result["code"] === "blooket-browser-unavailable" ||
       result["code"] === "blooket-browser-failed"
     ) &&
-    Object.keys(result).sort().join() === "code,kind,ok"
+    exactKeys(result, "code,kind,ok")
   )
     return browserFailureWithKind(result["code"]);
   return browserFailureWithKind();

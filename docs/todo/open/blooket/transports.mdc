@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the concrete local browser bridge began requiring the
+extension's exact null login-submit acknowledgement instead of treating
+any successful payload as a valid authentication submit. Bridge result
+and write receipt decoders also reject hidden and symbol-owned fields,
+closing a runtime exact-envelope gap. Synthetic tests cover malformed
+login results and unexpected Create Set/Add Question reply properties.
+
 On 2026-10-10, browser session and login acknowledgement admission
 began checking every own property, not merely enumerable string keys.
 Previously an extra hidden or symbol field could cross a purportedly
