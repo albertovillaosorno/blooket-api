@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 import { userDataRoot } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
 import {
+  boundedResponseText,
   decodeServiceRuntime,
   existingService,
 } from "../../../platforms/service-lifecycle/adapter-outbound/runtime.ts";
@@ -61,9 +62,16 @@ if (
       if (diagnostic.outcome === "failed") process.exitCode = 1;
     } else if (args.includes("--stop")) {
       if (runtime) {
-        const boot = await fetch(runtime.origin + "/api/bootstrap");
-        const data = (await boot.json()) as { csrf?: unknown };
-        if (typeof data.csrf !== "string") throw new Error("invalid-runtime");
+        const boot = await fetch(runtime.origin + "/api/bootstrap", {
+          signal: AbortSignal.timeout(3_000), redirect: "error",
+        });
+        if (!boot.ok) throw new Error("invalid-runtime");
+        const source = await boundedResponseText(boot, 128_000);
+        if (source === undefined) throw new Error("invalid-runtime");
+        const data = JSON.parse(source) as { csrf?: unknown };
+        if (typeof data.csrf !== "string" ||
+            !/^[A-Za-z0-9_-]{43}$/u.test(data.csrf))
+          throw new Error("invalid-runtime");
         const response = await fetch(runtime.origin + "/api/service-stop", {
           method: "POST",
           headers: {

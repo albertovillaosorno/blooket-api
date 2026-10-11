@@ -126,7 +126,7 @@ async function readOwnedRuntime(path: string): Promise<string> {
   }
 }
 
-async function boundedResponseText(
+export async function boundedResponseText(
   response: Response,
   maxBytes: number,
 ): Promise<string | undefined> {
