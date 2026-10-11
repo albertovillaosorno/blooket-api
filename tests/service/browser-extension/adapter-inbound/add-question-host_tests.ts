@@ -114,7 +114,9 @@ function fakeChrome(options: {
         calls.push(call);
         switch (func.name) {
           case "inspectBlooketDocumentOrigin":
-            return [{ result: 1_000 }];
+            return [{ result: tab.url ===
+              "https://dashboard.blooket.com/edit?id=set-fixture"
+              ? 2_000 : 1_000 }];
           case "canLeaveBlooketPageForRead":
             return [{ result: options.canLeave === undefined
               ? true : options.canLeave }];
@@ -674,14 +676,15 @@ test("same edit URL with a new document cannot submit or confirm a question",
   for (const phase of ["prepare", "submit", "inspectOpenedBlooketQuestion"]) {
     const fake = fakeChrome({});
     const original = fake.chrome.scripting.executeScript;
-    let origin = 1_000;
+    let origin = 2_000;
     fake.chrome.scripting.executeScript = async request => {
       if (request.func.name === "inspectBlooketDocumentOrigin")
-        return [{ result: origin }];
+        return [{ result: request.args?.[0] ===
+          "https://dashboard.blooket.com/my-sets" ? 1_000 : origin }];
       const result = await original(request);
       const action = request.func.name === "runBlooketAddQuestionPageAction"
         ? request.args?.[0] : request.func.name;
-      if (action === phase) origin = 2_000;
+      if (action === phase) origin = 3_000;
       return result;
     };
     const host = createExtensionAddQuestionHost(fake.chrome, 7,
@@ -748,5 +751,22 @@ test("Add Question refuses to navigate without a source document lifetime",
   ).addQuestion(input);
   assert.equal(result.ok, false);
   assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("Add Question rejects a target that reused the source document epoch",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: 1_000 }] : await original(request);
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), true);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
   },
 );

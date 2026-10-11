@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Create Set now requires a fresh native target document
+origin after its tab update and rechecks that origin across session-page
+observation and the form ownership Claim. Add Question similarly refuses a
+target edit page retaining the source document epoch after navigation.
+Synthetic tests prove that a stale completed tab, a same-route reload during
+page inspection, and a replacement during Claim cannot authorize a new
+form mutation. The check does not prove ownership of live account data.
+
 On 2026-10-10, Create Set and Add Question navigation began preserving
 one positive native dashboard document origin across the permission-to-leave
 check and the actual tab update. Previously a same-URL reload between the
