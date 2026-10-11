@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the injected Add Question write runner gained
+computed-style checks at the final Open, Save Question, Remove Image
+and read-owned media Cancel controls, as well as its visible set
+heading and authenticated shell. A hidden button with nonzero layout
+bounds no longer authorizes a single Save click or image cleanup.
+Prepared image values must also have exactly the two admitted own
+fields. Synthetic provider-form regressions cover CSS-hidden controls,
+image preview denial and hidden extra image fields without mutation.
+
 On 2026-10-11, the browser worker began applying the same strict
 set-list admission to both initial and second My Sets observations.
 Malformed rows and nonenumerable fields in the final snapshot cannot
