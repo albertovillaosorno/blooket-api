@@ -975,6 +975,7 @@ matching set-detail snapshots, including exact set ID, title,
 description, and visibility. A first valid panel snapshot may authorize
 an exact, guarded Cancel even if the second probe becomes malformed or
 conflicting; it never constitutes a saved-state receipt by itself.
+
 After Cancel is independently observed, the worker must see the saved
 sidebar twice again, both matching its pre-open metadata. Concurrent
 post-Cancel title/description drift makes the read inconclusive.
