@@ -266,7 +266,8 @@ export function createExtensionAddQuestionHost(
           return browserFailure();
         const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-          [input.image ? "open-image" : "open", input.setId],
+          [input.image ? "open-image" : "open", input.setId,
+            input.number],
         );
         if (opened !== true) return browserFailure();
 

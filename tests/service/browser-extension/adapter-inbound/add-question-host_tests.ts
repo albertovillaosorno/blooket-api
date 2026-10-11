@@ -955,3 +955,23 @@ test("a late existing question blocks form opening before a single Save",
   }
   },
 );
+
+test("host binds the opener to its intended next question number",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let opens = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "open") {
+      opens++;
+      assert.deepEqual(request.args, ["open", "set-fixture", 1]);
+    }
+    return await original(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: true });
+  assert.equal(opens, 1);
+  },
+);

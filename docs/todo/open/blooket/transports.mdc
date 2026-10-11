@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the serialized Add Question page opener gained a
+synchronous final check of the exact expected prior question-card
+sequence at the click boundary. The host now supplies its admitted next
+question number to that same injected function, so a teacher or provider
+card inserted after the host's two read-only preflights prevents opening
+the write form. Synthetic page and host tests verify contiguous cards,
+hidden or duplicate indices, invalid numbers, and exact argument binding.
+
 On 2026-10-10, the extension worker's native-browser deadline was
 also aligned with the new bounded 60-second broker write lease. It now
 permits 57 seconds of owned browser operations before requiring a stop,
