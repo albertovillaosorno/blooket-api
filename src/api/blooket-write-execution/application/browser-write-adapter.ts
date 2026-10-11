@@ -31,6 +31,7 @@
 //
 import { decodeBlooketSetId } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
+
 import type {
   BlooketAddQuestionSubmission,
   BlooketCreateSetSubmission,
@@ -93,9 +94,9 @@ async function executeCreateSet(
   media: Parameters<BlooketBrowserWriteSurfacePort["createSet"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
   const result = await surface.createSet(submission, media);
-  if (!result.ok) {
-    return preserveFailure(result);
-  }
+  if (!result.ok) return preserveFailure(result);
+  if (!exactKeys(result, "ok,remoteSetId") || result.ok !== true)
+    return browserFailure();
 
   const decoded = decodeBlooketSetId(result.remoteSetId, "$.remoteSetId");
   if (!decoded.ok) {
@@ -116,9 +117,10 @@ async function executeAddQuestion(
   media: Parameters<BlooketBrowserWriteSurfacePort["addQuestion"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
   const result = await surface.addQuestion(submission, media);
-  return result.ok
+  if (!result.ok) return preserveFailure(result);
+  return exactKeys(result, "ok") && result.ok === true
     ? { ok: true, receipt: null }
-    : preserveFailure(result);
+    : browserFailure();
 }
 
 function preserveFailure(
@@ -126,7 +128,23 @@ function preserveFailure(
     | Exclude<BlooketCreateSetSurfaceResult, { readonly ok: true }>
     | Exclude<BlooketAddQuestionSurfaceResult, { readonly ok: true }>,
 ): BlooketWriteAttemptResult {
-  return result;
+  if (!result || typeof result !== "object" || result.ok !== false ||
+      !Object.hasOwn(result, "kind")) return browserFailure();
+  if (result.kind === "browser" && exactKeys(result, "code,kind,ok") &&
+      (result.code === "blooket-browser-unavailable" ||
+       result.code === "blooket-browser-failed"))
+    return { ok: false, kind: "browser", code: result.code };
+  if (result.kind === "navigation" && exactKeys(result, "kind,ok,state") &&
+      ["signed-out", "organization-prompt", "expired-session",
+       "rate-limited", "security-challenge", "unexpected-page"]
+        .some(state => state === result.state))
+    return { ok: false, kind: "navigation", state: result.state };
+  return browserFailure();
+}
+
+function exactKeys(value: unknown, keys: string): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value) &&
+    Reflect.ownKeys(value).sort().join() === keys;
 }
 
 function browserFailure(): BlooketWriteAttemptResult {

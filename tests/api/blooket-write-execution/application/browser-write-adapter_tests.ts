@@ -295,3 +295,74 @@ test(
   assert.deepEqual(calls, []);
   },
 );
+
+
+test("only exact browser write acknowledgements become durable receipts",
+  async () => {
+  const malformedCreate: unknown[] = [
+    { ok: true, remoteSetId: "remote-set-1", diagnostic: "untrusted" },
+    { ok: true, remoteSetId: "remote-set-1", receipt: { confirmed: false } },
+    { ok: "true", remoteSetId: "remote-set-1" },
+    { ok: true, remoteSetId: "" },
+    { ok: true },
+    null,
+  ];
+  const malformedQuestion: unknown[] = [
+    { ok: true, diagnostic: "untrusted" },
+    { ok: true, receipt: { kind: "question-created" } },
+    { ok: 1 },
+    { ok: "true" },
+    null,
+  ];
+  for (const candidate of malformedCreate) {
+    const surface = blooketBrowserWriteExecutionPort({
+      createSet: async () => candidate as Awaited<ReturnType<
+        BlooketBrowserWriteSurfacePort["createSet"]>>,
+      addQuestion: async () => ({ ok: true }),
+    });
+    assert.deepEqual(await surface.execute(
+      setOperation, { remoteSetId: null }, { preparedMedia: [] },
+    ), { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  for (const candidate of malformedQuestion) {
+    const surface = blooketBrowserWriteExecutionPort({
+      createSet: async () => ({ ok: true, remoteSetId: "unused" }),
+      addQuestion: async () => candidate as Awaited<ReturnType<
+        BlooketBrowserWriteSurfacePort["addQuestion"]>>,
+    });
+    assert.deepEqual(await surface.execute(
+      questionOperation, { remoteSetId: "remote-set-1" },
+      { preparedMedia: [] },
+    ), { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  },
+);
+
+test("malformed or extra browser stop fields cannot escape the adapter",
+  async () => {
+  const malformed: unknown[] = [
+    { ok: false, kind: "navigation", state: "dashboard" },
+    { ok: false, kind: "navigation", state: "security-challenge",
+      account: "untrusted" },
+    { ok: false, kind: "browser", code: "blooket-browser-failed",
+      detail: "untrusted" },
+    { ok: false, kind: "browser", code: "not-a-browser-code" },
+    { ok: "false", kind: "navigation", state: "security-challenge" },
+    { ok: false, kind: "unknown", code: "blooket-browser-failed" },
+  ];
+  for (const candidate of malformed) {
+    const adapter = blooketBrowserWriteExecutionPort({
+      createSet: async () => candidate as Awaited<ReturnType<
+        BlooketBrowserWriteSurfacePort["createSet"]>>,
+      addQuestion: async () => candidate as Awaited<ReturnType<
+        BlooketBrowserWriteSurfacePort["addQuestion"]>>,
+    });
+    for (const [operation, target] of [
+      [setOperation, { remoteSetId: null }],
+      [questionOperation, { remoteSetId: "remote-set-1" }],
+    ] as const) assert.deepEqual(await adapter.execute(
+      operation, target, { preparedMedia: [] },
+    ), { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  },
+);

@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the canonical browser-write adapter began enforcing exact
+runtime envelopes for Create Set and Add Question confirmations and stops.
+Previously a structurally extra or malformed internal surface result could be
+accepted based on a truthy `ok` property, or propagated into durable attempt
+state with unknown fields. Synthetic adapter regressions prove malformed
+successes and invalid stop states fail closed without issuing a receipt.
+
 On 2026-10-10, read navigation began transferring its confirmed native
 target-document origin to My Sets, Set Detail, and question inspection.
 Previously a replacement page at the same URL could supply independent read
