@@ -56,6 +56,13 @@ The teacher may select another media root. Changing settings must not silently
 move or delete her existing library. Validate access and offer an explicit,
 recoverable library move separately when needed.
 
+Local personal skills and recoverable draft documents also use the
+same bounded `O_NOFOLLOW` byte-reader for reads and revision comparisons.
+A symlink or oversized file cannot supply stale revision evidence or be
+silently rewritten by an AI-driven command. Tests verify that a linked
+outside file and an over-limit skill remain unchanged after failed reads
+and update attempts.
+
 The current YAML library's metadata enumeration now reads from its
 bounded `O_NOFOLLOW` descriptor helper rather than trusting an `lstat`
 followed by a pathname read. The same source-byte reader rejects invalid

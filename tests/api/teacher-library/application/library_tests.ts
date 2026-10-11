@@ -1053,3 +1053,41 @@ test(
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("skill reads and revision checks refuse oversized or linked files",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "skill-document-safety-"));
+  const command = (name: "skills.get" | "skills.put", payload: unknown) =>
+    executeLibraryCommand({ version: 1, operationId: "synthetic-safe-skill",
+      command: name, payload }, root);
+  try {
+    const created = await command("skills.put", {
+      id: "lesson", text: "Private local guidance",
+      expectedRevision: null,
+    });
+    assert.equal(created.ok, true);
+    const path = join(root, "skills", "lesson.md");
+    const source = await readFile(path, "utf8");
+    await writeFile(path, source.padEnd(1_000_001, " "));
+    assert.equal((await command("skills.get", { id: "lesson" })).ok, false);
+    assert.equal((await command("skills.put", {
+      id: "lesson", text: "Attempted replacement",
+      expectedRevision: null,
+    })).ok, false);
+    assert.equal((await readFile(path)).length, 1_000_001);
+    await rm(path);
+    const outside = join(root, "outside-skill.md");
+    await writeFile(outside, "Do not overwrite this unrelated file");
+    await symlink(outside, path);
+    assert.equal((await command("skills.get", { id: "lesson" })).ok, false);
+    assert.equal((await command("skills.put", {
+      id: "lesson", text: "Attempted replacement",
+      expectedRevision: null,
+    })).ok, false);
+    assert.equal(await readFile(outside, "utf8"),
+      "Do not overwrite this unrelated file");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+  },
+);
