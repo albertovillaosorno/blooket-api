@@ -803,9 +803,12 @@ test("lost-click metadata must be stable across both readbacks",
 
 test("post-navigation sidebar may hydrate before two stable receipts",
   async () => {
-  const expected = { title: "Synthetic", description: "" };
+  const expected = { title: "Synthetic", description: "",
+    private: true };
   const incomplete = { ok: false, code: "blooket-browser-failed" };
-  const valid = { ok: true, value: { ...expected } };
+  const valid = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ scripts: [observed, observed,
     incomplete, incomplete, valid, valid,
     observed, valid, observed, valid,
@@ -818,15 +821,18 @@ test("post-navigation sidebar may hydrate before two stable receipts",
     fake.chrome, 7, async ms => { pauses.push(ms); },
   ).observeCreateSet(expected);
   assert.deepEqual(result, observed);
-  assert.equal(pauses.filter(ms => ms === 100).length, 2);
+  assert.equal(pauses.filter(ms => ms === 100).length, 3);
   assert.equal(fake.calls.filter(call => call === "script").length, 10);
   },
 );
 
 test("a valid then unavailable sidebar never confirms from one sample",
   async () => {
-  const expected = { title: "Synthetic", description: "" };
-  const valid = { ok: true, value: { ...expected } };
+  const expected = { title: "Synthetic", description: "",
+    private: true };
+  const valid = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ scripts: [observed, observed, valid,
     { ok: false, code: "blooket-browser-failed" },
     ...Array.from({ length: 33 }, () => ({
@@ -973,7 +979,7 @@ test("same-URL document replacement cannot prove Create Set success",
     const host = createExtensionCreateSetHost(fake.chrome, 7,
       async () => undefined);
     assert.deepEqual(await host.observeCreateSet({
-      title: "Synthetic set", description: "Description",
+      title: "Synthetic set", description: "Description", private: true,
     }), { ok: false, kind: "browser", code: "blooket-browser-failed" });
     assert.equal(reads, switchAt);
   }
@@ -1115,12 +1121,20 @@ test("Create Set cannot claim a new target document after Claim itself",
 
 test("optimistic Create Set redirect cannot confirm an unsaved set",
   async () => {
-  const expected = { title: "Synthetic", description: "Example" };
-  const sidebar = { ok: true, value: expected };
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   for (const afterReload of [
     { ok: false, code: "blooket-browser-failed" },
-    { ok: true, value: { ...expected, description: "Other" } },
-    { ok: true, value: { ...expected, extra: "untrusted" } },
+    { ok: true, value: {
+      title: expected.title, description: "Other",
+    } },
+    { ok: true, value: {
+      title: expected.title, description: expected.description,
+      extra: "untrusted",
+    } },
   ]) {
     const fake = fakeChrome({ scripts: [
       observed, observed, sidebar, sidebar,
@@ -1142,8 +1156,11 @@ test("optimistic Create Set redirect cannot confirm an unsaved set",
 
 test("teacher activity prevents Create Set confirmation reload",
   async () => {
-  const expected = { title: "Synthetic", description: "Example" };
-  const sidebar = { ok: true, value: expected };
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ canLeave: false,
     scripts: [observed, observed, sidebar, sidebar] });
   fake.setTab({ url:
@@ -1160,8 +1177,11 @@ test("teacher activity prevents Create Set confirmation reload",
 
 test("same-document Create Set reload cannot prove saved remote state",
   async () => {
-  const expected = { title: "Synthetic", description: "Example" };
-  const sidebar = { ok: true, value: expected };
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ scripts: [
     observed, observed, sidebar, sidebar,
   ] });
@@ -1182,8 +1202,11 @@ test("same-document Create Set reload cannot prove saved remote state",
 
 test("redirect route switch after Create Set reload stops receipt",
   async () => {
-  const expected = { title: "Synthetic", description: "Example" };
-  const sidebar = { ok: true, value: expected };
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ scripts: [
     observed, observed, sidebar, sidebar,
   ] });
@@ -1205,8 +1228,11 @@ test("redirect route switch after Create Set reload stops receipt",
 
 test("fresh Create Set receipt requires two identical saved metadata reads",
   async () => {
-  const expected = { title: "Synthetic", description: "Example" };
-  const sidebar = { ok: true, value: expected };
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ scripts: [
     observed, observed, sidebar, sidebar,
     observed, sidebar, observed,
@@ -1226,8 +1252,11 @@ test("fresh Create Set receipt requires two identical saved metadata reads",
 
 test("editor replacement after reload approval prevents Create Set reload",
   async () => {
-  const expected = { title: "Synthetic", description: "Example" };
-  const sidebar = { ok: true, value: expected };
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
   const fake = fakeChrome({ scripts: [
     observed, observed, sidebar, sidebar,
   ] });
@@ -1470,5 +1499,18 @@ test("conflicting saved details never hydrate into a confirmed Create Set",
     assert.equal(reads, 1);
     assert.equal(fake.calls.includes("detail-close"), false);
   }
+  },
+);
+
+test("metadata-only Create Set expectations cannot bypass privacy checks",
+  async () => {
+  const fake = fakeChrome({ scripts: [observed, observed] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet({ title: "Synthetic", description: "" } as never),
+  { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  assert.equal(fake.calls.includes("reload"), false);
   },
 );

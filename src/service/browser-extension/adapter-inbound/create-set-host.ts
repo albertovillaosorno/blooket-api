@@ -96,7 +96,7 @@ export interface ExtensionCreateSetHost {
   observeCreateSet(expected?: {
     readonly title: string;
     readonly description: string;
-    readonly private?: boolean;
+    readonly private: boolean;
   }): Promise<
     | { readonly ok: true; readonly remoteSetId: unknown }
     | ExtensionCreateSetFailure
@@ -179,7 +179,7 @@ export function createExtensionCreateSetHost(
   const confirmSavedVisibility = async (
     url: string,
     setId: string,
-    expected: { title: string; description: string; private?: boolean },
+    expected: { title: string; description: string; private: boolean },
     origin: number,
   ): Promise<boolean> => {
     const owns = async () => await editDocumentOrigin(url) === origin;
@@ -406,6 +406,8 @@ export function createExtensionCreateSetHost(
 
     observeCreateSet: async (expected) => {
       try {
+        if (expected !== undefined && typeof expected.private !== "boolean")
+          return browserFailure();
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
           if (tab.status === "complete" && tab.url) {
@@ -530,7 +532,6 @@ export function createExtensionCreateSetHost(
                 confirmedOrigin = freshOrigin;
               }
               if (expected !== undefined &&
-                  typeof expected.private === "boolean" &&
                   !await confirmSavedVisibility(
                     tab.url, ids[0], expected, confirmedOrigin,
                   )) return browserFailure();

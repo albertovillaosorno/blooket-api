@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the Create Set host's saved-state confirmation
+contract also began requiring an explicit boolean privacy expectation
+whenever it receives submitted metadata. The canonical browser
+surface and extension worker pass this exact value; a metadata-only
+synthetic caller cannot silently omit the visibility check. The
+unvalidated redirect-only low-level observation remains separate from
+normal production publication receipts.
+
 On 2026-10-11, the newly added read-only Create Set privacy inspection
 began distinguishing a genuinely not-yet-hydrated Edit Info panel from
 a readable but conflicting saved detail. Only the exact temporary
