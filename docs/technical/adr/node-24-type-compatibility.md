@@ -21,7 +21,9 @@ the upstream latest release separately and carries an approved exact-scope skip
 for the package projection while the runtime remains Node 24.
 
 The exception expires on January 5, 2027. It must be reviewed earlier if the
-supported Node runtime changes.
+supported Node runtime changes. On 2026-10-11, Jig refreshed the upstream
+registry observation to `@types/node@26.6.5` while the approved runtime remains
+Node 24; the exact-scoped skip tracks that verified stable release.
 
 ## Consequences
 

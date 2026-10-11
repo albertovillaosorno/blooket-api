@@ -101,8 +101,10 @@ This explicit launcher action returns bounded diagnostic JSON and refreshes its
 local log without starting the service or opening a browser. A failed check
 produces a nonzero exit status; portable success does not prove Mac acceptance.
 
-The current workstation's pnpm launcher has a documented external failure;
-npm scripts work with installed dependencies. Read the
+The repository pins pnpm 12.11.2 and keeps its package store under
+`.dependencies/`. On 2026-10-11, the workstation's pnpm launcher passed
+`pnpm run check` and a frozen lockfile-only install. Use npm scripts when pnpm
+is unavailable; do not install a second project package store. Read the
 [configuration record](docs/todo/completed/settings/configuration.mdc) before
 changing dependency layout or validators.
 
