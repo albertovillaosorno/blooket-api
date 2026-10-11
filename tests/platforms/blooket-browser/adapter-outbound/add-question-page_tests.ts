@@ -1341,3 +1341,36 @@ test("Add Question preparation rejects changes inside provider events",
   }
   },
 );
+
+
+test("prepared image change cannot confirm a replaced or challenged form",
+  () => {
+  const image = { format: "png" as const, base64: "iVBORw0KGgoA" };
+  for (const kind of ["human", "question", "challenge", "sidebar"] as const) {
+    withImagePage((page, interact) => {
+      assert.equal(runBlooketAddQuestionPageAction(
+        "open-image", "set-fixture"), true);
+      const picker = page.form.selectors['input[type="file"]']![0]!;
+      const original = picker.dispatchEvent.bind(picker);
+      picker.dispatchEvent = event => {
+        original(event);
+        if (kind === "human") interact();
+        if (kind === "question")
+          page.document.selectors['input#question[name="question"]'] =
+            [node("INPUT", "", { type: "hidden" })];
+        if (kind === "challenge")
+          page.document.selectors[
+            'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+          ] = [node("IFRAME")];
+        if (kind === "sidebar")
+          page.document.selectors['nav a[href="/my-sets"]'] = [];
+        return true;
+      };
+      const input = { ...typing, image };
+      assert.equal(prepareBlooketAddQuestionForm(input).ok, false, kind);
+      assert.equal(submitBlooketAddQuestionForm(input).ok, false, kind);
+      assert.equal(page.submit.clicked, 0, kind);
+    });
+  }
+  },
+);
