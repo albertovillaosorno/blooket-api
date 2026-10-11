@@ -439,6 +439,9 @@ test(
 test("malformed login adapter replies never establish a session", async () => {
   for (const authentication of [
     { ok: true, unexpected: "sensitive" },
+    Object.defineProperty({ ok: true }, "secret",
+      { value: "private" }),
+    { ok: true, [Symbol("secret")]: "private" },
     { ok: false, code: "other", unexpected: "sensitive" },
     { ok: false, code: "blooket-browser-failed", extra: "sensitive" },
     null,

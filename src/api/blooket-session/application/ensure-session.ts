@@ -210,7 +210,7 @@ async function safeAuthenticate(
     const result = await browser.authenticate(credentials);
     if (!result || typeof result !== "object" || Array.isArray(result))
       return { ok: false, code: "blooket-browser-failed" };
-    const keys = Object.keys(result).sort().join();
+    const keys = Reflect.ownKeys(result).sort().join();
     if (result.ok === true && keys === "ok") return { ok: true };
     if (result.ok === false && keys === "code,ok" &&
         (result.code === "blooket-browser-unavailable" ||

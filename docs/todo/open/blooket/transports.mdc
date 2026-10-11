@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, browser session and login acknowledgement admission
+began checking every own property, not merely enumerable string keys.
+Previously an extra hidden or symbol field could cross a purportedly
+exact observation into the write precondition path. Portable tests
+reject both forms without reporting an authenticated ready state.
+
 On 2026-10-10, prepared-media read admission stopped trusting its
 TypeScript-only port response shape. Unknown failure codes, extra fields,
 null successes, hostile accessors, and malformed nested media bytes now
