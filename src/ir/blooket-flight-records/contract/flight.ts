@@ -293,7 +293,14 @@ export function flightActionState(
         valid = false;
         break;
       }
-      decoded[key] = value as readonly string[];
+      // Error keys are provider-controlled and can include __proto__.
+      // An own descriptor cannot invoke the inherited prototype setter.
+      Object.defineProperty(decoded, key, {
+        value: value as readonly string[],
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
     }
     if (valid) return { status, message, fieldErrors: decoded };
   }
