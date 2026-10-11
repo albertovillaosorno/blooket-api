@@ -75,7 +75,9 @@ export function runBlooketLoginPageAction(
       return null;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const challenged = Array.from(
       document.querySelectorAll(
