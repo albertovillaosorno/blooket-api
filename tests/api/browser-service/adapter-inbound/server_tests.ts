@@ -31,7 +31,8 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, truncate, writeFile } from
+  "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:net";
@@ -284,6 +285,7 @@ test(
         })
       ).json()) as {
         id: string;
+        asset: string;
         revision: number;
         edit: { zoom: number };
       };
@@ -341,6 +343,29 @@ test(
       assert.equal(media.length, 1);
       assert.equal(media[0]!.id, imported.id);
       assert.equal(media[0]!.normalizationStatus, "pending");
+      // Never commit a 200 response until the owned asset was bounded.
+      const mediaRoot = (await loadPreferences(root)).mediaRoot;
+      const sourcePath = join(mediaRoot, imported.asset);
+      const sourceBytes = await readFile(sourcePath);
+      const originalResponse = await fetch(service.origin +
+        "/media/" + imported.id);
+      assert.equal(originalResponse.status, 200);
+      assert.deepEqual(Buffer.from(await originalResponse.arrayBuffer()),
+        sourceBytes);
+      await truncate(sourcePath, 25_000_001);
+      const oversizedSource = await fetch(service.origin +
+        "/media/" + imported.id);
+      assert.equal(oversizedSource.status, 400);
+      assert.equal((await readFile(sourcePath)).byteLength, 25_000_001);
+      await rm(sourcePath);
+      const outsideSource = join(root, "unrelated-source.webp");
+      await writeFile(outsideSource, Uint8Array.of(7, 8, 9));
+      await symlink(outsideSource, sourcePath);
+      assert.equal((await fetch(service.origin +
+        "/media/" + imported.id)).status, 400);
+      assert.deepEqual(await readFile(outsideSource), Buffer.from([7, 8, 9]));
+      await rm(sourcePath);
+      await writeFile(sourcePath, sourceBytes);
       const prepared = (await (
         await post("/api/prepare", {
           id: imported.id,

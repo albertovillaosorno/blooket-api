@@ -50,6 +50,13 @@ unused desktop host boundary. Preserve the canonical IR and executor. The UI
 cannot directly access another site's authenticated page; browser automation
 remains behind the existing Blooket ports.
 
+The loopback media GET handler reads only a validated local asset ID and
+an `O_NOFOLLOW` file descriptor bounded to 25 MB. It verifies bytes before
+sending an HTTP 200 response, so a replaced pathname, symbolic asset, or
+oversized local file cannot escape through a late unbounded read. Synthetic
+HTTP tests cover both ordinary bytes and these refusal paths.
+
+
 ### Online MCP and user-owned tunnel setup
 
 Expose a dedicated loopback MCP gateway with Streamable HTTP through the
