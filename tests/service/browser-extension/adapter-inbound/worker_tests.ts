@@ -92,6 +92,7 @@ test(
   let questionSaved = true;
   let loseCreateAck = false;
   let createSidebarMismatch = false;
+  let createdSetVisibility: "private" | "public" = "private";
   let capabilityPanelReady = false;
   let capabilityDrawerOpen = false;
   let holdWriteOpen = false;
@@ -256,6 +257,17 @@ test(
           } }];
         }
         if (func.name === "closeBlooketDetailPanel") {
+          if (args?.[0] === "created-set-fixture") {
+            assert.deepEqual(args, ["created-set-fixture", {
+              title: "Synthetic created set",
+              description: "Created through bridge fixture",
+            }, {
+              title: "Synthetic created set",
+              description: "Created through bridge fixture",
+              visibility: createdSetVisibility,
+            }]);
+            return [{ result: true }];
+          }
           assert.deepEqual(args, [
             "opaque id/with spaces",
             { title: "Synthetic", description: "" },
@@ -266,6 +278,8 @@ test(
         if (func.name === "isBlooketDetailPanelClosed")
           return [{ result: detailClosedSucceeds }];
         if (func.name === "openBlooketDetailPanel") {
+          if (args?.[0] === "created-set-fixture")
+            return [{ result: true }];
           assert.deepEqual(args, ["opaque id/with spaces"]);
           if (detailSwitchTabAfterOpen) {
             detailSwitchTabAfterOpen = false;
@@ -437,6 +451,15 @@ test(
           tabUrl = sessionSwitchAfterScript;
           sessionSwitchAfterScript = null;
           return [{ result: { ok: true, value: observed } }];
+        }
+        if (operation.kind === "sets.get" &&
+            operation.setId === "created-set-fixture") {
+          return [{ result: { ok: true, value: {
+            schemaVersion: 1, id: "created-set-fixture",
+            title: "Synthetic created set",
+            description: "Created through bridge fixture",
+            visibility: createdSetVisibility,
+          } } }];
         }
         if (operation.kind === "sets.get") {
           detailReadCount++;
@@ -993,6 +1016,16 @@ test(
     });
     assert.equal(scripts.filter(name =>
       name === "submitBlooketCreateSetForm").length, 2);
+    createdSetVisibility = "public";
+    tabUrl = "https://dashboard.blooket.com/my-sets";
+    const wrongPrivacy = await expectReply({
+      kind: "sets.create", title: "Synthetic created set",
+      description: "Created through bridge fixture", private: true,
+    });
+    assert.equal(wrongPrivacy.value.ok, false);
+    assert.equal(scripts.filter(name =>
+      name === "closeBlooketDetailPanel").length >= 1, true);
+    createdSetVisibility = "private";
     createSidebarMismatch = true;
     tabUrl = "https://dashboard.blooket.com/my-sets";
     const unrelated = await expectReply({
@@ -1001,7 +1034,7 @@ test(
     });
     assert.equal(unrelated.value.ok, false);
     assert.equal(scripts.filter(name =>
-      name === "submitBlooketCreateSetForm").length, 3);
+      name === "submitBlooketCreateSetForm").length, 4);
     createSidebarMismatch = false;
     loseCreateAck = false;
     // The fixture's prior read is a separate historical state. Reset its

@@ -42,7 +42,12 @@ import {
 import {
   inspectBlooketPage,
   inspectBlooketDetailSidebar,
+  openBlooketDetailPanel,
+  closeBlooketDetailPanel,
+  isBlooketDetailPanelClosed,
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import { decodeBlooketSetDetail } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
 import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import { inspectBlooketDocumentOrigin } from
@@ -91,6 +96,7 @@ export interface ExtensionCreateSetHost {
   observeCreateSet(expected?: {
     readonly title: string;
     readonly description: string;
+    readonly private?: boolean;
   }): Promise<
     | { readonly ok: true; readonly remoteSetId: unknown }
     | ExtensionCreateSetFailure
@@ -168,6 +174,93 @@ export function createExtensionCreateSetHost(
         typeof observed === "number" && Number.isFinite(observed) &&
         observed > 0 ? observed : null;
   };
+  // Saved privacy is not exposed in the sidebar. Inspect the native
+  // Edit Info panel without saving changes; only its owned Cancel may close it.
+  const confirmSavedVisibility = async (
+    url: string,
+    setId: string,
+    expected: { title: string; description: string; private?: boolean },
+    origin: number,
+  ): Promise<boolean> => {
+    const owns = async () => await editDocumentOrigin(url) === origin;
+    if (!await owns()) return false;
+    const safe = await script(
+      canLeaveBlooketPageForRead as (...args: never[]) => unknown,
+    );
+    if (safe !== true || !await owns()) return false;
+    const opened = await script(
+      openBlooketDetailPanel as (...args: never[]) => unknown,
+      [setId],
+    );
+    if (opened !== true || !await owns()) return false;
+    type Detail = {
+      readonly title: string;
+      readonly description: string;
+      readonly visibility: "private" | "public";
+    };
+    let observed: Detail | undefined;
+    let stable = false;
+    try {
+      const read = async (): Promise<Detail | undefined> => {
+        if (!await owns()) return undefined;
+        const reply = await script(
+          inspectBlooketPage as (...args: never[]) => unknown,
+          [{ kind: "sets.get", setId }],
+        );
+        if (!await owns() || !exactKeys(reply, "ok,value") ||
+            !reply || typeof reply !== "object" ||
+            !("ok" in reply) || reply.ok !== true ||
+            !("value" in reply)) return undefined;
+        const decoded = decodeBlooketSetDetail(reply.value);
+        if (!decoded.ok || decoded.value.id !== setId ||
+            decoded.value.title !== expected.title ||
+            decoded.value.description !== expected.description)
+          return undefined;
+        return { title: decoded.value.title,
+          description: decoded.value.description,
+          visibility: decoded.value.visibility };
+      };
+      for (let poll = 0; poll < 15; poll++) {
+        const candidate = await read();
+        if (candidate) {
+          observed = candidate;
+          await pause(POLL_MS);
+          const again = await read();
+          stable = !!again && JSON.stringify(again) ===
+            JSON.stringify(candidate);
+          break;
+        }
+        await pause(POLL_MS);
+      }
+    } catch { stable = false; }
+    if (!observed || !await owns()) return false;
+    const canceled = await script(
+      closeBlooketDetailPanel as (...args: never[]) => unknown,
+      [setId, { title: expected.title,
+        description: expected.description }, observed],
+    ).catch(() => false);
+    if (canceled !== true || !await owns()) return false;
+    let closed = false;
+    for (let poll = 0; poll < 15; poll++) {
+      const reply = await script(
+        isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+        [setId],
+      ).catch(() => false);
+      if (!await owns()) return false;
+      if (reply === true) { closed = true; break; }
+      if (reply !== false) return false;
+      await pause(POLL_MS);
+    }
+    if (!closed || !stable ||
+        observed.visibility !== (expected.private ? "private" : "public"))
+      return false;
+    const sidebar = await script(
+      inspectBlooketDetailSidebar as (...args: never[]) => unknown,
+      [setId],
+    );
+    return await owns() && exactSavedSidebar(sidebar, expected);
+  };
+
   return {
     openCreateSet: async () => {
       try {
@@ -374,6 +467,7 @@ export function createExtensionCreateSetHost(
               }
               if (await editDocumentOrigin(tab.url) !== origin)
                 return browserFailure();
+              let confirmedOrigin = origin;
               if (expected !== undefined) {
                 // An optimistic Edit redirect is not durable provider state.
                 // Never reload a teacher editor unless it is safe to leave.
@@ -425,7 +519,13 @@ export function createExtensionCreateSetHost(
                 if (matching !== 2 ||
                     await editDocumentOrigin(tab.url) !== freshOrigin)
                   return browserFailure();
+                confirmedOrigin = freshOrigin;
               }
+              if (expected !== undefined &&
+                  typeof expected.private === "boolean" &&
+                  !await confirmSavedVisibility(
+                    tab.url, ids[0], expected, confirmedOrigin,
+                  )) return browserFailure();
               return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
@@ -485,6 +585,11 @@ function exactEditRoute(tab: BrowserTab): boolean {
       !!ids[0] && ids[0].length <= 512 &&
       !/[\x00-\x1f\x7f]/u.test(ids[0]) && !url.hash;
   } catch { return false; }
+}
+
+function exactKeys(value: unknown, expected: string): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value) &&
+    Reflect.ownKeys(value).sort().join() === expected;
 }
 
 function exactFailedSidebar(value: unknown): boolean {

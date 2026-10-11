@@ -51,6 +51,9 @@ function fakeChrome(options: {
   readonly canLeave?: unknown;
   readonly claimed?: unknown;
   readonly owned?: unknown;
+  readonly savedVisibility?: "private" | "public";
+  readonly panelRead?: unknown;
+  readonly panelClose?: unknown;
 }) {
   const calls: string[] = [];
   let tab = {
@@ -62,6 +65,10 @@ function fakeChrome(options: {
   const scripts = [...(options.scripts ?? [])];
   let navigated = false;
   let reloaded = false;
+  let detailOpened = false;
+  let detailClosed = false;
+  let saved: { title: string; description: string } | undefined;
+  let detailReads = 0;
   const chrome: CreateSetChromePort = {
     tabs: {
       get: async () => {
@@ -102,11 +109,53 @@ function fakeChrome(options: {
             ? options.claimed === undefined ? true : options.claimed
             : options.owned === undefined ? true : options.owned }];
         }
+        if (request.func.name === "openBlooketDetailPanel") {
+          calls.push("detail-open");
+          detailOpened = true;
+          return [{ result: true }];
+        }
+        if (request.func.name === "inspectBlooketPage" &&
+            (request.args?.[0] as { kind?: string } | undefined)?.kind ===
+              "sets.get" && detailOpened) {
+          calls.push("detail-read");
+          const fallback = { ok: true, value: {
+            schemaVersion: 1, id: "remote-set-1",
+            title: saved?.title, description: saved?.description,
+            visibility: options.savedVisibility ?? "private",
+          } };
+          const custom = options.panelRead;
+          const result = typeof custom === "function"
+            ? custom(detailReads++) : custom ?? fallback;
+          return [{ result }];
+        }
+        if (request.func.name === "closeBlooketDetailPanel") {
+          calls.push("detail-close");
+          detailClosed = options.panelClose !== false;
+          return [{ result: detailClosed }];
+        }
+        if (request.func.name === "isBlooketDetailPanelClosed") {
+          calls.push("detail-is-closed");
+          return [{ result: detailClosed }];
+        }
+        if (request.func.name === "inspectBlooketDetailSidebar" &&
+            detailClosed) {
+          calls.push("detail-final-sidebar");
+          return [{ result: { ok: true, value: saved } }];
+        }
         calls.push("script");
         const next = scripts.shift();
         const result = typeof next === "function"
           ? next(request.args ?? [])
           : next;
+        if (request.func.name === "inspectBlooketDetailSidebar" &&
+            result && typeof result === "object" && "ok" in result &&
+            result.ok === true && "value" in result && result.value &&
+            typeof result.value === "object" &&
+            "title" in result.value && "description" in result.value &&
+            typeof result.value.title === "string" &&
+            typeof result.value.description === "string")
+          saved = { title: result.value.title,
+            description: result.value.description };
         return [{ result }];
       },
     },
@@ -1200,5 +1249,180 @@ test("editor replacement after reload approval prevents Create Set reload",
   ).observeCreateSet(expected)).ok, false);
   assert.equal(fake.calls.includes("can-leave-check"), true);
   assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
+test("fresh Create Set observes saved private and public visibility",
+  async () => {
+  for (const visibility of ["private", "public"] as const) {
+    const expected = { title: "Synthetic", description: "Example",
+      private: visibility === "private" };
+    const sidebar = { ok: true, value: {
+      title: expected.title, description: expected.description,
+    } };
+    const fake = fakeChrome({ savedVisibility: visibility, scripts: [
+      observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar,
+    ] });
+    fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    assert.deepEqual(await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected), observed);
+    assert.deepEqual(fake.calls.filter(call => call.startsWith("detail-")),
+      ["detail-open", "detail-read", "detail-read", "detail-close",
+        "detail-is-closed", "detail-final-sidebar"]);
+    assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  }
+  },
+);
+
+test("an unexpected public set cannot confirm requested private privacy",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const fake = fakeChrome({ savedVisibility: "public", scripts: [
+    observed, observed, sidebar, sidebar,
+    observed, sidebar, observed, sidebar,
+  ] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected), { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.includes("detail-close"), true);
+  assert.equal(fake.calls.includes("detail-is-closed"), true);
+  },
+);
+
+test("Create Set refuses transient saved privacy and unsafe detail cleanup",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const detail = (visibility: string) => ({ ok: true, value: {
+    schemaVersion: 1, id: "remote-set-1",
+    title: expected.title, description: expected.description, visibility,
+  } });
+  for (const options of [
+    { panelRead: (attempt: number) => detail(
+      attempt === 0 ? "private" : "public"), panelClose: true },
+    { panelRead: () => detail("private"), panelClose: false },
+    { panelRead: () => ({ ok: true, value: { ...detail("private").value,
+      description: "Different set" } }), panelClose: true },
+  ]) {
+    const fake = fakeChrome({ ...options, scripts: [
+      observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar,
+    ] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    assert.deepEqual(await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(fake.calls.includes("detail-open"), true);
+  }
+  },
+);
+
+test("Create Set privacy panel can hydrate without another remote write",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: false };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  let panelReads = 0;
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+    observed, sidebar, observed, sidebar,
+  ], panelRead: () => {
+    panelReads++;
+    if (panelReads < 3) return { ok: false,
+      code: "blooket-browser-failed" };
+    return { ok: true, value: { schemaVersion: 1,
+      id: "remote-set-1", title: expected.title,
+      description: expected.description, visibility: "public" } };
+  } });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected), observed);
+  assert.equal(panelReads, 4);
+  assert.equal(fake.calls.includes("detail-close"), true);
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  },
+);
+
+test("Create Set refuses an unrelated set or malformed visibility evidence",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  for (const detail of [
+    { schemaVersion: 1, id: "unrelated-set",
+      title: expected.title, description: expected.description,
+      visibility: "private" },
+    { schemaVersion: 1, id: "remote-set-1",
+      title: expected.title, description: expected.description,
+      visibility: "unknown" },
+    { schemaVersion: 1, id: "remote-set-1",
+      title: expected.title, description: expected.description,
+      visibility: "private", extra: "private-data" },
+  ]) {
+    const fake = fakeChrome({ scripts: [
+      observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar,
+    ], panelRead: { ok: true, value: detail } });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    assert.deepEqual(await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(fake.calls.includes("detail-open"), true);
+  }
+  },
+);
+
+test("new edit document after opening the privacy panel cannot confirm",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+    observed, sidebar, observed, sidebar,
+  ] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  let replaced = false;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin" && replaced)
+      return [{ result: 4_000 }];
+    const result = await original(request);
+    if (request.func.name === "openBlooketDetailPanel") replaced = true;
+    return result;
+  };
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected), { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.includes("detail-close"), false);
   },
 );

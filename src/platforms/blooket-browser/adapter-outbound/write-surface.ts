@@ -61,6 +61,7 @@ export interface BlooketCreateSetBrowserHost {
   observeCreateSet(expected: {
     readonly title: string;
     readonly description: string;
+    readonly private: boolean;
   }): Promise<
     | { readonly ok: true; readonly remoteSetId: unknown }
     | BlooketBrowserWriteSurfaceFailure
@@ -91,6 +92,7 @@ export function createBlooketBrowserWriteSurface(
         const observed = await host.observeCreateSet({
           title: expected.title,
           description: expected.description,
+          private: expected.private,
         });
         return admitHostObservation(observed);
       } catch {

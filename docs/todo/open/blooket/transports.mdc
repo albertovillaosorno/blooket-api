@@ -62,6 +62,17 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, Create Set's confirmed browser success gained saved
+privacy read-back. After fresh Edit document reload and two matching
+saved sidebar observations, the host opens only a read-owned Edit Info
+panel, checks its exact set ID/title/description/visibility twice, then
+cancels without a Save Set click and rechecks the sidebar. A requested
+private set observed as public, malformed details, an unrelated set,
+changed document ownership, or unsafe panel cleanup remain inconclusive.
+Synthetic host and worker regressions cover public/private success,
+privacy mismatch, hydration, and lost Submit acknowledgment; no actual
+provider account was modified.
+
 On 2026-10-10, capability inspection rejects hidden or symbol-owned
 extra properties on browser probe results, keeping write planning
 secret-free and fail closed on malformed capability evidence.
