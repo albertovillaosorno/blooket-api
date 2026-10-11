@@ -975,3 +975,78 @@ test("host binds the opener to its intended next question number",
   assert.equal(opens, 1);
   },
 );
+
+test("post-save conflicting question rows cannot later become a receipt",
+  async () => {
+  for (const conflicting of [
+    { ok: true, value: [2] },
+    { ok: true, value: [1, 2] },
+    { ok: true, value: [1], extra: "untrusted" },
+    { ok: true, value: [1, 1] },
+    { ok: true, value: "unexpected" },
+    { ok: false, code: "unknown" },
+  ]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let reads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "listBlooketQuestionNumbers" &&
+          ++reads === 3) return [{ result: conflicting }];
+      return await original(request);
+    };
+    assert.deepEqual(await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(reads, 3);
+    assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+    assert.equal(fake.calls.filter(call =>
+      call === "runBlooketAddQuestionPageAction:submit").length, 1);
+    assert.equal(fake.calls.includes("reload"), false);
+  }
+  },
+);
+
+test("a previous-only saved question collection can finish hydrating",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "listBlooketQuestionNumbers" &&
+        ++reads === 3) return [{ result: { ok: true, value: [] } }];
+    return await original(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: true });
+  assert.ok(reads >= 5);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("post-save hidden and symbol fields do not become question evidence",
+  async () => {
+  for (const result of [
+    Object.defineProperty({ ok: true, value: [1] }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ok: true, value: [1], [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let reads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "listBlooketQuestionNumbers" &&
+          ++reads === 3) return [{ result }];
+      return await original(request);
+    };
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input)).ok, false);
+    assert.equal(reads, 3);
+    assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  }
+  },
+);

@@ -437,7 +437,9 @@ async function observeQuestion(
       listBlooketQuestionNumbers as (...args: never[]) => unknown,
       [input.setId],
     );
-    if (!questionNumberPresent(listed, input.number)) {
+    const rows = postSaveQuestionRows(listed, input.number);
+    if (rows === "conflict") return browserFailure();
+    if (rows === "pending") {
       await pause(POLL_MS);
       continue;
     }
@@ -609,15 +611,41 @@ function exactPreviousQuestionNumbers(result: unknown, number: number) {
     Number.isSafeInteger(candidate) && candidate === index + 1);
 }
 
+// A still-hydrating card collection may contain exactly the previous
+// contiguous question slots. A readable conflicting collection is different
+// evidence and must never be polled until it happens to match a write.
+function postSaveQuestionRows(
+  result: unknown,
+  number: number,
+): "pending" | "ready" | "conflict" {
+  if (!Number.isSafeInteger(number) || number < 1 || number > 200 ||
+      !result || typeof result !== "object" || Array.isArray(result))
+    return "conflict";
+  if (exactKeys(result, "code,ok") && "ok" in result &&
+      result.ok === false && "code" in result &&
+      result.code === "blooket-browser-failed") return "pending";
+  if (!exactKeys(result, "ok,value") || !("ok" in result) ||
+      result.ok !== true || !("value" in result) ||
+      !Array.isArray(result.value) || result.value.length > 200 ||
+      (result.value.length !== number &&
+       result.value.length !== number - 1) ||
+      !result.value.every((candidate, index) =>
+        Number.isSafeInteger(candidate) && candidate === index + 1))
+    return "conflict";
+  return result.value.length === number ? "ready" : "pending";
+}
+
 function questionNumberPresent(result: unknown, number: number): boolean {
-  if (!result || typeof result !== "object" || Array.isArray(result) ||
-      Object.keys(result).sort().join() !== "ok,value" ||
-      !("ok" in result) || result.ok !== true ||
-      !("value" in result) || !Array.isArray(result.value) ||
-      !Number.isSafeInteger(number) || number < 1 || number > 200 ||
-      result.value.length !== number) return false;
-  return result.value.every((candidate, index) =>
-    Number.isSafeInteger(candidate) && candidate === index + 1);
+  return postSaveQuestionRows(result, number) === "ready";
+}
+
+function exactKeys(result: unknown, expected: string): boolean {
+  if (!result || typeof result !== "object" || Array.isArray(result))
+    return false;
+  const keys = Reflect.ownKeys(result);
+  const names = expected.split(",");
+  return keys.length === names.length && keys.every(key =>
+    typeof key === "string" && names.includes(key));
 }
 
 function exactOk(value: unknown): boolean {
