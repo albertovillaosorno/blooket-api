@@ -61,9 +61,12 @@ function fixture(options: {
   readonly panelReadyReplies?: readonly unknown[];
   readonly audioClosedReplies?: readonly unknown[];
   readonly questionClosedReplies?: readonly unknown[];
+  readonly replaceAt?: string;
 } = {}) {
   const originalUrl = "https://dashboard.blooket.com/edit?id=original-set";
   let tabUrl = originalUrl;
+  let documentOrigin = 1_000;
+  let replaced = false;
   let panelOpen = false;
   let drawerOpen = false;
   let audioProbeCount = 0;
@@ -84,6 +87,7 @@ function fixture(options: {
         if (options.restoreFails && input.url === originalUrl)
           throw new Error("synthetic restore failure");
         tabUrl = input.url;
+        documentOrigin += 1_000;
         navigations.push(input.url);
         return { url: tabUrl, status: "complete" };
       },
@@ -97,6 +101,14 @@ function fixture(options: {
         assert.equal(input.target.tabId, 7);
         scripts.push(input.func.name);
         const args = input.args ?? [];
+        if (input.func.name === "inspectBlooketDocumentOrigin") {
+          assert.deepEqual(args, [tabUrl]);
+          return [{ result: documentOrigin }];
+        }
+        if (!replaced && options.replaceAt === input.func.name) {
+          replaced = true;
+          documentOrigin += 1_000;
+        }
         switch (input.func.name) {
           case "canLeaveBlooketPageForRead":
             return [{ result: !options.unsafeOriginalEditor }];
@@ -1147,5 +1159,35 @@ test(
   assert.ok(cancellation >= 0);
   assert.equal(page.scripts.length, cancellation + 1);
   assert.equal(page.currentUrl(), manualRoute);
+  },
+);
+
+test("capability probing rejects a same-route document replacement",
+  async () => {
+  for (const phase of [
+    "inspectBlooketPage",
+    "openBlooketCapabilityQuestionPanel",
+    "openBlooketAudioCapabilityDrawer",
+    "inspectBlooketAudioCapabilityDrawer",
+    "closeBlooketAudioCapabilityDrawer",
+  ]) {
+    const page = fixture({ replaceAt: phase });
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.notEqual(page.navigations.at(-1), page.originalUrl);
+    // A replacement editor is teacher-owned, even at the identical URL.
+    if (phase === "openBlooketCapabilityQuestionPanel" ||
+        phase === "openBlooketAudioCapabilityDrawer" ||
+        phase === "inspectBlooketAudioCapabilityDrawer" ||
+        phase === "closeBlooketAudioCapabilityDrawer") {
+      assert.equal(page.scripts.includes(
+        "closeBlooketCapabilityQuestionPanel"), false);
+    }
+    if (phase === "closeBlooketAudioCapabilityDrawer")
+      assert.equal(page.scripts.filter(name =>
+        name === "closeBlooketAudioCapabilityDrawer").length, 1);
+  }
   },
 );

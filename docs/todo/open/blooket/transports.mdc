@@ -62,6 +62,18 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the read-only capability probe began tracking a positive
+native document origin separately on My Sets and on the probed edit route.
+The previous URL/status checks could mix separate documents, dismiss an
+unrelated Audio/question panel after a same-URL reload, or overwrite an
+independently changed page during route restoration.
+
+Synthetic tests replace the document during initial listing, modal opening,
+Audio evidence, and Cancel. These cases refuse the capability snapshot and
+skip foreign-document cleanup and restoration. A never-hydrated My Sets route
+can still be restored before the probe has claimed any document or editor.
+No actual account capability acceptance is inferred.
+
 On 2026-10-10, session inspection began binding both stable navigation
 observations to one native document origin, including the exact
 `https://id.blooket.com/login` identity page. A separate read-only helper
