@@ -125,6 +125,21 @@ test("ordinary JSON cannot impersonate a tagged Flight error row", () => {
   assert.deepEqual(flightObjects(new Map([["0", forged]])), [forged]);
 });
 
+test("Flight object copying preserves dangerous keys as own data", () => {
+  const source = '0:{"title":"Fictional","__proto__":' +
+    '{"polluted":true}}\n';
+  const rows = decodeFlightRows(source);
+  const values = flightObjects(rows);
+  const object = values.find(value => value["title"] === "Fictional")!;
+  assert.equal(Object.getPrototypeOf(object), Object.prototype);
+  assert.equal(Object.hasOwn(object, "__proto__"), true);
+  assert.deepEqual(object["__proto__"], { polluted: true });
+  assert.equal(({} as { polluted?: unknown }).polluted, undefined);
+  const forged = '0:{"status":"SUCCESS","message":"",' +
+    '"fieldErrors":{},"__proto__":{"hidden":true}}\n';
+  assert.equal(flightActionState(forged), undefined);
+});
+
 test("action state validation is exact and never coerces primitives", () => {
   const row = (value: unknown) => "0:" + JSON.stringify(value) + "\n";
   assert.deepEqual(flightActionState(row(action)), action);

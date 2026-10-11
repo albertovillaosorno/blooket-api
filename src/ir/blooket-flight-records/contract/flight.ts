@@ -218,8 +218,17 @@ export function flightObjects(
       }
       const output: Record<string, unknown> = {};
       objectMemo.set(value, output);
-      for (const [key, entry] of Object.entries(value))
-        output[key] = visit(entry, depth + 1);
+      for (const [key, entry] of Object.entries(value)) {
+        // Assignment to __proto__ invokes an inherited setter on {}.
+        // Preserve every untrusted key as an own enumerable data field so
+        // strict downstream decoders cannot miss it or inherit its values.
+        Object.defineProperty(output, key, {
+          value: visit(entry, depth + 1),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      }
       found.push(output);
       return output;
     } finally {
