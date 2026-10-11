@@ -783,6 +783,12 @@ test("Create Set refuses hidden ambiguous or inconsistent privacy rows",
       page.privacyRow.getBoundingClientRect = () => ({ width: 0,
         height: 0 });
     },
+    (page: ReturnType<typeof fixture>) => {
+      page.privacyState.visibility = "hidden";
+    },
+    (page: ReturnType<typeof fixture>) => {
+      page.privacyRow.visibility = "hidden";
+    },
   ]) {
     const page = fixture(true);
     mutate(page);
