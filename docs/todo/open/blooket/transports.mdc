@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, unchanged My Sets and question collections stopped
+counting as negative proof of an ambiguous write. A provider save may
+become visible only after its first post-submit read; clearing the journal
+at that point could authorize a duplicate retry. Synthetic delayed-visibility
+checks show reconciliation remains pending until an exact positive
+collection difference appears, then advances the original journal.
+
 On 2026-10-10, the portable Create Set browser surface began requiring
 exact host acknowledgements at Open, Prepare, Submit, and saved-receipt
 observation boundaries. Previously a truthy malformed success could trigger

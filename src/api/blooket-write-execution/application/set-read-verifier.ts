@@ -129,7 +129,9 @@ export function blooketSetReadWriteVerifier(
       }
       const currentBaseline = setBaselineFor(listed.value);
       if (sameBlooketWriteVerificationBaseline(currentBaseline, baseline)) {
-        return { ok: true, outcome: "not-confirmed" };
+        // An async provider mutation can become visible after this read.
+        // Absence alone cannot clear a durable ambiguous attempt for retry.
+        return { ok: true, outcome: "inconclusive" };
       }
       if (listed.value.length !== baseline.itemCount + 1) {
         return { ok: true, outcome: "inconclusive" };
@@ -198,7 +200,9 @@ async function verifyQuestion(
     return { ok: true, outcome: "inconclusive" };
   }
   if (sameBlooketWriteVerificationBaseline(currentBaseline, baseline)) {
-    return { ok: true, outcome: "not-confirmed" };
+    // A saved question may still hydrate after an ambiguous Save click.
+    // The unchanged page is not authoritative negative write evidence.
+    return { ok: true, outcome: "inconclusive" };
   }
   if (listed.value.length !== baseline.itemCount + 1) {
     return { ok: true, outcome: "inconclusive" };

@@ -40,6 +40,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { blooketSetReadWriteVerifier } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/application/set-read-verifier.ts";
+import type { BlooketSetReadPort } from
+  "../../../../src/api/blooket-set-reads/contract/set-reads.ts";
 import { verifyPersistedBlooketWrite } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/api/blooket-write-execution/application/verify-reconciliation.ts";
@@ -631,6 +636,55 @@ test("question reconciliation rejects forged set receipts before persistence",
     const recovered = await loadWriteAttemptFile(value.attempt, plan);
     assert.equal(recovered.ok && recovered.kind === "record" &&
       recovered.record.phase, "attempting");
+  });
+  },
+);
+
+
+test("delayed Create Set visibility never enables a duplicate replay",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const files = paths(directory);
+    let visible = false;
+    const old = { schemaVersion: 1, id: "old-set", title: "Existing" };
+    const created = { schemaVersion: 1, id: "remote-set-1",
+      title: "Fractions" };
+    const reads: BlooketSetReadPort = {
+      list: async () => ({ ok: true, completeness: "complete",
+        value: visible ? [old, created] : [old] }),
+      get: async id => ({ ok: true, value: { schemaVersion: 1, id,
+        title: "Fractions", description: "Review.",
+        visibility: "private" } }),
+    };
+    const evidence = blooketSetReadWriteVerifier(reads);
+    const baseline = await evidence.captureBaseline(plan.operations[0]!,
+      { remoteSetId: null });
+    assert.ok(baseline.ok && baseline.baseline);
+    if (!baseline.ok) return;
+    assert.equal((await beginWriteAttempt(files.attempt, plan, 0,
+      baseline.baseline)).ok, true);
+    const first = await verifyPersistedBlooketWrite(
+      files, plan, browser(), secrets(), evidence,
+    );
+    assert.equal(first.ok && first.kind, "reconciliation-required");
+    if (first.ok && first.kind === "reconciliation-required")
+      assert.equal(first.reason, "verification-inconclusive");
+    const afterFirst = await loadWriteAttemptFile(files.attempt, plan);
+    assert.equal(afterFirst.ok && afterFirst.kind === "record" &&
+      afterFirst.record.phase, "attempting");
+    await assert.rejects(readFile(files.checkpoint, "utf8"));
+    // The provider may commit only after the initial read-back attempt.
+    visible = true;
+    const second = await verifyPersistedBlooketWrite(
+      files, plan, browser(), secrets(), evidence,
+    );
+    assert.equal(second.ok && second.kind, "recovered");
+    if (second.ok && second.kind === "recovered") {
+      assert.equal(second.checkpoint.remoteSetId, "remote-set-1");
+      assert.equal(second.checkpoint.nextOperationIndex, 1);
+    }
+    assert.deepEqual(await loadWriteAttemptFile(files.attempt, plan),
+      { ok: true, kind: "missing" });
   });
   },
 );
