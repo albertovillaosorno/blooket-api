@@ -857,3 +857,67 @@ test("delayed question visibility stays inconclusive until positive evidence",
     { ok: true, outcome: "confirmed", receipt: null });
   },
 );
+
+test("transient Create Set candidate cannot become a durable receipt",
+  async () => {
+  const prior = summary("existing", "Existing");
+  const created = summary("new-set", "Astronomy");
+  let lists = 0;
+  const reads: BlooketSetReadPort = {
+    list: async () => ({ ok: true, completeness: "complete",
+      value: ++lists === 1 ? [prior]
+        : lists === 2 ? [prior, created] : [prior] }),
+    get: async id => ({ ok: true, value: detail(id, "Astronomy") }),
+  };
+  const verifier = blooketSetReadWriteVerifier(reads);
+  const captured = await verifier.captureBaseline(operation,
+    { remoteSetId: null });
+  assert.ok(captured.ok && captured.baseline);
+  if (!captured.ok) return;
+  assert.deepEqual(await verifier.verify(operation, { remoteSetId: null },
+    captured.baseline), { ok: true, outcome: "inconclusive" });
+  assert.equal(lists, 3);
+  },
+);
+
+test("changed Create Set details between reads prevent confirmation",
+  async () => {
+  const prior = summary("existing", "Existing");
+  const created = summary("new-set", "Astronomy");
+  let lists = 0;
+  let details = 0;
+  const reads: BlooketSetReadPort = {
+    list: async () => ({ ok: true, completeness: "complete",
+      value: ++lists === 1 ? [prior] : [prior, created] }),
+    get: async id => ({ ok: true, value: detail(id, "Astronomy",
+      ++details === 1 ? "Review" : "Changed after first read") }),
+  };
+  const verifier = blooketSetReadWriteVerifier(reads);
+  const captured = await verifier.captureBaseline(operation,
+    { remoteSetId: null });
+  assert.ok(captured.ok && captured.baseline);
+  if (!captured.ok) return;
+  assert.deepEqual(await verifier.verify(operation, { remoteSetId: null },
+    captured.baseline), { ok: true, outcome: "inconclusive" });
+  assert.equal(details, 2);
+  },
+);
+
+test("a transient matching question cannot confirm an ambiguous write",
+  async () => {
+  const sets: BlooketSetReadPort = {
+    list: async () => { throw Error("should not list sets"); },
+    get: async () => { throw Error("should not get sets"); },
+  };
+  const target = { remoteSetId: "remote-set-1" };
+  const op = typingOperation();
+  const verifier = blooketSetReadWriteVerifier(
+    sets, questionReads([[], [remoteTyping()], []]),
+  );
+  const captured = await verifier.captureBaseline(op, target);
+  assert.ok(captured.ok && captured.baseline);
+  if (!captured.ok) return;
+  assert.deepEqual(await verifier.verify(op, target, captured.baseline),
+    { ok: true, outcome: "inconclusive" });
+  },
+);

@@ -165,6 +165,18 @@ export function blooketSetReadWriteVerifier(
       ) {
         return { ok: true, outcome: "inconclusive" };
       }
+      // Hydration and other actor changes can invalidate one candidate.
+      // Confirm a second independent complete collection and saved detail.
+      const listedAgain = await safeList(reads);
+      if (!listedAgain.ok) return listedAgain;
+      if (listedAgain.completeness !== "complete" ||
+          JSON.stringify(listedAgain.value) !== JSON.stringify(listed.value))
+        return { ok: true, outcome: "inconclusive" };
+      const detailedAgain = await safeGet(reads, candidate.id);
+      if (!detailedAgain.ok) return detailedAgain;
+      if (JSON.stringify(detailedAgain.value) !==
+          JSON.stringify(detailed.value))
+        return { ok: true, outcome: "inconclusive" };
       return {
         ok: true,
         outcome: "confirmed",
@@ -233,7 +245,11 @@ async function verifyQuestion(
       questionBaselineFor(withoutIndex(listed.value, index)),
       baseline,
     ));
-  return candidates.length === 1
+  if (candidates.length !== 1)
+    return { ok: true, outcome: "inconclusive" };
+  const listedAgain = await safeQuestions(reads, target.remoteSetId);
+  if (!listedAgain.ok) return listedAgain;
+  return JSON.stringify(listedAgain.value) === JSON.stringify(listed.value)
     ? { ok: true, outcome: "confirmed", receipt: null }
     : { ok: true, outcome: "inconclusive" };
 }
