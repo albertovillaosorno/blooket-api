@@ -169,6 +169,12 @@ export function createExtensionAddQuestionHost(
         if (current.url !== editUrl) {
           // A write may navigate from My Sets or another dashboard view.
           // Never discard an existing teacher editor to reach its target.
+          const origin = await script(
+            inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+            [current.url],
+          );
+          if (typeof origin !== "number" || !Number.isFinite(origin) ||
+              origin <= 0) return browserFailure();
           const canLeave = await script(
             canLeaveBlooketPageForRead as (...args: never[]) => unknown,
           );
@@ -176,6 +182,16 @@ export function createExtensionAddQuestionHost(
           const afterGuard = await chrome.tabs.get(tabId);
           if (afterGuard.status !== "complete" ||
               afterGuard.url !== current.url) return browserFailure();
+          // A same-URL reload can install a new teacher-owned document after
+          // the navigation guard. Never navigate away from that replacement.
+          const unchanged = await script(
+            inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+            [current.url],
+          );
+          const beforeNavigation = await chrome.tabs.get(tabId);
+          if (unchanged !== origin ||
+              beforeNavigation.status !== "complete" ||
+              beforeNavigation.url !== current.url) return browserFailure();
           await chrome.tabs.update(tabId, { url: editUrl });
         }
 

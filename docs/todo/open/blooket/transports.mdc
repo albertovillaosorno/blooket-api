@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Create Set and Add Question navigation began preserving
+one positive native dashboard document origin across the permission-to-leave
+check and the actual tab update. Previously a same-URL reload between the
+safe-to-leave inspection and the navigation could replace the source document
+with a teacher-owned editor without changing the observed URL. Portable
+synthetic tests replace the native origin or withhold it; both hosts refuse to
+navigate or open forms. Post-submit evidence and authenticated Blooket
+acceptance remain separate, unverified gates.
+
 On 2026-10-10, the read navigation guard added a second native document
 origin check immediately before issuing its one allowed reload or navigation.
 Previously the teacher could replace the current document at the same URL
