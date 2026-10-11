@@ -93,6 +93,14 @@ test("changed or ambiguous provider component identities are refused", () => {
     [52644, ["1958", "static/chunks/1958-3beff819112074ac.js"], "other"],
     [52644, [1958, "static/chunks/1958-3beff819112074ac.js"], "default"],
     [52644, ["1958"], "default"],
+    [52644, [
+      "1958", "static/chunks/1958-3beff819112074ac.js",
+      "1958", "static/chunks/conflicting.js",
+    ], "default"],
+    [52644, [
+      "1958", "static/chunks/1958-3beff819112074ac.js",
+      "1958", "static/chunks/1958-3beff819112074ac.js",
+    ], "default"],
   ]) assert.equal(decode(libraryModelFixture({ module })), undefined);
   const source = libraryModelFixture();
   const tuple = source.slice(2, source.indexOf("\n"));
