@@ -855,3 +855,26 @@ test("question enumeration never evaluates accessors in page replies",
     }
   },
 );
+
+test("question scans refuse decorated empty and getter-backed card arrays",
+  async () => {
+    const empty: number[] = [];
+    Object.defineProperty(empty, "hidden", {
+      value: "untrusted", enumerable: false,
+    });
+    const sparse = new Array<number>(1);
+    let reads = 0;
+    const getter = Object.defineProperty([1], "0", {
+      enumerable: true,
+      get() { reads++; return 1; },
+    });
+    for (const list of [empty, sparse, getter]) {
+      const fixture = synthetic({ initial: { ok: true, value: list } });
+      assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000),
+        failed);
+      assert.equal(fixture.calls.includes("openBlooketQuestionPanel"),
+        false);
+    }
+    assert.equal(reads, 0);
+  },
+);

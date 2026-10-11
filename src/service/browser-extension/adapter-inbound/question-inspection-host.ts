@@ -37,6 +37,8 @@ import {
   "../../../ir/blooket-question-reads/contract/question-read.ts";
 import { inspectOpenedBlooketQuestionImage } from
   "../../../platforms/blooket-browser/adapter-outbound/question-image-page.ts";
+import { isExactDenseArray } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 import {
@@ -150,7 +152,7 @@ export function createExtensionQuestionInspectionHost(
       if (!result || typeof result !== "object" || Array.isArray(result) ||
           !exactKeys(result, "ok,value") ||
           !("ok" in result) || result.ok !== true ||
-          !("value" in result) || !Array.isArray(result.value) ||
+          !("value" in result) || !isExactDenseArray(result.value) ||
           result.value.length > MAX_QUESTIONS)
         return undefined;
       // The provider renders questions in one contiguous slot order.
