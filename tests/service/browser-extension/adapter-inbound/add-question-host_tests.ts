@@ -1182,3 +1182,25 @@ test("Add Question host never evaluates Chrome result getters before write",
     }
   },
 );
+
+test("Add Question never invokes list-result getters before opening",
+  async () => {
+    for (const kind of ["getter", "hidden"] as const) {
+      let getters = 0;
+      const value: { ok: boolean; value?: unknown } = { ok: true };
+      Object.defineProperty(value, "value", {
+        enumerable: kind !== "hidden",
+        ...(kind === "getter"
+          ? { get() { getters++; return []; } }
+          : { value: [] }),
+      });
+      const fake = fakeChrome({ priorListReply: value });
+      assert.equal((await createExtensionAddQuestionHost(
+        fake.chrome, 7, async () => undefined,
+      ).addQuestion(input)).ok, false);
+      assert.equal(getters, 0);
+      assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+        false);
+    }
+  },
+);

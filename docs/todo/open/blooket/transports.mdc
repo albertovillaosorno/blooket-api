@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, exact page-reply envelopes in the four Chrome hosts
+also began requiring enumerable own data fields, rather than merely
+matching field names. Accessor-backed and hidden `ok`/`value` data
+cannot execute getters or be admitted during Create Set, Add Question,
+login, or existing-question enumeration. Focused synthetic tests ensure
+those results stop before mutation or read-owned panel opening.
+
 On 2026-10-11, the common runtime object validator began rejecting
 non-enumerable and accessor-backed fields even when their names are
 admitted by a versioned contract. It reads only property descriptors,

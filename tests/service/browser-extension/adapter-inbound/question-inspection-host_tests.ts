@@ -834,3 +834,24 @@ test("question read host ignores accessor and hidden Chrome origin results",
     }
   },
 );
+
+test("question enumeration never evaluates accessors in page replies",
+  async () => {
+    for (const kind of ["getter", "hidden"] as const) {
+      let getters = 0;
+      const value: { ok: boolean; value?: unknown } = { ok: true };
+      Object.defineProperty(value, "value", {
+        enumerable: kind !== "hidden",
+        ...(kind === "getter"
+          ? { get() { getters++; return [1]; } }
+          : { value: [1] }),
+      });
+      const fixture = synthetic({ initial: value });
+      assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000),
+        failed);
+      assert.equal(getters, 0);
+      assert.equal(fixture.calls.includes("openBlooketQuestionPanel"),
+        false);
+    }
+  },
+);
