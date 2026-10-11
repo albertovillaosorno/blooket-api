@@ -109,3 +109,41 @@ test("captured model envelopes reject hidden and symbol-owned fields",
     malformed), failed);
   },
 );
+
+
+test("library model correlation ignores accessor-backed captured fields",
+  () => {
+  for (const key of ["build", "source"] as const) {
+    const envelope = { ...captured };
+    Object.defineProperty(envelope, key, {
+      enumerable: true,
+      get() { throw new Error("captured getter must not run"); },
+    });
+    assert.deepEqual(checkBlooketLibraryObservation(observed, envelope),
+      failed);
+  }
+  const hidden = { ...captured };
+  Object.defineProperty(hidden, "source", {
+    enumerable: false, value: captured.source,
+  });
+  assert.deepEqual(checkBlooketLibraryObservation(observed, hidden), failed);
+  },
+);
+
+test("library model correlation does not execute observed row getters",
+  () => {
+  const row = Object.defineProperty({ ...observed.value.items[0] }, "id", {
+    get() { throw new Error("observed getter must not run"); },
+  });
+  assert.deepEqual(checkBlooketLibraryObservation({ ...observed,
+    value: { ...observed.value, items: [row] },
+  }, captured), failed);
+  const slots = Object.defineProperty([observed.value.items[0]], "0", {
+    enumerable: true,
+    get() { throw new Error("slot getter must not run"); },
+  });
+  assert.deepEqual(checkBlooketLibraryObservation({ ...observed,
+    value: { ...observed.value, items: slots },
+  }, captured), failed);
+  },
+);

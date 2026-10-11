@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, My Sets Flight-model correlation began requiring
+owned, enumerable data fields for captured build/source values and
+reading only direct row identity properties. Accessor-backed model
+fields and saved-set rows can no longer execute getters during the
+comparison, which occurs before the worker's final list decoder.
+Synthetic consistency tests cover getter-backed captured and DOM data.
+
 On 2026-10-11, the extension worker's exact browser reply admission
 began requiring enumerable owned data fields for all expected keys.
 A hidden expected value or accessor getter on the second My Sets
