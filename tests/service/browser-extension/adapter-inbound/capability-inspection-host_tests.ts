@@ -62,8 +62,11 @@ function fixture(options: {
   readonly audioClosedReplies?: readonly unknown[];
   readonly questionClosedReplies?: readonly unknown[];
   readonly replaceAt?: string;
+  readonly originalIsSelected?: boolean;
+  readonly staleSelectedDocument?: boolean;
 } = {}) {
-  const originalUrl = "https://dashboard.blooket.com/edit?id=original-set";
+  const originalUrl = "https://dashboard.blooket.com/edit?id=" +
+    (options.originalIsSelected ? "set-fixture" : "original-set");
   let tabUrl = originalUrl;
   let documentOrigin = 1_000;
   let replaced = false;
@@ -87,7 +90,9 @@ function fixture(options: {
         if (options.restoreFails && input.url === originalUrl)
           throw new Error("synthetic restore failure");
         tabUrl = input.url;
-        documentOrigin += 1_000;
+        documentOrigin = options.staleSelectedDocument &&
+          input.url === "https://dashboard.blooket.com/edit?id=set-fixture"
+          ? 1_000 : documentOrigin + 1_000;
         navigations.push(input.url);
         return { url: tabUrl, status: "complete" };
       },
@@ -1224,5 +1229,34 @@ test("capability navigation rejects missing native source identity",
   assert.equal(result.ok, false);
   assert.equal(page.navigations.length, 0);
   assert.equal(page.scripts.includes("canLeaveBlooketPageForRead"), false);
+  },
+);
+
+test("capability probing may return to the same route with a fresh document",
+  async () => {
+  const page = fixture({ originalIsSelected: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.equal(result.ok, true);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.navigations.includes(
+    "https://dashboard.blooket.com/my-sets"), true);
+  assert.equal(page.navigations.includes(page.originalUrl), true);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    true);
+  },
+);
+
+test("a stale return to the original edit document cannot open a probe",
+  async () => {
+  const page = fixture({ originalIsSelected: true,
+    staleSelectedDocument: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.equal(result.ok, false);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    false);
   },
 );
