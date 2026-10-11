@@ -279,11 +279,20 @@ async function read(
       : origin !== "https://dashboard.blooket.com"
   )
     throw new Error("manual-blooket-sign-in-required");
+  let approvedSourceOrigin: number | undefined;
   if (target !== null) {
     // The teacher may be editing a question, metadata, or a fresh set in
     // the current tab. Refuse navigation or a same-route reload first.
     if (tab.status !== "complete")
       throw new Error("browser-navigation-unsafe");
+    const nativeSource = await script(current, browser,
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+      [tab.url]);
+    if (typeof nativeSource !== "number" ||
+        !Number.isFinite(nativeSource) || nativeSource <= 0 ||
+        Date.now() >= readDeadline)
+      throw new Error("browser-navigation-unsafe");
+    approvedSourceOrigin = nativeSource;
     const safe = await script(
       current, browser,
       canLeaveBlooketPageForRead as (...args: never[]) => unknown,
@@ -292,11 +301,18 @@ async function read(
     if (safe !== true || checked.status !== "complete" ||
         checked.url !== tab.url || Date.now() >= readDeadline)
       throw new Error("browser-navigation-unsafe");
+    const afterGuardOrigin = await script(current, browser,
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+      [tab.url]);
+    if (afterGuardOrigin !== approvedSourceOrigin ||
+        Date.now() >= readDeadline)
+      throw new Error("browser-navigation-unsafe");
   }
   const confirmed = await confirmBlooketReadNavigation(
     browser.tabs, current.tabId, tab, target, readDeadline, pause,
     async url => await script(current, browser,
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [url]),
+    Date.now, approvedSourceOrigin,
   );
   if (!confirmed) throw new Error("browser-navigation-timeout");
   tab = confirmed;

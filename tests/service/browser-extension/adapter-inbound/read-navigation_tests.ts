@@ -305,3 +305,22 @@ test("manual navigation after a fresh origin invalidates a read", async () => {
   assert.equal(result, undefined);
   assert.equal(page.reloads(), 1);
 });
+
+test("source authorization cannot be transferred to a replacement document",
+  async () => {
+  const page = fixture();
+  const changed = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 8_000, page.pause,
+    page.documentOrigin, page.now, 2_000,
+  );
+  assert.equal(changed, undefined);
+  assert.equal(page.updates(), 0);
+  assert.equal(page.reloads(), 0);
+  const unchanged = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 8_000, page.pause,
+    page.documentOrigin, page.now, 1_000,
+  );
+  assert.deepEqual(unchanged, { url: EDIT, status: "complete" });
+  assert.equal(page.updates(), 1);
+  },
+);
