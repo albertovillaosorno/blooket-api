@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the injected login preparer started requiring
+CSS-visible heading, identifier, password and submit controls.
+A stale hidden login form with nonzero layout bounds can no longer
+receive stored credentials or authorize one login click. Portable
+tests confirm these failures without entering an account or changing
+the provider's supported login URL behavior.
+
 On 2026-10-11, the Create Set ownership claim, preparation and
 single-submit page functions began requiring the exact `/create`
 route without search or fragment. Preparation refuses CSS-hidden

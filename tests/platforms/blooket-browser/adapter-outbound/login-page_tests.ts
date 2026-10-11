@@ -46,6 +46,8 @@ interface FixtureNode {
   value: string;
   disabled: boolean;
   clicked: number;
+  visibility?: string;
+  display?: string;
   selectors: Record<string, FixtureNode[]>;
   getAttribute(name: string): string | null;
   querySelectorAll(selector: string): FixtureNode[];
@@ -99,7 +101,8 @@ function withPage(
   run: () => void,
 ): void {
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
-  for (const key of ["document", "location", "HTMLInputElement", "Event"])
+  for (const key of ["document", "location", "HTMLInputElement", "Event",
+    "getComputedStyle"])
     descriptors.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
 
   class InputFixture {}
@@ -119,6 +122,13 @@ function withPage(
     }
   }
 
+  Object.defineProperty(globalThis, "getComputedStyle", {
+    configurable: true,
+    value: (element: FixtureNode) => ({
+      display: element.display ?? "block",
+      visibility: element.visibility ?? "visible",
+    }),
+  });
   Object.defineProperty(globalThis, "document", {
     configurable: true,
     value: document,
@@ -324,5 +334,27 @@ test(
     assert.equal(submitBlooketLoginForm(credentials).ok, false);
     assert.equal(page.submit.clicked, 0);
   });
+  },
+);
+
+
+test("CSS-hidden login controls never receive credentials or a click",
+  () => {
+  for (const target of ["heading", "identifier", "password",
+    "submit"] as const) {
+    const page = fixture();
+    page[target].visibility = "hidden";
+    withPage(page.document, "https://id.blooket.com/login", () => {
+      assert.equal(runBlooketLoginPageAction("prepare", credentials).ok,
+        false);
+      assert.equal(page.identifier.value, "");
+      assert.equal(page.password.value, "");
+      assert.equal(runBlooketLoginPageAction(
+        "is-prepared", credentials), false);
+      assert.equal(runBlooketLoginPageAction("submit", credentials).ok,
+        false);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
   },
 );
