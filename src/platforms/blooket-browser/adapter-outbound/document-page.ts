@@ -42,3 +42,19 @@ export function inspectBlooketDocumentOrigin(
     return null;
   }
 }
+
+// Session observation may be on the public identity origin. Keep this
+// intentionally separate from dashboard-only saved-data read admission.
+export function inspectBlooketSessionDocumentOrigin(
+  expectedUrl: string,
+): number | null {
+  try {
+    const expected = new URL(expectedUrl);
+    if ((expected.origin !== "https://dashboard.blooket.com" &&
+         expected.origin !== "https://id.blooket.com") ||
+        location.href !== expectedUrl || document.readyState !== "complete")
+      return null;
+    const origin = performance.timeOrigin;
+    return Number.isFinite(origin) && origin > 0 ? origin : null;
+  } catch { return null; }
+}

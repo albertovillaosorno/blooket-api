@@ -31,8 +31,10 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inspectBlooketDocumentOrigin } from
-  "../../../../src/platforms/blooket-browser/adapter-outbound/document-page.ts";
+import {
+  inspectBlooketDocumentOrigin, inspectBlooketSessionDocumentOrigin,
+// jig-ignore-next-line: The TypeScript module specifier is indivisible.
+} from "../../../../src/platforms/blooket-browser/adapter-outbound/document-page.ts";
 
 const SETS = "https://dashboard.blooket.com/my-sets";
 
@@ -83,3 +85,31 @@ test("invalid native origins cannot prove a new document", () => {
     });
   }
 });
+
+test("session document origins admit only exact dashboard and identity pages",
+  () => {
+  for (const url of [SETS, "https://id.blooket.com/login"]) {
+    withDocument(321, url, "complete", () => {
+      assert.equal(inspectBlooketSessionDocumentOrigin(url), 321);
+      assert.equal(inspectBlooketSessionDocumentOrigin(url + "?other=1"),
+        null);
+      if (url.includes("id.blooket.com"))
+        assert.equal(inspectBlooketDocumentOrigin(url), null);
+    });
+  }
+  withDocument(321, "https://id.blooket.com/login", "loading", () => {
+    assert.equal(inspectBlooketSessionDocumentOrigin(
+      "https://id.blooket.com/login"), null);
+  });
+  for (const url of ["https://example.invalid/", "http://id.blooket.com/"]) {
+    withDocument(321, url, "complete", () => {
+      assert.equal(inspectBlooketSessionDocumentOrigin(url), null);
+    });
+  }
+  for (const bad of [null, "321", 0, -1, NaN, Infinity]) {
+    withDocument(bad, SETS, "complete", () => {
+      assert.equal(inspectBlooketSessionDocumentOrigin(SETS), null);
+    });
+  }
+  },
+);

@@ -34,6 +34,11 @@ Session inspection performs exactly one browser observation attempt. It never
 authenticates and never reads the host secret store. This makes health/session
 reads safe to expose later without causing login side effects.
 
+The worker checks stable session observations against one positive
+document origin on an exact dashboard or identity page. A same-URL
+page replacement cannot masquerade as two confirmations. Saved-data
+reads remain restricted to the dashboard-only identity helper.
+
 Session establishment first inspects the current browser. Dashboard, create, and
 edit states are reused without credential access. Signed-out or expired states
 trigger security-domain credential retrieval. The application passes those

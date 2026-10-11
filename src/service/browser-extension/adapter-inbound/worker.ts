@@ -51,8 +51,10 @@ import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
 import { confirmBlooketReadNavigation } from "./read-navigation.ts";
-import { inspectBlooketDocumentOrigin } from
-  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
+import {
+  inspectBlooketDocumentOrigin,
+  inspectBlooketSessionDocumentOrigin,
+} from "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 import { captureBlooketLibraryModel } from
   "../../../platforms/blooket-browser/adapter-outbound/library-model-page.ts";
 import { checkBlooketLibraryObservation } from "./library-observation.ts";
@@ -570,6 +572,14 @@ async function read(
       if (!closed) throw new Error("browser-details-cleanup-failed");
     }
   }
+  const sessionOrigin = operation.kind === "session.observe"
+    ? await script(current, browser,
+      inspectBlooketSessionDocumentOrigin as (...args: never[]) => unknown,
+      [tab.url]) : null;
+  if (operation.kind === "session.observe" &&
+      (typeof sessionOrigin !== "number" ||
+       !Number.isFinite(sessionOrigin) || sessionOrigin <= 0))
+    throw new Error("browser-session-changed");
   const observed = await script(
     current,
     browser,
@@ -580,10 +590,13 @@ async function read(
     // A result from a tab that navigated while the script ran cannot prove
     // the current authentication state, regardless of which state it claimed.
     const currentTab = await browser.tabs.get(current.tabId);
+    const afterOrigin = await script(current, browser,
+      inspectBlooketSessionDocumentOrigin as (...args: never[]) => unknown,
+      [tab.url]);
     if (
       Date.now() >= readDeadline ||
       currentTab.status !== "complete" ||
-      currentTab.url !== tab.url
+      currentTab.url !== tab.url || afterOrigin !== sessionOrigin
     ) throw new Error("browser-session-changed");
     // React or a verification interstitial can change without navigation.
     // A single read cannot establish the current state in that transition.
@@ -600,10 +613,13 @@ async function read(
       [operation],
     );
     const afterAgain = await browser.tabs.get(current.tabId);
+    const finalOrigin = await script(current, browser,
+      inspectBlooketSessionDocumentOrigin as (...args: never[]) => unknown,
+      [tab.url]);
     if (
       Date.now() >= readDeadline ||
       afterAgain.status !== "complete" ||
-      afterAgain.url !== tab.url ||
+      afterAgain.url !== tab.url || finalOrigin !== sessionOrigin ||
       JSON.stringify(observed) !== JSON.stringify(again)
     ) throw new Error("browser-session-changed");
   }

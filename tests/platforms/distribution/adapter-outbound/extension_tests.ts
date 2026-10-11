@@ -190,6 +190,18 @@ test(
       assert.equal(injected(documentPage.inspectBlooketDocumentOrigin)(
         url + "?filter=other",
       ), null);
+      const sessionIdentity = injected(
+        documentPage.inspectBlooketSessionDocumentOrigin,
+      );
+      assert.ok(sessionIdentity(url) > 0);
+      const loginUrl = "https://id.blooket.com/login";
+      Object.defineProperty(globalThis, "location", {
+        configurable: true, value: { href: loginUrl },
+      });
+      assert.ok(sessionIdentity(loginUrl) > 0);
+      assert.equal(injected(documentPage.inspectBlooketDocumentOrigin)(
+        loginUrl,
+      ), null);
     } finally {
       for (const [name, descriptor] of [
         ["location", previousLocation], ["document", previousDocument],
