@@ -279,8 +279,8 @@ test("set success without a receipt cannot advance", async () => {
 
   assert.deepEqual(result, {
     ok: false,
-    stage: "checkpoint",
-    code: "checkpoint-invariant",
+    stage: "write",
+    code: "blooket-browser-failed",
   });
 });
 
@@ -366,7 +366,7 @@ test("ready navigation without confirmation does not advance", async () => {
   assert.deepEqual(result, {
     ok: false,
     stage: "write",
-    code: "blooket-write-not-confirmed",
+    code: "blooket-browser-failed",
   });
 });
 
@@ -391,5 +391,31 @@ test("write adapter failures and exceptions remain stable", async () => {
     if (!result.ok) {
       assert.equal(result.stage, "write");
     }
+  }
+});
+
+test("untrusted write acknowledgements never advance checkpoint", async () => {
+  const wrong: unknown[] = [
+    { ok: "true", receipt: { kind: "set-created", remoteSetId: "set-1" } },
+    { ok: true, receipt: { kind: "set-created", remoteSetId: "set-1",
+      extra: true } },
+    { ok: true, receipt: { kind: "set-created", remoteSetId: "set-1" },
+      extra: true },
+    { ok: true, receipt: null },
+    { ok: false, kind: "navigation", state: "dashboard" },
+    { ok: false, kind: "navigation", state: "security-challenge",
+      extra: true },
+    { ok: false, kind: "browser", code: "invalid" },
+    null,
+  ];
+  for (const reply of wrong) {
+    const calls: string[] = [];
+    const result = await executeNextBlooketWrite(
+      plan, checkpoint(), browser([]), secrets([]),
+      writePort(reply as BlooketWriteAttemptResult, calls),
+    );
+    assert.deepEqual(result, { ok: false, stage: "write",
+      code: "blooket-browser-failed" });
+    assert.deepEqual(calls, ["write:plan:test:set"]);
   }
 });

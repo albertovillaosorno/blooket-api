@@ -2088,3 +2088,38 @@ test("invalid second baseline is rejected after pacing without a write",
   });
   },
 );
+
+test("forged browser write acknowledgements keep the durable ambiguity",
+  async () => {
+  for (const forged of [
+    { ok: "true", receipt: SET_RECEIPT },
+    { ok: true, receipt: SET_RECEIPT, providerTrace: "untrusted" },
+    { ok: true, receipt: { ...SET_RECEIPT, extra: "untrusted" } },
+    { ok: false, kind: "navigation", state: "dashboard" },
+  ]) {
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const remoteWrites: string[] = [];
+      const result = await executePersistedBlooketWrite(
+        paths, plan, browser([]), secrets(),
+        writes(forged as BlooketWriteAttemptResult, remoteWrites),
+        verification({ ok: true, baseline: SET_BASELINE }),
+      );
+      assert.equal(result.ok, true);
+      if (result.ok) {
+        assert.equal(result.kind, "reconciliation-required");
+        if (result.kind === "reconciliation-required") {
+          assert.equal(result.reason, "write-not-confirmed");
+          assert.deepEqual(result.outcome, { ok: false,
+            stage: "write", code: "blooket-browser-failed" });
+        }
+      }
+      assert.deepEqual(remoteWrites, ["plan:persisted-test:set"]);
+      const attempt = await loadWriteAttemptFile(paths.attempt, plan);
+      assert.equal(attempt.ok && attempt.kind === "record" &&
+        attempt.record.phase, "attempting");
+      assert.equal(existsSync(paths.checkpoint), false);
+    });
+  }
+  },
+);

@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the final write-execution port began validating exact
+confirmed receipts and known browser stops before advancing a checkpoint.
+Previously a truthy acknowledgement from an unexpected adapter could be
+trusted as a typed write result; forged provider fields were not checked
+at this final boundary. Portable tests prove malformed results cannot
+advance an unjournaled operation and leave persisted attempts ambiguous
+rather than confirming them or allowing immediate replay.
+
 On 2026-10-10, baseline capture began validating the outer runtime
 response before pacing, mutation-budget reservation, or attempt journaling.
 Previously a truthy status or a surface failure with extra fields could be
