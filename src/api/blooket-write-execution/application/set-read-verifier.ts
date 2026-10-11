@@ -288,10 +288,9 @@ async function safeList(
 > {
   try {
     const probed = await reads.list();
-    if (!probed.ok) {
-      return { ok: false, kind: "browser", code: probed.code };
-    }
-    if (
+    if (!probed || probed.ok !== true)
+      return safeProbeFailure(probed);
+    if (!exactProbeKeys(probed, "completeness,ok,value") ||
       probed.completeness !== "complete"
       && probed.completeness !== "unknown"
     ) {
@@ -322,9 +321,9 @@ async function safeGet(
 > {
   try {
     const probed = await reads.get(setId);
-    if (!probed.ok) {
-      return { ok: false, kind: "browser", code: probed.code };
-    }
+    if (!probed || probed.ok !== true)
+      return safeProbeFailure(probed);
+    if (!exactProbeKeys(probed, "ok,value")) return browserFailure();
     const decoded = decodeBlooketSetDetail(probed.value);
     return decoded.ok
       ? { ok: true, value: decoded.value }
@@ -343,9 +342,9 @@ async function safeQuestions(
 > {
   try {
     const probed = await reads.list(setId);
-    if (!probed.ok) {
-      return { ok: false, kind: "browser", code: probed.code };
-    }
+    if (!probed || probed.ok !== true)
+      return safeProbeFailure(probed);
+    if (!exactProbeKeys(probed, "ok,value")) return browserFailure();
     const decoded = decodeBlooketQuestionReadList(probed.value);
     return decoded.ok
       ? { ok: true, value: decoded.value }
@@ -353,6 +352,25 @@ async function safeQuestions(
   } catch {
     return browserFailure();
   }
+}
+
+function exactProbeKeys(value: unknown, keys: string): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value) &&
+    Reflect.ownKeys(value).sort().join() === keys;
+}
+
+function safeProbeFailure(value: unknown): Extract<
+  BlooketWriteVerificationResult, { readonly ok: false }
+> {
+  if (!exactProbeKeys(value, "code,ok") ||
+      !value || typeof value !== "object" ||
+      !("ok" in value) || value.ok !== false ||
+      !("code" in value) ||
+      (value.code !== "blooket-browser-failed" &&
+       value.code !== "blooket-browser-unavailable" &&
+       value.code !== "blooket-browser-incompatible"))
+    return browserFailure();
+  return { ok: false, kind: "browser", code: value.code };
 }
 
 function setBaselineFor(

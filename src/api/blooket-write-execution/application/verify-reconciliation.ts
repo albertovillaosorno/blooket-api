@@ -41,6 +41,8 @@ import {
   type WriteAttemptRecord,
 } from
   "../../../platforms/write-attempt-files/adapter-outbound/file.ts";
+import { decodeBlooketWriteReceipt } from
+  "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import type { BlooketWriteCheckpoint } from
   "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import type { BlooketWritePlan } from
@@ -352,17 +354,55 @@ async function safeVerify(
   remoteSetId: string | null,
   baseline: Parameters<BlooketWriteVerificationPort["verify"]>[2],
 ): Promise<BlooketWriteVerificationResult> {
+  const failed = (): BlooketWriteVerificationResult => ({
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  const exact = (value: unknown, keys: string): boolean =>
+    !!value && typeof value === "object" && !Array.isArray(value) &&
+    Reflect.ownKeys(value).sort().join() === keys;
   try {
-    return await verifier.verify(
-      operation,
-      { remoteSetId },
-      baseline,
+    const raw: unknown = await verifier.verify(
+      operation, { remoteSetId }, baseline,
     );
+    if (!raw || typeof raw !== "object" || !("ok" in raw))
+      return failed();
+    if (raw.ok === true && "outcome" in raw) {
+      if (exact(raw, "ok,outcome") &&
+          (raw.outcome === "inconclusive" ||
+           raw.outcome === "not-confirmed"))
+        return { ok: true, outcome: raw.outcome };
+      if (raw.outcome === "confirmed" &&
+          exact(raw, "ok,outcome,receipt") && "receipt" in raw) {
+        if (operation.kind === "question" && raw.receipt === null)
+          return { ok: true, outcome: "confirmed", receipt: null };
+        if (operation.kind === "set") {
+          const receipt = decodeBlooketWriteReceipt(raw.receipt);
+          if (receipt.ok)
+            return { ok: true, outcome: "confirmed",
+              receipt: receipt.value };
+        }
+      }
+      return failed();
+    }
+    if (raw.ok === false && "kind" in raw) {
+      if (raw.kind === "browser" && exact(raw, "code,kind,ok") &&
+          "code" in raw &&
+          (raw.code === "blooket-browser-failed" ||
+           raw.code === "blooket-browser-unavailable" ||
+           raw.code === "blooket-browser-incompatible"))
+        return { ok: false, kind: "browser", code: raw.code };
+      if (raw.kind === "navigation" && exact(raw, "kind,ok,state") &&
+          "state" in raw &&
+          ["signed-out", "expired-session", "organization-prompt",
+           "rate-limited", "security-challenge", "unexpected-page"]
+            .some(state => state === raw.state))
+        return { ok: false, kind: "navigation",
+          state: raw.state as "signed-out" | "expired-session" |
+            "organization-prompt" | "rate-limited" |
+            "security-challenge" | "unexpected-page" };
+    }
+    return failed();
   } catch {
-    return {
-      ok: false,
-      kind: "browser",
-      code: "blooket-browser-failed",
-    };
+    return failed();
   }
 }

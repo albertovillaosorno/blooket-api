@@ -62,6 +62,18 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, verifier result admission now rejects unknown outcomes,
+extra response fields, invalid receipt kinds, and unrecognized browser stops
+before touching an ambiguous persisted attempt. Previously an unknown
+outcome could fall through to `not-confirmed`, clearing the journal and
+making a duplicate retry possible. Synthetic recovery tests verify that the
+attempt and checkpoint remain unchanged for malformed responses.
+
+The same pass tightened the set-list, set-detail, and question-list verifier
+read envelopes. Inner IR decoding was already strict, but truthy `ok`
+lookalikes or unexpected outer fields could previously reach reconciliation.
+Synthetic tests now reject these replies without creating confirmation.
+
 On 2026-10-10, the canonical browser-write adapter began enforcing exact
 runtime envelopes for Create Set and Add Question confirmations and stops.
 Previously a structurally extra or malformed internal surface result could be
