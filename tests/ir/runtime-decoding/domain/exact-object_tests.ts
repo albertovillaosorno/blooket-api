@@ -116,3 +116,18 @@ test("owned data reads ignore inherited fields without invoking getters",
   assert.equal(ownDataField(fixture, "value"), "owned");
   },
 );
+
+
+test("dense arrays reject own index getters and hidden numeric slots",
+  () => {
+  const getter = Object.defineProperty(["a"], "0", {
+    enumerable: true,
+    get() { throw new Error("index getter must never execute"); },
+  });
+  assert.equal(isExactDenseArray(getter), false);
+  const hidden = Object.defineProperty(["a"], "0", {
+    enumerable: false, value: "a",
+  });
+  assert.equal(isExactDenseArray(hidden), false);
+  },
+);
