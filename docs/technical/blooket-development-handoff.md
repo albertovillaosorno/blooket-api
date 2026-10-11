@@ -937,3 +937,31 @@ The worker integration additionally rejects a public saved set when the
 command requested Private. None of these portable tests is actual live
 Blooket persistence evidence. Earlier ambiguous journals remain pending;
 no new authenticated account content was mutated in this session.
+
+## Saved question verification follow-up (2026-10-11)
+
+The browser Add Question host now distinguishes a provider read that has
+not hydrated from a readable card collection that conflicts with the
+submitted question slot. Only an explicit page-unavailable reply or the
+exact previous contiguous question sequence may be polled again. Wrong
+indices, duplicate or unexpected cards, and malformed envelopes stop
+immediately without attempting another Save Question mutation.
+
+After canceling its read-owned question panel, the host requires two
+identical question-card observations. It applies this to both its first
+post-submit observation and its fresh-document persisted read-back.
+The shared question page reader also refuses CSS-hidden cards, counters,
+and Edit controls even when layout bounds are nonzero.
+
+The independent existing-question inspection host now admits only exact
+contiguous index sequences from one. It rejects hidden and symbol-owned
+properties in card-list, modal, and saved-image evidence, and requires
+two stable card lists after finishing all read-only panel cancellations.
+Portable regressions exercise hydration, late concurrent cards, changed
+question state, malformed replies, and zero-question sets.
+
+These improvements were validated synthetically on Fedora and do not
+establish a live loaded-extension publication or a native Safari run.
+Earlier ambiguous real Create Set journals still require explicit safe
+reconciliation, not automatic replay. No provider account mutation was
+made during this development session.
