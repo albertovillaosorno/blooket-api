@@ -32,10 +32,8 @@
 // - Defaults:
 //   - Backups are retained after successful replacement for manual recovery.
 //
-import {
-  lstat,
-  readFile,
-} from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -364,24 +362,55 @@ function decodeWriteMarker(source: string): WriteMarker | undefined {
   };
 }
 
+// Project and media JSONL are teacher-owned files; keep a generous bound
+// while never consuming arbitrarily large files during crash recovery.
+const MAX_PROJECT_FILE_BYTES = 16 * 1_024 * 1_024;
+
 async function readOwnedTextFile(path: string): Promise<
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "missing" }
   | { readonly kind: "unsafe" }
   | { readonly kind: "unreadable" }
 > {
+  // Read one bounded checked descriptor; lstat plus pathname read could
+  // follow a substituted link during project or recovery journal loading.
+  let handle;
   try {
-    const metadata = await lstat(path);
-    if (metadata.isSymbolicLink() || !metadata.isFile()) {
-      return { kind: "unsafe" };
-    }
-    return { kind: "text", value: await readFile(path, "utf8") };
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch (error: unknown) {
-    if (isMissingPathError(error)) {
-      return { kind: "missing" };
-    }
+    if (isMissingPathError(error)) return { kind: "missing" };
+    if (error instanceof Error && "code" in error && error.code === "ELOOP")
+      return { kind: "unsafe" };
     return { kind: "unreadable" };
   }
+  let result:
+    | { readonly kind: "text"; readonly value: string }
+    | { readonly kind: "unsafe" }
+    | { readonly kind: "unreadable" } = { kind: "unreadable" };
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > MAX_PROJECT_FILE_BYTES) {
+      result = { kind: "unsafe" };
+    } else {
+      const bytes = Buffer.alloc(MAX_PROJECT_FILE_BYTES + 1);
+      let size = 0;
+      let complete = false;
+      while (size < bytes.length) {
+        const part = await handle.read(bytes, size, bytes.length - size, null);
+        if (part.bytesRead === 0) {
+          complete = true;
+          break;
+        }
+        size += part.bytesRead;
+      }
+      result = complete
+        ? { kind: "text", value: bytes.subarray(0, size).toString("utf8") }
+        : { kind: "unsafe" };
+    }
+  } catch { /* An unreadable descriptor cannot admit a new reservation. */ }
+  try { await handle.close(); }
+  catch { return { kind: "unreadable" }; }
+  return result;
 }
 
 async function ownedFileExists(

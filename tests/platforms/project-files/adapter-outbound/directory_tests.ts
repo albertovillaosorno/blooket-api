@@ -350,3 +350,26 @@ function mustDecode(projectJson: string, mediaJsonl: string) {
   }
   return result.value;
 }
+
+test("oversized project files remain untouched and cannot be loaded",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    assert.deepEqual(await saveProjectDirectory(directory, firstBundle), {
+      ok: true,
+    });
+    const path = join(directory, "project.json");
+    const valid = await readFile(path, "utf8");
+    const limit = 16 * 1_024 * 1_024;
+    await writeFile(path, valid.padEnd(limit, " "));
+    assert.equal((await loadProjectDirectory(directory)).ok, true);
+    await writeFile(path, valid.padEnd(limit + 1, " "));
+    const invalid = await loadProjectDirectory(directory);
+    assert.deepEqual(invalid, {
+      ok: false, kind: "io", code: "project-files-unreadable",
+    });
+    assert.equal((await readFile(path)).length, limit + 1);
+    await writeFile(path, valid);
+    assert.equal((await loadProjectDirectory(directory)).ok, true);
+  });
+  },
+);
