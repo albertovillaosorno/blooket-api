@@ -358,3 +358,45 @@ test("CSS-hidden login controls never receive credentials or a click",
   }
   },
 );
+
+
+test("login rechecks form identity before delivering password bytes",
+  () => {
+  const page = fixture();
+  const replacement = node("INPUT");
+  page.identifier.dispatchEvent = () => {
+    page.document.selectors[
+      'input[placeholder="Username or email"]'] = [replacement];
+    return true;
+  };
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.identifier.value, credentials.loginIdentifier);
+    assert.equal(page.password.value, "");
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
+test("login rejects a challenge or changed form during password dispatch",
+  () => {
+  for (const reason of ["challenge", "replacement"] as const) {
+    const page = fixture();
+    page.password.dispatchEvent = () => {
+      if (reason === "challenge")
+        page.document.selectors[
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+      else page.document.selectors[
+        'input[type="password"][placeholder="Password"]'
+      ] = [node("INPUT")];
+      return true;
+    };
+    withPage(page.document, "https://id.blooket.com/login", () => {
+      assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+      assert.equal(submitBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+  },
+);

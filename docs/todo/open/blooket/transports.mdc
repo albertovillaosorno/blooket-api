@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the injected login preparer began rechecking exact
+provider form identity and challenge absence after dispatching username
+and password events. If a provider handler replaces the form after the
+username event, the local password is never delivered into an obsolete
+control. A remount or CAPTCHA during password dispatch also prevents
+claiming successful preparation. Synthetic tests use no real secrets.
+
 On 2026-10-11, Create Set form preparation began rechecking the
 same owned document, form, visible controls, privacy row and provider
 human-stop gates after each input/change dispatch. A synchronous
