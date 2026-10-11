@@ -56,6 +56,13 @@ The teacher may select another media root. Changing settings must not silently
 move or delete her existing library. Validate access and offer an explicit,
 recoverable library move separately when needed.
 
+The project-bundle directory reader uses bounded `O_NOFOLLOW` file
+handles for project JSON, media JSONL, and interrupted-write recovery
+material. As of 2026-10-10, each candidate file is bounded to 16 MiB;
+files beyond that size are not parsed or overwritten. Synthetic filesystem
+tests check the exact project limit and retain an oversized original for
+manual recovery rather than treating it as an empty project.
+
 The local JSON settings adapter reads one `O_NOFOLLOW` file descriptor
 and bounds actual file bytes to 65,536. On 2026-10-10, synthetic regressions
 confirmed that oversized replacements and dangling symlinks fail closed
