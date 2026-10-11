@@ -81,6 +81,8 @@ test(
   let detailReloadDuringInspection = false;
   let sessionSwitchAfterScript: string | null = null;
   let observedSessionOverride: string | null = null;
+  let sessionSecondHasHiddenField = false;
+  let sessionReadProbeCount = 0;
   let driftSessionAtSameRoute = false;
   let reloadSessionAtSameRoute = false;
   let sessionObservations = 0;
@@ -438,6 +440,17 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "session.observe" &&
+            sessionSecondHasHiddenField) {
+          sessionReadProbeCount++;
+          if (sessionReadProbeCount === 2) {
+            const reply = { ok: true, value: "my-sets" };
+            Object.defineProperty(reply, "hidden", {
+              value: "untrusted", enumerable: false,
+            });
+            return [{ result: reply }];
+          }
+        }
         if (operation.kind === "session.observe" &&
             observedSessionOverride !== null) {
           return [{ result: { ok: true, value: observedSessionOverride } }];
@@ -1194,6 +1207,14 @@ test(
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
     assert.equal((await message({ kind: "status" })).status, "connected");
+    sessionSecondHasHiddenField = true;
+    sessionReadProbeCount = 0;
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, false);
+    assert.equal(sessionReadProbeCount, 2);
+    sessionSecondHasHiddenField = false;
+    observedSessionOverride = "untrusted-navigation-state";
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, false);
+    observedSessionOverride = null;
     assert.equal(typeof onTabUpdated, "function");
     onTabUpdated(999, { title: "Just a moment..." }, {
       id: 999, url: "https://dashboard.blooket.com/my-sets",

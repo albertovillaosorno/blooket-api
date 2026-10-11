@@ -60,6 +60,8 @@ import { captureBlooketLibraryModel } from
 import { checkBlooketLibraryObservation } from "./library-observation.ts";
 import { decodeBlooketSetDetail } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
+import { BLOOKET_NAVIGATION_STATE_KINDS } from
+  "../../../ir/blooket-navigation/domain/navigation-state.ts";
 
 import {
   BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserBridgeRequest,
@@ -171,6 +173,19 @@ function exactWorkerKeys(value: unknown, expected: string): boolean {
   const names = expected.split(",");
   return own.length === names.length && own.every(key =>
     typeof key === "string" && names.includes(key));
+}
+
+const OBSERVED_SESSION_STATES: ReadonlySet<string> = new Set(
+  BLOOKET_NAVIGATION_STATE_KINDS.filter(state =>
+    state !== "authenticating" && state !== "authenticated" &&
+    state !== "human-action-required"),
+);
+
+function exactSessionObservation(value: unknown): boolean {
+  return exactWorkerKeys(value, "ok,value") && !!value &&
+    typeof value === "object" && "ok" in value && value.ok === true &&
+    "value" in value && typeof value.value === "string" &&
+    OBSERVED_SESSION_STATES.has(value.value);
 }
 
 function configured(value: unknown): Connection | undefined {
@@ -640,6 +655,8 @@ async function read(
     [operation],
   );
   if (operation.kind === "session.observe") {
+    if (!exactSessionObservation(observed))
+      throw new Error("browser-session-changed");
     // A result from a tab that navigated while the script ran cannot prove
     // the current authentication state, regardless of which state it claimed.
     const currentTab = await browser.tabs.get(current.tabId);
@@ -673,6 +690,7 @@ async function read(
       Date.now() >= readDeadline ||
       afterAgain.status !== "complete" ||
       afterAgain.url !== tab.url || finalOrigin !== sessionOrigin ||
+      !exactSessionObservation(again) ||
       JSON.stringify(observed) !== JSON.stringify(again)
     ) throw new Error("browser-session-changed");
   }
