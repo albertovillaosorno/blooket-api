@@ -363,7 +363,7 @@ test("existing unsaved editor blocks capability navigation", async () => {
   assert.equal(page.currentUrl(), page.originalUrl);
   assert.equal(page.navigations.length, 0);
   assert.deepEqual(page.scripts, [
-    "canLeaveBlooketPageForRead",
+    "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
   ]);
 });
 
@@ -1189,5 +1189,40 @@ test("capability probing rejects a same-route document replacement",
       assert.equal(page.scripts.filter(name =>
         name === "closeBlooketAudioCapabilityDrawer").length, 1);
   }
+  },
+);
+
+test("capability navigation never leaves a reloaded source document",
+  async () => {
+  const page = fixture({ replaceAt: "canLeaveBlooketPageForRead" });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.deepEqual(result, {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.navigations.length, 0);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.deepEqual(page.scripts, [
+    "inspectBlooketDocumentOrigin",
+    "canLeaveBlooketPageForRead",
+    "inspectBlooketDocumentOrigin",
+  ]);
+  },
+);
+
+test("capability navigation rejects missing native source identity",
+  async () => {
+  const page = fixture();
+  const original = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async options =>
+    options.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: null }] : await original(options);
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.equal(result.ok, false);
+  assert.equal(page.navigations.length, 0);
+  assert.equal(page.scripts.includes("canLeaveBlooketPageForRead"), false);
   },
 );
