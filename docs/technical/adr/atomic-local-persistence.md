@@ -77,6 +77,14 @@ are flushed. Recovery with a valid marker restores the exact pre-transaction
 pair. Missing required backups or invalid markers fail closed instead of
 guessing.
 
+A previous-value backup is copied through a checked regular-file
+descriptor opened with `O_NOFOLLOW`, not through a pathname `copyFile`
+operation that could follow a symlink substituted after checking the target.
+A bounded transfer buffer preserves large binary backups while source
+length and timestamps are checked before durable backup publication.
+The 2026-10-10 portable regressions cover a multi-megabyte binary
+backup, restrictive backup permissions, and linked backup refusal.
+
 Settings retain one previous-value backup when replacing an existing file.
 Project persistence retains one coherent previous project/media pair. Backups
 are recovery material, not history; version history belongs in a different

@@ -242,3 +242,43 @@ test("atomic replacement refuses symbolic targets", async () => {
     assert.equal((await lstat(symbolicTarget)).isSymbolicLink(), true);
   });
 });
+
+test("streamed previous-value backup retains exact large binary bytes",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const target = join(directory, "media.bin");
+    const backup = join(directory, "media.bin.bak");
+    const old = Buffer.alloc(2_000_123, 0x5a);
+    old[11] = 0;
+    old[old.length - 1] = 0xf7;
+    await writeFile(target, old, { mode: 0o600 });
+    await writeAtomicFile(target, Buffer.from([5, 6, 7]), {
+      backupPath: backup,
+    });
+    assert.deepEqual(await readFile(target), Buffer.from([5, 6, 7]));
+    assert.deepEqual(await readFile(backup), old);
+    assert.equal((await lstat(backup)).mode & 0o777, 0o600);
+    assert.deepEqual((await readdir(directory)).sort(), [
+      "media.bin", "media.bin.bak",
+    ]);
+  });
+  },
+);
+
+test("symbolic backup paths refuse replacement without overwriting data",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const target = join(directory, "project.json");
+    const outside = join(directory, "outside.json");
+    const backup = join(directory, "project.json.bak");
+    await writeFile(target, "original", { mode: 0o600 });
+    await writeFile(outside, "unrelated");
+    await symlink(outside, backup);
+    await assert.rejects(writeAtomicFile(target, "replacement", {
+      backupPath: backup,
+    }), /Refusing symbolic file target/u);
+    assert.equal(await readFile(target, "utf8"), "original");
+    assert.equal(await readFile(outside, "utf8"), "unrelated");
+  });
+  },
+);
