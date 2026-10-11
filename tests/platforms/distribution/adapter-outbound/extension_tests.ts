@@ -150,6 +150,55 @@ test(
       "fixture",
     ), false);
     assert.equal(questionPage.isBlooketQuestionPanelClosed.length, 1);
+    // The shipped model reader is injected by Chrome as function source.
+    // A direct TypeScript import does not prove its closure is browser-safe.
+    const libraryPage = compiled(join(output,
+      "src/platforms/blooket-browser/adapter-outbound/library-model-page.js",
+    ));
+    const documentPage = compiled(join(output,
+      "src/platforms/blooket-browser/adapter-outbound/document-page.js",
+    ));
+    const source = '0:{"fixture":true}\n';
+    const build = "349b82c80fc4a5a2001e609136cfed32747ba3f4";
+    const bootstrap = "(self.__next_f=self.__next_f||[]).push([0]);";
+    const url = "https://dashboard.blooket.com/my-sets";
+    const previousLocation = Object.getOwnPropertyDescriptor(
+      globalThis, "location",
+    );
+    const previousDocument = Object.getOwnPropertyDescriptor(
+      globalThis, "document",
+    );
+    try {
+      Object.defineProperty(globalThis, "location", {
+        configurable: true, value: { href: url },
+      });
+      Object.defineProperty(globalThis, "document", {
+        configurable: true, value: {
+          readyState: "complete",
+          scripts: [{ textContent: bootstrap + "self.__next_f.push(" +
+            JSON.stringify([1, source]) + ")" }],
+          querySelectorAll: () => [{
+            getAttribute: (name: string) => name === "src" ?
+              "https://ac.blooket.com/dashboard/" + build +
+              "/_next/static/chunks/fixture.js" : null,
+          }],
+        },
+      });
+      assert.deepEqual(injected(libraryPage.captureBlooketLibraryModel)(),
+        { build, source });
+      assert.ok(injected(documentPage.inspectBlooketDocumentOrigin)(url) > 0);
+      assert.equal(injected(documentPage.inspectBlooketDocumentOrigin)(
+        url + "?filter=other",
+      ), null);
+    } finally {
+      for (const [name, descriptor] of [
+        ["location", previousLocation], ["document", previousDocument],
+      ] as const) {
+        if (descriptor)
+          Object.defineProperty(globalThis, name, descriptor);
+        else Reflect.deleteProperty(globalThis, name);
+      }
+    }
     assert.ok(scripts.length > 1);
     assert.equal(
       files.some(

@@ -71,6 +71,12 @@ visible cards; the Flight text and unrelated model props remain local to the
 extension and are never returned over the browser bridge. Wrong builds retain
 unknown completeness; malformed matching-build models fail closed.
 
+A 2026-10-10 distribution regression now compiles the actual browser extension,
+serializes the emitted My Sets model reader and fresh-document identity helper,
+and evaluates them against a fictional DOM without their module lexical scope.
+This checks shipped script closure rather than only TypeScript imports. It does
+not demonstrate installation in the authenticated Chrome session.
+
 The Flight page reader accepts ID-less `:HL` resource hints without enabling
 them in action-response parsing. This framing distinction was checked on
 2026-10-10 against the [React Server Components documentation][react-rsc]
