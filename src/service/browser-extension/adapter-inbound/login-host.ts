@@ -34,6 +34,8 @@ import {
   runBlooketLoginPageAction,
   type BlooketLoginPageInput,
 } from "../../../platforms/blooket-browser/adapter-outbound/login-page.ts";
+import { inspectBlooketSessionDocumentOrigin } from
+  "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 
 interface BrowserTab {
   readonly url?: string;
@@ -95,10 +97,22 @@ export function createExtensionSessionAuthenticationHost(
     ): Promise<ExtensionSessionAuthenticationResult> => {
       try {
         const deadline = now() + LOGIN_BUDGET_MS;
+        let loginOrigin: number | null = null;
         const readyTab = async () => {
           if (now() >= deadline) return false;
           const tab = await chrome.tabs.get(tabId);
-          return now() < deadline && exactLoginTab(tab);
+          if (now() >= deadline || !exactLoginTab(tab)) return false;
+          const observed = await script(
+            inspectBlooketSessionDocumentOrigin as
+              (...args: never[]) => unknown,
+            [tab.url],
+          );
+          const after = await chrome.tabs.get(tabId);
+          if (now() >= deadline || !exactLoginTab(after) ||
+              after.url !== tab.url || typeof observed !== "number" ||
+              !Number.isFinite(observed) || observed <= 0) return false;
+          if (loginOrigin === null) loginOrigin = observed;
+          return loginOrigin === observed;
         };
         if (!await readyTab()) return browserFailure();
         const prepared = await script(

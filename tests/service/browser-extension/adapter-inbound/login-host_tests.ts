@@ -49,12 +49,17 @@ function fixture(options: {
   readonly readLatencyMs?: number;
   readonly scriptLatencyMs?: number;
   readonly nextUrlAfterPrepare?: string;
+  readonly reloadAfterAction?: "prepare" | "is-prepared";
+  readonly nativeOrigin?: number | null;
 }) {
   const calls: string[] = [];
   const argumentsSeen: unknown[] = [];
   const polls = [...(options.preparedPolls ?? [true])];
   let tick = 0;
   let url = options.url ?? "https://id.blooket.com/login";
+  let origin = options.nativeOrigin === undefined
+    ? 1_000 : options.nativeOrigin;
+  let reloaded = false;
   const chrome = {
     tabs: {
       get: async () => {
@@ -68,7 +73,15 @@ function fixture(options: {
         readonly args?: unknown[];
       }) => {
         const args = request.args ?? [];
+        if (request.func.name === "inspectBlooketSessionDocumentOrigin") {
+          assert.deepEqual(args, [url]);
+          return [{ result: origin }];
+        }
         const action = args[0];
+        if (!reloaded && options.reloadAfterAction === action) {
+          reloaded = true;
+          origin = 2_000;
+        }
         calls.push(String(action));
         argumentsSeen.push(...args);
         tick += options.scriptLatencyMs ?? 0;
@@ -234,5 +247,39 @@ test(
   assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
   assert.deepEqual(page.calls, ["prepare", "is-prepared"]);
   assert.equal(page.calls.includes("submit"), false);
+  },
+);
+
+test("same-route identity reload cannot receive another credential step",
+  async () => {
+  for (const phase of ["prepare", "is-prepared"] as const) {
+    const page = fixture({ reloadAfterAction: phase });
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => {}, page.now,
+    ).authenticate(credentials);
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.calls.includes("submit"), false);
+    assert.deepEqual(page.calls, phase === "prepare"
+      ? ["prepare"] : ["prepare", "is-prepared"]);
+    assert.equal(JSON.stringify(result).includes(credentials.password), false);
+  }
+  },
+);
+
+test("invalid native identity-origin evidence blocks credential delivery",
+  async () => {
+  for (const nativeOrigin of [null, 0, -1, NaN, Infinity]) {
+    const page = fixture({ nativeOrigin });
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => {}, page.now,
+    ).authenticate(credentials);
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(page.calls, []);
+    assert.deepEqual(page.argumentsSeen, []);
+  }
   },
 );
