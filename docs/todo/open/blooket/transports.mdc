@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the Create Set, Add Question, question-inspection and
+login Chrome hosts began accepting only directly owned enumerable
+`result` data descriptors from browser injection replies. Hidden,
+missing or accessor-backed result fields cannot run injected getters
+or establish navigation, write or saved-state evidence. Synthetic
+host regressions verify the refusal before any submission or
+read-owned panel opening; Chrome frame metadata remains allowed.
+
 On 2026-10-11, the main browser-extension worker also began
 accepting only an enumerable owned `result` data descriptor from
 Chrome script injection replies. Hidden or accessor-backed wrappers

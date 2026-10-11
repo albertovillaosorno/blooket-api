@@ -92,9 +92,16 @@ export function createExtensionQuestionInspectionHost(
     const replies = await chrome.scripting.executeScript({
       target: { tabId }, func, args,
     });
-    if (replies.length !== 1 || replies[0]?.result === undefined)
+    if (!Array.isArray(replies) || replies.length !== 1 ||
+        !replies[0] || typeof replies[0] !== "object")
       throw new Error("browser-question-script-failed");
-    return replies[0].result;
+    // Chrome adds frame metadata, but only its own enumerable result data
+    // descriptor may carry evidence. Never invoke an accessor getter.
+    const descriptor = Object.getOwnPropertyDescriptor(replies[0], "result");
+    if (!descriptor || !descriptor.enumerable ||
+        !("value" in descriptor) || descriptor.value === undefined)
+      throw new Error("browser-question-script-failed");
+    return descriptor.value;
   };
   let originalDocumentOrigin: number | null = null;
   const sameDocument = async (url: string): Promise<boolean> => {

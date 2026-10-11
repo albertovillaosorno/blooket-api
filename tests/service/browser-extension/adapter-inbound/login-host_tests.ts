@@ -283,3 +283,41 @@ test("invalid native identity-origin evidence blocks credential delivery",
   }
   },
 );
+
+test("login host never evaluates accessor-backed Chrome result fields",
+  async () => {
+    for (const kind of ["getter", "hidden", "absent"] as const) {
+      const fake = fixture({});
+      let getterCalls = 0;
+      const chrome = {
+        ...fake.chrome,
+        scripting: {
+          executeScript: async (request: Parameters<
+            typeof fake.chrome.scripting.executeScript
+          >[0]) => {
+            if (request.func.name !== "inspectBlooketSessionDocumentOrigin")
+              return fake.chrome.scripting.executeScript(request);
+            const reply: { result?: unknown; frameId?: number } = {
+              frameId: 0,
+            };
+            if (kind !== "absent") Object.defineProperty(reply, "result", {
+              configurable: true,
+              enumerable: kind !== "hidden",
+              ...(kind === "getter"
+                ? { get() { getterCalls++; return 1_000; } }
+                : { value: 1_000 }),
+            });
+            return [reply];
+          },
+        },
+      };
+      const result = await createExtensionSessionAuthenticationHost(
+        chrome, 7, async () => undefined,
+      ).authenticate(credentials);
+      assert.equal(result.ok, false, kind);
+      assert.equal(getterCalls, 0);
+      assert.deepEqual(fake.argumentsSeen, []);
+      assert.equal(fake.calls.includes("submit"), false);
+    }
+  },
+);
