@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the capability host also began reading only the
+directly owned, enumerable `result` data field from each Chrome
+injection reply. An accessor-backed, hidden or absent wrapper cannot
+run a getter before read-only My Sets selection or Audio inspection.
+Synthetic wrapper regressions verify no getter executes and cleanup
+preserves the original tab route when evidence is unavailable.
+
 On 2026-10-11, the browser capability host began requiring
 exact, enumerable owned data fields on both saved-set lists,
 session and Audio page replies. It rejects hidden/symbol fields,
