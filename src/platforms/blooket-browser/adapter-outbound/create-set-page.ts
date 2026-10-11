@@ -208,6 +208,66 @@ export function prepareBlooketCreateSetForm(
           : undefined;
     if (currentPrivate === undefined) return failed();
 
+    const intact = (expectedPrivate: boolean): boolean => {
+      if (location.origin !== "https://dashboard.blooket.com" ||
+          location.pathname !== "/create" || location.search ||
+          location.hash || document.title === "Just a moment..." ||
+          document.querySelector('input[type="password"]') ||
+          watch.document !== document || watch.form !== form ||
+          watch.dirty || watch.submitted || !form.isConnected ||
+          document.querySelectorAll("form#question-set-form").length !== 1 ||
+          document.querySelector("form#question-set-form") !== form ||
+          form.querySelectorAll('input#title[name="title"]').length !== 1 ||
+          form.querySelector('input#title[name="title"]') !== titleInput ||
+          form.querySelectorAll('textarea#desc[name="desc"]').length !== 1 ||
+          form.querySelector('textarea#desc[name="desc"]') !==
+            descriptionInput ||
+          form.querySelectorAll('input#private[name="private"]').length !== 1 ||
+          form.querySelector('input#private[name="private"]') !==
+            privacyInput ||
+          !readyControl(form) || !readyControl(titleInput) ||
+          !readyControl(descriptionInput) || !readyControl(privacyInput) ||
+          privacyInput.disabled ||
+          privacyInput.getAttribute("aria-disabled") === "true" ||
+          document.querySelectorAll(logoutSelector).length !== 1 ||
+          document.querySelector(logoutSelector)?.textContent?.trim() !==
+            "Logout" ||
+          !readyControl(rows[0]!) || !readyControl(paragraph) ||
+          Array.from(privacyInput.labels ?? []).filter(label =>
+            label.tagName === "LABEL" &&
+            (label.parentElement?.tagName === "SPAN"
+              ? label.parentElement.parentElement : label.parentElement)
+              === rows[0]).length !== 1 ||
+          rows[0]!.querySelectorAll(":scope > p").length !== 1 ||
+          rows[0]!.querySelector(":scope > p") !== paragraph ||
+          (expectedPrivate
+            ? privacyInput.getAttribute("aria-checked") !== "false" ||
+              paragraph.textContent?.trim() !==
+                "Private (Only playable by you)"
+            : privacyInput.getAttribute("aria-checked") !== "true" ||
+              paragraph.textContent?.trim() !==
+                "Public (Playable by everyone)")) return false;
+      if (Array.from(document.querySelectorAll(
+        'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+      )).some(readyControl) || Array.from(document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"] h3',
+      )).some(node => readyControl(node) &&
+        node.textContent?.trim() === "Select your organization"))
+        return false;
+      const currentButtons = Array.from(form.querySelectorAll("button"))
+        .filter(button => button.textContent?.trim() === "Create Set");
+      if (currentButtons.length !== 1 || currentButtons[0] !== buttons[0] ||
+          !readyControl(buttons[0]!) ||
+          (buttons[0] as HTMLButtonElement).disabled ||
+          buttons[0]!.getAttribute("aria-disabled") === "true") return false;
+      return visibleUnique("main") &&
+        visibleUnique('nav a[href="/my-sets"]') &&
+        document.querySelectorAll(logoutSelector).length === 1 &&
+        (visibleUnique(logoutSelector) ||
+          (visibleUnique(accountSelector) &&
+            !!document.querySelector(accountSelector)?.textContent?.trim()));
+    };
+
     const setValue = (
       element: HTMLInputElement | HTMLTextAreaElement,
       value: string,
@@ -224,7 +284,11 @@ export function prepareBlooketCreateSetForm(
     };
 
     setValue(titleInput, input.title);
+    if (!intact(currentPrivate) || titleInput.value !== input.title)
+      return failed();
     setValue(descriptionInput, input.description);
+    if (!intact(currentPrivate) || titleInput.value !== input.title ||
+        descriptionInput.value !== input.description) return failed();
     if (currentPrivate !== input.private) {
       // Checkbox activation fires trusted input/change even for click().
       // Own only these synchronous events on this exact privacy control.
@@ -232,6 +296,8 @@ export function prepareBlooketCreateSetForm(
       try { privacyInput.click(); }
       finally { delete watch.privacyChangeTarget; }
     }
+    if (!intact(input.private) || titleInput.value !== input.title ||
+        descriptionInput.value !== input.description) return failed();
     return { ok: true };
   } catch {
     return failed();

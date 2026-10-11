@@ -845,3 +845,68 @@ test("Create Set form refuses CSS-hidden inputs and Save before mutation",
   }
   },
 );
+
+
+test("Create Set title events must retain exact controls before description",
+  () => {
+  const input = { title: "Synthetic", description: "Review", private: false };
+  const variants = ["form", "title", "challenge", "privacy", "hidden",
+    "sidebar"] as const;
+  for (const variant of variants) {
+    const page = fixture(true);
+    page.title.dispatchEvent = (event) => {
+      if (event.type !== "input") return true;
+      if (variant === "form")
+        page.document.selectors["form#question-set-form"] = [node("FORM")];
+      if (variant === "title")
+        page.form.selectors['input#title[name="title"]'] = [node("INPUT")];
+      if (variant === "challenge")
+        page.document.selectors[
+          'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        ] = [node("IFRAME")];
+      if (variant === "privacy") {
+        page.privacy.attributes["aria-checked"] = "true";
+        page.privacyState.textContent = "Public (Playable by everyone)";
+      }
+      if (variant === "hidden") page.description.visibility = "hidden";
+      if (variant === "sidebar")
+        page.document.selectors['nav a[href="/my-sets"]'] = [];
+      return true;
+    };
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false, variant);
+      assert.equal(page.description.value, "", variant);
+      assert.equal(page.privacy.clicked, 0, variant);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+    });
+  }
+  },
+);
+
+test("Create Set description events cannot use changed privacy controls",
+  () => {
+  const input = { title: "Synthetic", description: "Review", private: false };
+  for (const variant of ["privacy", "challenge", "row"] as const) {
+    const page = fixture(true);
+    page.description.dispatchEvent = event => {
+      if (event.type !== "change") return true;
+      if (variant === "privacy") {
+        page.privacy.attributes["aria-checked"] = "true";
+        page.privacyState.textContent = "Public (Playable by everyone)";
+      }
+      if (variant === "challenge")
+        page.document.selectors[
+          '[role="dialog"][aria-modal="true"] h3'
+        ] = [node("H3", "Select your organization")];
+      if (variant === "row")
+        page.privacy.labels = [node("LABEL")];
+      return true;
+    };
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false, variant);
+      assert.equal(page.privacy.clicked, 0, variant);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+    });
+  }
+  },
+);
