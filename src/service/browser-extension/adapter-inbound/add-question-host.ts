@@ -514,7 +514,17 @@ async function observeQuestion(
           listBlooketQuestionNumbers as (...args: never[]) => unknown,
           [input.setId],
         ).catch(() => null);
-        return questionNumberPresent(finalList, input.number)
+        if (!questionNumberPresent(finalList, input.number))
+          return browserFailure();
+        // Closing a read-owned panel can trigger a delayed card rerender.
+        // A single final list is not stable provider evidence.
+        await pause(0);
+        const finalAgain = await script(
+          listBlooketQuestionNumbers as (...args: never[]) => unknown,
+          [input.setId],
+        ).catch(() => null);
+        return questionNumberPresent(finalAgain, input.number) &&
+            JSON.stringify(finalAgain) === JSON.stringify(finalList)
           ? { ok: true } : browserFailure();
       }
       if (isClosed !== false) return browserFailure();
