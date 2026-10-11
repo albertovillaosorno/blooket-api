@@ -452,3 +452,79 @@ test("browser write adapter forwards one owned prepared image, not paths",
   assert.equal(commands.length, 1);
   },
 );
+
+test("login submission needs the exact null browser acknowledgement",
+  async () => {
+  for (const value of [
+    true,
+    "logged-in",
+    { ok: true },
+    { ok: false, code: "blooket-browser-failed" },
+    { loginIdentifier: "teacher@example.invalid" },
+    undefined,
+  ]) {
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      { ok: true, value } as BlooketBrowserBridgeTransportResult,
+    ], []));
+    assert.deepEqual(await adapters.session.authenticate({
+      loginIdentifier: "teacher@example.invalid",
+      password: "synthetic-password",
+    }), { ok: false, code: "blooket-browser-failed" });
+  }
+  },
+);
+
+test("hidden or symbol-bearing bridge results cannot cross write ports",
+  async () => {
+  const setSuccess = { ok: true, remoteSetId: "remote-set-1" };
+  const questionSuccess = { ok: true };
+  const malformed = [
+    Object.defineProperty({ ok: true, value: setSuccess }, "secret",
+      { value: "private" }),
+    { ok: true, value: setSuccess, [Symbol("secret")]: "private" },
+  ];
+  for (const reply of malformed) {
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      reply as BlooketBrowserBridgeTransportResult,
+    ], []));
+    assert.deepEqual(await adapters.writes.createSet({
+      schemaVersion: 1, kind: "create-set", title: "Synthetic",
+      description: "", private: true, coverImage: null,
+    }, []), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+  }
+  const surfaceReplies = [
+    Object.defineProperty({ ...setSuccess }, "extra",
+      { value: "private" }),
+    { ...setSuccess, [Symbol("secret")]: "private" },
+  ];
+  for (const value of surfaceReplies) {
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      { ok: true, value },
+    ], []));
+    assert.deepEqual(await adapters.writes.createSet({
+      schemaVersion: 1, kind: "create-set", title: "Synthetic",
+      description: "", private: true, coverImage: null,
+    }, []), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+  }
+  for (const value of [
+    Object.defineProperty({ ...questionSuccess }, "extra",
+      { value: "private" }),
+    { ...questionSuccess, [Symbol("secret")]: "private" },
+  ]) {
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      { ok: true, value },
+    ], []));
+    assert.deepEqual(await adapters.writes.addQuestion({
+      schemaVersion: 1, kind: "add-question",
+      remoteSetId: "set-fixture", number: 1,
+      question: "Type sun.", answers: [{ kind: "text",
+        text: "sun", correct: true }], image: null, audio: "",
+      qType: "typing", random: true, answerTypes: ["exactly"],
+      timeLimit: 15,
+    }, []), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+  }
+  },
+);
