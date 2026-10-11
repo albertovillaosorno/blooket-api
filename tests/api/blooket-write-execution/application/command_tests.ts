@@ -223,7 +223,7 @@ test("each draft step writes once and requires separate fresh verification",
       "blooket-publication-remote-conflict");
   }); });
 
-test("uncertain writes preserve their journal and never replay on a step",
+test("uncertain writes stay journaled even after an empty read-back",
   async () => { await fixture(async state => {
     state.ambiguous(true);
     const first = value(await executeBlooketPublicationCommand(
@@ -242,12 +242,16 @@ test("uncertain writes preserve their journal and never replay on a step",
       command("reconcile"), state.host,
     ));
     assert.equal(reconciled["completedOperations"], 0);
+    assert.equal(reconciled["phase"], "reconciliation-required");
+    assert.equal(reconciled["reason"], "verification-inconclusive");
     assert.equal(state.writes(), 1);
     state.ambiguous(false);
-    await executeBlooketPublicationCommand(
+    const next = value(await executeBlooketPublicationCommand(
       command("step", state.revision), state.host,
-    );
-    assert.equal(state.writes(), 2);
+    ));
+    assert.equal(next["phase"], "reconciliation-required");
+    assert.equal(state.writes(), 1);
+    assert.equal(await readFile(files.attempt, "utf8"), journal);
   }); });
 
 test("unknown collection stops new publication and preserves legacy recovery",
@@ -673,7 +677,7 @@ test("active remote publication prevents update ownership",
     await boundary.release();
   }); });
 
-test("uncertain attempts block updates and survive until reconciliation",
+test("uncertain attempts block updates after inconclusive reconciliation",
   async () => { await fixture(async state => {
     state.ambiguous(true);
     value(await executeBlooketPublicationCommand(
@@ -686,11 +690,13 @@ test("uncertain attempts block updates and survive until reconciliation",
     });
     assert.equal(await readFile(files.attempt, "utf8"), journal);
     assert.equal(state.writes(), 1);
-    value(await executeBlooketPublicationCommand(command("reconcile"),
-      state.host));
-    const boundary = await acquireUpdatePublicationBoundary(state.root);
-    assert.ok(boundary.ok);
-    await boundary.release();
+    const reconciled = value(await executeBlooketPublicationCommand(
+      command("reconcile"), state.host));
+    assert.equal(reconciled["reason"], "verification-inconclusive");
+    assert.deepEqual(await acquireUpdatePublicationBoundary(state.root), {
+      ok: false, reason: "publication-recovery-required",
+    });
+    assert.equal(await readFile(files.attempt, "utf8"), journal);
     assert.equal(state.writes(), 1);
   }); });
 
