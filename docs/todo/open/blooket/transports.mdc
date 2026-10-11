@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, Add Question and saved-question inspection also
+stopped invoking `.every()` or `.entries()` from untrusted browser
+arrays after their descriptor checks. Numeric slots are verified by
+bounded indices and the read-only inspector returns a fresh array.
+Synthetic forged-prototype regressions show that custom iterator or
+comparison methods cannot turn a wrong card list into a positive
+post-Save receipt or authorize read-only panel opening.
+
 On 2026-10-11, the Add Question host and read-only question
 inspector began requiring exact dense numeric card collections before
 claiming empty prior state, saved post-submit question rows, or

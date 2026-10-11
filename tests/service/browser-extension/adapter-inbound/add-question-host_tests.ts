@@ -1247,3 +1247,21 @@ test("Add Question cannot confirm sparse or getter-backed saved cards",
     }
   },
 );
+
+test("forged list-array prototype methods cannot authorize a Save receipt",
+  async () => {
+    const rows = [2];
+    let prototypeCalls = 0;
+    Object.setPrototypeOf(rows, {
+      every() { prototypeCalls++; return true; },
+    });
+    const fake = fakeChrome({ listReply: { ok: true, value: rows } });
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input)).ok, false);
+    assert.equal(prototypeCalls, 0);
+    assert.equal(fake.calls.filter(name => name.includes(":submit"))
+      .length, 1);
+    assert.equal(fake.readBackReads(), 0);
+  },
+);

@@ -157,12 +157,16 @@ export function createExtensionQuestionInspectionHost(
         return undefined;
       // The provider renders questions in one contiguous slot order.
       // An otherwise valid [2] or [2, 1] is not an entire saved set.
-      for (const [index, number] of result.value.entries()) {
+      const slots: number[] = [];
+      for (let index = 0; index < result.value.length; index++) {
+        const number = result.value[index];
         if (!Number.isSafeInteger(number) || number !== index + 1 ||
             number > MAX_NUMBER) return undefined;
+        slots.push(number);
       }
-      // A scripted answer from a tab that switched mid-flight is not evidence.
-      return await ready(url, deadline) ? result.value as number[] : undefined;
+      // Copy only validated own slots: never invoke an untrusted array
+      // prototype iterator, and never return a mutable script result.
+      return await ready(url, deadline) ? slots : undefined;
     }
     return undefined;
   };
