@@ -698,13 +698,22 @@ async function showHumanBlooketTab(
   if (tab.id !== tabId || !tab.url || !stillOwned() ||
       !["https://dashboard.blooket.com", "https://id.blooket.com"]
         .includes(new URL(tab.url).origin)) return false;
-  await chrome.tabs.update(tabId, { active: true });
-  if (!stillOwned()) return false;
   if (typeof tab.windowId !== "number" ||
       !Number.isSafeInteger(tab.windowId) || tab.windowId < 0)
     return false;
+  const active = await chrome.tabs.update(tabId, { active: true });
+  if (!stillOwned() || active.id !== tabId || active.url !== tab.url ||
+      active.windowId !== tab.windowId) return false;
+  // A manual tab switch may finish while activation is pending. Never focus
+  // the remembered window if the active tab has become foreign or replaced.
+  const checked = await chrome.tabs.get(tabId);
+  if (!stillOwned() || checked.id !== tabId ||
+      checked.url !== tab.url || checked.windowId !== tab.windowId ||
+      !checked.url ||
+      !["https://dashboard.blooket.com", "https://id.blooket.com"]
+        .includes(new URL(checked.url).origin)) return false;
   await chrome.windows.update(tab.windowId, { focused: true });
-  return true;
+  return stillOwned();
 }
 
 async function relay(current: Connection, activeGeneration: number) {
