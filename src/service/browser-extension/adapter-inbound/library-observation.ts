@@ -42,8 +42,8 @@ export function checkBlooketLibraryObservation(
       !Array.isArray(observed["value"]["items"])) return observed;
   if (captured === null) return observed;
   const failed = { ok: false, code: "blooket-browser-failed" };
-  if (!record(captured) || Object.keys(captured).sort().join() !==
-      "build,source" || typeof captured["build"] !== "string" ||
+  if (!record(captured) || !exactKeys(captured, ["build", "source"]) ||
+      typeof captured["build"] !== "string" ||
       typeof captured["source"] !== "string") return failed;
   if (captured["build"] !== BLOOKET_LIBRARY_MODEL_BUILD) return observed;
   const model = decodeBlooketLibraryModel(
@@ -62,4 +62,10 @@ export function checkBlooketLibraryObservation(
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" &&
     !Array.isArray(value);
+}
+
+function exactKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  const own = Reflect.ownKeys(value);
+  return own.length === keys.length && own.every(key =>
+    typeof key === "string" && keys.includes(key));
 }

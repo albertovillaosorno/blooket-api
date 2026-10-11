@@ -42,8 +42,9 @@ export function unknownFieldIssues(
   allowed: ReadonlySet<string>,
   path: string,
 ): readonly ValidationIssue[] {
-  return Object.keys(value)
-    .filter((key) => !allowed.has(key))
+  return Reflect.ownKeys(value)
+    .filter((key) => typeof key !== "string" || !allowed.has(key))
+    .map((key) => typeof key === "string" ? key : "[symbol]")
     .sort()
     .map((key) => ({
       path: `${path}.${key}`,

@@ -91,6 +91,9 @@ test(
   let listEmpty = false;
   let listEmptyDrifts = false;
   let listInvalidEnvelope = false;
+  let listSecondHiddenEnvelope = false;
+  let listSecondHiddenRow = false;
+  let listFirstInvalidRow = false;
   let listModelSource: string | null = null;
   let listReloadDuringCapture = false;
   let setListReads = 0;
@@ -524,9 +527,7 @@ test(
             ok: true, extra: "untrusted",
             value: { items: [], completeness: "complete" },
           } }];
-          return [{ result: {
-            ok: true,
-            value: {
+          const reply = { ok: true, value: {
               items: (listEmpty &&
                   (!listEmptyDrifts || setListReads % 2 !== 0))
                 ? []
@@ -539,8 +540,18 @@ test(
               completeness: (listEmpty &&
                   (!listEmptyDrifts || setListReads % 2 !== 0))
                 ? "complete" : "unknown",
-            },
-          } }];
+            } };
+          if (setListReads === 2 && listSecondHiddenEnvelope)
+            Object.defineProperty(reply, "hidden", {
+              value: "untrusted", enumerable: false,
+            });
+          if (setListReads === 2 && listSecondHiddenRow)
+            Object.defineProperty(reply.value.items[0], "hidden", {
+              value: "untrusted", enumerable: false,
+            });
+          if (setListReads === 1 && listFirstInvalidRow)
+            reply.value.items[0].title = "";
+          return [{ result: reply }];
         }
         const reply = [
           {
@@ -834,6 +845,20 @@ test(
     assert.equal(malformedSets.ok, false);
     assert.equal(setListReads, 1);
     listInvalidEnvelope = false;
+    for (const kind of ["first-invalid-row", "second-hidden-envelope",
+      "second-hidden-row"]) {
+      setListReads = 0;
+      listFirstInvalidRow = kind === "first-invalid-row";
+      listSecondHiddenEnvelope = kind === "second-hidden-envelope";
+      listSecondHiddenRow = kind === "second-hidden-row";
+      const rejected = await expectReply({ kind: "sets.list" });
+      assert.equal(rejected.ok, false, kind);
+      assert.equal(setListReads,
+        kind === "first-invalid-row" ? 1 : 2, kind);
+    }
+    listFirstInvalidRow = false;
+    listSecondHiddenEnvelope = false;
+    listSecondHiddenRow = false;
     listEmpty = true;
     setListReads = 0;
     const emptySets = await expectReply({ kind: "sets.list" });

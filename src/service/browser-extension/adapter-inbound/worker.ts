@@ -58,7 +58,7 @@ import {
 import { captureBlooketLibraryModel } from
   "../../../platforms/blooket-browser/adapter-outbound/library-model-page.ts";
 import { checkBlooketLibraryObservation } from "./library-observation.ts";
-import { decodeBlooketSetDetail } from
+import { decodeBlooketSetDetail, decodeBlooketSetList } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
@@ -186,6 +186,21 @@ function exactSessionObservation(value: unknown): boolean {
     typeof value === "object" && "ok" in value && value.ok === true &&
     "value" in value && typeof value.value === "string" &&
     OBSERVED_SESSION_STATES.has(value.value);
+}
+
+function admittedLibraryRead(value: unknown): boolean {
+  if (!exactWorkerKeys(value, "ok,value") || !value ||
+      typeof value !== "object" || !("ok" in value) ||
+      value.ok !== true || !("value" in value) ||
+      !exactWorkerKeys(value.value, "completeness,items") ||
+      !value.value || typeof value.value !== "object" ||
+      !("completeness" in value.value) ||
+      !("items" in value.value) ||
+      !Array.isArray(value.value.items) ||
+      (value.value.items.length === 0
+        ? value.value.completeness !== "complete"
+        : value.value.completeness !== "unknown")) return false;
+  return decodeBlooketSetList(value.value.items).ok;
 }
 
 function configured(value: unknown): Connection | undefined {
@@ -395,23 +410,8 @@ async function read(
         await pause(100);
         continue;
       }
-      if (
-        !result || typeof result !== "object" || Array.isArray(result) ||
-        !exactWorkerKeys(result, "ok,value") ||
-        !("ok" in result) || result.ok !== true ||
-        !("value" in result) || !result.value ||
-        typeof result.value !== "object" || Array.isArray(result.value) ||
-        !exactWorkerKeys(result.value, "completeness,items") ||
-        !("completeness" in result.value) ||
-        !("items" in result.value) ||
-        !Array.isArray(result.value.items) ||
-        result.value.items.length > 200 ||
-        (result.value.completeness !== "complete" &&
-          result.value.completeness !== "unknown") ||
-        (result.value.items.length === 0
-          ? result.value.completeness !== "complete"
-          : result.value.completeness !== "unknown")
-      ) throw new Error("browser-set-list-unavailable");
+      if (!admittedLibraryRead(result))
+        throw new Error("browser-set-list-unavailable");
       initial = result;
       captured = true;
       break;
@@ -427,10 +427,9 @@ async function read(
     if (tabAfter.status !== "complete" || tabAfter.url !== target)
       throw new Error("browser-set-list-unavailable");
     const after = await observe();
-    if (
-      Date.now() >= readDeadline ||
-      JSON.stringify(initial) !== JSON.stringify(after)
-    ) throw new Error("browser-set-list-unavailable");
+    if (Date.now() >= readDeadline || !admittedLibraryRead(after) ||
+        JSON.stringify(initial) !== JSON.stringify(after))
+      throw new Error("browser-set-list-unavailable");
     const checkedTab = await browser.tabs.get(current.tabId);
     if (checkedTab.status !== "complete" || checkedTab.url !== target)
       throw new Error("browser-set-list-unavailable");

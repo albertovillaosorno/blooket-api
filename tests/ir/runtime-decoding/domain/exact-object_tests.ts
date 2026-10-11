@@ -64,3 +64,21 @@ test("requiredString does not coerce numbers", () => {
   assert.equal(value, undefined);
   assert.equal(issues.length, 1);
 });
+
+
+test("unknownFieldIssues rejects nonenumerable and symbol-owned extras",
+  () => {
+  const value = Object.defineProperty({ ok: true }, "hidden", {
+    enumerable: false, value: "untrusted",
+  });
+  Object.defineProperty(value, Symbol("secret"), {
+    enumerable: false, value: "untrusted",
+  });
+  assert.deepEqual(unknownFieldIssues(value, new Set(["ok"]), "$"), [
+    { path: "$.[symbol]", code: "unknown-field",
+      message: "Field is not admitted by this contract." },
+    { path: "$.hidden", code: "unknown-field",
+      message: "Field is not admitted by this contract." },
+  ]);
+  },
+);

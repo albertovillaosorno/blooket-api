@@ -238,3 +238,17 @@ test("set read fields preserve local browser safety bounds", () => {
     description: "x".repeat(10_000), visibility: "private",
   }).ok, true);
 });
+
+
+test("saved set rows reject hidden and symbol-owned untrusted fields",
+  () => {
+  for (const row of [
+    Object.defineProperty({ schemaVersion: 1, id: "fixture",
+      title: "Synthetic" }, "hidden", {
+      enumerable: false, value: "untrusted",
+    }),
+    { schemaVersion: 1, id: "fixture", title: "Synthetic",
+      [Symbol("hidden")]: "untrusted" },
+  ]) assert.equal(decodeBlooketSetList([row]).ok, false);
+  },
+);
