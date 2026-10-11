@@ -68,6 +68,12 @@ object was still resolving. The normalizer now checks active recursion before
 the completed-object memo. Shared acyclic objects remain reusable. This guards
 programmatic row inputs; ordinary decoded JSON cannot itself encode cycles.
 
+An additional Flight regression on 2026-10-10 proved that ordinary JSON with
+`kind: "error"` and `digest` could masquerade as an `E`-framed error row.
+Only the actual validated `E` decoder now attaches an internal nonenumerable
+marker. JSON lookalikes stay ordinary models; legitimate error digests retain
+their exact public shape without exposing extra provider fields.
+
 On 2026-10-10, a private extension-local candidate decoder was added for
 My Sets server-rendered Flight data. It is gated on the specific observed
 `349b82c80fc4a5a2001e609136cfed32747ba3f4` build, the client module

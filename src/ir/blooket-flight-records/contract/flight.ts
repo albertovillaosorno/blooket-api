@@ -58,6 +58,10 @@ export interface FlightPageRows {
   readonly modules: ReadonlyMap<string, unknown>;
 }
 
+// Only a decoded E row may be interpreted as an error. Ordinary JSON objects
+// with the same fields must not impersonate provider error framing.
+const FLIGHT_ERROR_ROW = Symbol("flight-error-row");
+
 const MAX_FLIGHT_BYTES = 5_000_000;
 const MAX_FLIGHT_ROWS = 20_000;
 const MAX_GRAPH_VALUES = 100_000;
@@ -402,7 +406,10 @@ function decodeErrorRecord(content: string): FlightErrorRecord {
     encodedBytes(value.digest) > 4_096
   )
     throw new Error("invalid-flight-error");
-  return { kind: "error", digest: value.digest };
+  return Object.defineProperty(
+    { kind: "error" as const, digest: value.digest }, FLIGHT_ERROR_ROW,
+    { value: true },
+  );
 }
 
 function isFlightError(value: unknown): value is FlightErrorRecord {
@@ -410,8 +417,10 @@ function isFlightError(value: unknown): value is FlightErrorRecord {
     !!value &&
     typeof value === "object" &&
     !Array.isArray(value) &&
+    Object.keys(value).sort().join() === "digest,kind" &&
     (value as { kind?: unknown }).kind === "error" &&
-    typeof (value as { digest?: unknown }).digest === "string"
+    typeof (value as { digest?: unknown }).digest === "string" &&
+    (value as { [FLIGHT_ERROR_ROW]?: unknown })[FLIGHT_ERROR_ROW] === true
   );
 }
 
