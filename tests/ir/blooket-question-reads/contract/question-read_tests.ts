@@ -505,3 +505,57 @@ test("legacy answer values cannot ambiguously identify multiple rows", () => {
       issue.code === "duplicate-legacy-answer"), true);
   }
 });
+
+
+test("question and answer arrays refuse hidden extras and sparse slots",
+  () => {
+  const exact = decodeBlooketQuestionRead(question);
+  assert.equal(exact.ok, true);
+  if (!exact.ok) return;
+  const hiddenQuestions = Object.defineProperty([exact.value], "hidden", {
+    value: true, enumerable: false,
+  });
+  assert.equal(decodeBlooketQuestionReadList(hiddenQuestions).ok, false);
+  const symbolQuestions = [exact.value];
+  Object.defineProperty(symbolQuestions, Symbol("hidden"), { value: true });
+  assert.equal(decodeBlooketQuestionReadList(symbolQuestions).ok, false);
+  const sparseQuestions = new Array(1);
+  assert.equal(decodeBlooketQuestionReadList(sparseQuestions).ok, false);
+  const answers = Object.defineProperty([...exact.value.answers], "hidden", {
+    value: true, enumerable: false,
+  });
+  assert.equal(decodeBlooketQuestionRead({ ...exact.value, answers }).ok,
+    false);
+  const legacyAnswers = Object.defineProperty([...question.answers],
+    Symbol("hidden"), { value: true });
+  assert.equal(decodeBlooketQuestionRead({ ...question,
+    answers: legacyAnswers }).ok, false);
+  const legacyMatch = Object.defineProperty([...question.answerTypes],
+    "hidden", { value: true, enumerable: false });
+  assert.equal(decodeBlooketQuestionRead({ ...question,
+    answerTypes: legacyMatch }).ok, false);
+  const legacyCorrect = Object.defineProperty([...question.correctAnswers],
+    "hidden", { value: true, enumerable: false });
+  assert.equal(decodeBlooketQuestionRead({ ...question,
+    correctAnswers: legacyCorrect }).ok, false);
+  },
+);
+
+
+test("canonical saved questions require exact contiguous slot order",
+  () => {
+  for (const value of [
+    [{ ...question, number: 2 }],
+    [question, { ...question, number: 3 }],
+    [{ ...question, number: 2 }, question],
+  ]) {
+    const result = decodeBlooketQuestionReadList(value);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues.some(issue =>
+      issue.code === "noncontiguous-question-number"), true);
+  }
+  assert.equal(decodeBlooketQuestionReadList([
+    question, { ...question, number: 2 },
+  ]).ok, true);
+  },
+);

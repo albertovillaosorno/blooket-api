@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, both the versioned set-list and question-read
+contracts began requiring exact dense arrays, with no sparse slots,
+hidden named or symbol-owned properties. Normalized answers and legacy
+answer/match lists use the same rule. A canonical question collection
+must also retain slot numbers `1..n` in order; missing or rearranged
+questions cannot become positive publication read-back evidence.
+Synthetic IR regressions cover malformed arrays and ordering.
+
 On 2026-10-11, the versioned set-list decoder also began checking
 the array's complete own-key shape: dense canonical indices and its
 built-in length only. Extra named or symbol-owned array properties,

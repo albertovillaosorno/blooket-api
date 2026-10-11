@@ -36,6 +36,7 @@ import {
   type ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
+  isExactDenseArray,
   isRecord,
   requiredString,
   unknownFieldIssues,
@@ -158,11 +159,7 @@ export function decodeBlooketSetList(
   // An array received through a browser-port contract has only its dense
   // indexed slots and length. Extra named/symbol fields or sparse holes
   // must not become a successful saved-set collection.
-  const keys = Reflect.ownKeys(value);
-  if (keys.length !== value.length + 1 ||
-      !Object.hasOwn(value, "length") ||
-      !Array.from({ length: value.length }, (_, i) => String(i))
-        .every(key => Object.hasOwn(value, key))) {
+  if (!isExactDenseArray(value)) {
     return {
       ok: false,
       issues: [{ path: "$", code: "unknown-field",

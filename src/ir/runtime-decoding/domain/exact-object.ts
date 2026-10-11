@@ -37,6 +37,17 @@ export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+export function isExactDenseArray(value: unknown): value is unknown[] {
+  if (!Array.isArray(value)) return false;
+  const keys = Reflect.ownKeys(value);
+  if (keys.length !== value.length + 1 ||
+      !Object.hasOwn(value, "length")) return false;
+  for (let index = 0; index < value.length; index++) {
+    if (!Object.hasOwn(value, String(index))) return false;
+  }
+  return true;
+}
+
 export function unknownFieldIssues(
   value: UnknownRecord,
   allowed: ReadonlySet<string>,
