@@ -62,6 +62,17 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the existing-question read host began preserving one native
+`performance.timeOrigin` across number enumeration, modal inspection, saved
+image probing, cancellation, and closure verification. Previously a reload of
+an unchanged edit URL could splice two question collections together and a
+best-effort Cancel could target another document.
+
+Synthetic tests replace the document at each stage and verify that the host
+refuses the scan and never cancels or probes a foreign document. Invalid or
+unavailable native origins refuse even the initial enumeration. The deadline
+remains authoritative; this is not evidence of live Blooket completeness.
+
 On 2026-10-10, Add Question browser mutations began binding the exact edit
 page to one positive native `performance.timeOrigin`. The former host checked
 only tab URL and readiness between opener, prepared-state, submission, and

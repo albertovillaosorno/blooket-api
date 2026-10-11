@@ -77,6 +77,10 @@ interface Scenario {
   readonly imageEvidence?: unknown;
   readonly imageLatencyMs?: number;
   readonly switchOnImage?: boolean;
+  readonly nativeOrigin?: number | null;
+  readonly changeOriginAfter?:
+    "listBlooketQuestionNumbers" | "openBlooketQuestionPanel" |
+    "inspectOpenedBlooketQuestion" | "closeBlooketQuestionPanel";
 }
 
 function synthetic(options: Scenario = {}) {
@@ -85,6 +89,8 @@ function synthetic(options: Scenario = {}) {
   let inspections = 0;
   let tick = 0;
   let currentUrl = options.tabUrl ?? EDIT_URL;
+  let origin = options.nativeOrigin === undefined
+    ? 1_000 : options.nativeOrigin;
   const port = {
     tabs: {
       get: async (id: number) => {
@@ -103,10 +109,15 @@ function synthetic(options: Scenario = {}) {
         readonly args?: unknown[];
       }) => {
         assert.equal(request.target.tabId, 7);
+        if (request.func.name === "inspectBlooketDocumentOrigin") {
+          assert.deepEqual(request.args, [EDIT_URL]);
+          return [{ result: origin }];
+        }
         assert.equal(request.args?.[0], FIXTURE_SET);
         calls.push(request.func.name);
         tick += options.scriptLatencyMs ?? 0;
         const name = request.func.name;
+        if (options.changeOriginAfter === name) origin = 2_000;
         if (name === "listBlooketQuestionNumbers") {
           enumerations++;
           if (enumerations === options.switchAtEnumeration)
@@ -668,5 +679,35 @@ test(
   assert.equal(fixture.inspections(), 1);
   assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), false);
   assert.equal(fixture.calls.includes("isBlooketQuestionPanelClosed"), false);
+  },
+);
+
+test("same-route document replacement rejects mixed question observations",
+  async () => {
+  for (const phase of [
+    "listBlooketQuestionNumbers",
+    "openBlooketQuestionPanel",
+    "inspectOpenedBlooketQuestion",
+    "closeBlooketQuestionPanel",
+  ] as const) {
+    const fixture = synthetic({ changeOriginAfter: phase });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    // A newly replaced page may contain a different teacher-owned editor.
+    // Never issue Cancel or closure probes into that second document.
+    assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"),
+      phase === "closeBlooketQuestionPanel");
+    assert.equal(fixture.calls.includes("isBlooketQuestionPanelClosed"),
+      false);
+  }
+  },
+);
+
+test("question scans refuse missing native document lifetime evidence",
+  async () => {
+  for (const nativeOrigin of [null, 0, -5, NaN, Infinity]) {
+    const fixture = synthetic({ nativeOrigin });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.deepEqual(fixture.calls, []);
+  }
   },
 );
