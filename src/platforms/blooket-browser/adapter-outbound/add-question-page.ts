@@ -130,8 +130,10 @@ export function runBlooketAddQuestionPageAction(
     const heading = headings[0]!;
     const headingBounds = heading.getBoundingClientRect();
     const header = heading.parentElement?.parentElement;
-    if (!header || headingBounds.width <= 0 || headingBounds.height <= 0)
-      return false;
+    const headingStyle = getComputedStyle(heading);
+    if (!header || headingBounds.width <= 0 || headingBounds.height <= 0 ||
+        headingStyle.display === "none" ||
+        headingStyle.visibility !== "visible") return false;
     const counterCandidates = Array.from(header.querySelectorAll("div"))
       .filter(candidate => candidate.querySelectorAll("*").length === 0 &&
         /^(0|[1-9][0-9]*) Questions?$/u
@@ -259,7 +261,9 @@ export function runBlooketAddQuestionPageAction(
       const nodes = Array.from(document.querySelectorAll(selector));
       if (nodes.length !== 1) return false;
       const bounds = nodes[0]!.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(nodes[0]!);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const logoutSelector = 'a[href="https://id.blooket.com/logout"]';
     const logout = Array.from(document.querySelectorAll(logoutSelector));
@@ -342,7 +346,10 @@ export function runBlooketAddQuestionPageAction(
         return false;
       const opener = buttons[0] as HTMLButtonElement;
       const bounds = opener.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0 || opener.disabled ||
+      const style = getComputedStyle(opener);
+      if (bounds.width <= 0 || bounds.height <= 0 ||
+          style.display === "none" || style.visibility !== "visible" ||
+          opener.disabled ||
           opener.getAttribute("aria-disabled") === "true") return false;
       {
         // Do not revoke a previous upload's Blob URL or abandon a teacher's
@@ -427,7 +434,10 @@ export function runBlooketAddQuestionPageAction(
         return false;
       const remove = removes[0] as HTMLButtonElement;
       const bounds = remove.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0 || remove.disabled ||
+      const style = getComputedStyle(remove);
+      if (bounds.width <= 0 || bounds.height <= 0 ||
+          style.display === "none" || style.visibility !== "visible" ||
+          remove.disabled ||
           remove.getAttribute("aria-disabled") === "true") return false;
       if (resolved.question.value.length > 100_000) return false;
       const raw: unknown = JSON.parse(resolved.question.value);
@@ -459,7 +469,10 @@ export function runBlooketAddQuestionPageAction(
         return failed();
       const cancel = buttons[0] as HTMLButtonElement;
       const bounds = cancel.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0 || cancel.disabled ||
+      const style = getComputedStyle(cancel);
+      if (bounds.width <= 0 || bounds.height <= 0 ||
+          style.display === "none" || style.visibility !== "visible" ||
+          cancel.disabled ||
           cancel.getAttribute("aria-disabled") === "true") return failed();
       cancel.click();
       watch.dispose();
@@ -486,7 +499,9 @@ export function runBlooketAddQuestionPageAction(
     if (hasImage) {
       const image = input.image;
       if (!image || typeof image !== "object" ||
-          Object.keys(image).sort().join() !== "base64,format" ||
+          Reflect.ownKeys(image).length !== 2 ||
+          !["base64", "format"].every(key =>
+            Object.hasOwn(image, key)) ||
           (image.format !== "png" && image.format !== "jpeg" &&
             image.format !== "gif") || typeof image.base64 !== "string" ||
           image.base64.length < 4 || image.base64.length > 3_333_332 ||
@@ -598,7 +613,10 @@ export function runBlooketAddQuestionPageAction(
       return failed();
     const submit = submits[0] as HTMLButtonElement;
     const bounds = submit.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || submit.disabled ||
+    const style = getComputedStyle(submit);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        submit.disabled ||
         submit.getAttribute("aria-disabled") === "true")
       return failed();
     watch.submitted = true;

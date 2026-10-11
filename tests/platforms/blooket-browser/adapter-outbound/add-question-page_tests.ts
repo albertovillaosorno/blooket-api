@@ -504,7 +504,7 @@ test("provider image readiness refuses changed previews and ambiguous controls",
     ...typing, image: { format: "png" as const, base64: "iVBORw0KGgoA" },
   };
   for (const reason of ["number", "audio", "url", "duplicate", "button",
-    "hidden", "human", "replaced"] as const) {
+    "css-remove", "hidden", "human", "replaced"] as const) {
     withImagePage((page, interact) => {
       assert.equal(runBlooketAddQuestionPageAction(
         "open-image", "set-fixture",
@@ -520,6 +520,8 @@ test("provider image readiness refuses changed previews and ambiguous controls",
       );
       if (reason === "button") page.form.selectors["button"]![0]!.disabled =
         true;
+      if (reason === "css-remove")
+        page.form.selectors["button"]![0]!.visibility = "hidden";
       if (reason === "hidden") Object.assign(
         page.form.selectors['input[name="coverImageFile"]']![0]!,
         { hidden: false },
@@ -642,7 +644,8 @@ test("unknown serialized Add Question actions never submit", () => {
 });
 
 test("unusable Save Question buttons cannot authorize a click", () => {
-  for (const reason of ["disabled", "aria", "hidden", "wrong-tag"] as const) {
+  for (const reason of ["disabled", "aria", "hidden", "css-hidden",
+    "wrong-tag"] as const) {
     const page = fixture();
     withPage(page.document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
@@ -651,6 +654,7 @@ test("unusable Save Question buttons cannot authorize a click", () => {
       if (reason === "aria") page.submit.attributes["aria-disabled"] = "true";
       if (reason === "hidden")
         page.submit.getBoundingClientRect = () => ({ width: 0, height: 0 });
+      if (reason === "css-hidden") page.submit.visibility = "hidden";
       if (reason === "wrong-tag") page.submit.tagName = "DIV";
       assert.equal(submitBlooketAddQuestionForm(typing).ok, false);
       assert.equal(page.submit.clicked, 0);
@@ -826,12 +830,14 @@ test("ambiguous controls and invalid question semantics fail closed", () => {
 
 
 test("hidden or disabled Add Question openers are not acknowledged", () => {
-  for (const reason of ["disabled", "aria", "hidden"] as const) {
+  for (const reason of ["disabled", "aria", "hidden",
+    "css-hidden"] as const) {
     const page = fixture();
     if (reason === "disabled") page.add.disabled = true;
     if (reason === "aria") page.add.attributes["aria-disabled"] = "true";
     if (reason === "hidden")
       page.add.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    if (reason === "css-hidden") page.add.visibility = "hidden";
     withPage(page.document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
@@ -1235,5 +1241,71 @@ test("Add Question does not use edited URLs with extra query or fragment",
         assert.equal(page.submit.clicked, 0);
       });
   }
+  },
+);
+
+
+test("CSS-hidden set heading and authenticated shell block Add Question",
+  () => {
+  for (const element of ["main", "nav", "logout", "heading"] as const) {
+    const page = fixture();
+    closedQuestionEditor(page);
+    const target = element === "main"
+      ? page.document.selectors["main"]![0]!
+      : element === "nav"
+        ? page.document.selectors['nav a[href="/my-sets"]']![0]!
+        : element === "logout"
+          ? page.document.selectors[
+            'a[href="https://id.blooket.com/logout"]']![0]!
+          : page.document.selectors["main h1"]![0]!;
+    target.visibility = "hidden";
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+        assert.equal(runBlooketAddQuestionPageAction(
+          "open", "set-fixture"), false);
+        assert.equal(page.add.clicked, 0);
+      });
+  }
+  },
+);
+
+
+test("owned image cancellation refuses a CSS-hidden Cancel button",
+  () => {
+  const image = { format: "png" as const, base64: "iVBORw0KGgoA" };
+  withImagePage((page) => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open-image", "set-fixture"), true);
+    assert.deepEqual(prepareBlooketAddQuestionForm({ ...typing, image }),
+      { ok: true });
+    const cancel = node("BUTTON", "Cancel", { type: "button" });
+    page.form.selectors['button[type="button"]'] = [cancel];
+    cancel.visibility = "hidden";
+    assert.equal(runBlooketAddQuestionPageAction(
+      "cancel-image", "set-fixture").ok, false);
+    assert.equal(cancel.clicked, 0);
+    cancel.visibility = "visible";
+    assert.deepEqual(runBlooketAddQuestionPageAction(
+      "cancel-image", "set-fixture"), { ok: true });
+    assert.equal(cancel.clicked, 1);
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
+test("hidden image-envelope fields cannot reach provider File controls",
+  () => {
+  const image = Object.defineProperty({
+    format: "png" as const, base64: "iVBORw0KGgoA",
+  }, "hidden", { enumerable: false, value: "untrusted" });
+  withImagePage((page) => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open-image", "set-fixture"), true);
+    assert.equal(prepareBlooketAddQuestionForm({ ...typing, image }).ok,
+      false);
+    assert.equal(page.form.selectors['input[type="file"]']![0]!.files,
+      undefined);
+    assert.equal(page.submit.clicked, 0);
+  });
   },
 );
