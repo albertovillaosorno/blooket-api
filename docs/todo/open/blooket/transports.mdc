@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, prepared image bytes also gained a second
+question-slot guard after the provider file-change event. A new
+question counter or concurrently inserted prior card cannot
+acknowledge an image prepared for an older slot or enable its Save.
+The synthetic regression changes the visible count during dispatch.
+
 On 2026-10-11, My Sets Flight-model correlation began requiring
 owned, enumerable data fields for captured build/source values and
 reading only direct row identity properties. Accessor-backed model
