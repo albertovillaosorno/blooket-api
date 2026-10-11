@@ -323,6 +323,34 @@ test("capability probe opens only the exact Add Question form", () => {
   });
 });
 
+test("a pending capability owner refuses repeated open and stale drawer",
+  () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    // While React has not mounted the modal, another opener cannot click.
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.add.clicked, 1);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    // Missing modal markup is not permission to adopt a new read owner.
+    page.document.selectors['input#question[name="question"]'] = [];
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.add.clicked, 1);
+  });
+  const second = fixture();
+  second.document.selectors['aside[data-drawer-open="true"]'] = [
+    drawer("unsupported"),
+  ];
+  withPage(second.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(second.add.clicked, 0);
+  });
+  },
+);
+
 test("verified capability modal cannot transfer ownership to a remount", () => {
   const page = fixture();
   withPage(page.document, () => {

@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the read-only Add Question capability opener also
+began refusing another click while its original document still has
+an owned inspection watch, including while React has not mounted the
+modal. A remaining Audio drawer is likewise not a fresh opener
+surface. Synthetic tests prove pending ownership and stale drawers
+cannot result in another toolbar click or silently replace ownership.
+
 On 2026-10-11, read-only capability inspection began pinning the
 exact Add Question form and hidden question control after its first
 verified readiness observation. A provider remount cannot transfer

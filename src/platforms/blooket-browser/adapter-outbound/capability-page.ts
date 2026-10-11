@@ -142,7 +142,8 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       url.searchParams.get("id") !== setId
     )
       return false;
-    if (document.querySelector('input#question[name="question"]')) return false;
+    if (document.querySelector('input#question[name="question"]') ||
+        document.querySelector('aside[data-drawer-open="true"]')) return false;
     let buttons = Array.from(document.querySelectorAll("button")).filter(
       (button) => normalized(button) === "Add Question",
     );
@@ -179,7 +180,11 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
         dispose: () => void;
       };
     };
-    world.__blooketCapabilityEditWatch?.dispose();
+    const previous = world.__blooketCapabilityEditWatch;
+    // Repeated requests must never replace a pending owner whose opener
+    // already ran in this document, even if the form is still hydrating.
+    if (previous?.document === document) return false;
+    previous?.dispose();
     const watch: NonNullable<typeof world.__blooketCapabilityEditWatch> = {
       document,
       setId,
