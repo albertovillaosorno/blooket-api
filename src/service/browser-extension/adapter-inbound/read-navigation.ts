@@ -52,6 +52,7 @@ export async function confirmBlooketReadNavigation(
   pause: (ms: number) => Promise<void>,
   documentOrigin: (url: string) => Promise<unknown>,
   now: () => number = Date.now,
+  approvedSourceOrigin?: number,
 ): Promise<ReadTab | undefined> {
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (now() >= deadline) return undefined;
@@ -64,7 +65,9 @@ export async function confirmBlooketReadNavigation(
         current.url !== previous.url || current.status !== "complete")
       return undefined;
     const origin = await documentOrigin(current.url);
-    if (now() >= deadline || !validOrigin(origin)) return undefined;
+    if (now() >= deadline || !validOrigin(origin) ||
+        (approvedSourceOrigin !== undefined &&
+         origin !== approvedSourceOrigin)) return undefined;
     previousOrigin = origin;
     const checked = await tabs.get(tabId);
     if (now() >= deadline || checked.url !== current.url ||

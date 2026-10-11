@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the extension worker's read navigation also began
+binding the safe-to-leave approval to one native source-document origin.
+Previously the worker could validate that leaving a teacher editor was safe,
+then inspect a different document reloaded at the same URL and navigate away
+from it. The shared read-navigation guard now requires the caller's
+preapproved native origin, rather than treating a later snapshot as fresh
+approval. Synthetic worker and helper tests confirm that no tab update or
+reload follows the substituted source document.
+
 On 2026-10-10, Create Set now requires a fresh native target document
 origin after its tab update and rechecks that origin across session-page
 observation and the form ownership Claim. Add Question similarly refuses a

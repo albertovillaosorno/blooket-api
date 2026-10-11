@@ -58,6 +58,7 @@ test(
   let incompatibleStatus = false;
   let incompatiblePoll = false;
   let unsafeReadSource = false;
+  let reloadDuringLeave = false;
   let detailOpenSucceeds = true;
   let detailSidebarDrifts = false;
   let detailSidebarReadCount = 0;
@@ -200,8 +201,13 @@ test(
           assert.deepEqual(args, [tabUrl]);
           return [{ result: documentOrigin }];
         }
-        if (func.name === "canLeaveBlooketPageForRead")
+        if (func.name === "canLeaveBlooketPageForRead") {
+          if (reloadDuringLeave) {
+            reloadDuringLeave = false;
+            documentOrigin += 1_000;
+          }
           return [{ result: !unsafeReadSource }];
+        }
         if (func.name === "captureBlooketLibraryModel") {
           if (listReloadDuringCapture) {
             listReloadDuringCapture = false;
@@ -694,6 +700,18 @@ test(
     assert.equal(conflictingModel.ok, false);
     assert.equal(JSON.stringify(conflictingModel).includes("source"), false);
     listModelSource = null;
+    // The user can reload the same URL during permission-to-leave. The old
+    // document's answer cannot authorize a reload of the replacement.
+    reloadDuringLeave = true;
+    const reloadBeforeGuard = readReloads;
+    const beforeGuardSwitch = scripts.length;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(readReloads, reloadBeforeGuard);
+    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    assert.deepEqual(scripts.slice(beforeGuardSwitch), [
+      "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin",
+    ]);
     // Never reload an active editor even when already on the target route.
     unsafeReadSource = true;
     const beforeSameRouteReload = readReloads;
@@ -713,9 +731,9 @@ test(
         "https://dashboard.blooket.com/edit?id=teacher-draft");
     }
     assert.deepEqual(scripts.slice(beforeUnsafeRead), [
-      "canLeaveBlooketPageForRead",
-      "canLeaveBlooketPageForRead",
-      "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
     ]);
     unsafeReadSource = false;
     tabUrl = "https://dashboard.blooket.com/my-sets";
