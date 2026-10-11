@@ -732,3 +732,56 @@ test("question inspection cannot accept missing or reordered card slots",
   }
   },
 );
+
+test("hidden list evidence never authorizes existing-question reads",
+  async () => {
+  for (const initial of [
+    Object.defineProperty({ ok: true, value: [1] }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ok: true, value: [1], [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fixture = synthetic({ initial });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.enumerations(), 1);
+    assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
+  }
+  },
+);
+
+test("hidden modal evidence is rejected and its panel canceled",
+  async () => {
+  for (const inspected of [
+    Object.defineProperty({ ok: true, value: validQuestion }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ok: true, value: validQuestion,
+      [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fixture = synthetic({ inspected });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.inspections(), 1);
+    assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), true);
+  }
+  },
+);
+
+test("hidden saved-image envelopes never become question evidence",
+  async () => {
+  for (const imageEvidence of [
+    Object.defineProperty({ ok: true, value: null }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ok: true, value: null, [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fixture = synthetic({
+      inspected: { ok: true, value: { ...validQuestion, hasImage: true } },
+      imageEvidence,
+    });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.calls.includes(
+      "inspectOpenedBlooketQuestionImage"), true);
+    assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), true);
+  }
+  },
+);

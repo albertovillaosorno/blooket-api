@@ -131,7 +131,7 @@ export function createExtensionQuestionInspectionHost(
       if (
         waitForControls && result && typeof result === "object" &&
         !Array.isArray(result) &&
-        Object.keys(result).sort().join() === "code,ok" &&
+        exactKeys(result, "code,ok") &&
         "ok" in result && result.ok === false &&
         "code" in result && result.code === "blooket-browser-failed"
       ) {
@@ -141,7 +141,7 @@ export function createExtensionQuestionInspectionHost(
         continue;
       }
       if (!result || typeof result !== "object" || Array.isArray(result) ||
-          Object.keys(result).sort().join() !== "ok,value" ||
+          !exactKeys(result, "ok,value") ||
           !("ok" in result) || result.ok !== true ||
           !("value" in result) || !Array.isArray(result.value) ||
           result.value.length > MAX_QUESTIONS)
@@ -238,7 +238,7 @@ export function createExtensionQuestionInspectionHost(
               if (
                 inspected && typeof inspected === "object" &&
                 !Array.isArray(inspected) &&
-                Object.keys(inspected).sort().join() === "code,ok" &&
+                exactKeys(inspected, "code,ok") &&
                 "ok" in inspected && inspected.ok === false &&
                 "code" in inspected &&
                 inspected.code === "blooket-browser-failed"
@@ -278,7 +278,7 @@ export function createExtensionQuestionInspectionHost(
               );
               if (!await ready(url, deadline) || !evidence ||
                   typeof evidence !== "object" || Array.isArray(evidence) ||
-                  Object.keys(evidence).sort().join() !== "ok,value" ||
+                  !exactKeys(evidence, "ok,value") ||
                   !("ok" in evidence) || evidence.ok !== true ||
                   !("value" in evidence)) invalid = true;
               else {
@@ -329,12 +329,21 @@ function decodeInspectedQuestion(
   value: unknown, number: number,
 ): BlooketQuestionRead | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
-      Object.keys(value).sort().join() !== "ok,value" ||
+      !exactKeys(value, "ok,value") ||
       !("ok" in value) || value.ok !== true || !("value" in value))
     return undefined;
   const decoded = decodeBlooketQuestionRead(value.value);
   return decoded.ok && decoded.value.number === number
     ? decoded.value : undefined;
+}
+
+function exactKeys(value: unknown, expected: string): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const keys = Reflect.ownKeys(value);
+  const names = expected.split(",");
+  return keys.length === names.length && keys.every(key =>
+    typeof key === "string" && names.includes(key));
 }
 
 function browserFailure(): ExtensionQuestionInspectionResult {

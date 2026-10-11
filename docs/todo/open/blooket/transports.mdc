@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, read-only question inspection also requires the exact
+contiguous visible question indices beginning at one. Gapped and
+reordered lists now stop before opening any modal. The same host
+rejects hidden and symbol-owned fields in collection, question and
+saved-image browser-script envelopes. Synthetic tests show malformed
+responses never become remote publication evidence.
+
 On 2026-10-11, the Create Set Chrome host extended exact own-field
 admission to the form preparation acknowledgement, redirect identity,
 post-reload saved title/description sidebar, and page navigation
