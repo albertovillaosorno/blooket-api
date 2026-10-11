@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the extension worker's exact browser reply admission
+began requiring enumerable owned data fields for all expected keys.
+A hidden expected value or accessor getter on the second My Sets
+observation cannot reach the comparison or execute inside the worker.
+Synthetic integration tests inject both malformed envelopes without
+allowing a saved-state receipt.
+
 On 2026-10-11, saved-set and question list validation began
 requiring enumerable data descriptors for each dense array index.
 Accessor-backed rows, legacy answers and hidden index properties now

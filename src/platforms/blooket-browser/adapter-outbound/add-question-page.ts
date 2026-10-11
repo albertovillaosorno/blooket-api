@@ -571,7 +571,8 @@ export function runBlooketAddQuestionPageAction(
               "Logout" ||
             !(visibleUnique(logoutSelector) ||
               (visibleUnique(accountSelector) &&
-                !!document.querySelector(accountSelector)?.textContent?.trim())))
+                Boolean(document.querySelector(accountSelector)
+                  ?.textContent?.trim()))))
           return failed();
         const visibleStop = (node: Element): boolean => {
           const bounds = node.getBoundingClientRect();

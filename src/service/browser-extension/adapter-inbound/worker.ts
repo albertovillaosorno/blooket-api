@@ -171,8 +171,11 @@ function exactWorkerKeys(value: unknown, expected: string): boolean {
     return false;
   const own = Reflect.ownKeys(value);
   const names = expected.split(",");
-  return own.length === names.length && own.every(key =>
-    typeof key === "string" && names.includes(key));
+  return own.length === names.length && own.every(key => {
+    if (typeof key !== "string" || !names.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !!descriptor && "value" in descriptor && descriptor.enumerable;
+  });
 }
 
 const OBSERVED_SESSION_STATES: ReadonlySet<string> = new Set(
