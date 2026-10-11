@@ -198,6 +198,14 @@ function withPage(
 function fixture() {
   const document = node("DOCUMENT");
   document.selectors["main"] = [node("MAIN")];
+  const heading = node("H1", "Synthetic set");
+  const header = node("DIV");
+  const headingGroup = node("DIV");
+  heading.parentElement = headingGroup;
+  headingGroup.parentElement = header;
+  const counter = node("DIV", "0 Questions");
+  header.selectors["div"] = [counter];
+  document.selectors["main h1"] = [heading];
   document.selectors['nav a[href="/my-sets"]'] = [node("A", "My Sets")];
   document.selectors['a[href="https://id.blooket.com/logout"]'] = [
     node("A", "Logout"),
@@ -227,7 +235,7 @@ function fixture() {
   form.selectors['button[type="submit"]'] = [submit];
   form.selectors['input[type="file"]'] = [];
   document.selectors['input#question[name="question"]'] = [hidden];
-  return { document, add, form, hidden, setId, submit };
+  return { document, add, form, hidden, setId, submit, counter };
 }
 
 function closedQuestionEditor(
@@ -1018,6 +1026,8 @@ test("Add Question click rechecks the exact prior cards atomically",
     closedQuestionEditor(page);
     page.document.selectors[selector] = cards.map(label =>
       node("DIV", "", { "aria-label": label }));
+    page.counter.textContent = cards.length === 1
+      ? "1 Question" : String(cards.length) + " Questions";
     withPage(page.document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.equal(runBlooketAddQuestionPageAction(
@@ -1037,6 +1047,7 @@ test("hidden and malformed prior cards never authorize Add Question",
   const hidden = node("DIV", "", { "aria-label": "Edit question 1" });
   hidden.getBoundingClientRect = () => ({ width: 0, height: 0 });
   page.document.selectors[selector] = [hidden];
+  page.counter.textContent = "1 Question";
   withPage(page.document,
     "https://dashboard.blooket.com/edit?id=set-fixture", () => {
     for (const number of [-1, 0, 2, 201, 1.5, Infinity])
@@ -1100,6 +1111,7 @@ test("a hidden or missing prior card blocks a prepared next-slot Save",
   closedQuestionEditor(page);
   const first = node("DIV", "", { "aria-label": "Edit question 1" });
   page.document.selectors[selector] = [first];
+  page.counter.textContent = "1 Question";
   const input = { ...typing, number: 2 };
   withPage(page.document,
     "https://dashboard.blooket.com/edit?id=set-fixture", () => {
@@ -1112,6 +1124,90 @@ test("a hidden or missing prior card blocks a prepared next-slot Save",
     });
     page.document.selectors[selector] = [];
     assert.deepEqual(submitBlooketAddQuestionForm(input), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
+test("a counter that hydrates ahead of cards stops Add Question opening",
+  () => {
+  const page = fixture();
+  closedQuestionEditor(page);
+  page.counter.textContent = "1 Question";
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open", "set-fixture", 1), false);
+    assert.equal(page.add.clicked, 0);
+  });
+  },
+);
+
+test("a changed question counter after preparation blocks Save",
+  () => {
+  const page = fixture();
+  closedQuestionEditor(page);
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open", "set-fixture", 1), true);
+    assert.deepEqual(prepareBlooketAddQuestionForm(typing), { ok: true });
+    page.counter.textContent = "1 Question";
+    assert.deepEqual(submitBlooketAddQuestionForm(typing), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
+test("ambiguous or hidden question counters cannot authorize a mutation",
+  () => {
+  for (const change of [
+    (page: ReturnType<typeof fixture>) => {
+      page.counter.visibility = "hidden";
+    },
+    (page: ReturnType<typeof fixture>) => {
+      page.counter.textContent = "0 Questionz";
+    },
+    (page: ReturnType<typeof fixture>) => {
+      const heading = page.document.selectors["main h1"]![0]!;
+      heading.parentElement!.parentElement!.selectors["div"]!.push(
+        node("DIV", "0 Questions"),
+      );
+    },
+  ]) {
+    const page = fixture();
+    closedQuestionEditor(page);
+    change(page);
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(runBlooketAddQuestionPageAction(
+        "open", "set-fixture", 1), false);
+      assert.equal(page.add.clicked, 0);
+    });
+  }
+  },
+);
+
+test("a CSS-hidden prior card cannot authorize a later Save",
+  () => {
+  const selector = '[role="button"][aria-label^="Edit question "]';
+  const page = fixture();
+  closedQuestionEditor(page);
+  const prior = node("DIV", "", { "aria-label": "Edit question 1" });
+  page.counter.textContent = "1 Question";
+  page.document.selectors[selector] = [prior];
+  const next = { ...typing, number: 2 };
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open", "set-fixture", 2), true);
+    assert.deepEqual(prepareBlooketAddQuestionForm(next), { ok: true });
+    prior.visibility = "hidden";
+    assert.deepEqual(submitBlooketAddQuestionForm(next), {
       ok: false, code: "blooket-browser-failed",
     });
     assert.equal(page.submit.clicked, 0);

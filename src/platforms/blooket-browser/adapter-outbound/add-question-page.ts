@@ -114,12 +114,35 @@ export function runBlooketAddQuestionPageAction(
     const cards = Array.from(document.querySelectorAll(
       '[role="button"][aria-label^="Edit question "]',
     ));
-    return cards.length === number - 1 && cards.every((card, index) => {
+    if (cards.length !== number - 1 || !cards.every((card, index) => {
       const bounds = card.getBoundingClientRect();
+      const style = getComputedStyle(card);
       return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
         card.getAttribute("aria-label") ===
           "Edit question " + String(index + 1);
-    });
+    })) return false;
+    // The provider's separately rendered question counter can advance
+    // before a new card hydrates. The opener and Save must agree with both.
+    const headings = Array.from(document.querySelectorAll("main h1"));
+    if (headings.length !== 1) return false;
+    const heading = headings[0]!;
+    const headingBounds = heading.getBoundingClientRect();
+    const header = heading.parentElement?.parentElement;
+    if (!header || headingBounds.width <= 0 || headingBounds.height <= 0)
+      return false;
+    const counterCandidates = Array.from(header.querySelectorAll("div"))
+      .filter(candidate => candidate.querySelectorAll("*").length === 0 &&
+        /^(0|[1-9][0-9]*) Questions?$/u
+          .test(candidate.textContent?.trim() ?? ""));
+    if (counterCandidates.length !== 1) return false;
+    const counter = counterCandidates[0]!;
+    const count = Number(counter.textContent!.trim().split(" ")[0]);
+    const bounds = counter.getBoundingClientRect();
+    const style = getComputedStyle(counter);
+    return Number.isSafeInteger(count) && count === cards.length &&
+      bounds.width > 0 && bounds.height > 0 &&
+      style.display !== "none" && style.visibility === "visible";
   };
   const normalizedText = (element: Element): string =>
     (element.textContent ?? "").replace(/\s+/gu, " ").trim();

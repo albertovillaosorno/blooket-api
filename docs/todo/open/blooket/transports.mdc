@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, injected Open and Save checks for Add Question began
+comparing the existing card sequence against the separately rendered
+provider question counter. React can update the counter before a new
+card appears, making a card-only check insufficient at either click.
+Portable tests reject mismatched, hidden, or duplicate counters and
+hidden cards without initiating a remote mutation.
+
 On 2026-10-10, the Add Question isolated-world Save button gained an
 atomic recheck of the exact contiguous prior question-card collection.
 Earlier checks guarded the form opener, but an unrelated teacher card
