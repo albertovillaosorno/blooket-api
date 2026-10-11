@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the browser-extension worker began accepting only
+exact, individually validated session observations at both the first
+and second native-document probes. An unsupported navigation state,
+hidden or symbol-owned result field, or shape difference in either
+sample now fails closed instead of potentially promoting a session to
+connected or suppressing a human challenge. Synthetic worker tests
+inject a hidden second observation and an unknown state.
+
 On 2026-10-11, page-level saved-set reads and read-owned Edit Info
 controls began checking computed CSS visibility as well as layout
 bounds. CSS-hidden My Sets cards, edit links, metadata sidebar fields,
