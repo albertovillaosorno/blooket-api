@@ -255,8 +255,13 @@ export function createExtensionCapabilityInspectionHost(
           inspectBlooketPage as (...args: never[]) => unknown,
           [{ kind: "sets.list" }],
         );
-        if (JSON.stringify(listed) !== JSON.stringify(listedAgain) ||
-            firstSetId(listedAgain) !== selected) return browserFailure();
+        // Decode both lists before serializing either. Otherwise a hidden
+        // accessor in the confirming read could run during stringify.
+        const confirmedSelection = firstSetId(listedAgain);
+        if (confirmedSelection === undefined ||
+            confirmedSelection !== selected ||
+            JSON.stringify(listed) !== JSON.stringify(listedAgain))
+          return browserFailure();
         const afterListConfirmation = await chrome.tabs.get(tabId);
         if (
           now() >= probeDeadline ||
