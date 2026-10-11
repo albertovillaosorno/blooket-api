@@ -252,3 +252,19 @@ test("saved set rows reject hidden and symbol-owned untrusted fields",
   ]) assert.equal(decodeBlooketSetList([row]).ok, false);
   },
 );
+
+
+test("set list decoder rejects extra array properties and sparse slots",
+  () => {
+  const row = { schemaVersion: 1, id: "remote-a", title: "Fractions" };
+  const hidden = Object.defineProperty([row], "hidden", {
+    value: true, enumerable: false,
+  });
+  const symbol = [row] as typeof hidden;
+  Object.defineProperty(symbol, Symbol("hidden"), { value: true });
+  const sparse = Array.from({ length: 2 }, () => row);
+  delete sparse[0];
+  for (const list of [hidden, symbol, sparse])
+    assert.equal(decodeBlooketSetList(list).ok, false);
+  },
+);

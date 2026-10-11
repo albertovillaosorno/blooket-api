@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the versioned set-list decoder also began checking
+the array's complete own-key shape: dense canonical indices and its
+built-in length only. Extra named or symbol-owned array properties,
+and sparse slots, cannot become remote collection evidence. Synthetic
+IR and worker regressions remain green with ordinary saved-set lists.
+
 On 2026-10-11, the injected login preparer started requiring
 CSS-visible heading, identifier, password and submit controls.
 A stale hidden login form with nonzero layout bounds can no longer
