@@ -996,3 +996,22 @@ test("CSS-hidden question cards and counters are not saved-state evidence",
   });
   },
 );
+
+test("question enumeration refuses extra edit URL parameters and fragments",
+  () => {
+  const document = node("DOCUMENT");
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [];
+  questionHeader(document, 0);
+  for (const suffix of ["&source=teacher", "#teacher-panel"]) {
+    page(document,
+      "https://dashboard.blooket.com/edit?id=fixture" + suffix,
+      () => {
+        assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+        assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+        assert.equal(isBlooketQuestionPanelClosed("fixture"), false);
+      });
+  }
+  },
+);

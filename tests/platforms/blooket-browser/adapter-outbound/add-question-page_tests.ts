@@ -1214,3 +1214,26 @@ test("a CSS-hidden prior card cannot authorize a later Save",
   });
   },
 );
+
+test("Add Question does not use edited URLs with extra query or fragment",
+  () => {
+  for (const suffix of ["&source=teacher", "#teacher-panel"]) {
+    const page = fixture();
+    closedQuestionEditor(page);
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture" + suffix,
+      () => {
+        assert.equal(runBlooketAddQuestionPageAction(
+          "open", "set-fixture"), false);
+        assert.deepEqual(runBlooketAddQuestionPageAction(
+          "prepare", typing), { ok: false,
+          code: "blooket-browser-failed" });
+        assert.deepEqual(runBlooketAddQuestionPageAction(
+          "submit", typing), { ok: false,
+          code: "blooket-browser-failed" });
+        assert.equal(page.add.clicked, 0);
+        assert.equal(page.submit.clicked, 0);
+      });
+  }
+  },
+);

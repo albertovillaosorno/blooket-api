@@ -73,7 +73,8 @@ export async function inspectOpenedBlooketQuestionImage(
           watch.setId !== setId || watch.number !== number ||
           location.href !== route ||
           url.origin !== "https://dashboard.blooket.com" ||
-          url.pathname !== "/edit" ||
+          url.pathname !== "/edit" || url.hash ||
+          url.searchParams.size !== 1 ||
           url.searchParams.getAll("id").length !== 1 ||
           url.searchParams.get("id") !== setId ||
           document.title === "Just a moment..." ||
