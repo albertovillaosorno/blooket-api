@@ -32,14 +32,21 @@
 import {
   BLOOKET_LIBRARY_MODEL_BUILD, decodeBlooketLibraryModel,
 } from "../../../ir/blooket-flight-records/contract/library-model.ts";
+import {
+  isExactDenseArray, ownDataField,
+} from "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 export function checkBlooketLibraryObservation(
   observed: unknown,
   captured: unknown,
 ): unknown {
-  if (!record(observed) || observed["ok"] !== true ||
-      !record(observed["value"]) ||
-      !Array.isArray(observed["value"]["items"])) return observed;
+  if (!record(observed) || ownDataField(observed, "ok") !== true ||
+      !record(ownDataField(observed, "value"))) return observed;
+  const observation = ownDataField(observed, "value");
+  if (!record(observation)) return observed;
+  const items = ownDataField(observation, "items");
+  if (!isExactDenseArray(items) || items.length > 200)
+    return { ok: false, code: "blooket-browser-failed" };
   if (captured === null) return observed;
   const failed = { ok: false, code: "blooket-browser-failed" };
   if (!record(captured) || !exactKeys(captured, ["build", "source"]) ||
@@ -50,11 +57,11 @@ export function checkBlooketLibraryObservation(
     captured["source"], captured["build"],
   );
   if (!model) return failed;
-  const items = observed["value"]["items"];
   const equal = (expected: typeof model.allSets) =>
     expected.length === items.length && expected.every(set =>
-      items.filter(item => record(item) && item["id"] === set.id &&
-        item["title"] === set.title).length === 1,
+      items.filter(item => record(item) &&
+        ownDataField(item, "id") === set.id &&
+        ownDataField(item, "title") === set.title).length === 1,
     );
   return equal(model.allSets) && equal(model.displayedSets) ? observed : failed;
 }
@@ -66,6 +73,9 @@ function record(value: unknown): value is Record<string, unknown> {
 
 function exactKeys(value: Record<string, unknown>, keys: string[]): boolean {
   const own = Reflect.ownKeys(value);
-  return own.length === keys.length && own.every(key =>
-    typeof key === "string" && keys.includes(key));
+  return own.length === keys.length && own.every(key => {
+    if (typeof key !== "string" || !keys.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !!descriptor && "value" in descriptor && descriptor.enumerable;
+  });
 }
