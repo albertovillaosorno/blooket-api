@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the saved-question image read helper began
+requiring CSS-visible account and owned panel controls before
+requesting media bytes. A mid-fetch hidden control also discards the
+digest. Synthetic tests cover nonzero-bounds hidden controls and
+mid-flight concealment without contacting an account.
+
 On 2026-10-11, both the versioned set-list and question-read
 contracts began requiring exact dense arrays, with no sparse slots,
 hidden named or symbol-owned properties. Normalized answers and legacy
