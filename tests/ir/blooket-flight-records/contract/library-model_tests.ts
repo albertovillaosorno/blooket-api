@@ -50,9 +50,12 @@ test("the library model returns only normalized identity candidates", () => {
     allSets: [], sets: [],
   } })), { allSets: [], displayedSets: [] });
   // Account totals are counters, not guaranteed zeros or a completeness gate.
-  assert.deepEqual(decode(libraryModelFixture({ props: {
-    numSets: 7, numQuestions: 31,
-  } })), {
+  for (const counts of [
+    { numSets: 7, numQuestions: 31 },
+    { numSets: null, numQuestions: null },
+    { numSets: "$undefined", numQuestions: "$undefined" },
+    { numSets: null, numQuestions: 31 },
+  ]) assert.deepEqual(decode(libraryModelFixture({ props: counts })), {
     allSets: [{ id: "set-fixture", title: "Synthetic" }],
     displayedSets: [{ id: "set-fixture", title: "Synthetic" }],
   });
@@ -104,7 +107,8 @@ test("only the exact unfiltered library prop shape is admitted", () => {
     { filter: "recent" }, { setsFolder: {} }, { folders: [{}] },
     { hasPlus: "false" }, { isStudent: null }, { numSets: -1 },
     { numQuestions: -1 }, { numSets: 0.5 }, { numQuestions: "31" },
-    { numSets: Number.MAX_SAFE_INTEGER + 1 }, { numQuestions: null },
+    { numSets: Number.MAX_SAFE_INTEGER + 1 }, { numQuestions: "$null" },
+    { numQuestions: "$L1" }, { numSets: "$undefinedExtra" },
     { extra: true }, { allSets: null },
   ]) assert.equal(decode(libraryModelFixture({ props })), undefined);
 });
