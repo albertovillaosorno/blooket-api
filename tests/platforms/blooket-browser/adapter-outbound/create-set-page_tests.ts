@@ -46,6 +46,7 @@ interface FixtureNode {
   textContent: string;
   value: string;
   labels: FixtureNode[];
+  parentElement?: FixtureNode;
   clicked: number;
   visibility: string;
   disabled?: boolean;
@@ -198,14 +199,21 @@ function fixture(privateSet: boolean) {
     role: "switch",
     "aria-checked": privateSet ? "false" : "true",
   });
-  privacy.labels = [
-    node(
-      "LABEL",
-      privateSet
-        ? "Private (Only playable by you)"
-        : "Public (Playable by everyone)",
-    ),
-  ];
+  const row = node("DIV");
+  const toggleLabel = node("LABEL", "Toggle");
+  toggleLabel.parentElement = row;
+  const privacyState = node("P", privateSet
+    ? "Private (Only playable by you)"
+    : "Public (Playable by everyone)");
+  row.selectors[":scope > p"] = [privacyState];
+  privacy.labels = [toggleLabel];
+  const oldClick = privacy.click.bind(privacy);
+  privacy.click = () => {
+    oldClick();
+    privacyState.textContent = privacy.attributes["aria-checked"] === "true"
+      ? "Public (Playable by everyone)"
+      : "Private (Only playable by you)";
+  };
   form.selectors["button"] = [node("BUTTON", "Create Set")];
   form.selectors['input#title[name="title"]'] = [title];
   form.selectors['textarea#desc[name="desc"]'] = [description];
@@ -214,7 +222,8 @@ function fixture(privateSet: boolean) {
   document.selectors['input#title[name="title"]'] = [title];
   document.selectors['textarea#desc[name="desc"]'] = [description];
   document.selectors['input#private[name="private"]'] = [privacy];
-  return { document, form, title, description, privacy };
+  return { document, form, title, description, privacy, privacyState,
+    privacyRow: row };
 }
 
 test("preparation fills observed controls without submitting", () => {
@@ -337,12 +346,12 @@ test("submit refuses stale privacy and ambiguous submit controls", () => {
   withPage(page.document, "https://dashboard.blooket.com/create", () => {
     assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
     page.privacy.attributes["aria-checked"] = "true";
-    page.privacy.labels = [node("LABEL", "Public (Playable by everyone)")];
+    page.privacyState.textContent = "Public (Playable by everyone)";
     assert.equal(submitBlooketCreateSetForm(expected).ok, false);
     assert.equal(submit.clicked, 0);
 
     page.privacy.attributes["aria-checked"] = "false";
-    page.privacy.labels = [node("LABEL", "Private (Only playable by you)")];
+    page.privacyState.textContent = "Private (Only playable by you)";
     page.form.selectors["button"]?.push(node("BUTTON", "Create Set"));
     assert.equal(submitBlooketCreateSetForm(expected).ok, false);
     assert.equal(submit.clicked, 0);
@@ -709,6 +718,79 @@ test("Create Set claim releases partial listeners when observation fails",
     if (previous)
       Object.defineProperty(globalThis, "MutationObserver", previous);
     else Reflect.deleteProperty(globalThis, "MutationObserver");
+  }
+  },
+);
+
+test("Create Set reads privacy from the observed sibling paragraph",
+  () => {
+  for (const privateSet of [true, false]) {
+    const page = fixture(privateSet);
+    const expected = { title: "Synthetic", description: "",
+      private: privateSet };
+    // The toggle's accessible label does not contain the provider state.
+    assert.equal(page.privacy.labels[0]?.textContent, "Toggle");
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
+      assert.deepEqual(submitBlooketCreateSetForm(expected), { ok: true });
+      assert.equal(page.form.selectors["button"]?.[0]?.clicked, 1);
+    });
+  }
+  },
+);
+
+test("a switched Create Set privacy must agree before the Save click",
+  () => {
+  const page = fixture(false);
+  const expected = { title: "Synthetic", description: "", private: true };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
+    assert.equal(page.privacy.clicked, 1);
+    assert.equal(page.privacyState.textContent,
+      "Private (Only playable by you)");
+    assert.deepEqual(submitBlooketCreateSetForm(expected), { ok: true });
+    assert.equal(page.form.selectors["button"]?.[0]?.clicked, 1);
+  });
+  },
+);
+
+test("Create Set refuses hidden ambiguous or inconsistent privacy rows",
+  () => {
+  const expected = { title: "Synthetic", description: "", private: true };
+  for (const mutate of [
+    (page: ReturnType<typeof fixture>) => {
+      page.privacyState.textContent = "Public (Playable by everyone)";
+    },
+    (page: ReturnType<typeof fixture>) => {
+      page.privacyState.getBoundingClientRect = () => ({ width: 0,
+        height: 0 });
+    },
+    (page: ReturnType<typeof fixture>) => {
+      page.privacyRow.selectors[":scope > p"] = [
+        page.privacyState, node("P", "Private (Only playable by you)"),
+      ];
+    },
+    (page: ReturnType<typeof fixture>) => {
+      const another = node("DIV");
+      another.selectors[":scope > p"] = [
+        node("P", "Private (Only playable by you)"),
+      ];
+      const label = node("LABEL", "Toggle");
+      label.parentElement = another;
+      page.privacy.labels.push(label);
+    },
+    (page: ReturnType<typeof fixture>) => {
+      page.privacyRow.getBoundingClientRect = () => ({ width: 0,
+        height: 0 });
+    },
+  ]) {
+    const page = fixture(true);
+    mutate(page);
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+      assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+      assert.equal(page.form.selectors["button"]?.[0]?.clicked, 0);
+    });
   }
   },
 );
