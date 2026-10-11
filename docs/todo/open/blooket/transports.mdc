@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, hexadecimal Flight record IDs and decimal chunk IDs began
+requiring canonical digit spellings. A padded `00` row previously coexisted
+with row `0`, while a prefixed `01958` chunk could coexist with the pinned
+`1958` chunk without duplicate detection. Both ambiguous encodings now fail
+closed; synthetic fixtures retain ordinary canonical IDs.
+
 On 2026-10-10, a synthetic Flight normalization regression exposed a direct
 object/array cycle bypass: the memoized output was returned while its source
 object was still resolving. The normalizer now checks active recursion before

@@ -114,7 +114,10 @@ function decodeRows(source: string, page: boolean): FlightPageRows {
     if (colon < 0 || colon === offset || colon - offset > 12)
       throw new Error("invalid-flight-row");
     const id = decoder.decode(data.subarray(offset, colon));
-    if (!/^[0-9a-f]+$/u.test(id)) throw new Error("invalid-flight-id");
+    // React Flight IDs are canonical hexadecimal counters, not arbitrary
+    // digit strings. Padded spellings would alias the same numeric row.
+    if (!/^(?:0|[1-9a-f][0-9a-f]*)$/u.test(id))
+      throw new Error("invalid-flight-id");
     if (rows.has(id)) throw new Error("duplicate-flight-id");
     offset = colon + 1;
     const tag = data[offset];

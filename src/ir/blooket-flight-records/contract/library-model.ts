@@ -158,7 +158,7 @@ function admittedModule(value: unknown): boolean {
   for (let index = 0; index < value[1].length; index += 2) {
     const id = value[1][index];
     const chunk = value[1][index + 1];
-    if (typeof id !== "string" || !/^[0-9]+$/u.test(id) ||
+    if (typeof id !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(id) ||
         seen.has(id) || typeof chunk !== "string" ||
         chunk.length > 4_096 ||
         !chunk.startsWith("static/chunks/")) return false;
