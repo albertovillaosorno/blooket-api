@@ -201,33 +201,41 @@ export function createExtensionCreateSetHost(
     let observed: Detail | undefined;
     let stable = false;
     try {
-      const read = async (): Promise<Detail | undefined> => {
-        if (!await owns()) return undefined;
+      type DetailRead =
+        | { readonly state: "pending" | "conflict" }
+        | { readonly state: "ready"; readonly detail: Detail };
+      const read = async (): Promise<DetailRead> => {
+        if (!await owns()) return { state: "conflict" };
         const reply = await script(
           inspectBlooketPage as (...args: never[]) => unknown,
           [{ kind: "sets.get", setId }],
         );
-        if (!await owns() || !exactKeys(reply, "ok,value") ||
+        if (!await owns()) return { state: "conflict" };
+        if (exactFailedSidebar(reply)) return { state: "pending" };
+        if (!exactKeys(reply, "ok,value") ||
             !reply || typeof reply !== "object" ||
             !("ok" in reply) || reply.ok !== true ||
-            !("value" in reply)) return undefined;
+            !("value" in reply)) return { state: "conflict" };
         const decoded = decodeBlooketSetDetail(reply.value);
         if (!decoded.ok || decoded.value.id !== setId ||
             decoded.value.title !== expected.title ||
             decoded.value.description !== expected.description)
-          return undefined;
-        return { title: decoded.value.title,
+          return { state: "conflict" };
+        return { state: "ready", detail: {
+          title: decoded.value.title,
           description: decoded.value.description,
-          visibility: decoded.value.visibility };
+          visibility: decoded.value.visibility,
+        } };
       };
       for (let poll = 0; poll < 15; poll++) {
         const candidate = await read();
-        if (candidate) {
-          observed = candidate;
+        if (candidate.state === "conflict") break;
+        if (candidate.state === "ready") {
+          observed = candidate.detail;
           await pause(POLL_MS);
           const again = await read();
-          stable = !!again && JSON.stringify(again) ===
-            JSON.stringify(candidate);
+          stable = again.state === "ready" &&
+            JSON.stringify(again.detail) === JSON.stringify(candidate.detail);
           break;
         }
         await pause(POLL_MS);

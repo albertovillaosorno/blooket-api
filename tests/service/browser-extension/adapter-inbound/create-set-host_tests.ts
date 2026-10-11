@@ -1426,3 +1426,49 @@ test("new edit document after opening the privacy panel cannot confirm",
   assert.equal(fake.calls.includes("detail-close"), false);
   },
 );
+
+test("conflicting saved details never hydrate into a confirmed Create Set",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  for (const firstRead of [
+    { ok: true, value: { schemaVersion: 1, id: "remote-set-1",
+      title: "Different title", description: expected.description,
+      visibility: "private" } },
+    { ok: true, value: { schemaVersion: 1, id: "remote-set-1",
+      title: expected.title, description: expected.description,
+      visibility: "invalid" } },
+    { ok: true, value: { schemaVersion: 1, id: "other-set",
+      title: expected.title, description: expected.description,
+      visibility: "private" } },
+    { ok: true, value: { schemaVersion: 1, id: "remote-set-1",
+      title: expected.title, description: expected.description,
+      visibility: "private", extra: "unexpected" } },
+  ]) {
+    let reads = 0;
+    const fake = fakeChrome({ scripts: [
+      observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar,
+    ], panelRead: () => {
+      reads++;
+      return reads === 1 ? firstRead : { ok: true, value: {
+        schemaVersion: 1, id: "remote-set-1",
+        title: expected.title, description: expected.description,
+        visibility: "private",
+      } };
+    } });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    assert.deepEqual(await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(reads, 1);
+    assert.equal(fake.calls.includes("detail-close"), false);
+  }
+  },
+);
