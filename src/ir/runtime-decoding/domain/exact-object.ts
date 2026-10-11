@@ -48,6 +48,15 @@ export function isExactDenseArray(value: unknown): value is unknown[] {
   return true;
 }
 
+/** Read only a directly owned data field; inherited getters are untrusted. */
+export function ownDataField(
+  value: UnknownRecord,
+  key: string,
+): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && "value" in descriptor ? descriptor.value : undefined;
+}
+
 export function unknownFieldIssues(
   value: UnknownRecord,
   allowed: ReadonlySet<string>,

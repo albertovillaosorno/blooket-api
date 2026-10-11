@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, saved-set and saved-question versioned decoders
+began accepting only directly owned data fields for required metadata,
+answers and image identities. Prototype-inherited values and
+accessor-backed getters no longer become remote publication proof or
+execute while decoding an observation. Synthetic IR regressions cover
+malformed set summaries/details, question fields, normalized answers,
+and saved-image hashes. Set-detail page reads additionally require the
+observed form and privacy switch to be CSS-visible.
+
 On 2026-10-11, the read-only account capability helpers began
 requiring an exact `/edit?id=<set-id>` route and CSS-visible shell
 and click controls for Add Question, Audio and owned cancellation.

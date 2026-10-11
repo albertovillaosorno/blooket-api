@@ -293,7 +293,8 @@ export function inspectBlooketPage(
     const forms = Array.from(
       document.querySelectorAll("form#question-set-form"),
     );
-    if (forms.length !== 1) return failed();
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM" ||
+        !visible(forms[0])) return failed();
     const identities = Array.from(forms[0]!.querySelectorAll(
       'input[type="hidden"][name="setId"]',
     ));
@@ -326,7 +327,8 @@ export function inspectBlooketPage(
       privacy.getAttribute("type") !== "checkbox" ||
       privacy.getAttribute("role") !== "switch" ||
       !visible(title) ||
-      !visible(description)
+      !visible(description) ||
+      !visible(privacy)
     )
       return failed();
     const titleValue = (title as HTMLInputElement).value;

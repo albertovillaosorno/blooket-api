@@ -329,6 +329,18 @@ test(
     const result = inspectBlooketPage({ kind: "sets.get", setId: "fixture" });
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(decodeBlooketSetDetail(result.value).ok, true);
+    form.visibility = "hidden";
+    assert.equal(inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
+      false);
+    delete form.visibility;
+    privacy.display = "none";
+    assert.equal(inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
+      false);
+    delete privacy.display;
+    privacy.visibility = "collapse";
+    assert.equal(inspectBlooketPage({ kind: "sets.get", setId: "fixture" }).ok,
+      false);
+    delete privacy.visibility;
     assert.equal(
       inspectBlooketPage({ kind: "sets.get", setId: "other" }).ok,
       false,

@@ -35,6 +35,7 @@ import test from "node:test";
 import {
   isExactDenseArray,
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../../../src/ir/runtime-decoding/domain/exact-object.ts";
@@ -98,5 +99,20 @@ test("dense array admission refuses sparse slots and hidden extras",
   assert.equal(isExactDenseArray(["a", Symbol("hidden")]), true);
   assert.equal(isExactDenseArray(Object.defineProperty(["a"],
     Symbol("hidden"), { value: true })), false);
+  },
+);
+
+
+test("owned data reads ignore inherited fields without invoking getters",
+  () => {
+  const parent = { id: "inherited" };
+  const fixture = Object.create(parent) as Record<string, unknown>;
+  Object.defineProperty(fixture, "hidden", {
+    get() { throw new Error("accessor must not run"); },
+  });
+  Object.defineProperty(fixture, "value", { value: "owned" });
+  assert.equal(ownDataField(fixture, "id"), undefined);
+  assert.equal(ownDataField(fixture, "hidden"), undefined);
+  assert.equal(ownDataField(fixture, "value"), "owned");
   },
 );

@@ -559,3 +559,39 @@ test("canonical saved questions require exact contiguous slot order",
   ]).ok, true);
   },
 );
+
+
+test("question reads require directly owned data, never inherited getters",
+  () => {
+  const required = ["schemaVersion", "number", "question", "qType",
+    "random", "timeLimit", "answers", "hasImage", "hasAudio"] as const;
+  for (const key of required) {
+    const entry = { ...question };
+    const inherited = Object.create({ [key]: entry[key] });
+    for (const field of Object.keys(entry)) {
+      if (field !== key)
+        inherited[field] = entry[field as keyof typeof entry];
+    }
+    assert.equal(decodeBlooketQuestionRead(inherited).ok, false, key);
+    const accessor = { ...question };
+    Object.defineProperty(accessor, key, {
+      enumerable: true,
+      get() { throw new Error("getter must not run"); },
+    });
+    assert.equal(decodeBlooketQuestionRead(accessor).ok, false, key);
+  }
+  const valid = decodeBlooketQuestionRead(question);
+  assert.equal(valid.ok, true);
+  if (!valid.ok) return;
+  const answer = { ...valid.value.answers[0]! };
+  Object.defineProperty(answer, "correct", {
+    get() { throw new Error("getter must not run"); },
+  });
+  assert.equal(decodeBlooketQuestionRead({ ...valid.value,
+    answers: [answer] }).ok, false);
+  const digest = Object.defineProperty({
+    byteLength: 9, sha256: "a".repeat(64),
+  }, "sha256", { get() { throw new Error("getter must not run"); } });
+  assert.equal(decodeBlooketQuestionImageEvidence(digest).ok, false);
+  },
+);
