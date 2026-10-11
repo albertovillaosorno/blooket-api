@@ -1346,7 +1346,8 @@ test("Add Question preparation rejects changes inside provider events",
 test("prepared image change cannot confirm a replaced or challenged form",
   () => {
   const image = { format: "png" as const, base64: "iVBORw0KGgoA" };
-  for (const kind of ["human", "question", "challenge", "sidebar"] as const) {
+  for (const kind of ["human", "question", "challenge", "sidebar",
+    "counter"] as const) {
     withImagePage((page, interact) => {
       assert.equal(runBlooketAddQuestionPageAction(
         "open-image", "set-fixture"), true);
@@ -1364,6 +1365,7 @@ test("prepared image change cannot confirm a replaced or challenged form",
           ] = [node("IFRAME")];
         if (kind === "sidebar")
           page.document.selectors['nav a[href="/my-sets"]'] = [];
+        if (kind === "counter") page.counter.textContent = "1 Question";
         return true;
       };
       const input = { ...typing, image };

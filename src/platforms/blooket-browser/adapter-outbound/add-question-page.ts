@@ -562,6 +562,8 @@ export function runBlooketAddQuestionPageAction(
             current.question !== resolved.question ||
             world.__blooketAddQuestionFormWatch !== watch ||
             watch.document !== document || watch.dirty || watch.submitted ||
+            (watch.expectedNumber !== undefined &&
+              !exactPriorCards(watch.expectedNumber)) ||
             document.title === "Just a moment..." ||
             document.querySelector('input[type="password"]') !== null ||
             !visibleUnique("main") ||
