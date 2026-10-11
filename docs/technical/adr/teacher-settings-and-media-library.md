@@ -56,6 +56,13 @@ The teacher may select another media root. Changing settings must not silently
 move or delete her existing library. Validate access and offer an explicit,
 recoverable library move separately when needed.
 
+The current YAML library's metadata enumeration now reads from its
+bounded `O_NOFOLLOW` descriptor helper rather than trusting an `lstat`
+followed by a pathname read. The same source-byte reader rejects invalid
+limits and detects changed file metadata before admitting content. Focused
+portable regressions cover exact byte limits and live/dangling aliases,
+without claiming actual teacher-library filesystem acceptance on macOS.
+
 The legacy media-vault adapter also loads its index, import/edit
 journals, originals, and saved renditions through checked `O_NOFOLLOW`
 descriptors. Candidate JSONL/journal text is bounded to 16 MiB and
