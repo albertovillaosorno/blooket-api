@@ -464,7 +464,21 @@ async function captureVerificationBaseline(
       },
     };
   }
-  if (captured.ok) {
+  const invalid = (): CapturedVerificationBaseline => ({
+    ok: false,
+    result: { ok: false, stage: "verification-baseline",
+      code: "blooket-write-baseline-invalid" },
+  });
+  const exactKeys = (value: unknown, names: string): boolean => {
+    try {
+      return !!value && typeof value === "object" &&
+        !Array.isArray(value) && Reflect.ownKeys(value).sort().join() === names;
+    } catch { return false; }
+  };
+  if (!captured || (captured.ok !== true && captured.ok !== false))
+    return invalid();
+  if (captured.ok === true) {
+    if (!exactKeys(captured, "baseline,ok")) return invalid();
     if (captured.baseline === null) {
       return missing();
     }
@@ -485,6 +499,10 @@ async function captureVerificationBaseline(
     return { ok: true, value: decoded.value };
   }
   if (captured.kind === "browser") {
+    if (!exactKeys(captured, "code,kind,ok") ||
+        (captured.code !== "blooket-browser-failed" &&
+         captured.code !== "blooket-browser-unavailable" &&
+         captured.code !== "blooket-browser-incompatible")) return invalid();
     return {
       ok: false,
       result: {
@@ -494,6 +512,11 @@ async function captureVerificationBaseline(
       },
     };
   }
+  if (captured.kind !== "navigation" ||
+      !exactKeys(captured, "kind,ok,state") ||
+      !["signed-out", "expired-session", "organization-prompt",
+        "rate-limited", "security-challenge", "unexpected-page"]
+        .some(state => state === captured.state)) return invalid();
 
   const decision = blooketNavigationDecision({
     kind: captured.state,

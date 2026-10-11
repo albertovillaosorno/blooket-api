@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, baseline capture began validating the outer runtime
+response before pacing, mutation-budget reservation, or attempt journaling.
+Previously a truthy status or a surface failure with extra fields could be
+admitted as a typed baseline result, even though baseline contents were
+already decoded strictly. Portable tests reject malformed first and second
+captures and verify no remote write or new attempt follows.
+
 On 2026-10-10, verifier result admission now rejects unknown outcomes,
 extra response fields, invalid receipt kinds, and unrecognized browser stops
 before touching an ambiguous persisted attempt. Previously an unknown
