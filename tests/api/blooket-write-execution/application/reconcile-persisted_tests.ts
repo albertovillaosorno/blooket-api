@@ -292,3 +292,30 @@ test("reconciliation uses the shared execution lock", async () => {
     await acquired.lock.release();
   });
 });
+
+test("malformed negative reconciliation never clears the journal", async () => {
+  const cases: unknown[] = [
+    { operationId: "plan:reconcile-test:set", outcome: "not-confirmed",
+      receipt: null },
+    { operationId: "plan:reconcile-test:set", outcome: "not-confirmed",
+      extra: true },
+    { operationId: "plan:reconcile-test:set", outcome: "unknown" },
+    { operationId: 42, outcome: "not-confirmed" },
+    null,
+  ];
+  for (const candidate of cases) await withTemporaryDirectory(
+    async directory => {
+      const value = paths(directory);
+      await beginWriteAttempt(value.attempt, plan, 0);
+      const result = await reconcilePersistedBlooketWrite(
+        value.checkpoint, value.attempt, plan,
+        candidate as Parameters<typeof reconcilePersistedBlooketWrite>[3],
+      );
+      assert.deepEqual(result, { ok: false, stage: "reconciliation",
+        code: "reconciliation-state-inconsistent" });
+      const loaded = await loadWriteAttemptFile(value.attempt, plan);
+      assert.equal(loaded.ok && loaded.kind === "record" &&
+        loaded.record.phase, "attempting");
+    },
+  );
+});
