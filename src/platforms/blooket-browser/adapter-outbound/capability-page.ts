@@ -46,12 +46,22 @@ export function canLeaveBlooketPageForRead(): boolean {
     if (location.origin !== "https://dashboard.blooket.com" ||
         document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]')) return false;
-    const path = location.pathname;
+    const url = new URL(location.href);
+    const path = url.pathname;
     // The Create Set page is itself a draft form, even when no control has
     // focus. A route change could silently discard the teacher's work.
     if (path === "/create") return false;
     if (path !== "/my-sets" && path !== "/edit" &&
         !path.startsWith("/set/")) return false;
+    // Do not abandon a teacher-selected variant that may carry page state
+    // not understood by the capability inspector.
+    if (url.hash || (path === "/edit"
+      ? url.searchParams.size !== 1 ||
+        url.searchParams.getAll("id").length !== 1 ||
+        !url.searchParams.get("id") ||
+        url.searchParams.get("id")!.length > 512 ||
+        /[\x00-\x1f\x7f]/u.test(url.searchParams.get("id")!)
+      : Boolean(url.search))) return false;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return false;
