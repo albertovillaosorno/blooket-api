@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the read navigation guard added a second native document
+origin check immediately before issuing its one allowed reload or navigation.
+Previously the teacher could replace the current document at the same URL
+after the first check, and the worker would still navigate away from the
+new editor. Synthetic tests confirm that no navigation or reload follows a
+changed native origin, including on an already loaded target route.
+
 On 2026-10-10, explicit login hosting began pinning one positive native
 identity-page document origin before forwarding credential input, during
 prepared-state polling, and immediately before its only possible submit.
