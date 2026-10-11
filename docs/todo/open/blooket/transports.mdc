@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the shared publication file-lock reader switched from a
+pathname `lstat`/`readFile` pair to a bounded `O_NOFOLLOW` descriptor read.
+The prior sequence could follow a substituted symlink between inspection
+and reading the recovery owner. Exact 4,096-byte and oversized owner tests,
+as well as dangling-link refusal, preserve fail-closed lock acquisition.
+The [official Node 24 filesystem API][node-nofollow], checked on 2026-10-10,
+documents this flag; tests are portable, not a live account mutation.
+
 On 2026-10-10, checkpoint persistence reads began opening the checkpoint
 with `O_NOFOLLOW` and inspecting and reading the same descriptor. This removes
 the pathname-based `lstat`/`readFile` substitution window and bounds checkpoint
@@ -385,3 +393,5 @@ product surfaces; portable foundations alone do not complete this record.
 
 [react-rsc]: https://react.dev/reference/rsc/server-components
 [next-flight]: https://github.com/vercel/next.js/discussions/42170
+
+[node-nofollow]: https://nodejs.org/docs/latest-v24.x/api/fs.html
