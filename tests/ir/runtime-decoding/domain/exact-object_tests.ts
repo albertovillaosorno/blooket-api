@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  isExactDenseArray,
   isRecord,
   requiredString,
   unknownFieldIssues,
@@ -80,5 +81,22 @@ test("unknownFieldIssues rejects nonenumerable and symbol-owned extras",
     { path: "$.hidden", code: "unknown-field",
       message: "Field is not admitted by this contract." },
   ]);
+  },
+);
+
+
+test("dense array admission refuses sparse slots and hidden extras",
+  () => {
+  assert.equal(isExactDenseArray(["a", "b"]), true);
+  assert.equal(isExactDenseArray([]), true);
+  const sparse = new Array(2);
+  sparse[1] = "b";
+  assert.equal(isExactDenseArray(sparse), false);
+  assert.equal(isExactDenseArray(Object.defineProperty(["a"], "extra", {
+    value: 1, enumerable: false,
+  })), false);
+  assert.equal(isExactDenseArray(["a", Symbol("hidden")]), true);
+  assert.equal(isExactDenseArray(Object.defineProperty(["a"],
+    Symbol("hidden"), { value: true })), false);
   },
 );

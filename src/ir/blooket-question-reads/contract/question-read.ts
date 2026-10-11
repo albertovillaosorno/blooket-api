@@ -34,6 +34,7 @@ import {
   type ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
+  isExactDenseArray,
   isRecord,
   requiredString,
   unknownFieldIssues,
@@ -295,6 +296,8 @@ export function decodeBlooketQuestionReadList(
   if (value.length > 200) {
     return failure("$", "too-many-questions", "Expected at most 200 reads.");
   }
+  if (!isExactDenseArray(value)) return failure("$", "unknown-field",
+    "Expected dense question slots without extra array properties.");
   const questions: BlooketQuestionRead[] = [];
   const issues: ValidationIssue[] = [];
   const numbers = new Set<number>();
@@ -314,6 +317,14 @@ export function decodeBlooketQuestionReadList(
       continue;
     }
     numbers.add(decoded.value.number);
+    if (decoded.value.number !== index + 1) {
+      issues.push({
+        path: path + ".number",
+        code: "noncontiguous-question-number",
+        message: "Saved questions must appear in contiguous slot order.",
+      });
+      continue;
+    }
     questions.push(decoded.value);
   }
   return issues.length > 0
@@ -554,6 +565,11 @@ function decodeAnswers(
     });
     return undefined;
   }
+  if (!isExactDenseArray(value)) {
+    issues.push({ path, code: "unknown-field",
+      message: "Expected dense answers without extra array properties." });
+    return undefined;
+  }
   const answers: BlooketAnswerRead[] = [];
   for (const [index, candidate] of value.entries()) {
     const decoded = decodeAnswer(
@@ -719,6 +735,11 @@ function stringArray(
     });
     return undefined;
   }
+  if (!isExactDenseArray(value)) {
+    issues.push({ path, code: "unknown-field",
+      message: "Expected dense text answers without extra fields." });
+    return undefined;
+  }
   const result: string[] = [];
   for (const [index, candidate] of value.entries()) {
     const item = requiredString(
@@ -757,6 +778,11 @@ function decodeLegacyAnswerTypes(
       code: "too-many-answers",
       message: "Expected at most 100 answer match modes.",
     });
+    return undefined;
+  }
+  if (!isExactDenseArray(value)) {
+    issues.push({ path, code: "unknown-field",
+      message: "Expected dense answer types without extra fields." });
     return undefined;
   }
   const result: BlooketAnswerMatch[] = [];
