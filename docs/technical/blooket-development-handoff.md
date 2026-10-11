@@ -1034,3 +1034,28 @@ establish Plus entitlement.
 These are synthetic Fedora observations, not live Blooket publication
 or native macOS/Safari evidence. No account content was changed and
 ambiguous past attempts remain preserved without replay.
+
+## Form-event and browser data ownership (2026-10-11)
+
+The Create Set preparer now rechecks its exact owned form and controls
+after setting title and description. If a synchronous provider handler
+remounts the form, hides a control, changes privacy or raises a challenge,
+the next form mutation is not attempted. The preparation receipt remains
+unconfirmed until separate Save and fresh remote read-back.
+
+Login preparation rechecks the live identity form before writing the
+password, and again after password events. A replacement form or human
+challenge stops the attempt without a second credential submission.
+The Add Question runner similarly revalidates after hidden-question input
+events and provider file-change events, before acknowledging preparation.
+
+Saved-set and saved-question decoders now read required values through
+owned data descriptors rather than prototype properties or accessors.
+Collection arrays require dense enumerable data slots. Browser script
+reply envelopes and the Flight model correlation also refuse getter-backed
+or hidden expected fields before they are inspected or compared.
+
+These are synthetic Fedora browser/IR checks, not evidence of actual
+authenticated Create Set or Add Question persistence. The prior ambiguous
+account publication journal remains preserved, and no new live write was
+performed. Task `blooket-09` stays open until loaded-extension acceptance.
