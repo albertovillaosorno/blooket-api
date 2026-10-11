@@ -49,6 +49,8 @@ import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
+import { isExactDenseArray } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 interface BrowserTab {
   readonly url?: string;
@@ -80,6 +82,21 @@ export type ExtensionCapabilityInspectionResult =
         | "blooket-browser-unavailable"
         | "blooket-browser-failed";
     };
+
+function exactCapabilityFields<const K extends string>(
+  value: unknown,
+  expected: readonly K[],
+): value is Record<K, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const own = Reflect.ownKeys(value);
+  return own.length === expected.length && expected.every(key => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor !== undefined && descriptor.enumerable &&
+      "value" in descriptor;
+  }) && own.every(key => typeof key === "string" &&
+    expected.some(field => field === key));
+}
 
 const DASHBOARD_ORIGIN = "https://dashboard.blooket.com";
 const MY_SETS_URL = DASHBOARD_ORIGIN + "/my-sets";
@@ -330,10 +347,8 @@ export function createExtensionCapabilityInspectionHost(
             [setId],
           );
           if (
-            !again || typeof again !== "object" || Array.isArray(again) ||
-            Object.keys(again).sort().join() !== "ok,value" ||
-            !("ok" in again) || again.ok !== true ||
-            !("value" in again) || again.value !== inspected
+            !exactCapabilityFields(again, ["ok", "value"]) ||
+            again.ok !== true || again.value !== inspected
           ) return browserFailure();
           const tabAfterConfirmation = await chrome.tabs.get(tabId);
           if (
@@ -543,16 +558,15 @@ async function pollCapability(
     );
     if (now() >= deadline || !result || typeof result !== "object" ||
         Array.isArray(result)) return undefined;
-    const keys = Object.keys(result).sort().join();
-    if (keys === "ok,value" && "ok" in result && result.ok === true &&
-        "value" in result &&
+    if (exactCapabilityFields(result, ["ok", "value"]) &&
+        result.ok === true &&
         (result.value === "supported" || result.value === "unsupported"))
       return result.value;
     // A genuine page-unavailable state can mean drawer hydration. Invalid
     // success or diagnostic envelopes must not become true after a later poll.
-    if (keys !== "code,ok" || !("ok" in result) ||
-        result.ok !== false || !("code" in result) ||
-        result.code !== "blooket-browser-failed") return undefined;
+    if (!exactCapabilityFields(result, ["ok", "code"]) ||
+        result.ok !== false || result.code !== "blooket-browser-failed")
+      return undefined;
     await pause(Math.min(POLL_MS, deadline - now()));
   }
   return undefined;
@@ -622,19 +636,10 @@ async function closeQuestionPanel(
 
 function firstSetId(value: unknown): string | null | undefined {
   if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.keys(value).sort().join() !== "ok,value" ||
-    !("ok" in value) ||
+    !exactCapabilityFields(value, ["ok", "value"]) ||
     value.ok !== true ||
-    !("value" in value) ||
-    !value.value ||
-    typeof value.value !== "object" ||
-    Array.isArray(value.value) ||
-    Object.keys(value.value).sort().join() !== "completeness,items" ||
-    !("items" in value.value) ||
-    !Array.isArray(value.value.items) ||
+    !exactCapabilityFields(value.value, ["completeness", "items"]) ||
+    !isExactDenseArray(value.value.items) ||
     value.value.items.length > 200 ||
     !("completeness" in value.value) ||
     (value.value.completeness !== "complete" &&
@@ -648,11 +653,10 @@ function firstSetId(value: unknown): string | null | undefined {
   let first: string | null = null;
   const seen = new Set<string>();
   for (const item of value.value.items) {
-    if (!item || typeof item !== "object" || Array.isArray(item))
+    if (!exactCapabilityFields(item, ["schemaVersion", "id", "title"]))
       return undefined;
-    const record = item as Record<string, unknown>;
+    const record = item;
     if (
-      Object.keys(record).sort().join() !== "id,schemaVersion,title" ||
       record["schemaVersion"] !== 1 ||
       typeof record["id"] !== "string" ||
       record["id"].length < 1 ||
@@ -672,13 +676,8 @@ function firstSetId(value: unknown): string | null | undefined {
 
 function exactObservedState(value: unknown, state: string): boolean {
   return (
-    !!value &&
-    typeof value === "object" &&
-    Object.keys(value).sort().join() === "ok,value" &&
-    "ok" in value &&
-    value.ok === true &&
-    "value" in value &&
-    value.value === state
+    exactCapabilityFields(value, ["ok", "value"]) &&
+    value.ok === true && value.value === state
   );
 }
 

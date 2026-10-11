@@ -735,6 +735,80 @@ test(
   },
 );
 
+test("capability Audio replies reject hidden data and accessor getters",
+  async () => {
+  let getterCalls = 0;
+  const accessor = Object.defineProperty({ ok: true }, "value", {
+    enumerable: true,
+    get: () => { getterCalls++; return "supported"; },
+  });
+  const hidden = Object.defineProperty({ ok: true, value: "supported" },
+    "secret", { enumerable: false, value: "untrusted" });
+  const symbol = { ok: true, value: "supported",
+    [Symbol("hidden")]: true };
+  for (const first of [accessor, hidden, symbol]) {
+    const page = fixture({ audioProbeReplies: [
+      first, { ok: true, value: "supported" },
+    ] });
+    assert.equal((await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect()).ok, false);
+    assert.equal(page.scripts.filter(name =>
+      name === "inspectBlooketAudioCapabilityDrawer").length, 1);
+    assert.equal(page.currentUrl(), page.originalUrl);
+  }
+  assert.equal(getterCalls, 0);
+  for (const second of [hidden, accessor, symbol]) {
+    const page = fixture({ audioProbeReplies: [
+      { ok: true, value: "supported" }, second,
+    ] });
+    assert.equal((await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect()).ok, false);
+    assert.equal(page.scripts.filter(name =>
+      name === "inspectBlooketAudioCapabilityDrawer").length, 2);
+  }
+  assert.equal(getterCalls, 0);
+  },
+);
+
+test("capability My Sets refuses accessor and hidden collection evidence",
+  async () => {
+  let getters = 0;
+  const row = { schemaVersion: 1,
+    id: "set-fixture", title: "Synthetic fixture" };
+  const accessor = Object.defineProperty({ ...row }, "id", {
+    enumerable: true,
+    get: () => { getters++; return "set-fixture"; },
+  });
+  const hidden = Object.defineProperty({ ...row }, "hidden", {
+    enumerable: false, value: "untrusted",
+  });
+  const extraArray = Object.defineProperty([row], "hidden", {
+    enumerable: false, value: "untrusted",
+  });
+  const bad = [
+    { completeness: "unknown", items: [accessor] },
+    { completeness: "unknown", items: [hidden] },
+    { completeness: "unknown", items: extraArray },
+    Object.defineProperty({ completeness: "unknown", items: [row] },
+      "hidden", { enumerable: false, value: true }),
+  ];
+  for (const value of bad) {
+    const page = fixture({ setListReplies: [
+      { ok: true, value }, { ok: true, value },
+    ] });
+    assert.equal((await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect()).ok, false);
+    assert.equal(page.scripts.includes(
+      "openBlooketCapabilityQuestionPanel"), false);
+    assert.equal(page.currentUrl(), page.originalUrl);
+  }
+  assert.equal(getters, 0);
+  },
+);
+
 test(
   "exact transient Audio unavailability may recover by polling",
   async () => {

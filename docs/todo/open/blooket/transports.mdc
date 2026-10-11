@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the browser capability host began requiring
+exact, enumerable owned data fields on both saved-set lists,
+session and Audio page replies. It rejects hidden/symbol fields,
+accessor-backed values, sparse or accessor array slots, and malformed
+row identities before My Sets selection or Plus-gate confirmation.
+Synthetic host regressions verify accessor getters never execute and
+malformed first or second Audio observations remain inconclusive.
+
 On 2026-10-11, the capability Audio drawer gained its own
 read-owned identity after the first valid Plus-gate inspection.
 An equally labeled drawer remounted between inspection and Cancel
