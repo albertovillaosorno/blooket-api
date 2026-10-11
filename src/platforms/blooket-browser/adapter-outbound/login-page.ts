@@ -149,6 +149,13 @@ export function runBlooketLoginPageAction(
     const page = controls();
     if (page === null) return action === "is-prepared" ? false : failed();
     if (action === "prepare") {
+      const stillOwned = (): boolean => {
+        const current = controls();
+        return current !== null &&
+          current.identifier === page.identifier &&
+          current.password === page.password &&
+          current.submit === page.submit;
+      };
       const descriptor = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
         "value",
@@ -157,9 +164,13 @@ export function runBlooketLoginPageAction(
       descriptor.set.call(page.identifier, input.loginIdentifier);
       page.identifier.dispatchEvent(new Event("input", { bubbles: true }));
       page.identifier.dispatchEvent(new Event("change", { bubbles: true }));
+      if (!stillOwned() || page.identifier.value !== input.loginIdentifier)
+        return failed();
       descriptor.set.call(page.password, input.password);
       page.password.dispatchEvent(new Event("input", { bubbles: true }));
       page.password.dispatchEvent(new Event("change", { bubbles: true }));
+      if (!stillOwned() || page.identifier.value !== input.loginIdentifier ||
+          page.password.value !== input.password) return failed();
       return { ok: true };
     }
     const prepared =
