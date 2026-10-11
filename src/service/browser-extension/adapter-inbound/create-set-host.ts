@@ -104,6 +104,8 @@ export interface CreateSetChromePort {
       tabId: number,
       options: { readonly url: string },
     ): Promise<BrowserTab>;
+    reload(tabId: number, options: { readonly bypassCache: true }):
+      Promise<void>;
   };
   readonly scripting: {
     executeScript(options: {
@@ -372,6 +374,58 @@ export function createExtensionCreateSetHost(
               }
               if (await editDocumentOrigin(tab.url) !== origin)
                 return browserFailure();
+              if (expected !== undefined) {
+                // An optimistic Edit redirect is not durable provider state.
+                // Never reload a teacher editor unless it is safe to leave.
+                const canReload = await script(
+                  canLeaveBlooketPageForRead as
+                    (...args: never[]) => unknown,
+                );
+                if (canReload !== true ||
+                    await editDocumentOrigin(tab.url) !== origin)
+                  return browserFailure();
+                await chrome.tabs.reload(tabId, { bypassCache: true });
+                let freshOrigin: number | null = null;
+                for (let poll = 0; poll < MAX_POLLS; poll++) {
+                  const current = await chrome.tabs.get(tabId);
+                  if (current.url !== tab.url) return browserFailure();
+                  if (current.status === "complete") {
+                    const candidate = await editDocumentOrigin(tab.url);
+                    if (candidate !== null && candidate !== origin) {
+                      freshOrigin = candidate;
+                      break;
+                    }
+                  }
+                  await pause(POLL_MS);
+                }
+                if (freshOrigin === null) return browserFailure();
+                let matching = 0;
+                for (let poll = 0; poll < 35 && matching < 2; poll++) {
+                  if (poll > 0) await pause(matching ? 0 : POLL_MS);
+                  if (await editDocumentOrigin(tab.url) !== freshOrigin)
+                    return browserFailure();
+                  const redirect = await script(
+                    observeBlooketCreateSetSuccess as
+                      (...args: never[]) => unknown,
+                  );
+                  if (!exactRedirectReceipt(redirect, ids[0]) ||
+                      await editDocumentOrigin(tab.url) !== freshOrigin)
+                    return browserFailure();
+                  const sidebar = await script(
+                    inspectBlooketDetailSidebar as
+                      (...args: never[]) => unknown,
+                    [ids[0]],
+                  );
+                  if (await editDocumentOrigin(tab.url) !== freshOrigin)
+                    return browserFailure();
+                  if (exactSavedSidebar(sidebar, expected)) matching++;
+                  else if (exactFailedSidebar(sidebar)) matching = 0;
+                  else return browserFailure();
+                }
+                if (matching !== 2 ||
+                    await editDocumentOrigin(tab.url) !== freshOrigin)
+                  return browserFailure();
+              }
               return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
