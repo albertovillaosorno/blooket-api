@@ -63,7 +63,7 @@ export async function inspectBlooketSession(
     const observed = await browser.observe();
     if (!observed || typeof observed !== "object" ||
         Array.isArray(observed)) return browserFailure();
-    const keys = Object.keys(observed).sort().join();
+    const keys = Reflect.ownKeys(observed).sort().join();
     if (observed.ok === false) {
       if (keys !== "code,ok" ||
           (observed.code !== "blooket-browser-unavailable" &&
