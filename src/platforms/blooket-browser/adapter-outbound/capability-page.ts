@@ -174,11 +174,13 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
         document: Document;
         setId: string;
         dirty: boolean;
+        form?: Element;
+        question?: Element;
         dispose: () => void;
       };
     };
     world.__blooketCapabilityEditWatch?.dispose();
-    const watch = {
+    const watch: NonNullable<typeof world.__blooketCapabilityEditWatch> = {
       document,
       setId,
       dirty: false,
@@ -257,7 +259,8 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       return false;
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
-        document: Document; setId: string; dirty: boolean
+        document: Document; setId: string; dirty: boolean;
+        form?: Element; question?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -285,12 +288,18 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     const setIds = Array.from(
       form.querySelectorAll('input#setId[name="setId"]'),
     );
-    return (
-      setIds.length === 1 &&
-      setIds[0]?.tagName === "INPUT" &&
-      setIds[0].getAttribute("type") === "hidden" &&
-      (setIds[0] as HTMLInputElement).value === setId
-    );
+    if (setIds.length !== 1 || setIds[0]?.tagName !== "INPUT" ||
+        setIds[0].getAttribute("type") !== "hidden" ||
+        (setIds[0] as HTMLInputElement).value !== setId) return false;
+    if (watch.form && (watch.form !== form ||
+        watch.question !== question)) {
+      watch.dirty = true;
+      return false;
+    }
+    // The first verified panel becomes the only owned read-only form.
+    watch.form = form;
+    watch.question = question;
+    return true;
   } catch {
     return false;
   }
@@ -344,7 +353,8 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       return false;
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
-        document: Document; setId: string; dirty: boolean
+        document: Document; setId: string; dirty: boolean;
+        form?: Element; question?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -371,6 +381,11 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     if (question.getAttribute("type") !== "hidden") return false;
     const form = question.closest("form");
     if (form?.tagName !== "FORM") return false;
+    if (watch.form && (watch.form !== form ||
+        watch.question !== questions[0])) {
+      watch.dirty = true;
+      return false;
+    }
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
@@ -452,7 +467,8 @@ export function inspectBlooketAudioCapabilityDrawer(
       return failed();
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
-        document: Document; setId: string; dirty: boolean
+        document: Document; setId: string; dirty: boolean;
+        form?: Element; question?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -477,6 +493,11 @@ export function inspectBlooketAudioCapabilityDrawer(
       return failed();
     const form = questions[0]!.closest("form");
     if (form?.tagName !== "FORM") return failed();
+    if (watch.form && (watch.form !== form ||
+        watch.question !== questions[0])) {
+      watch.dirty = true;
+      return failed();
+    }
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
@@ -577,7 +598,8 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       return false;
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
-        document: Document; setId: string; dirty: boolean
+        document: Document; setId: string; dirty: boolean;
+        form?: Element; question?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -600,6 +622,11 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       return false;
     const form = questions[0]!.closest("form");
     if (form?.tagName !== "FORM") return false;
+    if (watch.form && (watch.form !== form ||
+        watch.question !== questions[0])) {
+      watch.dirty = true;
+      return false;
+    }
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
@@ -677,6 +704,14 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     });
     if (!authenticated || blockedByOrganization || blockedByChallenge)
       return false;
+    const watch = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; setId: string; dirty: boolean;
+        form?: Element; question?: Element;
+      };
+    }).__blooketCapabilityEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty) return false;
     const url = new URL(location.href);
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
@@ -686,6 +721,11 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       return false;
     const form = questions[0]!.closest("form");
     if (form?.tagName !== "FORM") return false;
+    if (watch.form && (watch.form !== form ||
+        watch.question !== questions[0])) {
+      watch.dirty = true;
+      return false;
+    }
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
@@ -759,7 +799,8 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       return false;
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
-        document: Document; setId: string; dirty: boolean
+        document: Document; setId: string; dirty: boolean;
+        form?: Element; question?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -785,6 +826,11 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       return false;
     const form = questions[0]!.closest("form");
     if (form?.tagName !== "FORM") return false;
+    if (watch.form && (watch.form !== form ||
+        watch.question !== questions[0])) {
+      watch.dirty = true;
+      return false;
+    }
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));

@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, read-only capability inspection began pinning the
+exact Add Question form and hidden question control after its first
+verified readiness observation. A provider remount cannot transfer
+Audio inspection, read-owned drawer closure, or Cancel to a different
+form with the same set ID. Once remount drift is observed, ownership
+remains invalid even if the original form returns. Synthetic page
+tests cover the same-ID remount and preserve teacher-owned controls.
+
 On 2026-10-11, prepared image bytes also gained a second
 question-slot guard after the provider file-change event. A new
 question counter or concurrently inserted prior card cannot

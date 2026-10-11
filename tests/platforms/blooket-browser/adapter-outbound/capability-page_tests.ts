@@ -323,6 +323,56 @@ test("capability probe opens only the exact Add Question form", () => {
   });
 });
 
+test("verified capability modal cannot transfer ownership to a remount", () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    const newForm = node("FORM");
+    const newQuestion = node("INPUT", "", { type: "hidden" });
+    newQuestion.parent = newForm;
+    const newIdentity = node("INPUT", "", { type: "hidden" });
+    newIdentity.value = "set-fixture";
+    newIdentity.parent = newForm;
+    const newAudio = node("BUTTON", "Audio");
+    newAudio.parent = newForm;
+    const newCancel = node("BUTTON", "Cancel", { type: "button" });
+    newCancel.parent = newForm;
+    newForm.selectors['input#setId[name="setId"]'] = [newIdentity];
+    newForm.selectors["button"] = [newAudio, newCancel];
+    newForm.selectors['button[type="button"]'] = [newAudio, newCancel];
+    page.document.selectors['input#question[name="question"]'] = [
+      newQuestion,
+    ];
+    const activeDrawer = drawer("supported");
+    page.document.selectors['aside[data-drawer-open="true"]'] = [
+      activeDrawer,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+      false);
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [];
+    assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+    assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(newAudio.clicked, 0);
+    assert.equal(newCancel.clicked, 0);
+    assert.equal(activeDrawer.selectors[
+      'button[aria-label="Cancel"]']![0]!.clicked, 0);
+    // Even restoring the original DOM does not recover read ownership.
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+    assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.cancel.clicked, 0);
+  });
+});
+
 test("audio drawer distinguishes the shared Plus gate and cancels", () => {
   for (const kind of ["supported", "unsupported"] as const) {
     const page = fixture();
