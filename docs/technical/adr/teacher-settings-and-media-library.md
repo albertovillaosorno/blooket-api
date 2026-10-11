@@ -71,6 +71,12 @@ files beyond that size are not parsed or overwritten. Synthetic filesystem
 tests check the exact project limit and retain an oversized original for
 manual recovery rather than treating it as an empty project.
 
+The actual teacher-preferences file (`settings.json`) is also read
+through one bounded `O_NOFOLLOW` descriptor rather than an unbounded
+pathname read. Its 65,536-byte cap is checked before allocation. Oversized,
+linked, or missing-target aliases cannot be interpreted as absent settings;
+tests verify they do not regenerate defaults or overwrite an external file.
+
 The local JSON settings adapter reads one `O_NOFOLLOW` file descriptor
 and bounds actual file bytes to 65,536. On 2026-10-10, synthetic regressions
 confirmed that oversized replacements and dangling symlinks fail closed
