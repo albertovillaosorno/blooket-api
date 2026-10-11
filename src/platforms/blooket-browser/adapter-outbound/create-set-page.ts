@@ -59,7 +59,9 @@ export function prepareBlooketCreateSetForm(
       const nodes = Array.from(document.querySelectorAll(selector));
       if (nodes.length !== 1) return false;
       const bounds = nodes[0]!.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(nodes[0]!);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const logoutSelector = 'a[href="https://id.blooket.com/logout"]';
     const logout = Array.from(document.querySelectorAll(logoutSelector));
@@ -92,7 +94,7 @@ export function prepareBlooketCreateSetForm(
       return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
-      location.pathname !== "/create" ||
+      location.pathname !== "/create" || location.search || location.hash ||
       typeof input.title !== "string" ||
       input.title.length < 1 ||
       input.title.length > 1_000 ||
@@ -145,14 +147,32 @@ export function prepareBlooketCreateSetForm(
     const buttons = Array.from(form.querySelectorAll("button")).filter(
       (button) => button.textContent?.trim() === "Create Set",
     );
-    if (buttons.length !== 1) return failed();
+    if (buttons.length !== 1 || buttons[0]?.tagName !== "BUTTON" ||
+        (buttons[0] as HTMLButtonElement).disabled ||
+        buttons[0]?.getAttribute("aria-disabled") === "true")
+      return failed();
+    const submitStyle = getComputedStyle(buttons[0]!);
+    const submitBounds = buttons[0]!.getBoundingClientRect();
+    if (submitBounds.width <= 0 || submitBounds.height <= 0 ||
+        submitStyle.display === "none" ||
+        submitStyle.visibility !== "visible") return failed();
 
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;
     const privacyInput = privacy as HTMLInputElement;
+    const readyControl = (element: Element): boolean => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    };
+    if (!readyControl(form) || !readyControl(titleInput) ||
+        !readyControl(descriptionInput)) return failed();
     const privacyBounds = privacyInput.getBoundingClientRect();
+    const privacyStyle = getComputedStyle(privacyInput);
     if (privacyBounds.width <= 0 || privacyBounds.height <= 0 ||
-        privacyInput.disabled ||
+        privacyStyle.display === "none" ||
+        privacyStyle.visibility !== "visible" || privacyInput.disabled ||
         privacyInput.getAttribute("aria-disabled") === "true")
       return failed();
     // Recovered module 31017 puts the current privacy words in a direct
@@ -232,7 +252,9 @@ export function submitBlooketCreateSetForm(
       const nodes = Array.from(document.querySelectorAll(selector));
       if (nodes.length !== 1) return false;
       const bounds = nodes[0]!.getBoundingClientRect();
-      return bounds.width > 0 && bounds.height > 0;
+      const style = getComputedStyle(nodes[0]!);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
     };
     const logoutSelector = 'a[href="https://id.blooket.com/logout"]';
     const logout = Array.from(document.querySelectorAll(logoutSelector));
@@ -265,7 +287,7 @@ export function submitBlooketCreateSetForm(
       return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
-      location.pathname !== "/create"
+      location.pathname !== "/create" || location.search || location.hash
     )
       return failed();
     const forms = Array.from(document.querySelectorAll(
@@ -309,9 +331,19 @@ export function submitBlooketCreateSetForm(
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;
     const privacyInput = privacy as HTMLInputElement;
+    const readyControl = (element: Element): boolean => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    };
+    if (!readyControl(form) || !readyControl(titleInput) ||
+        !readyControl(descriptionInput)) return failed();
     const privacyBounds = privacyInput.getBoundingClientRect();
+    const privacyStyle = getComputedStyle(privacyInput);
     if (privacyBounds.width <= 0 || privacyBounds.height <= 0 ||
-        privacyInput.disabled ||
+        privacyStyle.display === "none" ||
+        privacyStyle.visibility !== "visible" || privacyInput.disabled ||
         privacyInput.getAttribute("aria-disabled") === "true")
       return failed();
     // Recovered module 31017 puts the current privacy words in a direct
@@ -360,7 +392,10 @@ export function submitBlooketCreateSetForm(
       return failed();
     const submit = buttons[0] as HTMLButtonElement;
     const bounds = submit.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0 || submit.disabled ||
+    const style = getComputedStyle(submit);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        submit.disabled ||
         submit.getAttribute("aria-disabled") === "true")
       return failed();
     // A lost click acknowledgement must never authorize a second submit.
@@ -426,7 +461,7 @@ export function runBlooketCreateSetOwnership(
 ): boolean {
   try {
     if (location.origin !== "https://dashboard.blooket.com" ||
-        location.pathname !== "/create" ||
+        location.pathname !== "/create" || location.search || location.hash ||
         document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]')) return false;
     const dialogs = Array.from(document.querySelectorAll(
