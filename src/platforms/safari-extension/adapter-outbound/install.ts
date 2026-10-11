@@ -30,7 +30,8 @@
 //   - Non-macOS and incomplete packages report unavailable.
 //
 import { spawn } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 export interface SafariExtensionInstallPaths {
@@ -57,12 +58,14 @@ export async function safariExtensionAvailable(
 ): Promise<boolean> {
   if (platform !== "darwin") return false;
   try {
-    await Promise.all([
-      access(paths.companion),
-      access(paths.helper),
-      access(paths.identifier),
+    const [companion, helper, identifier] = await Promise.all([
+      lstat(paths.companion),
+      lstat(paths.helper),
+      lstat(paths.identifier),
     ]);
-    return true;
+    return companion.isDirectory() && !companion.isSymbolicLink() &&
+      helper.isFile() && !helper.isSymbolicLink() &&
+      identifier.isFile() && !identifier.isSymbolicLink();
   } catch {
     return false;
   }
@@ -85,7 +88,40 @@ export async function openPackagedSafariExtension(
   const paths = options.paths ?? packagedSafariExtensionPaths();
   if (!(await safariExtensionAvailable(platform, paths)))
     return { ok: false, code: "safari-extension-unavailable" };
-  const identifier = (await readFile(paths.identifier, "utf8")).trim();
+  let identifier: string;
+  try {
+    const handle = await open(paths.identifier,
+      constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > 256 || stat.size < 1)
+        throw new Error("invalid-extension-identifier");
+      const bytes = Buffer.alloc(stat.size + 1);
+      let size = 0;
+      let complete = false;
+      while (size < bytes.length) {
+        const part = await handle.read(bytes, size,
+          bytes.length - size, null);
+        if (part.bytesRead === 0) {
+          complete = true;
+          break;
+        }
+        size += part.bytesRead;
+      }
+      const after = await handle.stat();
+      if (!complete || size !== stat.size ||
+          stat.dev !== after.dev || stat.ino !== after.ino ||
+          stat.size !== after.size ||
+          stat.mtimeMs !== after.mtimeMs ||
+          stat.ctimeMs !== after.ctimeMs)
+        throw new Error("invalid-extension-identifier");
+      identifier = bytes.subarray(0, size).toString("utf8").trim();
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return { ok: false, code: "safari-extension-invalid" };
+  }
   if (!/^[A-Za-z0-9.-]{3,255}$/u.test(identifier))
     return { ok: false, code: "safari-extension-invalid" };
   const run = options.run ?? runProgram;

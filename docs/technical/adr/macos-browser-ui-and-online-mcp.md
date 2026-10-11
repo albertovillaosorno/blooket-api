@@ -57,6 +57,13 @@ oversized local file cannot escape through a late unbounded read. Synthetic
 HTTP tests cover both ordinary bytes and these refusal paths.
 
 
+The packaged Safari extension setup helper now verifies the expected
+companion directory, executable helper, and identifier text are not symbolic
+links. It reads the identifier from one bounded `O_NOFOLLOW` descriptor,
+rejecting changed or oversized bytes before issuing any launch command.
+Portable filesystem tests exercise only an injected command runner; they do
+not enable Safari or prove macOS installation acceptance.
+
 ### Online MCP and user-owned tunnel setup
 
 Expose a dedicated loopback MCP gateway with Streamable HTTP through the

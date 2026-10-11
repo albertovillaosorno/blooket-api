@@ -31,7 +31,8 @@
 //   - Non-macOS, missing files, and malformed identifiers fail closed.
 //
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from
+  "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -109,3 +110,59 @@ test("missing Safari companion fails before native open", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("Safari setup refuses oversized or unsafe identifier bytes before open",
+  async () => {
+  const { root, paths } = await fixture();
+  let opens = 0;
+  const run = async () => { opens++; };
+  try {
+    await writeFile(paths.identifier, "com.example." + "a".repeat(255));
+    assert.deepEqual(await openPackagedSafariExtension({
+      platform: "darwin", paths, run,
+    }), { ok: false, code: "safari-extension-invalid" });
+    assert.equal(opens, 0);
+    await writeFile(paths.identifier, "incorrect/id");
+    assert.deepEqual(await openPackagedSafariExtension({
+      platform: "darwin", paths, run,
+    }), { ok: false, code: "safari-extension-invalid" });
+    assert.equal(opens, 0);
+    const outside = join(root, "outside-id.txt");
+    await writeFile(outside, "com.example.foreign\n");
+    await rm(paths.identifier);
+    await symlink(outside, paths.identifier);
+    assert.deepEqual(await openPackagedSafariExtension({
+      platform: "darwin", paths, run,
+    }), { ok: false, code: "safari-extension-unavailable" });
+    assert.equal(await readFile(outside, "utf8"), "com.example.foreign\n");
+    await rm(paths.identifier);
+    await symlink(join(root, "missing-id.txt"), paths.identifier);
+    assert.deepEqual(await openPackagedSafariExtension({
+      platform: "darwin", paths, run,
+    }), { ok: false, code: "safari-extension-unavailable" });
+    assert.equal(opens, 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+  },
+);
+
+test("symbolic Safari companion or executable helper cannot be activated",
+  async () => {
+  for (const selected of ["companion", "helper"] as const) {
+    const { root, paths } = await fixture();
+    let calls = 0;
+    try {
+      const outside = join(root, "unrelated");
+      if (selected === "companion") await mkdir(outside);
+      else await writeFile(outside, "not-an-executable");
+      await rm(paths[selected], { recursive: true, force: true });
+      await symlink(outside, paths[selected]);
+      assert.equal(await safariExtensionAvailable("darwin", paths), false);
+      assert.deepEqual(await openPackagedSafariExtension({
+        platform: "darwin", paths,
+        run: async () => { calls++; },
+      }), { ok: false, code: "safari-extension-unavailable" });
+      assert.equal(calls, 0);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+  },
+);
