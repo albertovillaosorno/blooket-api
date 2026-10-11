@@ -324,3 +324,29 @@ test("source authorization cannot be transferred to a replacement document",
   assert.equal(page.updates(), 1);
   },
 );
+
+test("fresh read navigation transfers only its proven target document epoch",
+  async () => {
+  const page = fixture();
+  const origins: number[] = [];
+  assert.deepEqual(await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 8_000, page.pause,
+    page.documentOrigin, page.now, undefined,
+    origin => origins.push(origin),
+  ), { url: EDIT, status: "complete" });
+  assert.deepEqual(origins, [2_000]);
+  },
+);
+
+test("failed or stale navigation cannot export a target document epoch",
+  async () => {
+  const page = fixture({ keepOldOrigin: true });
+  const origins: number[] = [];
+  assert.equal(await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 250, page.pause,
+    page.documentOrigin, page.now, undefined,
+    origin => origins.push(origin),
+  ), undefined);
+  assert.deepEqual(origins, []);
+  },
+);

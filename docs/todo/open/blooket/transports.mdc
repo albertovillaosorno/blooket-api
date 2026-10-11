@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, read navigation began transferring its confirmed native
+target-document origin to My Sets, Set Detail, and question inspection.
+Previously a replacement page at the same URL could supply independent read
+authority after navigation had been confirmed. Synthetic tests show a stale
+target cannot export identity or open another document's question modal.
+
 On 2026-10-10, Add Question bound its initial Edit readiness observation
 to one positive native edit-document origin before and after the page script.
 A same-route reload during that observation cannot authorize opening a form

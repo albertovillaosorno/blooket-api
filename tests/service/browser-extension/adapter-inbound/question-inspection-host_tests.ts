@@ -711,3 +711,13 @@ test("question scans refuse missing native document lifetime evidence",
   }
   },
 );
+
+test("question scan refuses a target document different from navigation proof",
+  async () => {
+  const fixture = synthetic();
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000, 2_000),
+    failed);
+  assert.equal(fixture.calls.includes("listBlooketQuestionNumbers"), false);
+  assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);
