@@ -62,6 +62,10 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, capability inspection rejects hidden or symbol-owned
+extra properties on browser probe results, keeping write planning
+secret-free and fail closed on malformed capability evidence.
+
 On 2026-10-10, application set, detail, and question reads began
 validating every own field of browser-port envelopes before feeding
 results to publication recovery. Extra nonenumerable or symbol fields
