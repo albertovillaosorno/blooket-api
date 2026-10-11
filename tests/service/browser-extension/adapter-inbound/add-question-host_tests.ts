@@ -113,6 +113,8 @@ function fakeChrome(options: {
           : func.name;
         calls.push(call);
         switch (func.name) {
+          case "inspectBlooketDocumentOrigin":
+            return [{ result: 1_000 }];
           case "canLeaveBlooketPageForRead":
             return [{ result: options.canLeave === undefined
               ? true : options.canLeave }];
@@ -664,5 +666,49 @@ test("a preexisting contiguous question list permits only the next index",
   assert.equal(opened, true);
   assert.equal(fake.calls.filter(call =>
     call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("same edit URL with a new document cannot submit or confirm a question",
+  async () => {
+  for (const phase of ["prepare", "submit", "inspectOpenedBlooketQuestion"]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let origin = 1_000;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketDocumentOrigin")
+        return [{ result: origin }];
+      const result = await original(request);
+      const action = request.func.name === "runBlooketAddQuestionPageAction"
+        ? request.args?.[0] : request.func.name;
+      if (action === phase) origin = 2_000;
+      return result;
+    };
+    const host = createExtensionAddQuestionHost(fake.chrome, 7,
+      async () => undefined);
+    assert.deepEqual(await host.addQuestion(input), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+    assert.equal(fake.calls.filter(call =>
+      call === "runBlooketAddQuestionPageAction:submit").length,
+      phase === "prepare" ? 0 : 1);
+  }
+  },
+);
+
+test("Add Question cannot write without exact native document identity",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: null }] : await original(request);
+  const host = createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.addQuestion(input), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
   },
 );

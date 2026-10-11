@@ -62,6 +62,18 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Add Question browser mutations began binding the exact edit
+page to one positive native `performance.timeOrigin`. The former host checked
+only tab URL and readiness between opener, prepared-state, submission, and
+saved-question reads. A reload of the same edit route could therefore mix
+separate documents, including after an uncertain Save Question click.
+
+The host now rechecks that origin before and after every owned injected
+operation. Synthetic replacements during preparation, after one submit, and
+between read-back observations all fail without a second submission. Missing
+native origin evidence stops before opening a mutation form. Loaded-extension
+and authenticated acceptance remain pending.
+
 On 2026-10-10, the Create Set extension host began binding the edit redirect,
 its second confirmation read, and each saved-sidebar observation to one
 positive native `performance.timeOrigin` on the exact edit route. A document
