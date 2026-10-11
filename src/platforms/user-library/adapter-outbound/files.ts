@@ -36,7 +36,6 @@ import {
   mkdir,
   open,
   opendir,
-  readFile,
   realpath,
 } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
@@ -133,13 +132,12 @@ export async function listLibrary(root: string): Promise<LibraryMetadata[]> {
       if (entry.isDirectory()) await walk(next, depth + 1);
       else if (entry.name.endsWith(".yaml")) {
         const path = await safeLibraryPath(root, next);
-        const size = (await lstat(path)).size;
-        metadataBytes += size;
-        if (size > 100_000) throw new Error("metadata-too-large");
+        const source = await boundedBytes(path, 100_000);
+        metadataBytes += source.byteLength;
         if (metadataBytes > 32_000_000)
           throw new Error("library-metadata-byte-limit");
         const record = decodeLibraryMetadata(
-          runtime.parse(await readFile(path, "utf8"), {
+          runtime.parse(source.toString("utf8"), {
             maxAliasCount: 0,
             uniqueKeys: true,
             schema: "core",
@@ -387,13 +385,17 @@ function decodeTransaction(value: unknown): LibraryTransaction {
   return value as LibraryTransaction;
 }
 export async function boundedBytes(path: string, limit: number) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 32_000_000)
+    throw new Error("invalid-library-read-limit");
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = await handle.stat();
-    if (!stat.isFile() || stat.size > limit)
+    if (!stat.isFile() || !Number.isSafeInteger(stat.size) ||
+        stat.size > limit)
       throw new Error("invalid-or-oversized-library-file");
     const buffer = Buffer.alloc(stat.size + 1);
     let offset = 0;
+    let complete = false;
     while (offset < buffer.length) {
       const { bytesRead } = await handle.read(
         buffer,
@@ -401,10 +403,18 @@ export async function boundedBytes(path: string, limit: number) {
         buffer.length - offset,
         null,
       );
-      if (bytesRead === 0) break;
+      if (bytesRead === 0) {
+        complete = true;
+        break;
+      }
       offset += bytesRead;
     }
-    if (offset !== stat.size) throw new Error("library-file-changed");
+    const after = await handle.stat();
+    if (!complete || offset !== stat.size ||
+        stat.dev !== after.dev || stat.ino !== after.ino ||
+        stat.size !== after.size || stat.mtimeMs !== after.mtimeMs ||
+        stat.ctimeMs !== after.ctimeMs)
+      throw new Error("library-file-changed");
     return buffer.subarray(0, offset);
   } finally {
     await handle.close();
