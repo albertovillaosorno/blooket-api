@@ -97,10 +97,12 @@ export function createBlooketBrowserBridgeBroker(
   } = {},
 ): BlooketBrowserBridgeBroker {
   const timeoutMs = options.timeoutMs ?? 10_000;
-  // A real Create Set redirect can outlive the ten-second read budget.
+  // Create Set now verifies saved metadata in a fresh reloaded document.
+  // Retain the full bounded navigation/rehydration budget for both pages,
+  // instead of expiring a possible Save while its read-back is in flight.
   // Explicit test overrides retain their original bounded behavior.
   const writeTimeoutMs = options.writeTimeoutMs ??
-    (options.timeoutMs === undefined ? 30_000 : timeoutMs);
+    (options.timeoutMs === undefined ? 60_000 : timeoutMs);
   const maxPending = options.maxPending ?? 8;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
     throw new Error("invalid-browser-bridge-timeout");
