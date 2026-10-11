@@ -965,3 +965,31 @@ establish a live loaded-extension publication or a native Safari run.
 Earlier ambiguous real Create Set journals still require explicit safe
 reconciliation, not automatic replay. No provider account mutation was
 made during this development session.
+
+## Exact browser read identity and detail cleanup (2026-10-11)
+
+The extension worker's `sets.get` read binds one exact Edit document
+lifetime, reads the original saved sidebar twice, and opens only its
+read-owned Edit Info panel. It requires two independently decoded
+matching set-detail snapshots, including exact set ID, title,
+description, and visibility. A first valid panel snapshot may authorize
+an exact, guarded Cancel even if the second probe becomes malformed or
+conflicting; it never constitutes a saved-state receipt by itself.
+After Cancel is independently observed, the worker must see the saved
+sidebar twice again, both matching its pre-open metadata. Concurrent
+post-Cancel title/description drift makes the read inconclusive.
+
+Set-detail and saved-question page helpers now reject CSS-hidden state,
+including edit links, metadata sidebar, privacy paragraphs, read-only
+modal controls, and question-panel Cancel. Independently injected
+Create/Add/read helpers also require exactly `/edit?id=<opaque-set-id>`;
+a fragment or extra query parameter cannot authorize a mutation, modal
+click, set read, or saved-image fetch. The browser worker accepts only
+exact valid navigation-state envelopes in *both* session observations,
+not just matching JSON renderings.
+
+These are synthetic Fedora tests and portable Linux package checks.
+They do not show a completed authenticated loaded-extension write,
+real Blooket persistence, or native macOS/Safari acceptance. Existing
+ambiguous journals must still be reconciled by fresh remote evidence
+without replaying a write, and no teacher account was mutated.
