@@ -280,3 +280,49 @@ test("a durable media identity refuses changed bytes, format or revision",
   }, { schemaVersion: 1, items: [] })).ok, false);
   assert.equal(called, false);
 });
+
+test("untrusted media read envelopes fail closed before later lookups",
+  async () => {
+  for (const result of [
+    null,
+    {},
+    { ok: 1, value: { mediaId: "shared" } },
+    { ok: false, code: "unknown-failure" },
+    { ok: false, code: "blooket-media-stale", extra: true },
+    { ok: false, code: "blooket-media-stale", value: null },
+    { ok: true, value: null },
+    { ok: true, value: undefined },
+    { ok: true, value: {
+      mediaId: "shared", revision: 3, format: "png",
+      bytes: new Uint8Array([1, 2, 3]), extra: true,
+    } },
+    { ok: true, value: {
+      mediaId: "shared", revision: 3, format: "png",
+      bytes: new Uint8Array([1, 2, 3]),
+    }, extra: true },
+    { ok: true, value: new Proxy({}, {
+      get: () => { throw Error("unreadable-prepared-media"); },
+    }) },
+  ]) {
+    const calls: string[] = [];
+    assert.deepEqual(await admitBlooketPreparedMedia(
+      multipleChoice,
+      port(() => result as BlooketPreparedMediaReadResult, calls),
+    ), { ok: false, code: "blooket-media-invalid", mediaId: "shared" });
+    assert.deepEqual(calls, ["shared"]);
+  }
+  },
+);
+
+test("malformed second-media replies cannot release partial media",
+  async () => {
+  const calls: string[] = [];
+  assert.deepEqual(await admitBlooketPreparedMedia(
+    multipleChoice,
+    port(mediaId => mediaId === "shared" ? prepared(mediaId) :
+      { ok: false, code: "not-an-admitted-code" } as
+        BlooketPreparedMediaReadResult, calls),
+  ), { ok: false, code: "blooket-media-invalid", mediaId: "moon" });
+  assert.deepEqual(calls, ["shared", "moon"]);
+  },
+);

@@ -2153,3 +2153,42 @@ test("untrusted pacing responses cannot bypass an execution lease",
       { ok: true, kind: "missing" });
   });
 });
+
+test("malformed media read replies stop before journal and mutation budget",
+  async () => {
+  for (const reply of [
+    null,
+    { ok: false, code: "not-admitted" },
+    { ok: false, code: "blooket-media-stale", extra: true },
+    { ok: true, value: null },
+    { ok: true, value: { mediaId: "cover", revision: 1,
+      format: "png", bytes: new Uint8Array([1]), extra: true } },
+  ]) {
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const budgetPath = join(directory, "budget.json");
+      const writeCalls: string[] = [];
+      const pacing: string[] = [];
+      const result = await executePersistedBlooketWrite(
+        paths, mediaPlan, browser([]), secrets(),
+        writes(SET_SUCCESS, writeCalls),
+        verification({ ok: true, baseline: SET_BASELINE }), {
+          pacer: immediatePacer(pacing),
+          media: { read: async () => reply as never },
+          budget: { path: budgetPath,
+            policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
+            now: () => 96_000 },
+        },
+      );
+      assert.deepEqual(result, { ok: false, stage: "prepared-media",
+        code: "blooket-media-invalid", mediaId: "cover" });
+      assert.deepEqual(writeCalls, []);
+      assert.deepEqual(pacing, ["acquire", "release"]);
+      assert.deepEqual(await loadWriteAttemptFile(paths.attempt, mediaPlan),
+        { ok: true, kind: "missing" });
+      assert.deepEqual(await loadMutationBudgetFile(
+        budgetPath, mediaPlan.planId), { ok: true, state: null });
+    });
+  }
+  },
+);

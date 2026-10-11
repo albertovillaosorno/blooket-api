@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, prepared-media read admission stopped trusting its
+TypeScript-only port response shape. Unknown failure codes, extra fields,
+null successes, hostile accessors, and malformed nested media bytes now
+produce a stable invalid-media failure. Persisted execution tests show
+that these replies never reserve mutation budget, open a journal, or
+perform a remote write, even if an earlier media ID was valid.
+
 On 2026-10-10, injected Open and Save checks for Add Question began
 comparing the existing card sequence against the separately rendered
 provider question counter. React can update the counter before a new
