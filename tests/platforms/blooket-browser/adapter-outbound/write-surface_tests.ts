@@ -90,7 +90,7 @@ test(
       '"description":"Synthetic description","private":true}',
     "submit",
     'observe:{"title":"Synthetic set",' +
-      '"description":"Synthetic description"}',
+      '"description":"Synthetic description","private":true}',
   ]);
   },
 );
