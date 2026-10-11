@@ -612,3 +612,31 @@ test("saved-question collection getters cannot run during decoding",
     false);
   },
 );
+
+
+test("admitted question properties cannot be hidden or accessor backed",
+  () => {
+    const fields = [
+      "schemaVersion", "number", "question", "answers",
+    ] as const;
+    for (const field of fields) {
+      const fixture = { ...question } as Record<string, unknown>;
+      Object.defineProperty(fixture, field, {
+        value: question[field], enumerable: false,
+      });
+      assert.equal(decodeBlooketQuestionRead(fixture).ok, false, field);
+    }
+    let getterReads = 0;
+    const normalized = decodeBlooketQuestionRead(question);
+    assert.equal(normalized.ok, true);
+    if (!normalized.ok) return;
+    const answer = { ...normalized.value.answers[0] };
+    Object.defineProperty(answer, "kind", {
+      enumerable: true,
+      get() { getterReads++; return "text"; },
+    });
+    assert.equal(decodeBlooketQuestionRead({ ...normalized.value,
+      answers: [answer] }).ok, false);
+    assert.equal(getterReads, 0);
+  },
+);

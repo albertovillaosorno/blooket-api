@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the common runtime object validator began rejecting
+non-enumerable and accessor-backed fields even when their names are
+admitted by a versioned contract. It reads only property descriptors,
+never invokes untrusted getters, and preserves unknown-field refusal.
+Synthetic saved-set, saved-question and shared decoder tests prove
+that concealed required fields cannot become publication evidence.
+
 On 2026-10-11, the Create Set, Add Question, question-inspection and
 login Chrome hosts began accepting only directly owned enumerable
 `result` data descriptors from browser injection replies. Hidden,

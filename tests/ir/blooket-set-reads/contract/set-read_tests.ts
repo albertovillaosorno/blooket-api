@@ -313,3 +313,18 @@ test("saved-set collection getters cannot run during decoding", () => {
   });
   assert.equal(decodeBlooketSetList(list).ok, false);
 });
+
+
+test("saved-set allowed fields must be enumerable data properties",
+  () => {
+    const summary = {
+      schemaVersion: 1, id: "set-fixture", title: "Synthetic",
+    };
+    for (const field of ["schemaVersion", "id", "title"] as const) {
+      const hidden = Object.defineProperty({ ...summary }, field, {
+        enumerable: false, value: summary[field],
+      });
+      assert.equal(decodeBlooketSetList([hidden]).ok, false, field);
+    }
+  },
+);
