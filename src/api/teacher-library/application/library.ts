@@ -247,9 +247,8 @@ export async function executeLibraryCommand(
         folder + "/" + payload.id + (folder === "skills" ? ".md" : ".json"),
       );
       if (payload.kind === "get") {
-        if ((await lstat(path)).size > 1_000_000)
-          throw new Error("document-too-large");
-        const source = await readFile(path, "utf8");
+        const source = (await boundedBytes(path, 1_000_000))
+          .toString("utf8");
         let document: unknown;
         if (folder === "drafts") {
           const decoded = decodeProjectDocument(JSON.parse(source));
@@ -267,7 +266,8 @@ export async function executeLibraryCommand(
       try {
         let old: string | undefined;
         try {
-          old = await readFile(path, "utf8");
+          old = (await boundedBytes(path, 1_000_000))
+            .toString("utf8");
         } catch (error) {
           if (
             !(
