@@ -137,6 +137,13 @@ as lesson media. Normal successful operations remove their temporary files.
 Crash leftovers that cannot be proven safe to remove are ignored or surfaced for
 recovery rather than guessed away.
 
+The local service runtime discovery record (`service-runtime.json`) is
+loaded from one `O_NOFOLLOW` descriptor with a 4,096-byte limit. Even the
+localhost status HTTP response is decoded from a bounded stream rather than
+unbounded `response.text()`; oversized and inconsistent records cannot claim
+an existing instance. The 2026-10-10 tests use a synthetic loopback server,
+not an authenticated product session or native macOS service.
+
 ## Consequences
 
 - A reported successful write has flushed both its bytes and its directory entry
