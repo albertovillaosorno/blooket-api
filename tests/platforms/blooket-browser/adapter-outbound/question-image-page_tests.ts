@@ -203,6 +203,17 @@ test("tiny or endless chunks cannot accumulate unbounded stream metadata",
   },
 );
 
+test("image proof rejects extra edit-route query and fragment", async () => {
+  for (const alter of [
+    (url: URL) => { url.searchParams.set("source", "teacher"); },
+    (url: URL) => { url.hash = "teacher-panel"; },
+  ]) await fixture(async state => {
+    alter(state.location);
+    assert.deepEqual(await serialized("fixture", 1, 1_000), failed);
+    assert.equal(state.calls.length, 0);
+  });
+});
+
 test("route, watch, or raw form drift during fetch discards the digest",
   async () => {
     for (const mutate of [

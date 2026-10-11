@@ -240,6 +240,7 @@ export function inspectBlooketPage(
         if (
           link.origin !== url.origin ||
           link.pathname !== "/edit" ||
+          link.hash || link.searchParams.size !== 1 ||
           link.searchParams.getAll("id").length !== 1 ||
           !id ||
           id.length > 512 ||
@@ -281,7 +282,8 @@ export function inspectBlooketPage(
       !operation.setId ||
       operation.setId.length > 512 ||
       /[\x00-\x1f\x7f]/u.test(operation.setId) ||
-      url.searchParams.getAll("id").length !== 1 ||
+      url.hash || url.searchParams.size !== 1 ||
+        url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== operation.setId
     )
       return failed();
@@ -392,6 +394,7 @@ export function inspectBlooketDetailSidebar(setId: string): PageReadResult {
     if (url.origin !== "https://dashboard.blooket.com" ||
         url.pathname !== "/edit" || !setId || setId.length > 512 ||
         /[\x00-\x1f\x7f]/u.test(setId) ||
+        url.hash || url.searchParams.size !== 1 ||
         url.searchParams.getAll("id").length !== 1 ||
         url.searchParams.get("id") !== setId ||
         document.title === "Just a moment..." ||
@@ -463,6 +466,7 @@ export function closeBlooketDetailPanel(
     if (url.origin !== "https://dashboard.blooket.com" ||
         url.pathname !== "/edit" || !setId || setId.length > 512 ||
         /[\x00-\x1f\x7f]/u.test(setId) ||
+        url.hash || url.searchParams.size !== 1 ||
         url.searchParams.getAll("id").length !== 1 ||
         url.searchParams.get("id") !== setId ||
         document.title === "Just a moment..." ||
@@ -593,6 +597,7 @@ export function isBlooketDetailPanelClosed(setId: string): boolean {
     if (url.origin !== "https://dashboard.blooket.com" ||
         url.pathname !== "/edit" || !setId || setId.length > 512 ||
         /[\x00-\x1f\x7f]/u.test(setId) ||
+        url.hash || url.searchParams.size !== 1 ||
         url.searchParams.getAll("id").length !== 1 ||
         url.searchParams.get("id") !== setId ||
         document.title === "Just a moment..." ||
@@ -719,6 +724,7 @@ export function openBlooketDetailPanel(setId: string): boolean {
     !setId ||
     setId.length > 512 ||
     /[\x00-\x1f\x7f]/u.test(setId) ||
+    location.hash || new URL(location.href).searchParams.size !== 1 ||
     new URL(location.href).searchParams.getAll("id").length !== 1 ||
     new URL(location.href).searchParams.get("id") !== setId
   )

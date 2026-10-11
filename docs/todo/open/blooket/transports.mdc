@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, independently injected set-detail, question-card,
+Add Question and saved-image helpers began requiring an exact
+`/edit?id=<set-id>` route: one ID parameter, no extras or fragment.
+An unrelated teacher-selected edit URL cannot authorize a read-owned
+click, preparation, Save, question enumeration, or credential-free
+image identity request merely because its ID also matches. Synthetic
+DOM and streaming tests verify the refusal before any mutation/fetch.
+The canonical browser host already navigates to this exact URL.
+
 On 2026-10-11, the browser-extension worker began accepting only
 exact, individually validated session observations at both the first
 and second native-document probes. An unsupported navigation state,

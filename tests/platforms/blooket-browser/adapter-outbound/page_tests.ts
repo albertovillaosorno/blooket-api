@@ -277,6 +277,8 @@ test(
     "/edit?id=",
     "/edit?id=fixture&id=other",
     "/edit?id=fixture&id=fixture",
+    "/edit?id=fixture&source=teacher",
+    "/edit?id=fixture#teacher-panel",
     "/edit?id=x%0Ay",
   ]) {
     const article = card();
@@ -405,6 +407,13 @@ test(
       kind: "sets.get", setId: "fixture",
     }).ok, false);
   });
+  title.getBoundingClientRect = () => ({ width: 20, height: 20 });
+  for (const suffix of ["&source=teacher", "#teacher-panel"]) {
+    page(document, "https://dashboard.blooket.com/edit?id=fixture" +
+      suffix, () => assert.equal(inspectBlooketPage({
+        kind: "sets.get", setId: "fixture",
+      }).ok, false));
+  }
 });
 
 test("set privacy comes from the recovered visible sibling paragraph", () => {

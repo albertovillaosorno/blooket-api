@@ -103,7 +103,8 @@ export function runBlooketAddQuestionPageAction(
     const url = new URL(location.href);
     return (
       url.origin === "https://dashboard.blooket.com" &&
-      url.pathname === "/edit" &&
+      url.pathname === "/edit" && !url.hash &&
+      url.searchParams.size === 1 &&
       url.searchParams.getAll("id").length === 1 &&
       url.searchParams.get("id") === setId
     );
