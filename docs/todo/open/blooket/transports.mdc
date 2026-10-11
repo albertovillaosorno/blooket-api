@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, explicit reconciliation began requiring exact
+`not-confirmed` and `confirmed` resolution envelopes. Previously the public
+reconciliation entrypoint could accept a negative result with extra or
+contradictory fields and clear an ambiguous attempt. Portable tests verify
+that malformed resolutions preserve the pending journal and its recovery
+evidence instead of making a write eligible for immediate replay.
+
 On 2026-10-10, the final write-execution port began validating exact
 confirmed receipts and known browser stops before advancing a checkpoint.
 Previously a truthy acknowledgement from an unexpected adapter could be

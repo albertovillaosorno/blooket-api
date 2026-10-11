@@ -167,6 +167,24 @@ export async function reconcilePersistedBlooketWriteUnderLock(
       code: "reconciliation-state-inconsistent",
     };
   }
+  // The public reconciliation API is callable without an IR decoder.
+  // A malformed negative result must never erase a pending attempt.
+  const validResolution = !!resolution &&
+    typeof resolution === "object" && !Array.isArray(resolution) &&
+    typeof resolution.operationId === "string" &&
+    (resolution.outcome === "not-confirmed"
+      ? Reflect.ownKeys(resolution).sort().join() ===
+        "operationId,outcome"
+      : resolution.outcome === "confirmed" &&
+        Reflect.ownKeys(resolution).sort().join() ===
+          "operationId,outcome,receipt");
+  if (!validResolution) {
+    return {
+      ok: false,
+      stage: "reconciliation",
+      code: "reconciliation-state-inconsistent",
+    };
+  }
   if (recovery.attempt.operationId !== resolution.operationId) {
     return {
       ok: false,
