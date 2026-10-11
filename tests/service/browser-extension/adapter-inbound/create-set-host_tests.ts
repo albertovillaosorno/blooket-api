@@ -1620,3 +1620,37 @@ test("hidden saved-sidebar fields never confirm Create Set metadata",
   }
   },
 );
+
+test("Create Set host refuses accessor-backed Chrome result wrappers",
+  async () => {
+    for (const kind of ["getter", "hidden", "absent"] as const) {
+      const fake = fakeChrome({});
+      let called = 0;
+      const chrome: CreateSetChromePort = {
+        ...fake.chrome,
+        scripting: {
+          executeScript: async request => {
+            if (request.func.name !== "canLeaveBlooketPageForRead")
+              return fake.chrome.scripting.executeScript(request);
+            const reply: { result?: unknown; frameId?: number } = {
+              frameId: 0,
+            };
+            if (kind !== "absent") Object.defineProperty(reply, "result", {
+              enumerable: kind !== "hidden",
+              ...(kind === "getter"
+                ? { get() { called++; return true; } }
+                : { value: true }),
+            });
+            return [reply];
+          },
+        },
+      };
+      assert.equal((await createExtensionCreateSetHost(
+        chrome, 7, async () => undefined,
+      ).openCreateSet()).ok, false, kind);
+      assert.equal(called, 0);
+      assert.equal(fake.calls.some(call => call.startsWith("update:")),
+        false);
+    }
+  },
+);

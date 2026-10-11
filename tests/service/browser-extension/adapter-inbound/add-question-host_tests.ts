@@ -1149,3 +1149,36 @@ test("fresh-document card drift blocks Add Question success", async () => {
   assert.equal(fake.calls.filter(call =>
     call === "runBlooketAddQuestionPageAction:submit").length, 1);
 });
+
+test("Add Question host never evaluates Chrome result getters before write",
+  async () => {
+    for (const kind of ["getter", "hidden", "absent"] as const) {
+      const fake = fakeChrome({});
+      let getters = 0;
+      const chrome: AddQuestionChromePort = {
+        ...fake.chrome,
+        scripting: {
+          executeScript: async request => {
+            if (request.func.name !== "canLeaveBlooketPageForRead")
+              return fake.chrome.scripting.executeScript(request);
+            const reply: { result?: unknown; frameId?: number } = {
+              frameId: 0,
+            };
+            if (kind !== "absent") Object.defineProperty(reply, "result", {
+              enumerable: kind !== "hidden",
+              ...(kind === "getter"
+                ? { get() { getters++; return true; } }
+                : { value: true }),
+            });
+            return [reply];
+          },
+        },
+      };
+      assert.equal((await createExtensionAddQuestionHost(
+        chrome, 7, async () => undefined,
+      ).addQuestion(input)).ok, false, kind);
+      assert.equal(getters, 0);
+      assert.equal(fake.calls.some(call => call.includes(":submit")), false);
+    }
+  },
+);

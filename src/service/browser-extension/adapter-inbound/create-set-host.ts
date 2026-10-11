@@ -151,9 +151,16 @@ export function createExtensionCreateSetHost(
       func,
       args,
     });
-    if (replies.length !== 1 || replies[0]?.result === undefined)
+    if (!Array.isArray(replies) || replies.length !== 1 ||
+        !replies[0] || typeof replies[0] !== "object")
       throw new Error("browser-write-script-failed");
-    return replies[0].result;
+    // Chrome adds frame metadata, but only its own enumerable result data
+    // descriptor may carry evidence. Never invoke an accessor getter.
+    const descriptor = Object.getOwnPropertyDescriptor(replies[0], "result");
+    if (!descriptor || !descriptor.enumerable ||
+        !("value" in descriptor) || descriptor.value === undefined)
+      throw new Error("browser-write-script-failed");
+    return descriptor.value;
   };
 
   const createTabReady = async (): Promise<boolean> => {

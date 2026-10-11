@@ -78,6 +78,7 @@ interface Scenario {
   readonly imageLatencyMs?: number;
   readonly switchOnImage?: boolean;
   readonly nativeOrigin?: number | null;
+  readonly originWrapper?: "getter" | "hidden" | "absent";
   readonly changeOriginAfter?:
     "listBlooketQuestionNumbers" | "openBlooketQuestionPanel" |
     "inspectOpenedBlooketQuestion" | "closeBlooketQuestionPanel";
@@ -87,6 +88,7 @@ function synthetic(options: Scenario = {}) {
   const calls: string[] = [];
   let enumerations = 0;
   let inspections = 0;
+  let getterReads = 0;
   let tick = 0;
   let currentUrl = options.tabUrl ?? EDIT_URL;
   let origin = options.nativeOrigin === undefined
@@ -111,6 +113,19 @@ function synthetic(options: Scenario = {}) {
         assert.equal(request.target.tabId, 7);
         if (request.func.name === "inspectBlooketDocumentOrigin") {
           assert.deepEqual(request.args, [EDIT_URL]);
+          if (options.originWrapper !== undefined) {
+            const reply: { result?: unknown; frameId?: number } = {
+              frameId: 0,
+            };
+            if (options.originWrapper !== "absent")
+              Object.defineProperty(reply, "result", {
+                enumerable: options.originWrapper !== "hidden",
+                ...(options.originWrapper === "getter"
+                  ? { get() { getterReads++; return origin; } }
+                  : { value: origin }),
+              });
+            return [reply];
+          }
           return [{ result: origin }];
         }
         assert.equal(request.args?.[0], FIXTURE_SET);
@@ -191,6 +206,7 @@ function synthetic(options: Scenario = {}) {
     calls,
     enumerations: () => enumerations,
     inspections: () => inspections,
+    getterReads: () => getterReads,
     tick: () => tick,
   };
 }
@@ -802,5 +818,19 @@ test("late question-card drift after Cancel cannot confirm read results",
     assert.equal(fixture.calls.filter(name =>
       name === "closeBlooketQuestionPanel").length, lists[0]!.length);
   }
+  },
+);
+
+
+test("question read host ignores accessor and hidden Chrome origin results",
+  async () => {
+    for (const originWrapper of ["getter", "hidden", "absent"] as const) {
+      const fixture = synthetic({ originWrapper });
+      assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000),
+        failed);
+      assert.equal(fixture.getterReads(), 0);
+      assert.equal(fixture.calls.includes("openBlooketQuestionPanel"),
+        false);
+    }
   },
 );
