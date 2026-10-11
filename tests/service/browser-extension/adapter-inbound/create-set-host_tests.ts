@@ -1153,3 +1153,52 @@ test("redirect route switch after Create Set reload stops receipt",
   assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   },
 );
+
+test("fresh Create Set receipt requires two identical saved metadata reads",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example" };
+  const sidebar = { ok: true, value: expected };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+    observed, sidebar, observed,
+    { ok: true, value: { ...expected, title: "Human edited" } },
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected), { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  assert.equal(fake.calls.filter(call => call === "script").length, 8);
+  },
+);
+
+test("editor replacement after reload approval prevents Create Set reload",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example" };
+  const sidebar = { ok: true, value: expected };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+  ] });
+  fake.setTab({ url:
+    "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  let origin = 1_000;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin")
+      return [{ result: origin }];
+    const result = await original(request);
+    if (request.func.name === "canLeaveBlooketPageForRead")
+      origin = 2_000;
+    return result;
+  };
+  assert.equal((await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected)).ok, false);
+  assert.equal(fake.calls.includes("can-leave-check"), true);
+  assert.equal(fake.calls.includes("reload"), false);
+  },
+);

@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, additional Create Set read-back tests verified that
+a saved sidebar changing between the two post-reload observations never
+becomes a receipt. A replacement editor document inserted just after the
+safe-to-reload approval also prevents the reload itself, leaving its
+human-authored work untouched. These tests use synthetic tab epochs and
+make no provider account mutation.
+
 On 2026-10-10, the Add Question opener's admitted question number
 also became part of its isolated-world form ownership watch. An
 otherwise valid later Prepare, image Finalize, or Submit with another
