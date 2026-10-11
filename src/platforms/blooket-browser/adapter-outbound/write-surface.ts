@@ -56,7 +56,10 @@ export interface BlooketCreateSetBrowserHost {
     | { readonly ok: true }
     | BlooketBrowserWriteSurfaceFailure
   >;
-  observeCreateSet(): Promise<
+  observeCreateSet(expected: {
+    readonly title: string;
+    readonly description: string;
+  }): Promise<
     | { readonly ok: true; readonly remoteSetId: unknown }
     | BlooketBrowserWriteSurfaceFailure
   >;
@@ -81,7 +84,10 @@ export function createBlooketBrowserWriteSurface(
         if (!prepared.ok) return prepared;
         const submitted = await host.submitCreateSet(expected);
         if (!submitted.ok) return submitted;
-        return await host.observeCreateSet();
+        return await host.observeCreateSet({
+          title: expected.title,
+          description: expected.description,
+        });
       } catch {
         return browserFailure();
       }
