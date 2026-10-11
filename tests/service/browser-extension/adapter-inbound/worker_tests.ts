@@ -96,6 +96,7 @@ test(
   let capabilityDrawerOpen = false;
   let holdWriteOpen = false;
   let expireWriteAtOpen = false;
+  let slowWriteAtOpen = false;
   const realNow = Date.now;
   let holdReadScript = false;
   let reportReadScript!: () => void;
@@ -320,7 +321,11 @@ test(
             addQuestionPanelReady = true;
             if (expireWriteAtOpen) {
               expireWriteAtOpen = false;
-              Date.now = () => realNow() + 35_000;
+              Date.now = () => realNow() + 65_000;
+            }
+            if (slowWriteAtOpen) {
+              slowWriteAtOpen = false;
+              Date.now = () => realNow() + 40_000;
             }
             if (holdWriteOpen) {
               holdWriteOpen = false;
@@ -1022,6 +1027,22 @@ test(
     );
     assert.ok(scripts.includes("runBlooketAddQuestionPageAction"));
     assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
+
+    // A slow, but still leased, browser write must be able to finish its
+    // guarded fresh-document observation after the old 27-second ceiling.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    questionSaved = false;
+    slowWriteAtOpen = true;
+    const slow = await expectReply({
+      kind: "questions.create", setId: "set-fixture", number: 1,
+      question: "Type sun.",
+      answers: [{ text: "sun", correct: true }],
+      qType: "typing", random: true,
+      answerTypes: ["exactly"], timeLimit: 15,
+    });
+    Date.now = realNow;
+    assert.deepEqual(slow.value, { ok: true });
+    assert.equal(questionSaved, true);
 
     const beforeCapabilitiesUrl = tabUrl;
     const capabilities = await expectReply({ kind: "capabilities.inspect" });
