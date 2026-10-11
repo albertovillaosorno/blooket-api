@@ -56,6 +56,12 @@ The teacher may select another media root. Changing settings must not silently
 move or delete her existing library. Validate access and offer an explicit,
 recoverable library move separately when needed.
 
+The local JSON settings adapter reads one `O_NOFOLLOW` file descriptor
+and bounds actual file bytes to 65,536. On 2026-10-10, synthetic regressions
+confirmed that oversized replacements and dangling symlinks fail closed
+without overwriting settings or an outside target file. This is portable
+filesystem evidence, not native macOS acceptance.
+
 | Control        | Storage / behavior                            |
 | -------------- | --------------------------------------------- |
 | UI language    | Settings: en/es, independent of quiz language |

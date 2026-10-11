@@ -30,10 +30,8 @@
 // - Defaults:
 //   - Successful saves retain one previous-value `.bak` file when available.
 //
-import {
-  lstat,
-  readFile,
-} from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 
 import {
   decodeLocalServiceSettings,
@@ -186,24 +184,53 @@ async function saveSettingsFileLocked(
   }
 }
 
+const MAX_SETTINGS_FILE_BYTES = 65_536;
+
 async function readOwnedTextFile(path: string): Promise<
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "missing" }
   | { readonly kind: "unsafe" }
   | { readonly kind: "unreadable" }
 > {
+  // Read the exact checked descriptor; a pathname-based lstat/readFile
+  // sequence could follow a substituted symlink or unbounded replacement.
+  let handle;
   try {
-    const metadata = await lstat(path);
-    if (metadata.isSymbolicLink() || !metadata.isFile()) {
-      return { kind: "unsafe" };
-    }
-    return { kind: "text", value: await readFile(path, "utf8") };
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch (error: unknown) {
-    if (isMissingPathError(error)) {
-      return { kind: "missing" };
-    }
+    if (isMissingPathError(error)) return { kind: "missing" };
+    if (error instanceof Error && "code" in error && error.code === "ELOOP")
+      return { kind: "unsafe" };
     return { kind: "unreadable" };
   }
+  let result:
+    | { readonly kind: "text"; readonly value: string }
+    | { readonly kind: "unsafe" }
+    | { readonly kind: "unreadable" } = { kind: "unreadable" };
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > MAX_SETTINGS_FILE_BYTES) {
+      result = { kind: "unsafe" };
+    } else {
+      const bytes = Buffer.alloc(MAX_SETTINGS_FILE_BYTES + 1);
+      let size = 0;
+      let complete = false;
+      while (size < bytes.length) {
+        const part = await handle.read(bytes, size, bytes.length - size, null);
+        if (part.bytesRead === 0) {
+          complete = true;
+          break;
+        }
+        size += part.bytesRead;
+      }
+      result = complete
+        ? { kind: "text", value: bytes.subarray(0, size).toString("utf8") }
+        : { kind: "unsafe" };
+    }
+  } catch { /* An unreadable descriptor cannot admit a new reservation. */ }
+  try { await handle.close(); }
+  catch { return { kind: "unreadable" }; }
+  return result;
 }
 
 function ioLoadFailure(
