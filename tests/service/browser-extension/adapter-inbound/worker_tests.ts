@@ -62,6 +62,9 @@ test(
   let reloadDuringLeave = false;
   let detailOpenSucceeds = true;
   let detailSidebarDrifts = false;
+  let detailSidebarAfterCancelDrifts = false;
+  let detailSecondAfterCancelDrifts = false;
+  let detailCancelObserved = false;
   let detailSidebarReadCount = 0;
   let detailSidebarMalformed = false;
   let detailCancelSucceeds = true;
@@ -69,6 +72,8 @@ test(
   let detailMalformedReply = false;
   let detailDrifts = false;
   let detailReadCount = 0;
+  let detailSecondReadHasHiddenField = false;
+  let detailReadWrongId = false;
   let detailSwitchTabAfterScript = false;
   let detailSwitchTabAfterOpen = false;
   let detailReloadDuringSidebar = false;
@@ -250,8 +255,13 @@ test(
             value: { title: "Synthetic", description: "" },
           } : {
             ok: true, value: {
-              title: detailSidebarDrifts && detailSidebarReadCount % 2 === 0
-                ? "Local unsaved title" : "Synthetic",
+              title: (detailSidebarAfterCancelDrifts &&
+                  detailCancelObserved) ||
+                  (detailSecondAfterCancelDrifts && detailCancelObserved &&
+                    detailSidebarReadCount % 2 === 0)
+                ? "Changed after Cancel"
+                : detailSidebarDrifts && detailSidebarReadCount % 2 === 0
+                  ? "Local unsaved title" : "Synthetic",
               description: "",
             },
           } }];
@@ -273,6 +283,7 @@ test(
             { title: "Synthetic", description: "" },
             { title: "Synthetic", description: "", visibility: "private" },
           ]);
+          if (detailCancelSucceeds) detailCancelObserved = true;
           return [{ result: detailCancelSucceeds }];
         }
         if (func.name === "isBlooketDetailPanelClosed")
@@ -281,6 +292,7 @@ test(
           if (args?.[0] === "created-set-fixture")
             return [{ result: true }];
           assert.deepEqual(args, ["opaque id/with spaces"]);
+          detailCancelObserved = false;
           if (detailSwitchTabAfterOpen) {
             detailSwitchTabAfterOpen = false;
             tabUrl = "https://dashboard.blooket.com/edit?id=another-set";
@@ -517,7 +529,7 @@ test(
             },
           } }];
         }
-        return [
+        const reply = [
           {
             result: {
               ok: true,
@@ -543,7 +555,8 @@ test(
                       }
                     : {
                         schemaVersion: 1,
-                        id: operation.setId,
+                        id: detailReadWrongId ? "unrelated-set" :
+                          operation.setId,
                         title: detailDrifts && detailReadCount % 2 === 0
                           ? "Changed synthetic title" : "Synthetic",
                         description: "",
@@ -552,6 +565,12 @@ test(
             },
           },
         ];
+        if (operation.kind === "sets.get" && detailReadCount === 2 &&
+            detailSecondReadHasHiddenField)
+          Object.defineProperty(reply[0]!.result, "hidden", {
+            enumerable: false, value: "untrusted",
+          });
+        return reply;
       },
     },
   };
@@ -830,6 +849,47 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    // Saved set metadata can change while a read-owned panel is canceled.
+    // Such a result must not leave the browser as a confirmed remote read.
+    detailCancelObserved = false;
+    detailSidebarAfterCancelDrifts = true;
+    const beforeCancelDrift = scripts.length;
+    const changedAfterCancel = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(changedAfterCancel.ok, false);
+    assert.equal(scripts.slice(beforeCancelDrift).includes(
+      "closeBlooketDetailPanel"), true);
+    assert.equal(scripts.slice(beforeCancelDrift).filter(name =>
+      name === "inspectBlooketDetailSidebar").length, 4);
+    detailSidebarAfterCancelDrifts = false;
+    detailSecondAfterCancelDrifts = true;
+    detailCancelObserved = false;
+    detailSidebarReadCount = 0;
+    const beforeSecondDrift = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeSecondDrift).filter(name =>
+      name === "inspectBlooketDetailSidebar").length, 4);
+    assert.equal(scripts.slice(beforeSecondDrift).includes(
+      "closeBlooketDetailPanel"), true);
+    detailSecondAfterCancelDrifts = false;
+    detailSecondReadHasHiddenField = true;
+    detailReadCount = 0;
+    const beforeHiddenDetail = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeHiddenDetail).filter(name =>
+      name === "inspectBlooketPage").length, 2);
+    detailSecondReadHasHiddenField = false;
+    detailReadWrongId = true;
+    detailReadCount = 0;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    detailReadWrongId = false;
     // A read-owned editor must be canceled and its closure independently
     // observed before a metadata snapshot may escape the extension.
     // No Edit Info click when the source sidebar is malformed or drifts.

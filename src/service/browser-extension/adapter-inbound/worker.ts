@@ -58,6 +58,9 @@ import {
 import { captureBlooketLibraryModel } from
   "../../../platforms/blooket-browser/adapter-outbound/library-model-page.ts";
 import { checkBlooketLibraryObservation } from "./library-observation.ts";
+import { decodeBlooketSetDetail } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
+
 import {
   BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserBridgeRequest,
 } from
@@ -161,11 +164,20 @@ function pairedBrowserLabel(): Promise<string> {
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+function exactWorkerKeys(value: unknown, expected: string): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const own = Reflect.ownKeys(value);
+  const names = expected.split(",");
+  return own.length === names.length && own.every(key =>
+    typeof key === "string" && names.includes(key));
+}
+
 function configured(value: unknown): Connection | undefined {
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   if (
-    Object.keys(record).sort().join() !== "origin,tabId,token" ||
+    !exactWorkerKeys(record, "origin,tabId,token") ||
     typeof record["origin"] !== "string" ||
     typeof record["token"] !== "string" ||
     !/^[a-zA-Z0-9_-]{43}$/u.test(record["token"]) ||
@@ -361,7 +373,7 @@ async function read(
       const result = await observe();
       if (
         result && typeof result === "object" && !Array.isArray(result) &&
-        Object.keys(result).sort().join() === "code,ok" &&
+        exactWorkerKeys(result, "code,ok") &&
         "ok" in result && result.ok === false &&
         "code" in result && result.code === "blooket-browser-failed"
       ) {
@@ -370,11 +382,11 @@ async function read(
       }
       if (
         !result || typeof result !== "object" || Array.isArray(result) ||
-        Object.keys(result).sort().join() !== "ok,value" ||
+        !exactWorkerKeys(result, "ok,value") ||
         !("ok" in result) || result.ok !== true ||
         !("value" in result) || !result.value ||
         typeof result.value !== "object" || Array.isArray(result.value) ||
-        Object.keys(result.value).sort().join() !== "completeness,items" ||
+        !exactWorkerKeys(result.value, "completeness,items") ||
         !("completeness" in result.value) ||
         !("items" in result.value) ||
         !Array.isArray(result.value.items) ||
@@ -445,12 +457,12 @@ async function read(
       );
       if (!await ownsDetailRoute() || !reply ||
           typeof reply !== "object" || Array.isArray(reply) ||
-          Object.keys(reply).sort().join() !== "ok,value" ||
+          !exactWorkerKeys(reply, "ok,value") ||
           !("ok" in reply) || reply.ok !== true ||
           !("value" in reply) || !reply.value ||
           typeof reply.value !== "object" ||
           Array.isArray(reply.value) ||
-          Object.keys(reply.value).sort().join() !== "description,title" ||
+          !exactWorkerKeys(reply.value, "description,title") ||
           !("title" in reply.value) ||
           typeof reply.value.title !== "string" ||
           !("description" in reply.value) ||
@@ -484,6 +496,7 @@ async function read(
       await pause(100);
     }
     if (!opened) throw new Error("browser-details-unavailable");
+    let savedDetail: unknown;
     let cancellationEvidence: {
       readonly title: string;
       readonly description: string;
@@ -506,7 +519,7 @@ async function read(
           throw new Error("browser-details-unavailable");
         if (
           result && typeof result === "object" && !Array.isArray(result) &&
-          Object.keys(result).sort().join() === "ok,value" &&
+          exactWorkerKeys(result, "ok,value") &&
           "ok" in result && result.ok === true && "value" in result
         ) {
           if (Date.now() >= readDeadline)
@@ -524,19 +537,22 @@ async function read(
             inspectBlooketPage as (...args: never[]) => unknown,
             [operation],
           );
-          if (JSON.stringify(result) !== JSON.stringify(again))
+          if (!again || typeof again !== "object" ||
+              !exactWorkerKeys(again, "ok,value") ||
+              !("ok" in again) || again.ok !== true ||
+              !("value" in again) ||
+              JSON.stringify(result) !== JSON.stringify(again))
             throw new Error("browser-details-unavailable");
-          const candidate = result.value;
-          if (!candidate || typeof candidate !== "object" ||
-              Array.isArray(candidate) ||
-              !("title" in candidate) ||
-              !("description" in candidate) ||
-              !("visibility" in candidate) ||
-              candidate.title !== baseline.title ||
-              candidate.description !== baseline.description ||
-              (candidate.visibility !== "private" &&
-                candidate.visibility !== "public"))
+          const decoded = decodeBlooketSetDetail(result.value);
+          const againDecoded = decodeBlooketSetDetail(again.value);
+          if (!decoded.ok || !againDecoded.ok ||
+              JSON.stringify(decoded.value) !==
+                JSON.stringify(againDecoded.value) ||
+              decoded.value.id !== operation.setId ||
+              decoded.value.title !== baseline.title ||
+              decoded.value.description !== baseline.description)
             throw new Error("browser-details-unavailable");
+          const candidate = decoded.value;
           const after = await browser.tabs.get(current.tabId);
           if (
             Date.now() >= readDeadline || after.status !== "complete" ||
@@ -547,17 +563,18 @@ async function read(
             description: candidate.description,
             visibility: candidate.visibility,
           };
-          return result;
+          savedDetail = result;
+          break;
         }
         if (
           !result || typeof result !== "object" || Array.isArray(result) ||
-          Object.keys(result).sort().join() !== "code,ok" ||
+          !exactWorkerKeys(result, "code,ok") ||
           !("ok" in result) || result.ok !== false ||
           !("code" in result) || result.code !== "blooket-browser-failed"
         ) throw new Error("browser-details-unavailable");
         await pause(100);
       }
-      throw new Error("browser-details-unavailable");
+      if (!savedDetail) throw new Error("browser-details-unavailable");
     } finally {
       // Recovered edit module 12048 exposes a Cancel button. A read-owned
       // sidebar editor must not remain available for the next request to
@@ -594,6 +611,15 @@ async function read(
       }
       if (!closed) throw new Error("browser-details-cleanup-failed");
     }
+    // The sidebar remounts after Cancel. A panel read made before that
+    // remount must not confirm a set changed by a concurrent actor.
+    const afterCancel = await sidebarValue();
+    await pause(0);
+    const afterCancelAgain = await sidebarValue();
+    if (JSON.stringify(afterCancel) !== JSON.stringify(baseline) ||
+        JSON.stringify(afterCancelAgain) !== JSON.stringify(afterCancel))
+      throw new Error("browser-details-unavailable");
+    return savedDetail;
   }
   const sessionOrigin = operation.kind === "session.observe"
     ? await script(current, browser,
@@ -852,7 +878,7 @@ async function relay(current: Connection, activeGeneration: number) {
         if (
           job.command.kind === "session.observe" &&
           result && typeof result === "object" && !Array.isArray(result) &&
-          Object.keys(result).sort().join() === "ok,value" &&
+          exactWorkerKeys(result, "ok,value") &&
           "ok" in result && result.ok === true &&
           "value" in result && typeof result.value === "string"
         ) {
