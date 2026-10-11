@@ -30,12 +30,11 @@
 //   - Unknown owners and occupied recovery guards fail closed.
 //
 import { randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import {
   link,
-  lstat,
   mkdir,
   open,
-  readFile,
   rm,
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -228,26 +227,58 @@ async function removeOwnedLockPath(
   await rm(path);
 }
 
+const MAX_LOCK_OWNER_BYTES = 4_096;
+
 async function readLockOwner(path: string): Promise<
   | { readonly kind: "owner"; readonly owner: LockOwner }
   | { readonly kind: "missing" }
   | { readonly kind: "unsafe" }
   | { readonly kind: "unreadable" }
 > {
+  // Lock ownership must be read from the same descriptor that was opened.
+  // A symlink swapped in between lstat and readFile must never be followed.
+  let handle;
   try {
-    const metadata = await lstat(path);
-    if (metadata.isSymbolicLink() || !metadata.isFile()) {
-      return { kind: "unsafe" };
-    }
-    const decoded = decodeLockOwner(await readFile(path, "utf8"));
-    return decoded === undefined
-      ? { kind: "unsafe" }
-      : { kind: "owner", owner: decoded };
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch (error: unknown) {
-    return isCode(error, "ENOENT")
-      ? { kind: "missing" }
-      : { kind: "unreadable" };
+    if (isCode(error, "ENOENT")) return { kind: "missing" };
+    if (isCode(error, "ELOOP")) return { kind: "unsafe" };
+    return { kind: "unreadable" };
   }
+  let result:
+    | { readonly kind: "owner"; readonly owner: LockOwner }
+    | { readonly kind: "unsafe" }
+    | { readonly kind: "unreadable" } = { kind: "unreadable" };
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > MAX_LOCK_OWNER_BYTES) {
+      result = { kind: "unsafe" };
+    } else {
+      const buffer = Buffer.alloc(MAX_LOCK_OWNER_BYTES + 1);
+      let size = 0;
+      let complete = false;
+      while (size < buffer.length) {
+        const part = await handle.read(buffer, size, buffer.length - size,
+          null);
+        if (!part.bytesRead) {
+          complete = true;
+          break;
+        }
+        size += part.bytesRead;
+      }
+      if (!complete) {
+        result = { kind: "unsafe" };
+      } else {
+        const decoded = decodeLockOwner(buffer.subarray(0, size)
+          .toString("utf8"));
+        result = decoded === undefined ? { kind: "unsafe" }
+          : { kind: "owner", owner: decoded };
+      }
+    }
+  } catch { /* An uncertain owner may not be reclaimed. */ }
+  try { await handle.close(); }
+  catch { return { kind: "unreadable" }; }
+  return result;
 }
 
 function decodeLockOwner(source: string): LockOwner | undefined {

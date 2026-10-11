@@ -166,6 +166,30 @@ test("malformed and symbolic lock files fail closed", async () => {
   });
 });
 
+test("owner reads reject dangling links and bounded-size violations",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "stale.lock");
+    const stale = JSON.stringify({
+      version: 1, pid: 2147483647, token: "fixture-stale",
+    }) + "\n";
+    await writeFile(path, stale.padEnd(4_097, " "));
+    assert.deepEqual(await tryAcquireFileLock(path), {
+      ok: false, reason: "unsafe",
+    });
+    assert.equal((await readFile(path, "utf8")).length, 4_097);
+    await writeFile(path, stale.padEnd(4_096, " "));
+    const recovered = await tryAcquireFileLock(path);
+    assert.equal(recovered.ok, true);
+    if (recovered.ok) await recovered.lock.release();
+    await symlink(join(directory, "missing.json"), path);
+    assert.deepEqual(await tryAcquireFileLock(path), {
+      ok: false, reason: "unsafe",
+    });
+  });
+  },
+);
+
 test("normal acquisition leaves no owner temporary files", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "project.lock");
