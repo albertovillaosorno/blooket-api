@@ -29,7 +29,8 @@
 // - Defaults:
 //   - Unsupported hosts and invalid lifecycle inputs fail closed.
 //
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { join } from "node:path";
 import {
   object,
@@ -74,21 +75,83 @@ export function decodeServiceRuntime(value: unknown): LocalServiceRuntime {
 }
 export async function existingService(root: string) {
   try {
-    const bytes = await readFile(join(root, "service-runtime.json"));
-    if (bytes.length > 4096) return undefined;
-    const expected = decodeServiceRuntime(JSON.parse(bytes.toString("utf8")));
+    const bytes = await readOwnedRuntime(join(root, "service-runtime.json"));
+    const expected = decodeServiceRuntime(JSON.parse(bytes));
     const response = await fetch(expected.origin + "/api/service-status", {
       signal: AbortSignal.timeout(1500),
       redirect: "error",
     });
-    if (!response.ok) return undefined;
-    const body = await response.text();
-    if (body.length > 4096) return undefined;
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return undefined;
+    }
+    const body = await boundedResponseText(response, 4096);
+    if (body === undefined) return undefined;
     const current = decodeServiceRuntime(JSON.parse(body));
     return JSON.stringify(current) === JSON.stringify(expected)
       ? expected
       : undefined;
   } catch {
     return undefined;
+  }
+}
+
+const MAX_RUNTIME_BYTES = 4_096;
+
+async function readOwnedRuntime(path: string): Promise<string> {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || !Number.isSafeInteger(stat.size) ||
+        stat.size > MAX_RUNTIME_BYTES)
+      throw new Error("service-runtime-unsafe");
+    const bytes = Buffer.alloc(stat.size + 1);
+    let size = 0;
+    let complete = false;
+    while (size < bytes.length) {
+      const read = await handle.read(bytes, size, bytes.length - size, null);
+      if (read.bytesRead === 0) {
+        complete = true;
+        break;
+      }
+      size += read.bytesRead;
+    }
+    const after = await handle.stat();
+    if (!complete || stat.size !== after.size ||
+        stat.mtimeMs !== after.mtimeMs || stat.ctimeMs !== after.ctimeMs)
+      throw new Error("service-runtime-unsafe");
+    return bytes.subarray(0, size).toString("utf8");
+  } finally {
+    await handle.close();
+  }
+}
+
+async function boundedResponseText(
+  response: Response,
+  maxBytes: number,
+): Promise<string | undefined> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && /^[0-9]+$/u.test(declared) &&
+      Number(declared) > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
+  const stream = response.body;
+  if (stream === null) return undefined;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytes = 0;
+  let text = "";
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) return text + decoder.decode();
+      bytes += part.value.byteLength;
+      if (bytes > maxBytes) return undefined;
+      text += decoder.decode(part.value, { stream: true });
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
 }
