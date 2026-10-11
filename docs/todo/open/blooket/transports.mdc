@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, question-panel read and cleanup helpers also began
+requiring a CSS-visible authenticated shell and Cancel control.
+A CSS-hidden read-owned Cancel button with nonzero layout bounds
+cannot be clicked. Existing synthetic panel tests verify this
+without a provider mutation, while still allowing exact owned
+Cancel after the control becomes visible again.
+
 On 2026-10-11, independently injected set-detail, question-card,
 Add Question and saved-image helpers began requiring an exact
 `/edit?id=<set-id>` route: one ID parameter, no extras or fragment.

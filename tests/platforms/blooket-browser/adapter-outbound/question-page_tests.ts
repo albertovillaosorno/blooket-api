@@ -926,6 +926,12 @@ test("question modal actions refuse disabled and hidden controls", () => {
     cancel.getBoundingClientRect = () => ({ width: 0, height: 0 });
     assert.equal(closeBlooketQuestionPanel("fixture"), false);
     cancel.getBoundingClientRect = () => ({ width: 24, height: 20 });
+    cancel.visibility = "hidden";
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    delete cancel.visibility;
+    cancel.display = "none";
+    assert.equal(closeBlooketQuestionPanel("fixture"), false);
+    delete cancel.display;
     assert.equal(closeBlooketQuestionPanel("fixture"), true);
   });
   assert.equal(editClicks, 1);
