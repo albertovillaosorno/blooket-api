@@ -1113,3 +1113,39 @@ test("image identity refuses hidden and symbol-owned success fields",
   }
   },
 );
+
+test("post-Cancel card drift never confirms the question", async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "listBlooketQuestionNumbers" && ++reads === 5)
+      return [{ result: { ok: true, value: [1, 2] } }];
+    return await original(request);
+  };
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input)).ok, false);
+  assert.equal(reads, 5);
+  assert.equal(fake.calls.includes("reload"), false);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+});
+
+test("fresh-document card drift blocks Add Question success", async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "listBlooketQuestionNumbers" && ++reads === 8)
+      return [{ result: { ok: true, value: [1, 2] } }];
+    return await original(request);
+  };
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input)).ok, false);
+  assert.equal(reads, 8);
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+});
