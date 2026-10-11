@@ -746,14 +746,15 @@ async function relay(current: Connection, activeGeneration: number) {
         const decoded = decodeBlooketBrowserBridgeRequest(next.job);
         if (!decoded.ok) throw new Error("invalid-browser-job");
         const job = decoded.value;
-        // Read jobs have ten seconds; writes have a bounded thirty-second
-        // budget. Reserve margin so a late browser call cannot mutate after
-        // its caller has stopped waiting. In-flight scripts remain ambiguous.
+        // Reads retain ten seconds; browser writes have a sixty-second
+        // broker lease for navigation and fresh-document verification.
+        // Leave transport margin before expiry so a late script cannot
+        // start another mutation after its caller stopped awaiting it.
         const budgetMs = job.command.kind === "session.authenticate"
           ? 7_500
           : job.command.kind === "sets.create" ||
               job.command.kind === "questions.create"
-            ? 27_000
+            ? 57_000
             : job.command.kind === "capabilities.inspect"
               ? 9_000 : 8_000;
         const jobBrowser = ownedBrowser(
@@ -897,8 +898,8 @@ async function relay(current: Connection, activeGeneration: number) {
       }
       status = "connection-unavailable";
     }
-    // Write leases need 9.5 seconds of the broker's ten-second window.
-    // A one-second poll can consume that margin before any form is opened.
+    // The broker reserves most of each lease for a dispatched job.
+    // Rapid polling also protects the short read/authentication budgets.
     await pause(250);
   }
 }

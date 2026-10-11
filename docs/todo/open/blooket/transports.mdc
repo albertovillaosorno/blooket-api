@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the extension worker's native-browser deadline was
+also aligned with the new bounded 60-second broker write lease. It now
+permits 57 seconds of owned browser operations before requiring a stop,
+leaving transport margin and retaining the separate eight-second read
+budget. Worker integration tests simulate an in-budget write after the
+former 27-second cutoff and an expired write at 65 seconds; neither
+requires duplicate Save clicks or live provider access.
+
 On 2026-10-10, the local browser bridge write lease increased from
 30 to 60 seconds to accommodate bounded Create Set navigation and the
 new fresh-document saved-state read-back without expiring an active Save
