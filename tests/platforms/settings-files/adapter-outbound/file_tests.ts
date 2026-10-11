@@ -181,3 +181,30 @@ test("invalid JSON and symbolic settings files fail closed", async () => {
     assert.equal(await readFile(outside, "utf8"), "safe");
   });
 });
+
+test("settings refuse oversized files and dangling symlink aliases",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "settings.json");
+    const json = JSON.stringify(defaultLocalServiceSettings());
+    await writeFile(path, json.padEnd(65_536, " "));
+    assert.equal((await loadSettingsFile(path)).ok, true);
+    await writeFile(path, json.padEnd(65_537, " "));
+    assert.deepEqual(await loadSettingsFile(path), {
+      ok: false, kind: "io", code: "settings-file-unsafe",
+    });
+    assert.deepEqual(await saveSettingsFile(
+      path, defaultLocalServiceSettings(),
+    ), { ok: false, kind: "io", code: "settings-file-unsafe" });
+    assert.equal((await readFile(path, "utf8")).length, 65_537);
+    await rm(path);
+    await symlink(join(directory, "missing.json"), path);
+    assert.deepEqual(await loadSettingsFile(path), {
+      ok: false, kind: "io", code: "settings-file-unsafe",
+    });
+    assert.deepEqual(await saveSettingsFile(
+      path, defaultLocalServiceSettings(),
+    ), { ok: false, kind: "io", code: "settings-file-unsafe" });
+  });
+  },
+);
