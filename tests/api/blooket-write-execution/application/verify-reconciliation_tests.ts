@@ -574,3 +574,63 @@ test("provider verification uses the shared execution lock", async () => {
     await acquired.lock.release();
   });
 });
+
+test("invalid verifier outcomes never clear or advance ambiguous attempts",
+  async () => {
+  const invalid: unknown[] = [
+    { ok: true, outcome: "unknown" },
+    { ok: true, outcome: "not-confirmed", trace: "untrusted" },
+    { ok: "true", outcome: "not-confirmed" },
+    { ok: true, outcome: "confirmed" },
+    { ok: true, outcome: "confirmed", receipt: null },
+    { ok: true, outcome: "confirmed", receipt: {
+      kind: "set-created", remoteSetId: "remote-set-1", extra: true,
+    } },
+    { ok: false, kind: "navigation", state: "dashboard" },
+    { ok: false, kind: "navigation", state: "security-challenge",
+      trace: "untrusted" },
+    { ok: false, kind: "browser", code: "blooket-browser-failed",
+      extra: "untrusted" },
+    null,
+  ];
+  for (const reply of invalid) {
+    await withTemporaryDirectory(async directory => {
+      const value = paths(directory);
+      assert.equal((await beginWriteAttempt(value.attempt, plan, 0)).ok,
+        true);
+      const result = await verifyPersistedBlooketWrite(
+        value, plan, browser(), secrets(),
+        verifier(reply as BlooketWriteVerificationResult, []),
+      );
+      assert.deepEqual(result, { ok: false, stage: "verification",
+        code: "blooket-browser-failed" });
+      const recovered = await loadWriteAttemptFile(value.attempt, plan);
+      assert.equal(recovered.ok, true);
+      assert.equal(recovered.ok && recovered.kind === "record" &&
+        recovered.record.phase, "attempting");
+      await assert.rejects(readFile(value.checkpoint, "utf8"));
+    });
+  }
+  },
+);
+
+test("question reconciliation rejects forged set receipts before persistence",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const value = paths(directory);
+    await persistBoundCheckpoint(value.checkpoint);
+    assert.equal((await beginWriteAttempt(value.attempt, plan, 1)).ok,
+      true);
+    const result = await verifyPersistedBlooketWrite(
+      value, plan, browser(), secrets(), verifier({
+        ok: true, outcome: "confirmed", receipt: SET_RECEIPT,
+      }, []),
+    );
+    assert.deepEqual(result, { ok: false, stage: "verification",
+      code: "blooket-browser-failed" });
+    const recovered = await loadWriteAttemptFile(value.attempt, plan);
+    assert.equal(recovered.ok && recovered.kind === "record" &&
+      recovered.record.phase, "attempting");
+  });
+  },
+);

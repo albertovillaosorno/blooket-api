@@ -751,3 +751,87 @@ test("image reconciliation matches a copied durable identity, not presence",
       captured.baseline), { ok: true, outcome: "inconclusive" });
   }
 });
+
+test("malformed set-list probe envelopes cannot become verification evidence",
+  async () => {
+  const candidateReplies: unknown[] = [
+    { ok: "true", value: [summary("new", "Astronomy")],
+      completeness: "complete" },
+    { ok: true, value: [summary("new", "Astronomy")],
+      completeness: "complete", extra: "not-admitted" },
+    { ok: false, code: "blooket-browser-failed", detail: "provider text" },
+    { ok: false, code: "unknown-provider-status" },
+    { ok: 1, value: [], completeness: "complete" },
+    null,
+  ];
+  for (const reply of candidateReplies) {
+    const verifier = blooketSetReadWriteVerifier({
+      list: async () => reply as Awaited<ReturnType<
+        BlooketSetReadPort["list"]>>,
+      get: async () => ({ ok: true,
+        value: detail("new", "Astronomy") }),
+    });
+    assert.deepEqual(await verifier.captureBaseline(
+      operation, { remoteSetId: null },
+    ), { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  },
+);
+
+test("malformed set-detail envelopes cannot confirm an ambiguous creation",
+  async () => {
+  const baselineVerifier = blooketSetReadWriteVerifier({
+    list: async () => ({ ok: true, completeness: "complete", value: [] }),
+    get: async () => { throw Error("should not read detail"); },
+  });
+  const captured = await baselineVerifier.captureBaseline(
+    operation, { remoteSetId: null },
+  );
+  assert.ok(captured.ok && captured.baseline);
+  if (!captured.ok) return;
+  for (const reply of [
+    { ok: "true", value: detail("new", "Astronomy") },
+    { ok: true, value: detail("new", "Astronomy"),
+      debug: "not-admitted" },
+    { ok: false, code: "blooket-browser-failed", detail: "private" },
+  ]) {
+    const verifier = blooketSetReadWriteVerifier({
+      list: async () => ({ ok: true, completeness: "complete",
+        value: [summary("new", "Astronomy")] }),
+      get: async () => reply as Awaited<ReturnType<BlooketSetReadPort["get"]>>,
+    });
+    assert.deepEqual(await verifier.verify(
+      operation, { remoteSetId: null }, captured.baseline,
+    ), { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  },
+);
+
+test("malformed question-list envelopes never reconcile a saved question",
+  async () => {
+  const target = { remoteSetId: "remote-set-1" };
+  const op = typingOperation();
+  const unusedSets: BlooketSetReadPort = {
+    list: async () => { throw Error("set listing is not used"); },
+    get: async () => { throw Error("set details are not used"); },
+  };
+  const capture = await blooketSetReadWriteVerifier(
+    unusedSets, questionReads([[]]),
+  ).captureBaseline(op, target);
+  assert.ok(capture.ok && capture.baseline);
+  if (!capture.ok) return;
+  for (const reply of [
+    { ok: "true", value: [remoteTyping()] },
+    { ok: true, value: [remoteTyping()], extra: true },
+    { ok: false, code: "unknown-provider-status" },
+    { ok: false, code: "blooket-browser-failed", extra: true },
+  ]) {
+    const verifier = blooketSetReadWriteVerifier(unusedSets, {
+      list: async () => reply as Awaited<ReturnType<
+        BlooketQuestionReadPort["list"]>>,
+    });
+    assert.deepEqual(await verifier.verify(op, target, capture.baseline),
+      { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  },
+);
