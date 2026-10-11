@@ -476,8 +476,17 @@ async function observeQuestion(
         isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
         [input.setId],
       ).catch(() => false);
-      if (isClosed === true)
-        return confirmed ? { ok: true } : browserFailure();
+      if (isClosed === true) {
+        if (!confirmed) return browserFailure();
+        // A concurrent teacher edit can append another card while this
+        // read-owned panel is open. Never confirm a changed collection.
+        const finalList = await script(
+          listBlooketQuestionNumbers as (...args: never[]) => unknown,
+          [input.setId],
+        ).catch(() => null);
+        return questionNumberPresent(finalList, input.number)
+          ? { ok: true } : browserFailure();
+      }
       if (isClosed !== false) return browserFailure();
       await pause(POLL_MS);
     }
@@ -577,14 +586,10 @@ function questionNumberPresent(result: unknown, number: number): boolean {
       Object.keys(result).sort().join() !== "ok,value" ||
       !("ok" in result) || result.ok !== true ||
       !("value" in result) || !Array.isArray(result.value) ||
-      result.value.length > 200) return false;
-  const seen = new Set<number>();
-  for (const value of result.value) {
-    if (!Number.isSafeInteger(value) || value < 1 || value > 10_000 ||
-        seen.has(value)) return false;
-    seen.add(value);
-  }
-  return seen.has(number);
+      !Number.isSafeInteger(number) || number < 1 || number > 200 ||
+      result.value.length !== number) return false;
+  return result.value.every((candidate, index) =>
+    Number.isSafeInteger(candidate) && candidate === index + 1);
 }
 
 function exactOk(value: unknown): boolean {

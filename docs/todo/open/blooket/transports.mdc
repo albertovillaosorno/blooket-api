@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Add Question post-submit confirmation began requiring
+the exact contiguous question sequence through the newly added number,
+not merely the presence of that number among unrelated cards. After
+closing its owned inspection panel, the host repeats the collection
+check to reject concurrent edits. Synthetic browser tests confirm that
+unexpected cards and a late appended card cannot turn one uncertain Save
+Question into a successful receipt.
+
 On 2026-10-10, the reusable Create Set browser surface began admitting
 the existing extension host's exact `requireMetadataConfirmation: true`
 acknowledgement after a single possible Save Set click. A lost injected
