@@ -1018,3 +1018,19 @@ These results come from portable Fedora tests and do not establish
 successful authenticated provider publication or native Safari support.
 Ambiguous remote attempt journals remain durable and must never be
 replayed without independent reconciliation evidence.
+
+
+## Exact saved-state and capability routes (2026-10-11)
+
+My Sets observations now require an unfiltered route. Create and Edit
+session observations refuse query or fragment variants instead of
+inferring readiness from stale mounted controls.
+
+Saved-image reads require CSS-visible owned panels before and after
+fetch. Capability inspections require visible Add Question, Audio and
+Cancel controls on an exact Edit URL. A hidden Audio drawer cannot
+establish Plus entitlement.
+
+These are synthetic Fedora observations, not live Blooket publication
+or native macOS/Safari evidence. No account content was changed and
+ambiguous past attempts remain preserved without replay.
