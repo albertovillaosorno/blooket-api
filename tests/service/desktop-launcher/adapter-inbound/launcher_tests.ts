@@ -32,6 +32,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { execFile } from "node:child_process";
+import { createServer } from "node:http";
 import { promisify } from "node:util";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -93,3 +94,68 @@ test("launcher refuses diagnostics combined with a lifecycle action",
         { code: "ENOENT" });
     } finally { await rm(root, { recursive: true, force: true }); }
   });
+
+test("launcher stop refuses oversized and invalid local bootstrap replies",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "launcher-stop-safe-"));
+  let mode: "oversized" | "bad-csrf" | "valid" = "oversized";
+  let stopped = 0;
+  const runtime = {
+    version: 1, pid: process.pid,
+    instance: "00000000-0000-0000-0000-000000000000",
+    origin: "",
+  };
+  const server = createServer((request, response) => {
+    if (request.url === "/api/service-status") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify(runtime));
+    } else if (request.url === "/api/bootstrap") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(mode === "oversized"
+        ? "x".repeat(128_001)
+        : JSON.stringify({ csrf: mode === "bad-csrf"
+          ? "unsafe" : "a".repeat(43) }));
+    } else if (request.url === "/api/service-stop") {
+      stopped++;
+      assert.equal(request.headers.origin, runtime.origin);
+      assert.equal(request.headers["x-csrf-token"], "a".repeat(43));
+      response.writeHead(202);
+      response.end("{}");
+    } else {
+      response.writeHead(404);
+      response.end();
+    }
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  runtime.origin = "http://127.0.0.1:" + address.port;
+  try {
+    await writeFile(join(root, "service-runtime.json"),
+      JSON.stringify(runtime));
+    for (const invalid of ["oversized", "bad-csrf"] as const) {
+      mode = invalid;
+      await assert.rejects(promisify(execFile)(process.execPath, [
+        launcher, "--stop",
+      ], {
+        env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
+        timeout: 6_000, maxBuffer: 8192,
+      }), { code: 1 });
+      assert.equal(stopped, 0);
+    }
+    mode = "valid";
+    const accepted = await promisify(execFile)(process.execPath, [
+      launcher, "--stop",
+    ], {
+      env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
+      timeout: 6_000, maxBuffer: 8192,
+    });
+    assert.equal(accepted.stdout, "Service stopped.\n");
+    assert.equal(stopped, 1);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    await rm(root, { recursive: true, force: true });
+  }
+  },
+);

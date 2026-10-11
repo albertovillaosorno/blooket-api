@@ -145,6 +145,13 @@ as lesson media. Normal successful operations remove their temporary files.
 Crash leftovers that cannot be proven safe to remove are ignored or surfaced for
 recovery rather than guessed away.
 
+The explicit desktop launcher's Stop action also authenticates a
+bounded loopback bootstrap response before forwarding the CSRF header to
+`/api/service-stop`. The read has a three-second timeout, a 128 KiB
+stream ceiling, and an exact 43-character base64url token shape.
+A malformed or oversized bootstrap cannot initiate Stop; a synthetic
+loopback launcher subprocess proves both refusal and a normal stop.
+
 The local service runtime discovery record (`service-runtime.json`) is
 loaded from one `O_NOFOLLOW` descriptor with a 4,096-byte limit. Even the
 localhost status HTTP response is decoded from a bounded stream rather than
