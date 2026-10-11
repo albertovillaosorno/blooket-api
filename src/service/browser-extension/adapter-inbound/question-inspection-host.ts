@@ -317,6 +317,14 @@ export function createExtensionQuestionInspectionHost(
         if (!after || after.length !== numbers.length ||
             after.some((number, index) => number !== numbers[index]))
           return browserFailure();
+        // A just-canceled modal can briefly return a stale card collection.
+        // Require two independent final saved-list observations before the
+        // read becomes positive evidence for journal reconciliation.
+        await pause(0);
+        const afterAgain = await enumerate(setId, url, deadline);
+        if (!afterAgain || afterAgain.length !== after.length ||
+            afterAgain.some((number, index) => number !== after[index]))
+          return browserFailure();
         return { ok: true, value: questions };
       } catch {
         return browserFailure();

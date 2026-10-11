@@ -270,6 +270,7 @@ test(
     "closeBlooketQuestionPanel",
     "isBlooketQuestionPanelClosed",
     "listBlooketQuestionNumbers",
+    "listBlooketQuestionNumbers",
   ]);
   },
 );
@@ -284,7 +285,7 @@ test(
   assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
     ok: true, value: [],
   });
-  assert.equal(fixture.enumerations(), 2);
+  assert.equal(fixture.enumerations(), 3);
   assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
@@ -473,10 +474,10 @@ test("initial list retries bounded loading-state failures", async () => {
   const unavailable = { ok: false, code: "blooket-browser-failed" };
   const page = synthetic({ listReplies: [
     unavailable, unavailable, { ok: true, value: [1] },
-    { ok: true, value: [1] },
+    { ok: true, value: [1] }, { ok: true, value: [1] },
   ] });
   assert.equal((await page.host.inspect(FIXTURE_SET, 1_000)).ok, true);
-  assert.equal(page.enumerations(), 4);
+  assert.equal(page.enumerations(), 5);
   assert.equal(page.tick(), 200);
   assert.equal(page.calls.filter(
     (name) => name === "openBlooketQuestionPanel",
@@ -782,6 +783,24 @@ test("hidden saved-image envelopes never become question evidence",
     assert.equal(fixture.calls.includes(
       "inspectOpenedBlooketQuestionImage"), true);
     assert.equal(fixture.calls.includes("closeBlooketQuestionPanel"), true);
+  }
+  },
+);
+
+test("late question-card drift after Cancel cannot confirm read results",
+  async () => {
+  for (const lists of [
+    [[1], [1], [1, 2]],
+    [[1], [1], []],
+    [[], [], [1]],
+  ]) {
+    const fixture = synthetic({ listReplies: lists.map(value => ({
+      ok: true, value,
+    })) });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.enumerations(), 3);
+    assert.equal(fixture.calls.filter(name =>
+      name === "closeBlooketQuestionPanel").length, lists[0]!.length);
   }
   },
 );
