@@ -57,7 +57,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
-import { readFile, lstat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { decodeCommandEnvelope } from
   "../../../ir/wire-envelopes/contract/command-envelope.ts";
@@ -74,6 +74,7 @@ import {
   exists,
   listLibrary,
   safeLibraryPath,
+  boundedBytes,
 } from "../../../platforms/user-library/adapter-outbound/files.ts";
 import {
   importLibraryImage,
@@ -417,8 +418,9 @@ export async function startBrowserService(
         }
         const file = record.asset;
         const path = await safeLibraryPath(library, file);
-        const size = (await lstat(path)).size;
-        if (size > 25_000_000) throw new Error("media-byte-limit-exceeded");
+        // Read and validate bytes before committing the 200 response. A
+        // replaced path must never bypass the advertised size bound.
+        const mediaBytes = await boundedBytes(path, 25_000_000);
         response.writeHead(200, {
           "Content-Type": file.toLowerCase().endsWith(".gif")
             ? "image/gif"
@@ -430,7 +432,7 @@ export async function startBrowserService(
                   ? "image/avif"
                   : "image/jpeg",
         });
-        response.end(await readFile(path));
+        response.end(mediaBytes);
         return;
       }
       json(response, 404, { code: "not-found" });
