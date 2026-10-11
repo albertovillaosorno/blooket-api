@@ -62,6 +62,17 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the Create Set extension host began binding the edit redirect,
+its second confirmation read, and each saved-sidebar observation to one
+positive native `performance.timeOrigin` on the exact edit route. A document
+replacement at the same `/edit?id=...` URL previously could mix two valid
+observations and fabricate a stable saved-set receipt.
+
+Synthetic tests replace the origin before the second receipt and between
+sidebar samples; both stop without retrying the mutation. Missing native
+origin evidence also fails closed. No authenticated Create Set acceptance is
+inferred.
+
 On 2026-10-10, the shared publication file-lock reader switched from a
 pathname `lstat`/`readFile` pair to a bounded `O_NOFOLLOW` descriptor read.
 The prior sequence could follow a substituted symlink between inspection

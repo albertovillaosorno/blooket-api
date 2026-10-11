@@ -83,6 +83,10 @@ function fakeChrome(options: {
           return [{ result: options.canLeave === undefined
               ? true : options.canLeave }];
         }
+        if (request.func.name === "inspectBlooketDocumentOrigin") {
+          calls.push("document-origin");
+          return [{ result: 1_000 }];
+        }
         if (request.func.name === "runBlooketCreateSetOwnership") {
           const action = request.args?.[0];
           calls.push("create-ownership:" + action);
@@ -877,5 +881,53 @@ test("late tab switch after lost submit acknowledgement stops recovery",
     ok: false, kind: "browser", code: "blooket-browser-failed",
   });
   assert.equal(fake.calls.filter(x => x === "script").length, 2);
+  },
+);
+
+test("same-URL document replacement cannot prove Create Set success",
+  async () => {
+  const edit = "https://dashboard.blooket.com/edit?id=remote-set-1";
+  for (const switchAt of [2, 3, 5]) {
+    const sidebar = { ok: true, value: {
+      title: "Synthetic set", description: "Description",
+    } };
+    const fake = fakeChrome({ scripts: [
+      observed, observed, sidebar, sidebar,
+    ] });
+    fake.setTab({ url: edit, status: "complete" });
+    const original = fake.chrome.scripting.executeScript;
+    let reads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketDocumentOrigin") {
+        reads++;
+        return [{ result: reads < switchAt ? 1_000 : 2_000 }];
+      }
+      return await original(request);
+    };
+    const host = createExtensionCreateSetHost(fake.chrome, 7,
+      async () => undefined);
+    assert.deepEqual(await host.observeCreateSet({
+      title: "Synthetic set", description: "Description",
+    }), { ok: false, kind: "browser", code: "blooket-browser-failed" });
+    assert.equal(reads, switchAt);
+  }
+  },
+);
+
+test("missing native edit-document origin cannot confirm Create Set",
+  async () => {
+  const fake = fakeChrome({ scripts: [observed, observed] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: null }] : await original(request);
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.observeCreateSet(), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(fake.calls.filter(call => call === "script").length, 0);
   },
 );
