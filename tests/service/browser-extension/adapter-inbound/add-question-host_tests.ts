@@ -1204,3 +1204,46 @@ test("Add Question never invokes list-result getters before opening",
     }
   },
 );
+
+test("Add Question rejects malformed empty prior card collections",
+  async () => {
+    for (const mutation of [
+      (list: number[]) => Object.defineProperty(list, "hidden", {
+        value: true, enumerable: false,
+      }),
+      (list: number[]) => Object.defineProperty(list, Symbol("hidden"), {
+        value: true,
+      }),
+    ]) {
+      const list: number[] = [];
+      mutation(list);
+      const fake = fakeChrome({ priorListReply: { ok: true, value: list } });
+      assert.equal((await createExtensionAddQuestionHost(
+        fake.chrome, 7, async () => undefined,
+      ).addQuestion(input)).ok, false);
+      assert.equal(fake.calls.some(name => name.includes(":open")), false);
+      assert.equal(fake.calls.some(name => name.includes(":submit")), false);
+    }
+  },
+);
+
+test("Add Question cannot confirm sparse or getter-backed saved cards",
+  async () => {
+    for (const style of ["sparse", "getter"] as const) {
+      const list = new Array<number>(1);
+      let getters = 0;
+      if (style === "getter") Object.defineProperty(list, "0", {
+        enumerable: true,
+        get() { getters++; return 1; },
+      });
+      const fake = fakeChrome({ listReply: { ok: true, value: list } });
+      assert.equal((await createExtensionAddQuestionHost(
+        fake.chrome, 7, async () => undefined,
+      ).addQuestion(input)).ok, false);
+      assert.equal(getters, 0);
+      assert.equal(fake.calls.filter(name => name.includes(":submit"))
+        .length, 1);
+      assert.equal(fake.readBackReads(), 0);
+    }
+  },
+);

@@ -33,6 +33,8 @@ import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import { blooketPreparedImageBytes } from
   "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
+import { isExactDenseArray } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
 import { inspectOpenedBlooketQuestionImage } from
@@ -622,7 +624,7 @@ function exactPreviousQuestionNumbers(result: unknown, number: number) {
   if (!result || typeof result !== "object" || Array.isArray(result) ||
       !exactKeys(result, "ok,value") ||
       !("ok" in result) || result.ok !== true ||
-      !("value" in result) || !Array.isArray(result.value) ||
+      !("value" in result) || !isExactDenseArray(result.value) ||
       result.value.length !== number - 1 || result.value.length > 200)
     return false;
   return result.value.every((candidate, index) =>
@@ -644,7 +646,7 @@ function postSaveQuestionRows(
       result.code === "blooket-browser-failed") return "pending";
   if (!exactKeys(result, "ok,value") || !("ok" in result) ||
       result.ok !== true || !("value" in result) ||
-      !Array.isArray(result.value) || result.value.length > 200 ||
+      !isExactDenseArray(result.value) || result.value.length > 200 ||
       (result.value.length !== number &&
        result.value.length !== number - 1) ||
       !result.value.every((candidate, index) =>

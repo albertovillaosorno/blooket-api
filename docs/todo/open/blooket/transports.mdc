@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the Add Question host and read-only question
+inspector began requiring exact dense numeric card collections before
+claiming empty prior state, saved post-submit question rows, or
+existing-question enumeration. Sparse lists, hidden array metadata,
+and getter-backed numeric slots cannot bypass `.every()` or execute
+untrusted accessors. Synthetic cases cover refusal before opening the
+editor and a permanently ambiguous single Save when cards are malformed.
+
 On 2026-10-11, exact page-reply envelopes in the four Chrome hosts
 also began requiring enumerable own data fields, rather than merely
 matching field names. Accessor-backed and hidden `ok`/`value` data
