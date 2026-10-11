@@ -1381,3 +1381,38 @@ test("Edit Info read survives the recovered sidebar mount transition", () => {
     assert.equal(closed, 1);
   });
 });
+
+
+test("My Sets refuses filtered and fragmented collection routes", () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  for (const suffix of ["?filter=teacher", "#teacher-folder"]) {
+    page(document, "https://dashboard.blooket.com/my-sets" + suffix, () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "unexpected-page",
+      });
+      assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+    });
+  }
+});
+
+test("Create and Edit status refuses extra URL state", () => {
+  const { document, main } = base();
+  document.selectors["form#question-set-form"] = [node("FORM")];
+  document.selectors["form#question-set-form button"] = [node("BUTTON", "Create Set")];
+  for (const suffix of ["", "?draft=1", "#draft"]) {
+    page(document, "https://dashboard.blooket.com/create" + suffix, () => {
+      const result = inspectBlooketPage({ kind: "session.observe" });
+      assert.deepEqual(result, {
+        ok: true, value: suffix ? "unexpected-page" : "create",
+      });
+    });
+  }
+  main.selectors["button"] = [node("BUTTON", "Save Set")];
+  for (const suffix of ["", "&draft=1", "#draft"]) {
+    page(document, "https://dashboard.blooket.com/edit?id=fixture" + suffix,
+      () => assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: suffix ? "unexpected-page" : "edit",
+      }));
+  }
+});

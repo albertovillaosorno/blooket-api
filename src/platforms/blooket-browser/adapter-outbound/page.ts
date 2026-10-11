@@ -176,12 +176,12 @@ export function inspectBlooketPage(
         return { ok: true, value: "unexpected-page" };
       const heading = main.querySelector("h1");
       if (
-        url.pathname === "/my-sets" &&
+        url.pathname === "/my-sets" && !url.search && !url.hash &&
         heading !== null && visible(heading) &&
         heading.textContent?.trim() === "My Sets"
       )
         return { ok: true, value: "my-sets" };
-      if (url.pathname === "/create") {
+      if (url.pathname === "/create" && !url.search && !url.hash) {
         const forms = Array.from(
           document.querySelectorAll("form#question-set-form"),
         );
@@ -193,7 +193,10 @@ export function inspectBlooketPage(
           visible(forms[0]) && submits.length === 1 && visible(submits[0]!)
         ) return { ok: true, value: "create" };
       }
-      if (url.pathname === "/edit") {
+      if (url.pathname === "/edit" && !url.hash &&
+          url.searchParams.size === 1 &&
+          url.searchParams.getAll("id").length === 1 &&
+          !!url.searchParams.get("id")) {
         const heading = main.querySelector("h1");
         const saves = Array.from(main.querySelectorAll("button"))
           .filter((button) => button.textContent?.trim() === "Save Set");
@@ -213,7 +216,7 @@ export function inspectBlooketPage(
     if (operation.kind === "sets.list") {
       const heading = main.querySelector("h1");
       if (
-        url.pathname !== "/my-sets" ||
+        url.pathname !== "/my-sets" || url.search || url.hash ||
         !heading || !visible(heading) ||
         heading.textContent?.trim() !== "My Sets"
       )
