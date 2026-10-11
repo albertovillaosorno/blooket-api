@@ -113,6 +113,18 @@ test("direct cyclic object graphs cannot bypass Flight cycle checks", () => {
   assert.deepEqual(resolved, [{ title: "Fictional" }]);
 });
 
+test("ordinary JSON cannot impersonate a tagged Flight error row", () => {
+  const ordinary = '0:{"kind":"error","digest":"fixture-digest"}\n';
+  const extended =
+    '0:{"kind":"error","digest":"fixture-digest","extra":"hidden"}\n';
+  for (const source of [ordinary, extended]) {
+    assert.deepEqual(flightErrorRecords(source), []);
+    assert.equal(flightObjects(decodeFlightRows(source)).length, 1);
+  }
+  const forged = { kind: "error", digest: "direct" };
+  assert.deepEqual(flightObjects(new Map([["0", forged]])), [forged]);
+});
+
 test("action state validation is exact and never coerces primitives", () => {
   const row = (value: unknown) => "0:" + JSON.stringify(value) + "\n";
   assert.deepEqual(flightActionState(row(action)), action);
