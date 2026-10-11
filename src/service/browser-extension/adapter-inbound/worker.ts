@@ -308,25 +308,31 @@ async function read(
         Date.now() >= readDeadline)
       throw new Error("browser-navigation-unsafe");
   }
+  let confirmedTargetOrigin: number | undefined;
   const confirmed = await confirmBlooketReadNavigation(
     browser.tabs, current.tabId, tab, target, readDeadline, pause,
     async url => await script(current, browser,
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [url]),
     Date.now, approvedSourceOrigin,
+    origin => { confirmedTargetOrigin = origin; },
   );
-  if (!confirmed) throw new Error("browser-navigation-timeout");
+  if (!confirmed || (target !== null &&
+      confirmedTargetOrigin === undefined))
+    throw new Error("browser-navigation-timeout");
   tab = confirmed;
   if (operation.kind === "questions.list") {
     const host = createExtensionQuestionInspectionHost(
       browser, current.tabId, pause,
     );
-    return await host.inspect(operation.setId, readDeadline);
+    return await host.inspect(operation.setId, readDeadline,
+      confirmedTargetOrigin);
   }
   if (operation.kind === "sets.list") {
     const expectedOrigin = await script(current, browser,
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [target]);
     if (typeof expectedOrigin !== "number" ||
         !Number.isFinite(expectedOrigin) || expectedOrigin <= 0 ||
+        expectedOrigin !== confirmedTargetOrigin ||
         Date.now() >= readDeadline)
       throw new Error("browser-set-list-unavailable");
     const observe = async () => {
@@ -411,6 +417,7 @@ async function read(
       [target]);
     if (typeof documentOrigin !== "number" ||
         !Number.isFinite(documentOrigin) || documentOrigin <= 0 ||
+        documentOrigin !== confirmedTargetOrigin ||
         Date.now() >= readDeadline)
       throw new Error("browser-details-unavailable");
     const ownsDetailRoute = async () => {

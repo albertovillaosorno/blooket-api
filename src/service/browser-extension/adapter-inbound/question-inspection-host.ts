@@ -190,7 +190,12 @@ export function createExtensionQuestionInspectionHost(
     inspect: async (
       setId: string,
       deadline: number,
+      confirmedDocumentOrigin?: number,
     ): Promise<ExtensionQuestionInspectionResult> => {
+      if (confirmedDocumentOrigin !== undefined &&
+          (!Number.isFinite(confirmedDocumentOrigin) ||
+           confirmedDocumentOrigin <= 0)) return browserFailure();
+      originalDocumentOrigin = confirmedDocumentOrigin ?? null;
       if (!setId || setId.length > 512 ||
           /[\x00-\x1f\x7f]/u.test(setId) ||
           !Number.isFinite(deadline) || deadline <= now())

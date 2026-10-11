@@ -53,6 +53,7 @@ export async function confirmBlooketReadNavigation(
   documentOrigin: (url: string) => Promise<unknown>,
   now: () => number = Date.now,
   approvedSourceOrigin?: number,
+  onConfirmedTargetOrigin?: (origin: number) => void,
 ): Promise<ReadTab | undefined> {
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (now() >= deadline) return undefined;
@@ -100,6 +101,7 @@ export async function confirmBlooketReadNavigation(
         const checked = await tabs.get(tabId);
         if (now() >= deadline || checked.url !== target ||
             checked.status !== "complete") return undefined;
+        onConfirmedTargetOrigin?.(origin);
         return checked;
       }
     }
