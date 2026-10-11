@@ -155,16 +155,29 @@ export function prepareBlooketCreateSetForm(
         privacyInput.disabled ||
         privacyInput.getAttribute("aria-disabled") === "true")
       return failed();
-    const label = Array.from(privacyInput.labels ?? [])
-      .map((item) => item.textContent ?? "")
-      .join(" ");
+    // Recovered module 31017 puts the current privacy words in a direct
+    // <p> beside the switch, not inside its associated toggle label.
+    const rows = Array.from(privacyInput.labels ?? [])
+      .filter(label => label.tagName === "LABEL")
+      .map(label => label.parentElement?.tagName === "SPAN"
+        ? label.parentElement.parentElement : label.parentElement)
+      .filter(row => row?.tagName === "DIV" &&
+        row.querySelectorAll(":scope > p").length === 1);
+    if (rows.length !== 1) return failed();
+    const paragraph = rows[0]!.querySelectorAll(":scope > p")[0]!;
+    const stateBounds = paragraph.getBoundingClientRect();
+    const rowBounds = rows[0]!.getBoundingClientRect();
+    if (paragraph.tagName !== "P" || stateBounds.width <= 0 ||
+        stateBounds.height <= 0 || rowBounds.width <= 0 ||
+        rowBounds.height <= 0) return failed();
+    const state = paragraph.textContent?.replace(/\s+/gu, " ").trim();
     const ariaChecked = privacyInput.getAttribute("aria-checked");
     const currentPrivate =
       ariaChecked === "false" &&
-      /Private\s*\(Only playable by you\)/u.test(label)
+      state === "Private (Only playable by you)"
         ? true
         : ariaChecked === "true" &&
-            /Public\s*\(Playable by everyone\)/u.test(label)
+            state === "Public (Playable by everyone)"
           ? false
           : undefined;
     if (currentPrivate === undefined) return failed();
@@ -295,16 +308,29 @@ export function submitBlooketCreateSetForm(
         privacyInput.disabled ||
         privacyInput.getAttribute("aria-disabled") === "true")
       return failed();
-    const label = Array.from(privacyInput.labels ?? [])
-      .map((item) => item.textContent ?? "")
-      .join(" ");
+    // Recovered module 31017 puts the current privacy words in a direct
+    // <p> beside the switch, not inside its associated toggle label.
+    const rows = Array.from(privacyInput.labels ?? [])
+      .filter(label => label.tagName === "LABEL")
+      .map(label => label.parentElement?.tagName === "SPAN"
+        ? label.parentElement.parentElement : label.parentElement)
+      .filter(row => row?.tagName === "DIV" &&
+        row.querySelectorAll(":scope > p").length === 1);
+    if (rows.length !== 1) return failed();
+    const paragraph = rows[0]!.querySelectorAll(":scope > p")[0]!;
+    const stateBounds = paragraph.getBoundingClientRect();
+    const rowBounds = rows[0]!.getBoundingClientRect();
+    if (paragraph.tagName !== "P" || stateBounds.width <= 0 ||
+        stateBounds.height <= 0 || rowBounds.width <= 0 ||
+        rowBounds.height <= 0) return failed();
+    const state = paragraph.textContent?.replace(/\s+/gu, " ").trim();
     const ariaChecked = privacyInput.getAttribute("aria-checked");
     const currentPrivate =
       ariaChecked === "false" &&
-      /Private\s*\(Only playable by you\)/u.test(label)
+      state === "Private (Only playable by you)"
         ? true
         : ariaChecked === "true" &&
-            /Public\s*\(Playable by everyone\)/u.test(label)
+            state === "Public (Playable by everyone)"
           ? false
           : undefined;
     if (

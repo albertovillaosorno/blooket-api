@@ -62,6 +62,16 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, Create Set preparation and final single-click submission
+began reading the switch's *visible sibling privacy paragraph* instead
+of inferring its state from the associated toggle label. The recovered
+build `86784c3d4c38fcd559c92f38fbadd7a160947de2` module 31017 renders
+Private/Public text in a `<p>` next to the toggle; the 2026-10-08
+browser observation independently confirmed checked = Public and
+unchecked = Private. Synthetic tests exercise both states, switching,
+hidden paragraphs, duplicate rows, and mismatched switch state without
+any provider mutation. The newer live DOM still needs fresh acceptance.
+
 On 2026-10-11, Create Set's confirmed browser success gained saved
 privacy read-back. After fresh Edit document reload and two matching
 saved sidebar observations, the host opens only a read-owned Edit Info
