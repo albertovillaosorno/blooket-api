@@ -217,6 +217,27 @@ test("durable duration exhaustion preserves the prior state", async () => {
   });
 });
 
+test("the maximum bounded budget file admits only exact owned bytes",
+  async () => {
+  await temporary(async directory => {
+    const path = join(directory, "budget.json");
+    const body = JSON.stringify({
+      schemaVersion: 1, planId: "plan:synthetic", state: {
+        version: 1, startedAtMs: 10_000, starts: 1,
+      },
+    });
+    await writeFile(path, body.padEnd(4_096, " "));
+    assert.deepEqual(await loadMutationBudgetFile(path, "plan:synthetic"), {
+      ok: true, state: { version: 1, startedAtMs: 10_000, starts: 1 },
+    });
+    await writeFile(path, body.padEnd(4_097, " "));
+    assert.deepEqual(await loadMutationBudgetFile(path, "plan:synthetic"), {
+      ok: false, kind: "io", code: "mutation-budget-file-unsafe",
+    });
+  });
+  },
+);
+
 test("unsafe malformed and oversized budget files fail closed", async () => {
   await temporary(async (directory) => {
     const path = join(directory, "budget.json");
@@ -227,6 +248,17 @@ test("unsafe malformed and oversized budget files fail closed", async () => {
       ok: false,
       kind: "io",
       code: "mutation-budget-file-unsafe",
+    });
+    assert.deepEqual(await reserveMutationBudgetStart(
+      path, "plan:test", POLICY, 10_000,
+    ), {
+      ok: false, kind: "io", code: "mutation-budget-file-unsafe",
+    });
+    assert.equal(await readFile(outside, "utf8"), "{}");
+    await rm(path);
+    await symlink(join(directory, "missing.json"), path);
+    assert.deepEqual(await loadMutationBudgetFile(path, "plan:test"), {
+      ok: false, kind: "io", code: "mutation-budget-file-unsafe",
     });
 
     await rm(path);

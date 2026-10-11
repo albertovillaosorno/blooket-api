@@ -101,6 +101,17 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-10, the durable mutation-budget reader began opening the exact
+local file descriptor with `O_NOFOLLOW` before inspecting or reading it.
+Previously an `lstat` followed by a pathname-based `readFile` permitted a
+symlink replacement between checks.
+
+The new bounded descriptor read rejects symlink aliases, unreadable or
+nonregular files, and growth beyond 4,096 bytes. Synthetic filesystem
+regressions cover dangling and ordinary symlinks, budget reservation refusal,
+and the exact file-size boundary. No live provider write
+or exploit timing is claimed.
+
 On 2026-10-08, persisted write execution added a second cancellation
 checkpoint immediately after durable budget reservation. An abort while the
 budget adapter is working now prevents journal creation and remote mutation,
