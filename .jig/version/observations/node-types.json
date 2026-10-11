@@ -1,10 +1,10 @@
 {
   "authority": "node-types",
   "integrity_kind": "provider-response-sha256",
-  "integrity_sha256": "a5256d1f759b9293d694121f276aac39083eddc58ded0e93d7b477b2592a1068",
-  "observed_on": "2026-10-09",
+  "integrity_sha256": "c7b04c1f31c47dc6589284644d790ded395526d47fc08c9732885e9818a7b9c4",
+  "observed_on": "2026-10-11",
   "provider": "npm-registry",
   "schema_version": 1,
   "source": "https://registry.npmjs.org/@types%2fnode/latest",
-  "stable": "26.6.4"
+  "stable": "26.6.5"
 }
