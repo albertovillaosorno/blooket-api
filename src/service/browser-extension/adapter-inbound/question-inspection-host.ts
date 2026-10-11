@@ -146,11 +146,11 @@ export function createExtensionQuestionInspectionHost(
           !("value" in result) || !Array.isArray(result.value) ||
           result.value.length > MAX_QUESTIONS)
         return undefined;
-      const seen = new Set<number>();
-      for (const number of result.value) {
-        if (!Number.isSafeInteger(number) || number < 1 ||
-            number > MAX_NUMBER || seen.has(number)) return undefined;
-        seen.add(number);
+      // The provider renders questions in one contiguous slot order.
+      // An otherwise valid [2] or [2, 1] is not an entire saved set.
+      for (const [index, number] of result.value.entries()) {
+        if (!Number.isSafeInteger(number) || number !== index + 1 ||
+            number > MAX_NUMBER) return undefined;
       }
       // A scripted answer from a tab that switched mid-flight is not evidence.
       return await ready(url, deadline) ? result.value as number[] : undefined;
