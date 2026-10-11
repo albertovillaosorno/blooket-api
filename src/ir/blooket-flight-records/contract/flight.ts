@@ -199,9 +199,11 @@ export function flightObjects(
     }
     if (value === null || typeof value !== "object") return value;
     if (isFlightError(value)) return value;
+    // An in-progress output is not a completed memoized value. Checking
+    // memoization first would silently recreate direct object/array cycles.
+    if (resolvingObjects.has(value)) throw new Error("flight-cycle");
     const existing = objectMemo.get(value);
     if (existing !== undefined) return existing;
-    if (resolvingObjects.has(value)) throw new Error("flight-cycle");
     resolvingObjects.add(value);
     try {
       if (Array.isArray(value)) {
