@@ -903,3 +903,34 @@ verified without producing a macOS release asset. There was no new live
 Create Set, Add Question, browser-worker reload, or native macOS/Safari
 acceptance, so task blooket-09 remains open and earlier ambiguous
 journals retain their existing recovery requirements.
+
+## Create Set privacy fidelity and persisted confirmation (2026-10-11)
+
+Recovered dashboard module `31017.tsx` from build
+`86784c3d4c38fcd559c92f38fbadd7a160947de2` renders the current
+Private/Public wording inside a direct `<p>` beside the checkbox toggle,
+not in the toggle's own accessible label. Its inverted `aria-checked`
+semantics agree with the separately observed authenticated Chrome UI:
+checked means Public, unchecked means Private. The injected Create Set
+Prepare and final Submit functions now require the exact visible sibling
+paragraph and switch state. Hidden, duplicate, or contradictory rows
+refuse the click instead of inferring the requested privacy.
+
+Create Set's fresh-document read-back now goes beyond matching title
+and description: the extension opens the admitted Edit Info panel only
+for read-only verification, observes the exact set ID, metadata and
+saved private/public value twice, and cancels the owned panel without
+saving. It confirms only after the panel closes and the original saved
+sidebar still matches. A private request saved as public is inconclusive,
+not a success. Unexpected saved detail values fail immediately instead
+of waiting for a different later result, while only a genuinely not-ready
+panel may hydrate within the bounded read window. Confirmation callers
+must supply an explicit privacy expectation; the normal worker does.
+
+Synthetic Chrome host tests cover both privacy states, a lost Save
+acknowledgement, mismatched and changing visibility, malformed details,
+replacement document epochs, unsafe Cancel, and the delayed panel read.
+The worker integration additionally rejects a public saved set when the
+command requested Private. None of these portable tests is actual live
+Blooket persistence evidence. Earlier ambiguous journals remain pending;
+no new authenticated account content was mutated in this session.
