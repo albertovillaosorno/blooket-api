@@ -1038,6 +1038,32 @@ test(
 );
 
 
+test("confirming My Sets list cannot run a getter during comparison",
+  async () => {
+  let calls = 0;
+  const summary = { schemaVersion: 1, id: "set-fixture",
+    title: "Synthetic fixture" };
+  const first = { ok: true, value: {
+    completeness: "unknown", items: [summary],
+  } };
+  const secondRow = Object.defineProperty({ ...summary }, "title", {
+    enumerable: true,
+    get: () => { calls++; return "Synthetic fixture"; },
+  });
+  const second = { ok: true, value: {
+    completeness: "unknown", items: [secondRow],
+  } };
+  const page = fixture({ setListReplies: [first, second] });
+  assert.deepEqual(await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect(), { ok: false, code: "blooket-browser-failed" });
+  assert.equal(calls, 0);
+  assert.equal(page.scripts.includes(
+    "openBlooketCapabilityQuestionPanel"), false);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  },
+);
+
 test(
   "a user route change during My Sets confirmation aborts the probe",
   async () => {

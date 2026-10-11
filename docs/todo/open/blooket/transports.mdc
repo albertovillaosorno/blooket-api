@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, My Sets capability confirmation now validates the
+second result before any JSON comparison. A malicious accessor in a
+late row cannot run during stringification and cannot turn a drifted
+collection into a positive Plus-gate snapshot. The synthetic host
+test injects a getter only on the second observation and verifies
+that it is never invoked.
+
 On 2026-10-11, the capability host also began reading only the
 directly owned, enumerable `result` data field from each Chrome
 injection reply. An accessor-backed, hidden or absent wrapper cannot
