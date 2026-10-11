@@ -46,6 +46,8 @@ interface FixtureNode {
   tagName: string;
   textContent: string;
   value?: string;
+  visibility?: string;
+  display?: string;
   parent?: FixtureNode;
   readonly parentElement?: FixtureNode;
   selectors: Record<string, FixtureNode[]>;
@@ -132,6 +134,15 @@ function page(document: FixtureNode, href: string, run: () => void): void {
   ];
   const priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const priorStyle = Object.getOwnPropertyDescriptor(globalThis,
+    "getComputedStyle");
+  Object.defineProperty(globalThis, "getComputedStyle", {
+    configurable: true,
+    value: (element: FixtureNode) => ({
+      display: element.display ?? "block",
+      visibility: element.visibility ?? "visible",
+    }),
+  });
   Object.defineProperty(globalThis, "document", {
     configurable: true,
     value: document,
@@ -156,6 +167,9 @@ function page(document: FixtureNode, href: string, run: () => void): void {
     if (priorLocation)
       Object.defineProperty(globalThis, "location", priorLocation);
     else Reflect.deleteProperty(globalThis, "location");
+    if (priorStyle)
+      Object.defineProperty(globalThis, "getComputedStyle", priorStyle);
+    else Reflect.deleteProperty(globalThis, "getComputedStyle");
   }
 }
 
@@ -949,3 +963,36 @@ test("a teacher-owned question modal is not opened or replaced", () => {
     assert.equal(clicks, 1);
   });
 });
+
+test("CSS-hidden question cards and counters are not saved-state evidence",
+  () => {
+  const document = node("DOCUMENT");
+  const card = node("DIV", "", { "aria-label": "Edit question 1" });
+  const edit = node("BUTTON", " Edit ");
+  card.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label^="Edit question "]'
+  ] = [card];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [card];
+  const counter = questionHeader(document, 1);
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.deepEqual(listBlooketQuestionNumbers("fixture"), {
+      ok: true, value: [1],
+    });
+    for (const property of ["visibility", "display"] as const) {
+      card[property] = property === "visibility" ? "hidden" : "none";
+      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+      assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+      delete card[property];
+      counter[property] = property === "visibility" ? "collapse" : "none";
+      assert.equal(listBlooketQuestionNumbers("fixture").ok, false);
+      delete counter[property];
+      edit[property] = property === "visibility" ? "hidden" : "none";
+      assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+      delete edit[property];
+    }
+  });
+  },
+);

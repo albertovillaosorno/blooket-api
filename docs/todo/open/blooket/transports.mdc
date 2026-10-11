@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, saved question enumeration began rejecting
+CSS-hidden cards and independent question counters even when their
+bounding rectangles remain nonzero. The read-owned existing-question
+panel opener also refuses a CSS-hidden card or Edit button at its
+actual click boundary. Synthetic DOM tests confirm that concealed
+question slots cannot establish saved-state evidence or open a read
+modal after the visibility changes.
+
 On 2026-10-11, the Add Question Chrome host began checking *all own
 fields*, including hidden and symbol-owned properties, on navigation,
 form preparation, post-submit question, image identity and card-list

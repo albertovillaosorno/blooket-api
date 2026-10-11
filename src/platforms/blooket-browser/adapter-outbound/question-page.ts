@@ -125,14 +125,20 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     const counter = counters[0]!;
     const counterBounds = counter.getBoundingClientRect();
     const count = Number(counter.textContent!.trim().split(" ")[0]);
+    const counterStyle = getComputedStyle(counter);
     if (counterBounds.width <= 0 || counterBounds.height <= 0 ||
+        counterStyle.display === "none" ||
+        counterStyle.visibility !== "visible" ||
         !Number.isSafeInteger(count) || count > 200 ||
         controls.length !== count) return failed();
     const numbers: number[] = [];
     const seen = new Set<number>();
     for (const control of controls) {
       const bounds = control.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0) return failed();
+      const style = getComputedStyle(control);
+      if (bounds.width <= 0 || bounds.height <= 0 ||
+          style.display === "none" || style.visibility !== "visible")
+        return failed();
       const label = control.getAttribute("aria-label") ?? "";
       const match = /^Edit question ([1-9][0-9]*)$/u.exec(label);
       if (!match) return failed();
@@ -225,14 +231,19 @@ export function openBlooketQuestionPanel(
     );
     if (controls.length !== 1) return false;
     const cardBounds = controls[0]!.getBoundingClientRect();
-    if (cardBounds.width <= 0 || cardBounds.height <= 0) return false;
+    const cardStyle = getComputedStyle(controls[0]!);
+    if (cardBounds.width <= 0 || cardBounds.height <= 0 ||
+        cardStyle.display === "none" || cardStyle.visibility !== "visible")
+      return false;
     const buttons = Array.from(controls[0]!.querySelectorAll("button")).filter(
       (button) =>
         button.textContent?.replace(/\u00a0/gu, " ").trim() === "Edit",
     );
     if (buttons.length !== 1) return false;
     const editBounds = buttons[0]!.getBoundingClientRect();
+    const editStyle = getComputedStyle(buttons[0]!);
     if (editBounds.width <= 0 || editBounds.height <= 0 ||
+        editStyle.display === "none" || editStyle.visibility !== "visible" ||
         (buttons[0] as HTMLButtonElement).disabled ||
         buttons[0]!.getAttribute("aria-disabled") === "true") return false;
     // A question reader owns this modal only until the teacher interacts.
