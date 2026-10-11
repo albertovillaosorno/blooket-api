@@ -465,6 +465,40 @@ test("audio drawer distinguishes the shared Plus gate and cancels", () => {
   }
 });
 
+test("verified Audio drawer cannot transfer Cancel to a replacement", () => {
+  for (const type of ["supported", "unsupported"] as const) {
+    const page = fixture();
+    const first = drawer(type);
+    const replacement = drawer(type);
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [first];
+      assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
+        ok: true, value: type,
+      });
+      page.document.selectors['aside[data-drawer-open="true"]'] = [
+        replacement,
+      ];
+      assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+        false);
+      assert.equal(replacement.selectors[
+        'button[aria-label="Cancel"]']![0]!.clicked, 0);
+      assert.equal(page.cancel.clicked, 0);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [first];
+      assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(first.selectors[
+        'button[aria-label="Cancel"]']![0]!.clicked, 0);
+    });
+  }
+});
+
 test("audio upsell link text is not a second drawer heading", () => {
   const page = fixture();
   withPage(page.document, () => {

@@ -187,6 +187,7 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
         dirty: boolean;
         form?: Element;
         question?: Element;
+        drawer?: Element;
         dispose: () => void;
       };
     };
@@ -275,7 +276,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
-        form?: Element; question?: Element;
+        form?: Element; question?: Element; drawer?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -369,7 +370,7 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
-        form?: Element; question?: Element;
+        form?: Element; question?: Element; drawer?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -483,7 +484,7 @@ export function inspectBlooketAudioCapabilityDrawer(
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
-        form?: Element; question?: Element;
+        form?: Element; question?: Element; drawer?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -532,6 +533,10 @@ export function inspectBlooketAudioCapabilityDrawer(
     if (drawerBounds.width <= 0 || drawerBounds.height <= 0 ||
         drawerStyle.display === "none" ||
         drawerStyle.visibility !== "visible") return failed();
+    if (watch.drawer && watch.drawer !== drawer) {
+      watch.dirty = true;
+      return failed();
+    }
     const titles = Array.from(drawer.querySelectorAll("span"))
       // The live upsell repeats its title inside the subscription link.
       // Interactive labels are not drawer headings; duplicate headings stop.
@@ -551,15 +556,14 @@ export function inspectBlooketAudioCapabilityDrawer(
         "Add audio to your questions and unlock many other premium features " +
           "with Blooket Plus.",
       );
-      return exactUpsell && audioInputs.length === 0
-        ? { ok: true, value: "unsupported" }
-        : failed();
+      if (!exactUpsell || audioInputs.length !== 0) return failed();
+      watch.drawer = drawer;
+      return { ok: true, value: "unsupported" };
     }
-    return audioInputs.length === 1 &&
-        audioInputs[0]?.tagName === "INPUT" &&
-        !(audioInputs[0] as HTMLInputElement).disabled
-      ? { ok: true, value: "supported" }
-      : failed();
+    if (audioInputs.length !== 1 || audioInputs[0]?.tagName !== "INPUT" ||
+        (audioInputs[0] as HTMLInputElement).disabled) return failed();
+    watch.drawer = drawer;
+    return { ok: true, value: "supported" };
   } catch {
     return failed();
   }
@@ -614,7 +618,7 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
-        form?: Element; question?: Element;
+        form?: Element; question?: Element; drawer?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -655,6 +659,10 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       document.querySelectorAll('aside[data-drawer-open="true"]'),
     );
     if (drawers.length !== 1) return false;
+    if (watch.drawer && watch.drawer !== drawers[0]) {
+      watch.dirty = true;
+      return false;
+    }
     const cancels = Array.from(
       drawers[0]!.querySelectorAll('button[aria-label="Cancel"]'),
     );
@@ -722,7 +730,7 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
-        form?: Element; question?: Element;
+        form?: Element; question?: Element; drawer?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -815,7 +823,7 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
-        form?: Element; question?: Element;
+        form?: Element; question?: Element; drawer?: Element;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
