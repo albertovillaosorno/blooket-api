@@ -386,12 +386,25 @@ async function read(
     return initial;
   }
   if (operation.kind === "sets.get") {
-    // The Edit Info opener is a click, not a pure read. Do not continue
-    // interacting with the tab after the teacher selects another route.
+    // A new document can occupy the same /edit?id URL after the worker's
+    // navigation check. Keep all panel observations and Cancel in one lifetime.
+    const documentOrigin = await script(current, browser,
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+      [target]);
+    if (typeof documentOrigin !== "number" ||
+        !Number.isFinite(documentOrigin) || documentOrigin <= 0 ||
+        Date.now() >= readDeadline)
+      throw new Error("browser-details-unavailable");
     const ownsDetailRoute = async () => {
       const observed = await browser.tabs.get(current.tabId);
-      return Date.now() < readDeadline &&
-        observed.status === "complete" && observed.url === target;
+      if (Date.now() >= readDeadline || observed.status !== "complete" ||
+          observed.url !== target) return false;
+      const currentOrigin = await script(current, browser,
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [target]);
+      const after = await browser.tabs.get(current.tabId);
+      return Date.now() < readDeadline && after.status === "complete" &&
+        after.url === target && currentOrigin === documentOrigin;
     };
     // Module 12048 unmounts the original title/description sidebar once
     // Edit Info opens. Capture two identical independent sidebar readings

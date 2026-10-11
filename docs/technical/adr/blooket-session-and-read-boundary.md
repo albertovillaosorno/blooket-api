@@ -87,6 +87,10 @@ origin, late inspection, or manual route change cannot admit a saved-state read.
 Session observation remains non-navigating and does not need document
 replacement.
 
+Saved Set Detail reads likewise pin the native document origin through the
+sidebar baseline, metadata editor, and cancellation check. Their cleanup must
+never click a replacement document at an unchanged edit URL.
+
 The question-inspection host also pins the native document origin through its
 visible enumeration, each saved-question modal, optional image evidence,
 and final question-list comparison. When a document is replaced at the same

@@ -62,6 +62,17 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the extension worker's saved Set Detail path began pinning
+one positive native `performance.timeOrigin` across its sidebar baseline,
+metadata editor open, panel reads, and Cancel confirmation. Checking only the
+edit URL previously allowed a replacement document to provide inconsistent
+metadata or receive an unrelated Cancel click.
+
+Synthetic worker regressions replace the same-route document during the
+sidebar, after the editor opener, and during metadata inspection. All are
+refused, and the replacement document never receives the cleanup click.
+A verified live set detail read remains pending.
+
 On 2026-10-10, the existing-question read host began preserving one native
 `performance.timeOrigin` across number enumeration, modal inspection, saved
 image probing, cancellation, and closure verification. Previously a reload of

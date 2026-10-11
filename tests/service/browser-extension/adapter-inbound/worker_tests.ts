@@ -69,6 +69,9 @@ test(
   let detailReadCount = 0;
   let detailSwitchTabAfterScript = false;
   let detailSwitchTabAfterOpen = false;
+  let detailReloadDuringSidebar = false;
+  let detailReloadAfterOpen = false;
+  let detailReloadDuringInspection = false;
   let sessionSwitchAfterScript: string | null = null;
   let observedSessionOverride: string | null = null;
   let driftSessionAtSameRoute = false;
@@ -218,6 +221,10 @@ test(
             } } }];
           assert.deepEqual(args, ["opaque id/with spaces"]);
           detailSidebarReadCount++;
+          if (detailReloadDuringSidebar) {
+            detailReloadDuringSidebar = false;
+            documentOrigin += 1_000;
+          }
           return [{ result: detailSidebarMalformed ? {
             ok: true, extra: "not-admitted",
             value: { title: "Synthetic", description: "" },
@@ -244,6 +251,10 @@ test(
           if (detailSwitchTabAfterOpen) {
             detailSwitchTabAfterOpen = false;
             tabUrl = "https://dashboard.blooket.com/edit?id=another-set";
+          }
+          if (detailReloadAfterOpen) {
+            detailReloadAfterOpen = false;
+            documentOrigin += 1_000;
           }
           return [{ result: detailOpenSucceeds }];
         }
@@ -401,6 +412,10 @@ test(
         }
         if (operation.kind === "sets.get") {
           detailReadCount++;
+          if (detailReloadDuringInspection) {
+            detailReloadDuringInspection = false;
+            documentOrigin += 1_000;
+          }
           if (detailMalformedReply) {
             detailMalformedReply = false;
             return [{ result: {
@@ -768,6 +783,27 @@ test(
       "openBlooketDetailPanel",
     ), false);
     detailSidebarDrifts = false;
+    detailReloadDuringSidebar = true;
+    const beforeSidebarReload = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeSidebarReload).includes(
+      "openBlooketDetailPanel"), false);
+    detailReloadAfterOpen = true;
+    const beforeOpenReload = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeOpenReload).includes(
+      "closeBlooketDetailPanel"), false);
+    detailReloadDuringInspection = true;
+    const beforeInspectReload = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeInspectReload).includes(
+      "closeBlooketDetailPanel"), false);
     detailCancelSucceeds = false;
     const beforeCancelFailure = scripts.length;
     assert.equal((await expectReply({
@@ -826,10 +862,10 @@ test(
     assert.equal(switchedOpen.ok, false);
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=another-set");
-    assert.deepEqual(scripts.slice(beforeSwitchedOpen), [
+    assert.deepEqual(scripts.slice(beforeSwitchedOpen).filter(
+      name => name !== "inspectBlooketDocumentOrigin",
+    ), [
       "canLeaveBlooketPageForRead",
-      "inspectBlooketDocumentOrigin",
-      "inspectBlooketDocumentOrigin",
       "inspectBlooketDetailSidebar",
       "inspectBlooketDetailSidebar",
       "openBlooketDetailPanel",
