@@ -167,9 +167,15 @@ export function prepareBlooketCreateSetForm(
     const paragraph = rows[0]!.querySelectorAll(":scope > p")[0]!;
     const stateBounds = paragraph.getBoundingClientRect();
     const rowBounds = rows[0]!.getBoundingClientRect();
+    const paragraphStyle = getComputedStyle(paragraph);
+    const rowStyle = getComputedStyle(rows[0]!);
     if (paragraph.tagName !== "P" || stateBounds.width <= 0 ||
         stateBounds.height <= 0 || rowBounds.width <= 0 ||
-        rowBounds.height <= 0) return failed();
+        rowBounds.height <= 0 ||
+        paragraphStyle.display === "none" ||
+        paragraphStyle.visibility !== "visible" ||
+        rowStyle.display === "none" ||
+        rowStyle.visibility !== "visible") return failed();
     const state = paragraph.textContent?.replace(/\s+/gu, " ").trim();
     const ariaChecked = privacyInput.getAttribute("aria-checked");
     const currentPrivate =
@@ -320,9 +326,15 @@ export function submitBlooketCreateSetForm(
     const paragraph = rows[0]!.querySelectorAll(":scope > p")[0]!;
     const stateBounds = paragraph.getBoundingClientRect();
     const rowBounds = rows[0]!.getBoundingClientRect();
+    const paragraphStyle = getComputedStyle(paragraph);
+    const rowStyle = getComputedStyle(rows[0]!);
     if (paragraph.tagName !== "P" || stateBounds.width <= 0 ||
         stateBounds.height <= 0 || rowBounds.width <= 0 ||
-        rowBounds.height <= 0) return failed();
+        rowBounds.height <= 0 ||
+        paragraphStyle.display === "none" ||
+        paragraphStyle.visibility !== "visible" ||
+        rowStyle.display === "none" ||
+        rowStyle.visibility !== "visible") return failed();
     const state = paragraph.textContent?.replace(/\s+/gu, " ").trim();
     const ariaChecked = privacyInput.getAttribute("aria-checked");
     const currentPrivate =

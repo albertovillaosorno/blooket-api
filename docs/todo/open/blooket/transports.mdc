@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the Create Set sibling privacy paragraphs and their
+owning toggle rows also gained computed-style visibility checks.
+CSS-hidden state text with nonzero layout bounds can no longer
+satisfy the single-write Prepare or Submit gate. Portable tests cover
+hidden paragraphs and rows without opening a remote mutation.
+
 On 2026-10-11, the Create Set host's saved-state confirmation
 contract also began requiring an explicit boolean privacy expectation
 whenever it receives submitted metadata. The canonical browser
