@@ -62,6 +62,16 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the extension worker's read-owned `sets.get`
+operation began requiring two exact, stable saved-sidebar reads
+*after* the Edit Info panel closes. A concurrent title/description
+change on either final read no longer becomes positive remote set
+evidence; the read remains inconclusive. The panel result and both
+panel reads also pass exact saved-set decoders, including the requested
+set ID and hidden fields. Synthetic worker regressions cover both
+post-Cancel drift windows, a hidden second reply, and the wrong set ID;
+no provider account was changed.
+
 On 2026-10-11, read-only existing-question scans began confirming
 the saved card collection twice after closing all owned panels.
 An extra or disappearing card between the final observations now
