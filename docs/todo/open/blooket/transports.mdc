@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Add Question stopped accepting a same-document card as
+saved remote confirmation. After a single Save and exact owned-modal
+inspection, the host checks that no teacher draft can be lost, reloads
+only its admitted Edit tab, confirms a distinct native document epoch,
+and repeats the full question and optional image identity inspection.
+Synthetic tests prove optimistic cards disappearing after reload, an
+unchanged document epoch, and new human draft activity cannot produce a
+receipt or another submit.
+
 On 2026-10-10, Add Question post-submit confirmation began requiring
 the exact contiguous question sequence through the newly added number,
 not merely the presence of that number among unrelated cards. After

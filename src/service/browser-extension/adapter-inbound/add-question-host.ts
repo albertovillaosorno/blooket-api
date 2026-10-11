@@ -71,6 +71,8 @@ export interface AddQuestionChromePort {
       tabId: number,
       options: { readonly url: string },
     ): Promise<BrowserTab>;
+    reload(tabId: number, options: { readonly bypassCache: true }):
+      Promise<void>;
   };
   readonly scripting: {
     executeScript(options: {
@@ -208,6 +210,7 @@ export function createExtensionAddQuestionHost(
         if (typeof nativeOrigin !== "number" ||
             !Number.isFinite(nativeOrigin) || nativeOrigin <= 0 ||
             nativeOrigin === sourceOrigin) return browserFailure();
+        let ownedOrigin = nativeOrigin;
         const sameEditDocument = async (): Promise<boolean> => {
           const beforeOrigin = await chrome.tabs.get(tabId);
           if (beforeOrigin.status !== "complete" ||
@@ -218,7 +221,7 @@ export function createExtensionAddQuestionHost(
           );
           const afterOrigin = await chrome.tabs.get(tabId);
           return afterOrigin.status === "complete" &&
-            afterOrigin.url === editUrl && current === nativeOrigin;
+            afterOrigin.url === editUrl && current === ownedOrigin;
         };
         if (!await sameEditDocument()) return browserFailure();
 
@@ -319,13 +322,27 @@ export function createExtensionAddQuestionHost(
           // injected script's reply. Never click again: observe the exact
           // formerly empty card and verify its durable content instead.
         }
+        const initialRead = await observeQuestion(
+          input, ownedScript, chrome, tabId, pause, imageIdentity,
+        );
+        if (!initialRead.ok) return initialRead;
+        // The newly rendered card can be an optimistic UI state. Require a
+        // fresh provider document before reporting the question as saved.
+        // The read-owned modal was canceled; never reload teacher draft work.
+        const safeToReload = await ownedScript(
+          canLeaveBlooketPageForRead as (...args: never[]) => unknown,
+        );
+        if (safeToReload !== true || !await sameEditDocument())
+          return browserFailure();
+        await chrome.tabs.reload(tabId, { bypassCache: true });
+        const fresh = await waitForEdit(script, chrome, tabId, editUrl, pause);
+        if (!fresh.ok) return fresh;
+        if (fresh.origin === undefined || fresh.origin === ownedOrigin)
+          return browserFailure();
+        ownedOrigin = fresh.origin;
+        if (!await sameEditDocument()) return browserFailure();
         return await observeQuestion(
-          input,
-          ownedScript,
-          chrome,
-          tabId,
-          pause,
-          imageIdentity,
+          input, ownedScript, chrome, tabId, pause, imageIdentity,
         );
       } catch {
         return browserFailure();
