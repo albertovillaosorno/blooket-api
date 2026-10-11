@@ -448,3 +448,22 @@ test("cross-plan and symbolic journals remain recovery evidence", async () => {
     });
   });
 });
+
+test("journal reads bound file bytes and reject dangling aliases", async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "bounded-attempt.json");
+    assert.equal((await beginWriteAttempt(path, plan, 0)).ok, true);
+    const source = await readFile(path, "utf8");
+    await writeFile(path, source.padEnd(65_536, " "));
+    assert.equal((await loadWriteAttemptFile(path, plan)).ok, true);
+    await writeFile(path, source.padEnd(65_537, " "));
+    assert.deepEqual(await loadWriteAttemptFile(path, plan), {
+      ok: false, kind: "io", code: "write-attempt-file-unsafe",
+    });
+    await rm(path);
+    await symlink(join(directory, "missing.json"), path);
+    assert.deepEqual(await loadWriteAttemptFile(path, plan), {
+      ok: false, kind: "io", code: "write-attempt-file-unsafe",
+    });
+  });
+});
