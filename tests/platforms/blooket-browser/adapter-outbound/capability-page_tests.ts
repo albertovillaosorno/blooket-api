@@ -284,6 +284,35 @@ test("capability navigation leaves all teacher-owned editors untouched", () => {
   });
 });
 
+test("read navigation preserves unfamiliar teacher URL state", () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  withPage(page.document, () => {
+    for (const path of [
+      "/edit", "/edit?id=", "/edit?id=set-fixture&from=teacher",
+      "/edit?id=set-fixture#teacher", "/edit?id=a&id=b",
+      "/edit?id=x%0Ay", "/my-sets?filter=owned",
+      "/my-sets#teacher", "/set/fixture?mode=edit", "/set/fixture#info",
+    ]) {
+      Object.defineProperty(globalThis, "location", {
+        configurable: true,
+        value: new URL("https://dashboard.blooket.com" + path),
+      });
+      assert.equal(injected(), false, path);
+    }
+    for (const path of ["/edit?id=set-fixture", "/my-sets",
+      "/set/fixture"]) {
+      Object.defineProperty(globalThis, "location", {
+        configurable: true,
+        value: new URL("https://dashboard.blooket.com" + path),
+      });
+      assert.equal(injected(), true, path);
+    }
+  });
+});
+
 test("read navigation respects computed modal visibility", () => {
   const page = fixture();
   const dialog = node("DIV");

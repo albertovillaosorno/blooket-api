@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, pre-capability navigation began refusing any
+unrecognized URL query or fragment state instead of treating a
+matching `/edit` pathname as permission to leave the teacher's page.
+The exact `/edit?id=<set-id>`, plain My Sets, and plain set-detail
+routes remain eligible only when existing modal, draft and human-stop
+guards also pass. Synthetic navigation tests cover unfamiliar routes.
+
 On 2026-10-11, the read-only Add Question capability opener also
 began refusing another click while its original document still has
 an owned inspection watch, including while React has not mounted the
