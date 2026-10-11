@@ -845,3 +845,30 @@ The owner-authorized DevTools CLI also did not establish a responsive browser
 connection through the existing endpoint. Do not circumvent either boundary
 or label staged extension files as a proven loaded worker. Continue portable
 work while preserving the ambiguous real attempt and the user-selected photo.
+
+## Browser write durability and deadlines (2026-10-10, portable update)
+
+The current extension's Create Set confirmation now performs a safe,
+read-only reload after its first two exact saved-title and description
+observations. It refuses to discard teacher-authored work, requires a
+new native document origin on the same provider Edit URL, and independently
+rereads the saved metadata and redirect identity. A visible optimistic
+Edit screen is no longer sufficient for an acknowledged Create Set receipt.
+
+Add Question likewise confirms a saved question again on a freshly
+reloaded Edit document, checks the complete card sequence before and after
+its read-only modal, and binds the expected next index through the
+isolated-world opener and form ownership watch. A late card, a changed
+number, or an unresolved edit panel cannot authorize a second Save.
+
+The broker's default write lease is now 60 seconds, and the extension
+allows 57 seconds of guarded browser work to preserve result-delivery
+margin. Read leases retain their existing shorter budgets. The older
+30-second reference above is historical evidence from the 2026-10-09
+session, not the current runtime configuration.
+
+The portable regression suite verifies these boundaries, but none of
+these new checks establishes a fresh authenticated loaded-extension
+Create Set or Add Question acceptance run. The previously observed
+ambiguous remote attempt remains subject to its original journal; no
+account content was changed while implementing these guards.
