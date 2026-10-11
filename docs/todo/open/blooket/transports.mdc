@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the native My Sets reader and session-state probe
+began rejecting route variants with query parameters or fragments.
+A filtered folder page cannot become a complete saved collection,
+and an altered Create/Edit URL cannot be labeled ready merely from
+stale mounted page controls. Synthetic DOM tests cover those variants
+without navigation or account writes.
+
 On 2026-10-11, the saved-question image read helper began
 requiring CSS-visible account and owned panel controls before
 requesting media bytes. A mid-fetch hidden control also discards the
