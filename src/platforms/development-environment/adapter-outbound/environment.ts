@@ -29,7 +29,8 @@
 // - Defaults:
 //   - Unsupported or invalid requests fail closed.
 //
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { parseEnv } from "node:util";
 import {
   decodeTeacherPreferences,
@@ -125,9 +126,32 @@ export async function readDevelopmentEnvironment(
   path: string,
 ): Promise<Readonly<Record<string, string | undefined>>> {
   try {
-    const bytes = await readFile(path);
-    if (bytes.length > 65_536) throw new Error("development-env-too-large");
-    return parseEnv(bytes.toString("utf8"));
+    const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const before = await handle.stat();
+      if (!before.isFile() || !Number.isSafeInteger(before.size) ||
+          before.size > 65_536) throw new Error("development-env-too-large");
+      const buffer = Buffer.alloc(before.size + 1);
+      let size = 0;
+      let complete = false;
+      while (size < buffer.length) {
+        const part = await handle.read(buffer, size,
+          buffer.length - size, null);
+        if (part.bytesRead === 0) {
+          complete = true;
+          break;
+        }
+        size += part.bytesRead;
+      }
+      const after = await handle.stat();
+      if (!complete || before.size !== after.size ||
+          before.mtimeMs !== after.mtimeMs ||
+          before.ctimeMs !== after.ctimeMs)
+        throw new Error("development-env-changed");
+      return parseEnv(buffer.subarray(0, size).toString("utf8"));
+    } finally {
+      await handle.close();
+    }
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT")
       return {};

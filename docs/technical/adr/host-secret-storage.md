@@ -86,6 +86,13 @@ change when that backend is added.
   of ordinary lesson state and can cross transport or backup boundaries.
 - Environment variables remain development-only because they are process state,
   not a production credential store.
+
+The explicit development `.env` loader is not a production credential
+backend. Its pathname is opened through one `O_NOFOLLOW` descriptor and
+limited to 65,536 bytes before any text is parsed. A linked or oversized
+file fails closed, rather than being treated as absent or partially applied.
+Synthetic tests use non-secret test variables and never inspect the real
+repository `.env` or record credential values.
 - Passing security -w <secret> was rejected because it exposes the value in
   process arguments.
 - A repository-managed encrypted file was rejected because it would require a

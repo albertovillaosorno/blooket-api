@@ -31,9 +31,12 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from
+  "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseEnv } from "node:util";
-import { developmentConfiguration } from
+import { developmentConfiguration, readDevelopmentEnvironment } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/development-environment/adapter-outbound/environment.ts";
 import { defaultTeacherPreferences } from
@@ -222,3 +225,45 @@ test(
     /conflicting-development-setting/u,
   );
 });
+
+test("development env files admit the exact byte cap without reading beyond",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "dev-env-safe-"));
+  try {
+    const path = join(root, "synthetic.env");
+    const source = "LOCAL_HTTP_PORT=2607\n";
+    await writeFile(path, source.padEnd(65_536, " "));
+    assert.equal((await readDevelopmentEnvironment(path)).LOCAL_HTTP_PORT,
+      "2607");
+    await writeFile(path, source.padEnd(65_537, " "));
+    await assert.rejects(readDevelopmentEnvironment(path),
+      /development-env-unreadable/u);
+    assert.equal((await readFile(path)).length, 65_537);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+  },
+);
+
+test("development env refuses linked files and defaults only when missing",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "dev-env-link-"));
+  try {
+    const outside = join(root, "external.env");
+    const path = join(root, "synthetic.env");
+    await writeFile(outside, "LOCAL_HTTP_PORT=2607\n");
+    assert.deepEqual(await readDevelopmentEnvironment(path), {});
+    await symlink(outside, path);
+    await assert.rejects(readDevelopmentEnvironment(path),
+      /development-env-unreadable/u);
+    assert.equal(await readFile(outside, "utf8"),
+      "LOCAL_HTTP_PORT=2607\n");
+    await rm(path);
+    await symlink(join(root, "missing.env"), path);
+    await assert.rejects(readDevelopmentEnvironment(path),
+      /development-env-unreadable/u);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+  },
+);
