@@ -268,3 +268,39 @@ test("set list decoder rejects extra array properties and sparse slots",
     assert.equal(decodeBlooketSetList(list).ok, false);
   },
 );
+
+
+test("saved set reads reject inherited and accessor-backed required facts",
+  () => {
+  const summary = { schemaVersion: 1, id: "saved-a",
+    title: "Synthetic" };
+  const detail = { ...summary, description: "Review",
+    visibility: "private" };
+  for (const key of ["schemaVersion", "id", "title"] as const) {
+    const own = { ...summary };
+    const inherited = Object.create({ [key]: own[key] });
+    for (const name of Object.keys(own)) {
+      if (name !== key) inherited[name] = own[name as keyof typeof own];
+    }
+    assert.equal(decodeBlooketSetList([inherited]).ok, false, key);
+    const withGetter = { ...summary };
+    Object.defineProperty(withGetter, key, {
+      enumerable: true, get: () => { throw new Error("untrusted getter"); },
+    });
+    assert.equal(decodeBlooketSetList([withGetter]).ok, false, key);
+  }
+  for (const key of ["description", "visibility"] as const) {
+    const inherited = Object.create({ [key]: detail[key] });
+    for (const name of Object.keys(detail)) {
+      if (name !== key)
+        inherited[name] = detail[name as keyof typeof detail];
+    }
+    assert.equal(decodeBlooketSetDetail(inherited).ok, false, key);
+    const withGetter = { ...detail };
+    Object.defineProperty(withGetter, key, {
+      enumerable: true, get: () => { throw new Error("untrusted getter"); },
+    });
+    assert.equal(decodeBlooketSetDetail(withGetter).ok, false, key);
+  }
+  },
+);

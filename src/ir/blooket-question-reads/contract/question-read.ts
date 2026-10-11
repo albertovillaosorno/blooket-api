@@ -36,6 +36,7 @@ import {
 import {
   isExactDenseArray,
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
@@ -119,7 +120,7 @@ export function decodeBlooketQuestionRead(
   }
 
   const issues: ValidationIssue[] = [];
-  const version = value["schemaVersion"];
+  const version = ownDataField(value, "schemaVersion");
   if (
     version !== LEGACY_BLOOKET_QUESTION_READ_VERSION
     && version !== PREVIOUS_BLOOKET_QUESTION_READ_VERSION
@@ -144,10 +145,10 @@ export function decodeBlooketQuestionRead(
   ));
 
   const number = positiveInteger(
-    value["number"], path + ".number", issues, 10_000,
+    ownDataField(value, "number"), path + ".number", issues, 10_000,
   );
   const rawQuestion = requiredString(
-    value["question"],
+    ownDataField(value, "question"),
     path + ".question",
     issues,
   );
@@ -165,12 +166,12 @@ export function decodeBlooketQuestionRead(
         version === NORMALIZED_BLOOKET_QUESTION_READ_VERSION
       ? decodeCurrentQuestion(
           rawQuestion,
-          value["equation"],
+          ownDataField(value, "equation"),
           path,
           issues,
         )
       : normalizeLegacyQuestion(rawQuestion, path, issues);
-  const qType = value["qType"];
+  const qType = ownDataField(value, "qType");
   if (qType !== "mc" && qType !== "typing") {
     issues.push({
       path: path + ".qType",
@@ -178,30 +179,34 @@ export function decodeBlooketQuestionRead(
       message: 'Expected "mc" or "typing".',
     });
   }
-  const random = booleanValue(value["random"], path + ".random", issues);
+  const random = booleanValue(
+    ownDataField(value, "random"), path + ".random", issues,
+  );
   const timeLimit = positiveInteger(
-    value["timeLimit"],
+    ownDataField(value, "timeLimit"),
     path + ".timeLimit",
     issues,
     86_400,
   );
   const answers = version === LEGACY_BLOOKET_QUESTION_READ_VERSION
     ? decodeLegacyAnswers(value, path, qType, issues)
-    : decodeAnswers(value["answers"], path + ".answers", qType, issues);
+    : decodeAnswers(
+        ownDataField(value, "answers"), path + ".answers", qType, issues,
+      );
   const hasImage = booleanValue(
-    value["hasImage"],
+    ownDataField(value, "hasImage"),
     path + ".hasImage",
     issues,
   );
   const hasAudio = booleanValue(
-    value["hasAudio"],
+    ownDataField(value, "hasAudio"),
     path + ".hasAudio",
     issues,
   );
   let imageEvidence: BlooketQuestionImageEvidence | null = null;
   if (version === BLOOKET_QUESTION_READ_VERSION) {
     const evidence = decodeBlooketQuestionImageEvidence(
-      value["imageEvidence"], path + ".imageEvidence",
+      ownDataField(value, "imageEvidence"), path + ".imageEvidence",
     );
     if (!evidence.ok) issues.push(...evidence.issues);
     else imageEvidence = evidence.value;
@@ -271,8 +276,8 @@ export function decodeBlooketQuestionImageEvidence(
   const issues: ValidationIssue[] = [...unknownFieldIssues(
     value, new Set(["byteLength", "sha256"]), path,
   )];
-  const byteLength = value["byteLength"];
-  const sha256 = value["sha256"];
+  const byteLength = ownDataField(value, "byteLength");
+  const sha256 = ownDataField(value, "sha256");
   if (!Number.isSafeInteger(byteLength) || typeof byteLength !== "number" ||
       byteLength < 1 || byteLength >= 2_500_000 ||
       typeof sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(sha256))
@@ -403,14 +408,16 @@ function decodeLegacyAnswers(
   qType: unknown,
   issues: ValidationIssue[],
 ): readonly BlooketAnswerRead[] | undefined {
-  const answers = stringArray(value["answers"], path + ".answers", issues);
+  const answers = stringArray(
+    ownDataField(value, "answers"), path + ".answers", issues,
+  );
   const correctAnswers = stringArray(
-    value["correctAnswers"],
+    ownDataField(value, "correctAnswers"),
     path + ".correctAnswers",
     issues,
   );
   const answerTypes = decodeLegacyAnswerTypes(
-    value["answerTypes"],
+    ownDataField(value, "answerTypes"),
     path + ".answerTypes",
     issues,
   );
@@ -598,7 +605,7 @@ function decodeAnswer(
     return undefined;
   }
   issues.push(...unknownFieldIssues(value, ANSWER_KEYS, path));
-  const kind = value["kind"];
+  const kind = ownDataField(value, "kind");
   if (kind !== "text" && kind !== "math" && kind !== "image") {
     issues.push({
       path: path + ".kind",
@@ -606,7 +613,7 @@ function decodeAnswer(
       message: 'Expected "text", "math", or "image".',
     });
   }
-  const content = value["content"];
+  const content = ownDataField(value, "content");
   if (
     (kind === "image" && content !== null)
     || ((kind === "text" || kind === "math")
@@ -623,11 +630,11 @@ function decodeAnswer(
     });
   }
   const correct = booleanValue(
-    value["correct"],
+    ownDataField(value, "correct"),
     path + ".correct",
     issues,
   );
-  const match = value["match"];
+  const match = ownDataField(value, "match");
   if (match !== null && match !== "exactly" && match !== "contains") {
     issues.push({
       path: path + ".match",

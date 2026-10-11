@@ -38,6 +38,7 @@ import {
 import {
   isExactDenseArray,
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
@@ -109,11 +110,13 @@ export function decodeBlooketSetSummary(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, SUMMARY_KEYS, path),
   ];
-  validateVersion(value["schemaVersion"], path, issues);
-  const decodedId = decodeBlooketSetId(value["id"], path + ".id");
+  validateVersion(ownDataField(value, "schemaVersion"), path, issues);
+  const decodedId = decodeBlooketSetId(ownDataField(value, "id"), path + ".id");
   if (!decodedId.ok) issues.push(...decodedId.issues);
   const id = decodedId.ok ? decodedId.value : undefined;
-  const title = requiredTitle(value["title"], path + ".title", issues);
+  const title = requiredTitle(
+    ownDataField(value, "title"), path + ".title", issues,
+  );
 
   if (issues.length > 0) {
     return { ok: false, issues };
@@ -210,13 +213,13 @@ export function decodeBlooketSetDetail(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, DETAIL_KEYS, "$"),
   ];
-  validateVersion(value["schemaVersion"], "$", issues);
-  const decodedId = decodeBlooketSetId(value["id"], "$.id");
+  validateVersion(ownDataField(value, "schemaVersion"), "$", issues);
+  const decodedId = decodeBlooketSetId(ownDataField(value, "id"), "$.id");
   if (!decodedId.ok) issues.push(...decodedId.issues);
   const id = decodedId.ok ? decodedId.value : undefined;
-  const title = requiredTitle(value["title"], "$.title", issues);
+  const title = requiredTitle(ownDataField(value, "title"), "$.title", issues);
   const description = requiredStringValue(
-    value["description"],
+    ownDataField(value, "description"),
     "$.description",
     issues,
   );
@@ -227,7 +230,7 @@ export function decodeBlooketSetDetail(
       message: "Description exceeds the local browser read bound.",
     });
   }
-  const visibility = value["visibility"];
+  const visibility = ownDataField(value, "visibility");
   if (visibility !== "public" && visibility !== "private") {
     issues.push({
       path: "$.visibility",
