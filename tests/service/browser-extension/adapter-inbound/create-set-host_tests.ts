@@ -1551,3 +1551,72 @@ test("post-Cancel sidebar drift cannot confirm a newly created set",
   assert.equal(fake.calls.filter(call => call === "detail-close").length, 1);
   },
 );
+
+test("Create Set refuses hidden or symbol-owned redirect evidence",
+  async () => {
+  for (const reply of [
+    Object.defineProperty({ ...observed }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ...observed, [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fake = fakeChrome({ scripts: [reply, observed] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    assert.equal((await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet()).ok, false);
+    assert.equal(fake.calls.includes("reload"), false);
+  }
+  },
+);
+
+test("Create Set refuses hidden browser preparation acknowledgements",
+  async () => {
+  for (const reply of [
+    Object.defineProperty({ ok: true }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { ok: true, [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fake = fakeChrome({ afterUpdate: [{ url:
+      "https://dashboard.blooket.com/create", status: "complete",
+    }], scripts: [createState, reply] });
+    const host = createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    );
+    assert.equal((await host.openCreateSet()).ok, true);
+    assert.equal((await host.prepareCreateSet({ title: "Synthetic",
+      description: "", private: true })).ok, false);
+    assert.equal(fake.calls.includes("submitBlooketCreateSetForm"), false);
+  }
+  },
+);
+
+test("hidden saved-sidebar fields never confirm Create Set metadata",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  for (const payload of [
+    Object.defineProperty({ title: expected.title,
+      description: expected.description }, "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    { title: expected.title, description: expected.description,
+      [Symbol("hidden")]: "untrusted" },
+  ]) {
+    const fake = fakeChrome({ scripts: [
+      observed, observed, { ok: true, value: payload },
+    ] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    assert.equal((await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected)).ok, false);
+    assert.equal(fake.calls.includes("reload"), false);
+    assert.equal(fake.calls.includes("detail-open"), false);
+  }
+  },
+);

@@ -570,6 +570,7 @@ async function observe(
     [{ kind: "session.observe" }],
   );
   if (
+    !exactKeys(result, "ok,value") ||
     !result ||
     typeof result !== "object" ||
     !("ok" in result) ||
@@ -605,13 +606,17 @@ function exactEditRoute(tab: BrowserTab): boolean {
 }
 
 function exactKeys(value: unknown, expected: string): boolean {
-  return !!value && typeof value === "object" && !Array.isArray(value) &&
-    Reflect.ownKeys(value).sort().join() === expected;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const keys = Reflect.ownKeys(value);
+  const names = expected.split(",");
+  return keys.length === names.length && keys.every(key =>
+    typeof key === "string" && names.includes(key));
 }
 
 function exactFailedSidebar(value: unknown): boolean {
   return !!value && typeof value === "object" && !Array.isArray(value) &&
-    Object.keys(value).sort().join() === "code,ok" &&
+    exactKeys(value, "code,ok") &&
     "ok" in value && value.ok === false && "code" in value &&
     value.code === "blooket-browser-failed";
 }
@@ -621,11 +626,11 @@ function exactSavedSidebar(value: unknown, expected: {
   readonly description: string;
 }): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
-      Object.keys(value).sort().join() !== "ok,value" ||
+      !exactKeys(value, "ok,value") ||
       !("ok" in value) || value.ok !== true ||
       !("value" in value) || !value.value ||
       typeof value.value !== "object" || Array.isArray(value.value) ||
-      Object.keys(value.value).sort().join() !== "description,title")
+      !exactKeys(value.value, "description,title"))
     return false;
   const saved = value.value as { title?: unknown; description?: unknown };
   return saved.title === expected.title &&
@@ -645,7 +650,7 @@ function exactRedirectReceipt(
 ): value is { readonly ok: true; readonly remoteSetId: string } {
   return !!value && typeof value === "object" &&
     !Array.isArray(value) &&
-    Object.keys(value).sort().join() === "ok,remoteSetId" &&
+    exactKeys(value, "ok,remoteSetId") &&
     "ok" in value && value.ok === true &&
     "remoteSetId" in value && value.remoteSetId === id;
 }
@@ -654,7 +659,7 @@ function exactOk(value: unknown): boolean {
   return (
     !!value &&
     typeof value === "object" &&
-    Object.keys(value).length === 1 &&
+    exactKeys(value, "ok") &&
     "ok" in value &&
     value.ok === true
   );
