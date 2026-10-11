@@ -321,3 +321,24 @@ test("login host never evaluates accessor-backed Chrome result fields",
     }
   },
 );
+
+test("login acknowledgement fields must be enumerable data, not getters",
+  async () => {
+    for (const kind of ["getter", "hidden"] as const) {
+      let getterReads = 0;
+      const reply: { ok?: boolean } = {};
+      Object.defineProperty(reply, "ok", {
+        enumerable: kind !== "hidden",
+        ...(kind === "getter"
+          ? { get() { getterReads++; return true; } }
+          : { value: true }),
+      });
+      const fake = fixture({ prepareReply: reply });
+      assert.equal((await createExtensionSessionAuthenticationHost(
+        fake.chrome, 7, async () => undefined,
+      ).authenticate(credentials)).ok, false);
+      assert.equal(getterReads, 0);
+      assert.equal(fake.calls.includes("submit"), false);
+    }
+  },
+);

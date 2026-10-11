@@ -357,8 +357,11 @@ function exactKeys(value: unknown, expected: string): boolean {
     return false;
   const keys = Reflect.ownKeys(value);
   const names = expected.split(",");
-  return keys.length === names.length && keys.every(key =>
-    typeof key === "string" && names.includes(key));
+  return keys.length === names.length && keys.every(key => {
+    if (typeof key !== "string" || !names.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !!descriptor && descriptor.enumerable && "value" in descriptor;
+  });
 }
 
 function browserFailure(): ExtensionQuestionInspectionResult {

@@ -174,9 +174,10 @@ function exactOk(value: unknown): boolean {
   return (
     !!value &&
     typeof value === "object" &&
-    Object.keys(value).length === 1 &&
-    "ok" in value &&
-    value.ok === true
+    !Array.isArray(value) &&
+    Reflect.ownKeys(value).length === 1 &&
+    Object.getOwnPropertyDescriptor(value, "ok")?.enumerable === true &&
+    Object.getOwnPropertyDescriptor(value, "ok")?.value === true
   );
 }
 

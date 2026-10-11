@@ -1654,3 +1654,26 @@ test("Create Set host refuses accessor-backed Chrome result wrappers",
     }
   },
 );
+
+test("Create Set refuses page evidence with accessor or hidden values",
+  async () => {
+    for (const kind of ["getter", "hidden"] as const) {
+      let getters = 0;
+      const value: { ok: boolean; value?: unknown } = { ok: true };
+      Object.defineProperty(value, "value", {
+        enumerable: kind !== "hidden",
+        ...(kind === "getter"
+          ? { get() { getters++; return "create"; } }
+          : { value: "create" }),
+      });
+      const fake = fakeChrome({
+        afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+          status: "complete" }], scripts: [value],
+      });
+      assert.equal((await createExtensionCreateSetHost(
+        fake.chrome, 7, async () => undefined,
+      ).openCreateSet()).ok, false);
+      assert.equal(getters, 0);
+    }
+  },
+);

@@ -662,8 +662,11 @@ function exactKeys(result: unknown, expected: string): boolean {
     return false;
   const keys = Reflect.ownKeys(result);
   const names = expected.split(",");
-  return keys.length === names.length && keys.every(key =>
-    typeof key === "string" && names.includes(key));
+  return keys.length === names.length && keys.every(key => {
+    if (typeof key !== "string" || !names.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(result, key);
+    return !!descriptor && descriptor.enumerable && "value" in descriptor;
+  });
 }
 
 function exactOk(value: unknown): boolean {
