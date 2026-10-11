@@ -1300,7 +1300,8 @@ test("fresh Create Set observes saved private and public visibility",
     ).observeCreateSet(expected), observed);
     assert.deepEqual(fake.calls.filter(call => call.startsWith("detail-")),
       ["detail-open", "detail-read", "detail-read", "detail-close",
-        "detail-is-closed", "detail-final-sidebar"]);
+        "detail-is-closed", "detail-final-sidebar",
+        "detail-final-sidebar"]);
     assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   }
   },
@@ -1512,5 +1513,41 @@ test("metadata-only Create Set expectations cannot bypass privacy checks",
   ).observeCreateSet({ title: "Synthetic", description: "" } as never),
   { ok: false, kind: "browser", code: "blooket-browser-failed" });
   assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
+test("post-Cancel sidebar drift cannot confirm a newly created set",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+    observed, sidebar, observed, sidebar,
+  ] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  let finalReads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    const result = await original(request);
+    if (request.func.name === "inspectBlooketDetailSidebar" &&
+        fake.calls.includes("detail-is-closed")) {
+      finalReads++;
+      if (finalReads === 2) return [{ result: { ok: true, value: {
+        title: expected.title, description: "Changed by another actor",
+      } } }];
+    }
+    return result;
+  };
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected), { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(finalReads, 2);
+  assert.equal(fake.calls.filter(call => call === "detail-open").length, 1);
+  assert.equal(fake.calls.filter(call => call === "detail-close").length, 1);
   },
 );
