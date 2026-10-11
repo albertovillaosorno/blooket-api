@@ -56,6 +56,14 @@ The teacher may select another media root. Changing settings must not silently
 move or delete her existing library. Validate access and offer an explicit,
 recoverable library move separately when needed.
 
+The legacy media-vault adapter also loads its index, import/edit
+journals, originals, and saved renditions through checked `O_NOFOLLOW`
+descriptors. Candidate JSONL/journal text is bounded to 16 MiB and
+legacy asset bytes to 64 MiB, with per-request source limits still applied.
+Oversized and substituted-link content remains untouched and is never
+accepted as evidence of a persisted image. The 2026-10-10 regressions are
+synthetic Linux filesystem checks, not native Mac acceptance.
+
 The project-bundle directory reader uses bounded `O_NOFOLLOW` file
 handles for project JSON, media JSONL, and interrupted-write recovery
 material. As of 2026-10-10, each candidate file is bounded to 16 MiB;
