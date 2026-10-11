@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the local browser bridge write lease increased from
+30 to 60 seconds to accommodate bounded Create Set navigation and the
+new fresh-document saved-state read-back without expiring an active Save
+while the provider hydrates. The ordinary read lease remains ten seconds;
+explicit test overrides remain authoritative. Synthetic broker tests
+accept one delayed but in-budget receipt and reject a completion exactly
+at expiry; timeout still requires journal reconciliation, not replay.
+
 On 2026-10-10, Create Set confirmation gained a separate fresh-document
 read-back. After matching two saved metadata observations on the new Edit
 route, the extension refuses to reload over teacher work, requires a

@@ -838,3 +838,54 @@ test("late queued writes expire before dispatch without any mutation",
     } finally { broker.close(); }
   },
 );
+
+test("default write lease covers fresh-document persistence inspection",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    try {
+      const request = broker.request({
+        kind: "sets.create", title: "Synthetic", description: "",
+        private: true,
+      });
+      const client = "chrome-extension://test-profile/";
+      const leased = broker.next(TOKEN, client);
+      assert.ok(leased);
+      tick += 46_000;
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: leased.id, ok: true,
+        value: { ok: true, remoteSetId: "created-set" },
+      }, client), true);
+      assert.deepEqual(await request, {
+        ok: true, value: { ok: true, remoteSetId: "created-set" },
+      });
+    } finally { broker.close(); }
+  },
+);
+
+test("expired default writes cannot accept late saved-state replies",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    try {
+      const request = broker.request({
+        kind: "sets.create", title: "Synthetic", description: "",
+        private: true,
+      });
+      const client = "chrome-extension://test-profile/";
+      const leased = broker.next(TOKEN, client);
+      assert.ok(leased);
+      tick += 60_000;
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: leased.id, ok: true, value: { ok: true },
+      }, client), false);
+      assert.deepEqual(await request, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally { broker.close(); }
+  },
+);
