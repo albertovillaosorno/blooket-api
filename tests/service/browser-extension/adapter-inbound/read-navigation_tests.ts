@@ -255,7 +255,7 @@ test("a late fresh origin still cannot admit a saved-state read", async () => {
     page.tabs, 7, page.previous, SETS, 250, page.pause,
     async url => {
       const origin = await page.documentOrigin(url);
-      if (++observations === 2) await page.pause(250);
+      if (++observations === 3) await page.pause(250);
       return origin;
     }, page.now,
   );
@@ -263,6 +263,26 @@ test("a late fresh origin still cannot admit a saved-state read", async () => {
   assert.equal(page.reloads(), 1);
   assert.equal(page.elapsed(), 250);
 });
+
+test("same-route replacement before navigation never reloads an editor",
+  async () => {
+  for (const target of [SETS, EDIT]) {
+    const page = fixture();
+    let checked = 0;
+    const result = await confirmBlooketReadNavigation(
+      page.tabs, 7, page.previous, target, 500, page.pause,
+      async url => {
+        const origin = await page.documentOrigin(url);
+        return ++checked === 2 ? (origin as number) + 1_000 : origin;
+      }, page.now,
+    );
+    assert.equal(result, undefined);
+    assert.equal(page.reloads(), 0);
+    assert.equal(page.updates(), 0);
+    assert.equal(checked, 2);
+  }
+  },
+);
 
 test("manual navigation after a fresh origin invalidates a read", async () => {
   const page = fixture();

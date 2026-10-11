@@ -69,6 +69,11 @@ export async function confirmBlooketReadNavigation(
     const checked = await tabs.get(tabId);
     if (now() >= deadline || checked.url !== current.url ||
         checked.status !== "complete") return undefined;
+    // A same-URL document replacement after the first origin script may
+    // contain a teacher's new unsaved work. Do not reload or leave it.
+    const originAgain = await documentOrigin(current.url);
+    if (now() >= deadline || originAgain !== previousOrigin)
+      return undefined;
     if (current.url === target) {
       await tabs.reload(tabId, { bypassCache: true });
     } else {
