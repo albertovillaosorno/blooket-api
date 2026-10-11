@@ -296,9 +296,14 @@ async function script(
     func,
     args,
   });
-  if (replies.length !== 1 || replies[0]?.result === undefined)
+  if (!Array.isArray(replies) || replies.length !== 1 ||
+      !replies[0] || typeof replies[0] !== "object")
     throw new Error("browser-read-unavailable");
-  return replies[0].result;
+  const descriptor = Object.getOwnPropertyDescriptor(replies[0], "result");
+  if (!descriptor || !descriptor.enumerable ||
+      !("value" in descriptor) || descriptor.value === undefined)
+    throw new Error("browser-read-unavailable");
+  return descriptor.value;
 }
 async function read(
   current: Connection,
