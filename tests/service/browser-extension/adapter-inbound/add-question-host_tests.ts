@@ -712,3 +712,41 @@ test("Add Question cannot write without exact native document identity",
     false);
   },
 );
+
+test("Add Question refuses an identically routed replacement before navigation",
+  async () => {
+  for (const replacement of [null, 2_000]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let nativeReads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketDocumentOrigin" &&
+          ++nativeReads === 2) return [{ result: replacement }];
+      return await original(request);
+    };
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(nativeReads, 2);
+    assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+    assert.equal(fake.calls.includes(
+      "runBlooketAddQuestionPageAction:open"), false);
+  }
+  },
+);
+
+test("Add Question refuses to navigate without a source document lifetime",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: null }] : await original(request);
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);

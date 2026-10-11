@@ -931,3 +931,40 @@ test("missing native edit-document origin cannot confirm Create Set",
   assert.equal(fake.calls.filter(call => call === "script").length, 0);
   },
 );
+
+test("Create Set refuses an identically routed replacement before navigation",
+  async () => {
+  for (const replacement of [null, 2_000]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let nativeReads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketDocumentOrigin" &&
+          ++nativeReads === 2) return [{ result: replacement }];
+      return await original(request);
+    };
+    const result = await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).openCreateSet();
+    assert.equal(result.ok, false);
+    assert.equal(nativeReads, 2);
+    assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+    assert.equal(fake.calls.includes("create-ownership:claim"), false);
+  }
+  },
+);
+
+test("Create Set refuses navigation without a source document lifetime",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin"
+      ? [{ result: null }] : await original(request);
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);

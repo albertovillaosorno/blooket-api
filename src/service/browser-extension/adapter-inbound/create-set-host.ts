@@ -174,19 +174,25 @@ export function createExtensionCreateSetHost(
           return browserFailure();
         // A manual route selection between browser calls belongs to the user.
         const current = await chrome.tabs.get(tabId);
-        if (current.status !== "complete" || current.url !== before.url)
-          return browserFailure();
+        if (current.status !== "complete" || current.url !== before.url ||
+            typeof current.url !== "string") return browserFailure();
         // A form already on Create may contain unsaved teacher-authored work.
         // Only a freshly navigated product form may be populated and saved.
         if (current.url === CREATE_URL) return browserFailure();
         if (current.url !== CREATE_URL) {
+          const origin = await editDocumentOrigin(current.url);
+          if (origin === null) return browserFailure();
           const canLeave = await script(
             canLeaveBlooketPageForRead as (...args: never[]) => unknown,
           );
           if (canLeave !== true) return browserFailure();
           const afterGuard = await chrome.tabs.get(tabId);
           if (afterGuard.status !== "complete" ||
-              afterGuard.url !== current.url) return browserFailure();
+              afterGuard.url !== current.url ||
+              await editDocumentOrigin(current.url) !== origin)
+            return browserFailure();
+          // Do not discard an independently reloaded teacher document at
+          // the same dashboard URL while preparing the Create navigation.
           await chrome.tabs.update(tabId, { url: CREATE_URL });
         }
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
