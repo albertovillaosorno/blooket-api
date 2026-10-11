@@ -741,3 +741,35 @@ test(
   assert.deepEqual(calls, ["browser:observe", "sets:list"]);
   },
 );
+
+test("hidden and symbol-bearing browser read replies are rejected",
+  async () => {
+  for (const extra of [
+    (value: object) => Object.defineProperty(value, "hidden",
+      { value: "private" }),
+    (value: object) => Object.assign(value,
+      { [Symbol("hidden")]: "private" }),
+  ]) {
+    const sets = {
+      list: async () => extra({ ok: true, value: [],
+        completeness: "complete" }),
+      get: async () => extra({ ok: true, value: {
+        schemaVersion: 1, id: "fixture", title: "Synthetic",
+        description: "", visibility: "private",
+      } }),
+    } as unknown as BlooketSetReadPort;
+    const questions = {
+      list: async () => extra({ ok: true, value: [] }),
+    } as unknown as BlooketQuestionReadPort;
+    const b = () => browser([{ ok: true, state: "edit" }], []);
+    for (const result of [
+      await listBlooketSets(b(), secretStore([]), sets),
+      await getBlooketSet(b(), secretStore([]), sets, "fixture"),
+      await listBlooketQuestions(b(), secretStore([]), questions,
+        "fixture"),
+    ]) assert.deepEqual(result, {
+      ok: false, stage: "read", code: "blooket-browser-failed",
+    });
+  }
+  },
+);

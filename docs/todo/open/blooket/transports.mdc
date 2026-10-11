@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, application set, detail, and question reads began
+validating every own field of browser-port envelopes before feeding
+results to publication recovery. Extra nonenumerable or symbol fields
+on a successful readback now cause a stable browser failure rather
+than supplying remote write verification evidence. Portable tests cover
+all three read families without exposing untrusted data.
+
 On 2026-10-10, the concrete local browser bridge began requiring the
 extension's exact null login-submit acknowledgement instead of treating
 any successful payload as a valid authentication submit. Bridge result
