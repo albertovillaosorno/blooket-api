@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, canonical set/question decoders also stopped
+calling `.entries()` on caller-supplied collection prototypes. They
+read every admitted dense array slot by index, including normalized
+and legacy answer/match arrays. Forged iteration methods cannot swap
+saved questions, omit malformed answers or change a reconciliation
+baseline. Focused IR regressions verify no injected iterator runs.
+
 On 2026-10-11, Add Question and saved-question inspection also
 stopped invoking `.every()` or `.entries()` from untrusted browser
 arrays after their descriptor checks. Numeric slots are verified by

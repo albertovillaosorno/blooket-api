@@ -306,7 +306,8 @@ export function decodeBlooketQuestionReadList(
   const questions: BlooketQuestionRead[] = [];
   const issues: ValidationIssue[] = [];
   const numbers = new Set<number>();
-  for (const [index, candidate] of value.entries()) {
+  for (let index = 0; index < value.length; index++) {
+    const candidate = value[index];
     const path = "$[" + String(index) + "]";
     const decoded = decodeBlooketQuestionRead(candidate, path);
     if (!decoded.ok) {
@@ -578,7 +579,8 @@ function decodeAnswers(
     return undefined;
   }
   const answers: BlooketAnswerRead[] = [];
-  for (const [index, candidate] of value.entries()) {
+  for (let index = 0; index < value.length; index++) {
+    const candidate = value[index];
     const decoded = decodeAnswer(
       candidate,
       path + "[" + String(index) + "]",
@@ -748,7 +750,8 @@ function stringArray(
     return undefined;
   }
   const result: string[] = [];
-  for (const [index, candidate] of value.entries()) {
+  for (let index = 0; index < value.length; index++) {
+    const candidate = value[index];
     const item = requiredString(
       candidate,
       path + "[" + String(index) + "]",
@@ -793,7 +796,8 @@ function decodeLegacyAnswerTypes(
     return undefined;
   }
   const result: BlooketAnswerMatch[] = [];
-  for (const [index, candidate] of value.entries()) {
+  for (let index = 0; index < value.length; index++) {
+    const candidate = value[index];
     if (candidate !== "exactly" && candidate !== "contains") {
       issues.push({
         path: path + "[" + String(index) + "]",

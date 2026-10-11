@@ -172,7 +172,8 @@ export function decodeBlooketSetList(
   const items: BlooketSetSummary[] = [];
   const issues: ValidationIssue[] = [];
   const seenIds = new Set<string>();
-  for (const [index, candidate] of value.entries()) {
+  for (let index = 0; index < value.length; index++) {
+    const candidate = value[index];
     const path = "$[" + String(index) + "]";
     const decoded = decodeBlooketSetSummary(candidate, path);
     if (!decoded.ok) {

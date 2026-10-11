@@ -640,3 +640,39 @@ test("admitted question properties cannot be hidden or accessor backed",
     assert.equal(getterReads, 0);
   },
 );
+
+test("saved questions and answer arrays ignore forged iteration methods",
+  () => {
+    let calls = 0;
+    const questions = [{ ...question, number: 2 }];
+    Object.setPrototypeOf(questions, {
+      entries() {
+        calls++;
+        return [[0, question]][Symbol.iterator]();
+      },
+    });
+    assert.equal(decodeBlooketQuestionReadList(questions).ok, false);
+    const baseline = decodeBlooketQuestionRead(question);
+    assert.equal(baseline.ok, true);
+    if (!baseline.ok) return;
+    const answers = [{ ...baseline.value.answers[0]!, content: "" }];
+    Object.setPrototypeOf(answers, {
+      entries() {
+        calls++;
+        return [[0, baseline.value.answers[0]]][Symbol.iterator]();
+      },
+    });
+    assert.equal(decodeBlooketQuestionRead({ ...baseline.value, answers })
+      .ok, false);
+    const legacy = [""];
+    Object.setPrototypeOf(legacy, {
+      entries() {
+        calls++;
+        return [[0, "sun"]][Symbol.iterator]();
+      },
+    });
+    assert.equal(decodeBlooketQuestionRead({ ...question, answers: legacy })
+      .ok, false);
+    assert.equal(calls, 0);
+  },
+);
