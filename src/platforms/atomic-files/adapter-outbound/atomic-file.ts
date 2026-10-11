@@ -30,8 +30,8 @@
 //   - New files use owner-only permissions and symbolic targets are refused.
 //
 import { randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import {
-  copyFile,
   link,
   lstat,
   mkdir,
@@ -194,12 +194,46 @@ async function createBackup(
 
   await refuseSymbolicTarget(backupPath);
   await mkdir(dirname(backupPath), { recursive: true, mode: 0o700 });
-  await copyFile(targetPath, backupTemporaryPath);
-  const handle = await open(backupTemporaryPath, "r");
+  // Pathname copyFile follows a source symlink substituted after the
+  // target check. Copy the exact opened regular-file descriptor instead.
+  const source = await open(targetPath,
+    constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    await handle.sync();
+    const before = await source.stat();
+    if (!before.isFile() || !Number.isSafeInteger(before.size))
+      throw new Error("Refusing unsafe backup source.");
+    const backup = await open(backupTemporaryPath, "wx", 0o600);
+    try {
+      const buffer = Buffer.alloc(64 * 1_024);
+      let total = 0;
+      while (true) {
+        const { bytesRead } = await source.read(buffer, 0,
+          buffer.length, null);
+        if (bytesRead === 0) break;
+        total += bytesRead;
+        if (total > before.size)
+          throw new Error("Backup source changed during copy.");
+        let offset = 0;
+        while (offset < bytesRead) {
+          const written = await backup.write(buffer, offset,
+            bytesRead - offset, null);
+          if (written.bytesWritten === 0)
+            throw new Error("Backup write made no progress.");
+          offset += written.bytesWritten;
+        }
+      }
+      const after = await source.stat();
+      if (total !== before.size || before.dev !== after.dev ||
+          before.ino !== after.ino || before.size !== after.size ||
+          before.mtimeMs !== after.mtimeMs ||
+          before.ctimeMs !== after.ctimeMs)
+        throw new Error("Backup source changed during copy.");
+      await backup.sync();
+    } finally {
+      await backup.close();
+    }
   } finally {
-    await handle.close();
+    await source.close();
   }
   await rename(backupTemporaryPath, backupPath);
   await syncDirectory(dirname(backupPath));
