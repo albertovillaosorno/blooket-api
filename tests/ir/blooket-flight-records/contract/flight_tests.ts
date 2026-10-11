@@ -159,6 +159,18 @@ test("action state validation is exact and never coerces primitives", () => {
   );
 });
 
+test("action field-error keys remain owned instead of changing prototypes",
+  () => {
+  const source = '0:{"status":"ERROR","message":"Fixture",' +
+    '"fieldErrors":{"__proto__":["Fictional issue"]}}\n';
+  const state = flightActionState(source);
+  assert.ok(state);
+  assert.equal(Object.getPrototypeOf(state.fieldErrors), Object.prototype);
+  assert.equal(Object.hasOwn(state.fieldErrors, "__proto__"), true);
+  assert.deepEqual(state.fieldErrors["__proto__"], ["Fictional issue"]);
+  assert.deepEqual(Object.keys(state.fieldErrors), ["__proto__"]);
+});
+
 test("error rows expose only a bounded digest", () => {
   assert.deepEqual(
     flightErrorRecords('0:E{"digest":"synthetic-digest"}\n'),

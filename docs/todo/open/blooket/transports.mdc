@@ -87,6 +87,11 @@ data properties without invoking inherited setters. Regression tests confirm
 that malformed action payloads stay invalid and ordinary object prototypes are
 unchanged; this does not establish a real provider response format.
 
+The same Flight action decoder also assigned field-error entries to `{}`.
+A fictional `__proto__` field name could replace the result prototype rather
+than remain an enumerable own field. A 2026-10-10 regression now preserves the
+original key and message as ordinary data without altering the prototype.
+
 On 2026-10-10, a private extension-local candidate decoder was added for
 My Sets server-rendered Flight data. It is gated on the specific observed
 `349b82c80fc4a5a2001e609136cfed32747ba3f4` build, the client module
