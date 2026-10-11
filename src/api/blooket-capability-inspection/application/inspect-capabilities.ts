@@ -159,7 +159,7 @@ async function safeInspect(
     const result = await inspection.inspect();
     if (!result || typeof result !== "object" || Array.isArray(result))
       return capabilityFailure();
-    const keys = Object.keys(result).sort().join();
+    const keys = Reflect.ownKeys(result).sort().join();
     if (result.ok === true && keys === "ok,value")
       return { ok: true, value: result.value };
     if (result.ok === false && keys === "code,ok" &&

@@ -330,6 +330,12 @@ test("malformed capability probe envelopes never expose data", async () => {
     { ok: false, code: "private-code", raw: "private-data" },
     { ok: false, code: "blooket-browser-failed", extra: "private-data" },
     { ok: true, value: capabilities, extra: "private-data" },
+    Object.defineProperty({ ok: true, value: capabilities }, "hidden",
+      { value: "private-data" }),
+    { ok: true, value: capabilities,
+      [Symbol("secret")]: "private-data" },
+    Object.defineProperty({ ok: false, code: "blooket-browser-failed" },
+      "hidden", { value: "private-data" }),
     { ok: "true", value: capabilities },
     null,
   ]) {
