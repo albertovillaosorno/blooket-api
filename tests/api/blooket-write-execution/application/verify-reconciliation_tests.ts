@@ -349,7 +349,7 @@ test(
 );
 
 test(
-  "verified non-confirmation clears ambiguity without advancement",
+  "negative read claims cannot clear ambiguous journals",
   async () => {
   await withTemporaryDirectory(async (directory) => {
     const value = paths(directory);
@@ -365,16 +365,16 @@ test(
 
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.equal(result.kind, "ready");
-      if (result.kind === "ready") {
+      assert.equal(result.kind, "reconciliation-required");
+      if (result.kind === "reconciliation-required") {
+        assert.equal(result.reason, "verification-inconclusive");
         assert.equal(result.checkpoint.nextOperationIndex, 0);
       }
     }
     await assert.rejects(readFile(value.checkpoint, "utf8"));
-    assert.deepEqual(
-      await loadWriteAttemptFile(value.attempt, plan),
-      { ok: true, kind: "missing" },
-    );
+    const journal = await loadWriteAttemptFile(value.attempt, plan);
+    assert.equal(journal.ok && journal.kind === "record" &&
+      journal.record.phase, "attempting");
   });
   },
 );
