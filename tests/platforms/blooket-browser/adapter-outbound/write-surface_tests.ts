@@ -295,3 +295,55 @@ test("malformed Create Set observations never establish a remote set ID",
   }
   },
 );
+
+test("lost Save Set acknowledgement requires saved metadata verification",
+  async () => {
+  for (const persisted of [true, false]) {
+    const calls: string[] = [];
+    const surface = createBlooketBrowserWriteSurface(host(calls, {
+      submitCreateSet: async () => {
+        calls.push("submit");
+        return { ok: true, requireMetadataConfirmation: true };
+      },
+      observeCreateSet: async expected => {
+        calls.push("observe");
+        return persisted && expected.title === submission.title &&
+            expected.description === submission.description
+          ? { ok: true, remoteSetId: "remote-set-1" }
+          : { ok: false, kind: "browser",
+            code: "blooket-browser-failed" };
+      },
+    }));
+    const result = await surface.createSet(submission, []);
+    assert.deepEqual(result, persisted
+      ? { ok: true, remoteSetId: "remote-set-1" }
+      : { ok: false, kind: "browser", code: "blooket-browser-failed" });
+    assert.deepEqual(calls.filter(call => call === "submit"), ["submit"]);
+    assert.deepEqual(calls.filter(call => call === "observe"), ["observe"]);
+  }
+  },
+);
+
+test("only the exact lost-ack flag can permit Create Set observation",
+  async () => {
+  for (const reply of [
+    { ok: true, requireMetadataConfirmation: false },
+    { ok: true, requireMetadataConfirmation: "true" },
+    { ok: true, requireMetadataConfirmation: true, extra: true },
+    { ok: false, requireMetadataConfirmation: true },
+  ]) {
+    const calls: string[] = [];
+    const surface = createBlooketBrowserWriteSurface(host(calls, {
+      submitCreateSet: async () => {
+        calls.push("submit");
+        return reply as Awaited<ReturnType<
+          BlooketCreateSetBrowserHost["submitCreateSet"]>>;
+      },
+    }));
+    assert.deepEqual(await surface.createSet(submission, []), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+    assert.deepEqual(calls.filter(call => call.startsWith("observe")), []);
+  }
+  },
+);

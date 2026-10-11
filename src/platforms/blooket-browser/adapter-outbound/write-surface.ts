@@ -55,7 +55,7 @@ export interface BlooketCreateSetBrowserHost {
     readonly description: string;
     readonly private: boolean;
   }): Promise<
-    | { readonly ok: true }
+    | { readonly ok: true; readonly requireMetadataConfirmation?: true }
     | BlooketBrowserWriteSurfaceFailure
   >;
   observeCreateSet(expected: {
@@ -84,7 +84,9 @@ export function createBlooketBrowserWriteSurface(
         };
         const prepared = admitHostStep(await host.prepareCreateSet(expected));
         if (!prepared.ok) return prepared;
-        const submitted = admitHostStep(await host.submitCreateSet(expected));
+        const submitted = admitSubmittedStep(
+          await host.submitCreateSet(expected),
+        );
         if (!submitted.ok) return submitted;
         const observed = await host.observeCreateSet({
           title: expected.title,
@@ -127,6 +129,20 @@ function admitHostStep(
        reply.state === "unexpected-page"))
     return { ok: false, kind: "navigation", state: reply.state };
   return browserFailure();
+}
+
+function admitSubmittedStep(
+  reply: unknown,
+): { readonly ok: true } | BlooketBrowserWriteSurfaceFailure {
+  // Chrome may lose its script reply after a single Save Set click while a
+  // strict Edit redirect remains observable. This is not saved-state proof.
+  if (exactHostKeys(reply, "ok,requireMetadataConfirmation") &&
+      reply && typeof reply === "object" &&
+      "ok" in reply && reply.ok === true &&
+      "requireMetadataConfirmation" in reply &&
+      reply.requireMetadataConfirmation === true)
+    return { ok: true };
+  return admitHostStep(reply);
 }
 
 function admitHostObservation(
