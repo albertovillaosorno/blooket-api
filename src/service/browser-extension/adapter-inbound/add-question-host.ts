@@ -627,8 +627,7 @@ function exactPreviousQuestionNumbers(result: unknown, number: number) {
       !("value" in result) || !isExactDenseArray(result.value) ||
       result.value.length !== number - 1 || result.value.length > 200)
     return false;
-  return result.value.every((candidate, index) =>
-    Number.isSafeInteger(candidate) && candidate === index + 1);
+  return exactNumericSlots(result.value);
 }
 
 // A still-hydrating card collection may contain exactly the previous
@@ -649,10 +648,17 @@ function postSaveQuestionRows(
       !isExactDenseArray(result.value) || result.value.length > 200 ||
       (result.value.length !== number &&
        result.value.length !== number - 1) ||
-      !result.value.every((candidate, index) =>
-        Number.isSafeInteger(candidate) && candidate === index + 1))
+      !exactNumericSlots(result.value))
     return "conflict";
   return result.value.length === number ? "ready" : "pending";
+}
+
+function exactNumericSlots(items: readonly unknown[]): boolean {
+  for (let index = 0; index < items.length; index++) {
+    if (!Number.isSafeInteger(items[index]) || items[index] !== index + 1)
+      return false;
+  }
+  return true;
 }
 
 function questionNumberPresent(result: unknown, number: number): boolean {

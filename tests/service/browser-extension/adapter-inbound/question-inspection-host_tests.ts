@@ -878,3 +878,25 @@ test("question scans refuse decorated empty and getter-backed card arrays",
     assert.equal(reads, 0);
   },
 );
+
+test("question enumeration does not run forged array prototype iterators",
+  async () => {
+    const rows = [2];
+    let prototypeCalls = 0;
+    Object.setPrototypeOf(rows, {
+      entries() {
+        prototypeCalls++;
+        return [][Symbol.iterator]();
+      },
+      [Symbol.iterator]() {
+        prototypeCalls++;
+        return [1][Symbol.iterator]();
+      },
+    });
+    const fixture = synthetic({ initial: { ok: true, value: rows } });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000),
+      failed);
+    assert.equal(prototypeCalls, 0);
+    assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);
