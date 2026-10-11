@@ -2017,3 +2017,74 @@ test("malformed expected media context stops without a resolver or session",
     assert.deepEqual(calls, []);
   });
 });
+
+test("malformed baseline envelopes stop before pacing or mutation",
+  async () => {
+  const malformed: unknown[] = [
+    { ok: "true", baseline: SET_BASELINE },
+    { ok: true, baseline: SET_BASELINE, trace: "untrusted" },
+    { ok: true, baseline: null, trace: "untrusted" },
+    { ok: false, kind: "navigation", state: "dashboard" },
+    { ok: false, kind: "navigation", state: "security-challenge",
+      trace: "untrusted" },
+    { ok: false, kind: "browser", code: "blooket-browser-failed",
+      extra: "untrusted" },
+    { ok: false, kind: "browser", code: "unknown-provider-status" },
+    null,
+  ];
+  for (const reply of malformed) {
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const budgetPath = join(directory, "budget.json");
+      const pacingCalls: string[] = [];
+      const mutationCalls: string[] = [];
+      const result = await executePersistedBlooketWrite(
+        paths, plan, browser([]), secrets(),
+        writes(SET_SUCCESS, mutationCalls),
+        verification(reply as BlooketWriteVerificationBaselineResult),
+        { requireVerificationBaseline: true,
+          pacer: immediatePacer(pacingCalls),
+          budget: { path: budgetPath,
+            policy: { maximumStarts: 2, maximumDurationMs: 60_000 } } },
+      );
+      assert.deepEqual(result, { ok: false,
+        stage: "verification-baseline",
+        code: "blooket-write-baseline-invalid" });
+      assert.deepEqual(mutationCalls, []);
+      assert.deepEqual(pacingCalls, []);
+      assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+        { ok: true, kind: "missing" });
+      assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId),
+        { ok: true, state: null });
+    });
+  }
+  },
+);
+
+test("invalid second baseline is rejected after pacing without a write",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const pacingCalls: string[] = [];
+    const mutationCalls: string[] = [];
+    const result = await executePersistedBlooketWrite(
+      paths, plan, browser([]), secrets(),
+      writes(SET_SUCCESS, mutationCalls),
+      verificationSequence([
+        { ok: true, baseline: SET_BASELINE },
+        { ok: true, baseline: SET_BASELINE,
+          extra: "not-admitted" } as unknown as
+            BlooketWriteVerificationBaselineResult,
+      ]),
+      { requireVerificationBaseline: true,
+        pacer: immediatePacer(pacingCalls) },
+    );
+    assert.deepEqual(result, { ok: false,
+      stage: "verification-baseline", code: "blooket-write-baseline-invalid" });
+    assert.deepEqual(pacingCalls, ["acquire", "release"]);
+    assert.deepEqual(mutationCalls, []);
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" });
+  });
+  },
+);
