@@ -88,6 +88,7 @@ export function runBlooketAddQuestionPageAction(
       fileInput?: HTMLInputElement;
       file?: File;
       number?: number;
+      expectedNumber?: number;
       image?: BlooketPreparedImage;
       url?: string;
       dispose: () => void;
@@ -328,7 +329,7 @@ export function runBlooketAddQuestionPageAction(
         const watch: NonNullable<
           typeof world.__blooketAddQuestionFormWatch
         > = {
-          document, setId: value, dirty: false,
+          document, setId: value, expectedNumber, dirty: false,
           prepared: false, finalized: false,
           submitted: false, dispose: () => {},
         };
@@ -446,6 +447,8 @@ export function runBlooketAddQuestionPageAction(
     const watch = world.__blooketAddQuestionFormWatch;
     if (!watch || watch.document !== document ||
         watch.setId !== input.setId || watch.dirty || watch.submitted ||
+        (watch.expectedNumber !== undefined &&
+          watch.expectedNumber !== input.number) ||
         (watch.form && watch.form !== resolved.form) ||
         (watch.question && watch.question !== resolved.question) ||
         (action === "prepare" && watch.prepared) ||

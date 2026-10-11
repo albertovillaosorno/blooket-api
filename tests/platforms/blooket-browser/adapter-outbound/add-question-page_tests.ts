@@ -1047,3 +1047,24 @@ test("hidden and malformed prior cards never authorize Add Question",
   });
   },
 );
+
+test("page opener's observed next slot binds the prepared question number",
+  () => {
+  const page = fixture();
+  closedQuestionEditor(page);
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open", "set-fixture", 1,
+    ), true);
+    assert.equal(runBlooketAddQuestionPageAction(
+      "is-ready", "set-fixture",
+    ), true);
+    assert.deepEqual(runBlooketAddQuestionPageAction("prepare", {
+      ...typing, number: 2,
+    }), { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.hidden.value, "");
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);

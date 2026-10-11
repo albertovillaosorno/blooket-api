@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the Add Question opener's admitted question number
+also became part of its isolated-world form ownership watch. An
+otherwise valid later Prepare, image Finalize, or Submit with another
+question index can no longer repurpose the claimed modal for a different
+slot. A portable page test opens slot one and proves that preparing slot
+two fails before any hidden-form mutation or Save click.
+
 On 2026-10-10, the serialized Add Question page opener gained a
 synchronous final check of the exact expected prior question-card
 sequence at the click boundary. The host now supplies its admitted next
