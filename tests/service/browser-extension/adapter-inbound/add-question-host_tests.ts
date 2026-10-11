@@ -817,3 +817,49 @@ test("Add Question refuses a target without native edit document proof",
     false);
   },
 );
+
+test("unexpected post-save question rows never confirm a new question",
+  async () => {
+  for (const listReply of [
+    { ok: true, value: [1, 2] },
+    { ok: true, value: [2, 1] },
+    { ok: true, value: [2] },
+    { ok: true, value: [1, 3] },
+    { ok: true, value: [1, 1] },
+    { ok: true, value: [1], extra: true },
+  ]) {
+    const fake = fakeChrome({ listReply });
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input);
+    assert.equal(result.ok, false);
+    assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+    assert.equal(fake.calls.filter(call =>
+      call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  }
+  },
+);
+
+test("a new row during read-only inspection invalidates Add Question",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let listReads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "listBlooketQuestionNumbers" &&
+        ++listReads === 3)
+      return [{ result: { ok: true, value: [1, 2] } }];
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(listReads, 3);
+  assert.equal(fake.readBackReads(), 2);
+  assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
