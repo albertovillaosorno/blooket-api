@@ -721,3 +721,14 @@ test("question scan refuses a target document different from navigation proof",
   assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
+
+test("question inspection cannot accept missing or reordered card slots",
+  async () => {
+  for (const candidate of [[2], [1, 3], [2, 1], [1, 1]]) {
+    const fixture = synthetic({ initial: { ok: true, value: candidate } });
+    assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(fixture.enumerations(), 1);
+    assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
+  }
+  },
+);
