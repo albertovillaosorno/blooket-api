@@ -202,10 +202,9 @@ export function createExtensionAddQuestionHost(
         );
         if (!ready.ok) return ready;
 
-        const nativeOrigin = await script(
-          inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
-          [editUrl],
-        );
+        // The initial edit-page observation must belong to the same native
+        // document that subsequent form operations will claim.
+        const nativeOrigin = ready.origin;
         if (typeof nativeOrigin !== "number" ||
             !Number.isFinite(nativeOrigin) || nativeOrigin <= 0 ||
             nativeOrigin === sourceOrigin) return browserFailure();
@@ -341,16 +340,29 @@ async function waitForEdit(
   tabId: number,
   editUrl: string,
   pause: (ms: number) => Promise<void>,
-): Promise<ExtensionAddQuestionResult> {
+): Promise<ExtensionAddQuestionResult & { readonly origin?: number }> {
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.status === "complete") {
       if (tab.url !== editUrl) return browserFailure();
+      const origin = await script(
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [editUrl],
+      );
+      if (typeof origin !== "number" || !Number.isFinite(origin) ||
+          origin <= 0) return browserFailure();
       const observed = await observe(script);
       const after = await chrome.tabs.get(tabId);
       if (after.status !== "complete" || after.url !== editUrl)
         return browserFailure();
-      if (observed === "edit") return { ok: true };
+      const confirmedOrigin = await script(
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [editUrl],
+      );
+      const stillThere = await chrome.tabs.get(tabId);
+      if (confirmedOrigin !== origin || stillThere.status !== "complete" ||
+          stillThere.url !== editUrl) return browserFailure();
+      if (observed === "edit") return { ok: true, origin };
       if (observed !== undefined)
         return navigationFailure(normalizeUnexpected(observed));
     }

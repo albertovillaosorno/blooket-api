@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, Add Question bound its initial Edit readiness observation
+to one positive native edit-document origin before and after the page script.
+A same-route reload during that observation cannot authorize opening a form
+on the replacement document, even when the old script reported "edit".
+Synthetic changed-epoch and missing-origin regressions prevent form opening.
+
 On 2026-10-10, capability probe restoration also stopped treating
 mere equality with the original tab URL as proof that the page is still
 owned. After a modal or drawer probe, restoring a claimed route requires a
