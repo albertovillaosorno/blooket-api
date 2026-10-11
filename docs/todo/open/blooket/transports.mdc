@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-10, the Add Question isolated-world Save button gained an
+atomic recheck of the exact contiguous prior question-card collection.
+Earlier checks guarded the form opener, but an unrelated teacher card
+could appear while media or the hidden question field was being prepared.
+Synthetic tests reject inserted, duplicate, hidden, and missing cards
+at the final Save boundary without an additional mutation click.
+
 On 2026-10-10, additional Create Set read-back tests verified that
 a saved sidebar changing between the two post-reload observations never
 becomes a receipt. A replacement editor document inserted just after the

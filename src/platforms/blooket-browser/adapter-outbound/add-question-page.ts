@@ -108,6 +108,19 @@ export function runBlooketAddQuestionPageAction(
       url.searchParams.get("id") === setId
     );
   };
+  const exactPriorCards = (number: number): boolean => {
+    if (!Number.isSafeInteger(number) || number < 1 || number > 200)
+      return false;
+    const cards = Array.from(document.querySelectorAll(
+      '[role="button"][aria-label^="Edit question "]',
+    ));
+    return cards.length === number - 1 && cards.every((card, index) => {
+      const bounds = card.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0 &&
+        card.getAttribute("aria-label") ===
+          "Edit question " + String(index + 1);
+    });
+  };
   const normalizedText = (element: Element): string =>
     (element.textContent ?? "").replace(/\s+/gu, " ").trim();
   const questionForm = (setId: string): {
@@ -274,16 +287,7 @@ export function runBlooketAddQuestionPageAction(
       // One final DOM-local preflight shares the same synchronous function
       // as the Add Question click. A late manually added card cannot
       // overtake the host's earlier two collection reads.
-      const priorCards = Array.from(document.querySelectorAll(
-        '[role="button"][aria-label^="Edit question "]',
-      ));
-      if (priorCards.length !== expectedNumber - 1 ||
-          !priorCards.every((card, index) => {
-            const bounds = card.getBoundingClientRect();
-            return bounds.width > 0 && bounds.height > 0 &&
-              card.getAttribute("aria-label") ===
-                "Edit question " + String(index + 1);
-          })) return false;
+      if (!exactPriorCards(expectedNumber)) return false;
       const dialogs = Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"]',
       ));
@@ -560,7 +564,9 @@ export function runBlooketAddQuestionPageAction(
       watch.finalized = !hasImage || action === "finalize-image";
       return { ok: true };
     }
-    if (resolved.question.value !== JSON.stringify(expected)) return failed();
+    if (resolved.question.value !== JSON.stringify(expected) ||
+        !exactPriorCards(watch.expectedNumber ?? input.number))
+      return failed();
     const submits = Array.from(
       resolved.form.querySelectorAll('button[type="submit"]'),
     ).filter((button) => normalizedText(button) === "Save Question");

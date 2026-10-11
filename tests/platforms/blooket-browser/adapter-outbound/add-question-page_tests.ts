@@ -1068,3 +1068,53 @@ test("page opener's observed next slot binds the prepared question number",
   });
   },
 );
+
+test("new question cards after Prepare block the single Save click", () => {
+  const selector = '[role="button"][aria-label^="Edit question "]';
+  for (const cards of [
+    ["Edit question 1"],
+    ["Edit question 2"],
+    ["Edit question 1", "Edit question 1"],
+  ]) {
+    const page = fixture();
+    closedQuestionEditor(page);
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(runBlooketAddQuestionPageAction(
+        "open", "set-fixture", 1), true);
+      assert.deepEqual(prepareBlooketAddQuestionForm(typing), { ok: true });
+      page.document.selectors[selector] = cards.map(label =>
+        node("DIV", "", { "aria-label": label }));
+      assert.deepEqual(submitBlooketAddQuestionForm(typing), {
+        ok: false, code: "blooket-browser-failed",
+      });
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+});
+
+test("a hidden or missing prior card blocks a prepared next-slot Save",
+  () => {
+  const selector = '[role="button"][aria-label^="Edit question "]';
+  const page = fixture();
+  closedQuestionEditor(page);
+  const first = node("DIV", "", { "aria-label": "Edit question 1" });
+  page.document.selectors[selector] = [first];
+  const input = { ...typing, number: 2 };
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(runBlooketAddQuestionPageAction(
+      "open", "set-fixture", 2), true);
+    assert.deepEqual(prepareBlooketAddQuestionForm(input), { ok: true });
+    first.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    assert.deepEqual(submitBlooketAddQuestionForm(input), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    page.document.selectors[selector] = [];
+    assert.deepEqual(submitBlooketAddQuestionForm(input), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
