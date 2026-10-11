@@ -266,7 +266,15 @@ export function createExtensionCreateSetHost(
       inspectBlooketDetailSidebar as (...args: never[]) => unknown,
       [setId],
     );
-    return await owns() && exactSavedSidebar(sidebar, expected);
+    if (!await owns() || !exactSavedSidebar(sidebar, expected))
+      return false;
+    await pause(0);
+    const again = await script(
+      inspectBlooketDetailSidebar as (...args: never[]) => unknown,
+      [setId],
+    );
+    return await owns() && exactSavedSidebar(again, expected) &&
+      JSON.stringify(again) === JSON.stringify(sidebar);
   };
 
   return {

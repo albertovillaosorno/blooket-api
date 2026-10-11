@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, confirmed Create Set visibility inspection gained two
+independent saved-sidebar reads after the read-owned Edit Info panel
+was canceled. The original post-reload metadata may not be adopted if
+React or a concurrent actor changes the reopened sidebar during the
+final proof window. A regression changes only the second post-Cancel
+observation and retains the inconclusive single-submit outcome.
+
 On 2026-10-11, the Create Set sibling privacy paragraphs and their
 owning toggle rows also gained computed-style visibility checks.
 CSS-hidden state text with nonzero layout bounds can no longer

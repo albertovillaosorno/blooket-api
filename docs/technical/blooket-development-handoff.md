@@ -924,8 +924,11 @@ saving. It confirms only after the panel closes and the original saved
 sidebar still matches. A private request saved as public is inconclusive,
 not a success. Unexpected saved detail values fail immediately instead
 of waiting for a different later result, while only a genuinely not-ready
-panel may hydrate within the bounded read window. Confirmation callers
-must supply an explicit privacy expectation; the normal worker does.
+panel may hydrate within the bounded read window.
+
+Confirmation callers must supply an explicit privacy expectation; the
+normal worker does. The host also observes the saved sidebar twice after
+its guarded Cancel and refuses metadata that changes between those reads.
 
 Synthetic Chrome host tests cover both privacy states, a lost Save
 acknowledgement, mismatched and changing visibility, malformed details,
