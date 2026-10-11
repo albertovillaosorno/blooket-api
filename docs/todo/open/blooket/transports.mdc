@@ -89,6 +89,12 @@ and evaluates them against a fictional DOM without their module lexical scope.
 This checks shipped script closure rather than only TypeScript imports. It does
 not demonstrate installation in the authenticated Chrome session.
 
+A synthetic module-index regression on 2026-10-10 rejected repeated chunk IDs
+inside one `I` record. Earlier, a correctly pinned chunk followed by a
+conflicting duplicate `1958` entry could still satisfy the module identity
+check. Both matching and contradictory duplicate mappings now fail closed;
+provider builds and account completeness remain separately gated.
+
 The Flight page reader accepts ID-less `:HL` resource hints without enabling
 them in action-response parsing. This framing distinction was checked on
 2026-10-10 against the [React Server Components documentation][react-rsc]

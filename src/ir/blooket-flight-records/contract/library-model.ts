@@ -154,12 +154,15 @@ function admittedModule(value: unknown): boolean {
       value[1].length > 200 || value[1].length % 2 !== 0)
     return false;
   let matched = false;
+  const seen = new Set<string>();
   for (let index = 0; index < value[1].length; index += 2) {
     const id = value[1][index];
     const chunk = value[1][index + 1];
     if (typeof id !== "string" || !/^[0-9]+$/u.test(id) ||
-        typeof chunk !== "string" || chunk.length > 4_096 ||
+        seen.has(id) || typeof chunk !== "string" ||
+        chunk.length > 4_096 ||
         !chunk.startsWith("static/chunks/")) return false;
+    seen.add(id);
     if (id === "1958" && chunk === MODULE_CHUNK) matched = true;
   }
   return matched;
