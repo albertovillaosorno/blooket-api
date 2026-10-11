@@ -328,3 +328,19 @@ test("saved-set allowed fields must be enumerable data properties",
     }
   },
 );
+
+test("saved-set list decoder cannot use forged array iteration methods",
+  () => {
+    const rows = [{ schemaVersion: 1, id: "invalid", title: "" }];
+    let calls = 0;
+    Object.setPrototypeOf(rows, {
+      entries() {
+        calls++;
+        return [[0, { schemaVersion: 1, id: "set", title: "Valid" }]]
+          [Symbol.iterator]();
+      },
+    });
+    assert.equal(decodeBlooketSetList(rows).ok, false);
+    assert.equal(calls, 0);
+  },
+);
