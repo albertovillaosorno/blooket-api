@@ -770,3 +770,50 @@ test("Add Question rejects a target that reused the source document epoch",
     false);
   },
 );
+
+test("Add Question never opens a modal after reload during edit observation",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let editOrigin = 2_000;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] ===
+          "https://dashboard.blooket.com/edit?id=set-fixture")
+      return [{ result: editOrigin }];
+    const result = await original(request);
+    if (request.func.name === "inspectBlooketPage")
+      editOrigin = 3_000;
+    return result;
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.deepEqual(result, {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), true);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+  },
+);
+
+test("Add Question refuses a target without native edit document proof",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    request.func.name === "inspectBlooketDocumentOrigin" &&
+    request.args?.[0] ===
+      "https://dashboard.blooket.com/edit?id=set-fixture"
+      ? [{ result: null }] : await original(request);
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.equal(result.ok, false);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
+  },
+);
