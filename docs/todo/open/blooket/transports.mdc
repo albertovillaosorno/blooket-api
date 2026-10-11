@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-11, the Add Question Chrome host began checking *all own
+fields*, including hidden and symbol-owned properties, on navigation,
+form preparation, post-submit question, image identity and card-list
+script envelopes. Previously `Object.keys()` admitted nonenumerable
+extras and could misinterpret malformed acknowledgements. Portable
+tests keep hidden preparation acknowledgements from reaching Save and
+prevent malformed question/media evidence from authorizing a reload.
+
 On 2026-10-11, Add Question read-back began distinguishing a
 still-hydrating exact previous-card sequence from a readable but
 conflicting post-save collection. Wrong indices, extra cards, duplicate
