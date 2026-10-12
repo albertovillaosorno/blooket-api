@@ -1083,3 +1083,24 @@ These changes are supported by synthetic browser and host regressions.
 They do not establish live loaded-extension publication, remote quiz
 persistence, or native macOS/Safari acceptance. Task `blooket-09` stays
 open; old ambiguous publication attempts must not be replayed.
+
+## Exact cross-port reply admission (2026-10-12)
+
+The browser-backed publication path now validates the complete own
+property descriptors of session observations, login acknowledgements,
+capability snapshots, saved-set and question reads, bridge transport
+replies and canonical write-surface outcomes. A matching property name
+alone no longer admits a hidden or getter-backed field.
+
+The write reconciliation verifier applies the same rules to both
+success and failure results from the saved collection ports. A
+getter-backed Create Set receipt cannot advance a durable checkpoint,
+and a malformed navigation result cannot suppress a human stop. The
+My Sets model correlator also scans admitted numeric card slots
+directly rather than invoking a browser array prototype's `filter()`.
+
+Synthetic tests verify getter nonexecution and stable failures at
+these boundaries. They do not prove an authenticated loaded-extension
+publication, actual Blooket persistence or native macOS/Safari use.
+Keep the first unfinished publication task open until separate real
+browser acceptance and fresh remote read-back are demonstrated.
