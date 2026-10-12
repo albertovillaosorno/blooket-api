@@ -641,7 +641,8 @@ test("Create Set watch refuses stale and ambiguous forms", () => {
       '[role="dialog"][aria-modal="true"]'
     ]![0]!;
     dialog.visibility = "hidden";
-    assert.equal(runBlooketCreateSetOwnership("check"), true);
+    // A previously seen human modal revokes the old document owner.
+    assert.equal(runBlooketCreateSetOwnership("check"), false);
     dialog.visibility = "visible";
     assert.equal(runBlooketCreateSetOwnership("check"), false);
   });
@@ -925,3 +926,50 @@ test("Create Set claim never adopts prefilled teacher draft fields", () => {
     }, false);
   }
 });
+
+
+test("a visible challenge revokes Create Set form ownership", () => {
+  const page = fixture(true);
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.equal(runBlooketCreateSetOwnership("check"), true);
+    const frame = node("IFRAME");
+    page.document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [frame];
+    assert.equal(runBlooketCreateSetOwnership("check"), false);
+    page.document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [];
+    assert.equal(runBlooketCreateSetOwnership("check"), false);
+    assert.equal(prepareBlooketCreateSetForm({ title: "Synthetic",
+      description: "", private: true }).ok, false);
+  });
+});
+
+
+test("Create Set interstitial and form remount revoke earlier ownership",
+  () => {
+  for (const stop of ["security", "password", "form"] as const) {
+    const page = fixture(true);
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(runBlooketCreateSetOwnership("check"), true);
+      if (stop === "security")
+        Object.assign(page.document, { title: "Just a moment..." });
+      if (stop === "password")
+        page.document.selectors['input[type="password"]'] = [node("INPUT")];
+      if (stop === "form")
+        page.document.selectors["form#question-set-form"] = [node("FORM")];
+      assert.equal(runBlooketCreateSetOwnership("check"), false);
+      if (stop === "security")
+        Object.assign(page.document, { title: "Blooket" });
+      if (stop === "password")
+        page.document.selectors['input[type="password"]'] = [];
+      if (stop === "form")
+        page.document.selectors["form#question-set-form"] = [page.form];
+      assert.equal(runBlooketCreateSetOwnership("check"), false);
+      assert.equal(prepareBlooketCreateSetForm({ title: "Synthetic",
+        description: "", private: true }).ok, false);
+    });
+  }
+  },
+);
