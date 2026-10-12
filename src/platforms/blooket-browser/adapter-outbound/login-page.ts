@@ -146,8 +146,6 @@ export function runBlooketLoginPageAction(
       action !== "submit"
     ) return failed();
     if (!validInput()) return action === "is-prepared" ? false : failed();
-    const page = controls();
-    if (page === null) return action === "is-prepared" ? false : failed();
     // Chrome runs each injection in the same isolated document world. Keep
     // only DOM ownership and click state here, never credential values.
     const world = globalThis as typeof globalThis & {
@@ -162,6 +160,11 @@ export function runBlooketLoginPageAction(
       };
     };
     let watch = world.__blooketLoginFormWatch;
+    const page = controls();
+    if (page === null) {
+      if (watch?.document === document) watch.dirty = true;
+      return action === "is-prepared" ? false : failed();
+    }
     if (watch?.document !== document) {
       watch?.dispose();
       delete world.__blooketLoginFormWatch;
@@ -211,14 +214,19 @@ export function runBlooketLoginPageAction(
       descriptor.set.call(page.identifier, input.loginIdentifier);
       page.identifier.dispatchEvent(new Event("input", { bubbles: true }));
       page.identifier.dispatchEvent(new Event("change", { bubbles: true }));
-      if (!stillOwned() || page.identifier.value !== input.loginIdentifier)
+      if (!stillOwned() || page.identifier.value !== input.loginIdentifier) {
+        watch.dirty = true;
         return failed();
+      }
       descriptor.set.call(page.password, input.password);
       page.password.dispatchEvent(new Event("input", { bubbles: true }));
       page.password.dispatchEvent(new Event("change", { bubbles: true }));
       if (!stillOwned() || watch.dirty ||
           page.identifier.value !== input.loginIdentifier ||
-          page.password.value !== input.password) return failed();
+          page.password.value !== input.password) {
+        watch.dirty = true;
+        return failed();
+      }
       return { ok: true };
     }
     if (!watch) return action === "is-prepared" ? false : failed();

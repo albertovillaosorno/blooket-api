@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, a temporary identity-page challenge, disappearing
+login control or failed preparation now permanently invalidates that
+owned login document. A later return of identical credential fields
+cannot revive an unattended login click. The watch remains secret-free,
+and synthetic tests demonstrate both challenge and control-remount
+transitions without contacting an account.
+
 On 2026-10-12, the public login page helper began retaining an
 isolated document/form ownership watch without storing credentials.
 It refuses login after a trusted teacher pointer, key, input or change
