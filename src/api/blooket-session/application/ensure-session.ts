@@ -210,9 +210,17 @@ async function safeAuthenticate(
     const result = await browser.authenticate(credentials);
     if (!result || typeof result !== "object" || Array.isArray(result))
       return { ok: false, code: "blooket-browser-failed" };
-    const keys = Reflect.ownKeys(result).sort().join();
-    if (result.ok === true && keys === "ok") return { ok: true };
-    if (result.ok === false && keys === "code,ok" &&
+    const exact = (fields: readonly string[]): boolean => {
+      const keys = Reflect.ownKeys(result);
+      return keys.length === fields.length && keys.every(key => {
+        if (typeof key !== "string" || !fields.includes(key)) return false;
+        const descriptor = Object.getOwnPropertyDescriptor(result, key);
+        return !!descriptor && descriptor.enumerable &&
+          "value" in descriptor;
+      });
+    };
+    if (exact(["ok"]) && result.ok === true) return { ok: true };
+    if (exact(["code", "ok"]) && result.ok === false &&
         (result.code === "blooket-browser-unavailable" ||
           result.code === "blooket-browser-failed"))
       return { ok: false, code: result.code };

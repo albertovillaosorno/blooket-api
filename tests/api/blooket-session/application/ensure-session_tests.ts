@@ -462,3 +462,32 @@ test("malformed login adapter replies never establish a session", async () => {
     assert.deepEqual(calls, ["observe", "authenticate"]);
   }
 });
+
+test("login acknowledgements refuse accessors before reading values",
+  async () => {
+  let getterCalls = 0;
+  for (const [ordinary, field] of [
+    [{ ok: true }, "ok"],
+    [{ ok: false, code: "blooket-browser-failed" }, "ok"],
+    [{ ok: false, code: "blooket-browser-failed" }, "code"],
+  ] as const) {
+    const reply = { ...ordinary };
+    Object.defineProperty(reply, field, {
+      enumerable: true,
+      get() { getterCalls++; throw Error("login getter must not run"); },
+    });
+    const calls: string[] = [];
+    assert.deepEqual(await ensureBlooketSession(browserDouble({
+      observations: [
+        { ok: true, state: "signed-out" },
+        { ok: true, state: "dashboard" },
+      ],
+      authentication: reply as BlooketBrowserAuthenticationResult,
+    }, calls, []), secretStore([])), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(calls, ["observe", "authenticate"]);
+  }
+  assert.equal(getterCalls, 0);
+  },
+);

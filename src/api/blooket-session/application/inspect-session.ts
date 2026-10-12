@@ -34,6 +34,8 @@ import {
   blooketNavigationDecision,
   type ObservedBlooketNavigationStateKind,
 } from "../../../ir/blooket-navigation/domain/navigation-state.ts";
+import { isRecord, ownDataField } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 import type {
   BlooketBrowserFailureCode,
   BlooketBrowserSessionPort,
@@ -61,18 +63,17 @@ export async function inspectBlooketSession(
 ): Promise<InspectBlooketSessionResult> {
   try {
     const observed = await browser.observe();
-    if (!observed || typeof observed !== "object" ||
-        Array.isArray(observed)) return browserFailure();
-    const keys = Reflect.ownKeys(observed).sort().join();
-    if (observed.ok === false) {
-      if (keys !== "code,ok" ||
-          (observed.code !== "blooket-browser-unavailable" &&
-            observed.code !== "blooket-browser-failed"))
-        return browserFailure();
-      return { ok: false, code: observed.code };
+    if (!isRecord(observed)) return browserFailure();
+    if (exactSessionFields(observed, ["code", "ok"]) &&
+        ownDataField(observed, "ok") === false) {
+      const code = ownDataField(observed, "code");
+      if (code !== "blooket-browser-unavailable" &&
+          code !== "blooket-browser-failed") return browserFailure();
+      return { ok: false, code };
     }
-    const state: unknown = observed.state;
-    if (observed.ok !== true || keys !== "ok,state" ||
+    const state = ownDataField(observed, "state");
+    if (!exactSessionFields(observed, ["ok", "state"]) ||
+        ownDataField(observed, "ok") !== true ||
         !BLOOKET_NAVIGATION_STATE_KINDS.some(
           (candidate) => candidate === state,
         ) ||
@@ -81,7 +82,7 @@ export async function inspectBlooketSession(
         state === "human-action-required")
       return browserFailure();
     const decision = blooketNavigationDecision({
-      kind: observed.state,
+      kind: state as ObservedBlooketNavigationStateKind,
     });
     if (decision.action === "observe") {
       return {
@@ -91,12 +92,23 @@ export async function inspectBlooketSession(
     }
     return {
       ok: true,
-      state: observed.state,
+      state: state as ObservedBlooketNavigationStateKind,
       action: decision.action,
     };
   } catch {
     return browserFailure();
   }
+}
+
+function exactSessionFields(
+  value: Record<string, unknown>, fields: readonly string[],
+): boolean {
+  const keys = Reflect.ownKeys(value);
+  return keys.length === fields.length && keys.every(key => {
+    if (typeof key !== "string" || !fields.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !!descriptor && descriptor.enumerable && "value" in descriptor;
+  });
 }
 
 function browserFailure(): Extract<InspectBlooketSessionResult, { ok: false }> {

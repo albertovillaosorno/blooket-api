@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, session observation and credential-gated login also
+began requiring exact enumerable own data descriptors in browser
+result envelopes. Getter-backed navigation and authentication fields
+cannot execute before state admission, fake a connected session or
+bypass a human challenge. Synthetic tests confirm stable failures
+without reading stored credentials or contacting an account.
+
 On 2026-10-12, canonical set, detail and saved-question browser
 read adapters also began requiring exact enumerable own data
 fields before looking at success, completeness or failure codes.
