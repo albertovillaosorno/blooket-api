@@ -1104,3 +1104,31 @@ these boundaries. They do not prove an authenticated loaded-extension
 publication, actual Blooket persistence or native macOS/Safari use.
 Keep the first unfinished publication task open until separate real
 browser acceptance and fresh remote read-back are demonstrated.
+
+## Browser reply prototype and Chrome array admission (2026-10-12)
+
+The extension worker now returns locally constructed, descriptor-admitted
+My Sets rows, saved set details and primitive session observations. It
+never invokes browser-owned inherited `toJSON` methods during stable
+read-back comparisons or bridge result serialization.
+
+The Create Set host compares two exact redirect receipts and two final
+saved sidebar observations by admitted primitive fields. The Add Question
+host independently verifies contiguous card slots without serializing
+its browser-owned pre-open or post-Cancel lists.
+
+All six Chrome scripting hosts require one exact dense numeric result
+array slot with an enumerable own data descriptor before reading a frame
+wrapper. Accessor-backed, sparse or decorated arrays cannot authorize
+a form click, capability probe or confirmed publication result.
+
+Capability selection also scans My Sets slots by numeric index, then
+compares both full collection observations by exact ID/title/order and
+completeness instead of invoking array iterators or inherited JSON hooks.
+Synthetic Fedora regressions verify the protections and restoration
+behavior; no live teacher content was changed.
+
+Task `blooket-09` remains open because authenticated loaded-extension
+Create Set and Add Question persistence has not been demonstrated.
+Native macOS/Safari checks and manual reconciliation of ambiguous prior
+publication journals are separate outstanding acceptance work.
