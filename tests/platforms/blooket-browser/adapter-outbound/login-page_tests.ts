@@ -53,6 +53,11 @@ interface FixtureNode {
   querySelectorAll(selector: string): FixtureNode[];
   getBoundingClientRect(): { width: number; height: number };
   dispatchEvent(event: Event): boolean;
+  addEventListener(type: string,
+    listener: (event: { isTrusted: boolean }) => void): void;
+  removeEventListener(type: string,
+    listener: (event: { isTrusted: boolean }) => void): void;
+  dispatchTrusted(type: string): void;
   click(): void;
 }
 
@@ -61,9 +66,22 @@ function node(
   textContent = "",
   attributes: Record<string, string> = {},
 ): FixtureNode {
+  const listeners = new Map<string,
+    Set<(event: { isTrusted: boolean }) => void>>();
   return {
     tagName,
     textContent,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    dispatchTrusted(type) {
+      for (const listener of listeners.get(type) ?? [])
+        listener({ isTrusted: true });
+    },
     value: "",
     disabled: false,
     clicked: 0,
@@ -102,7 +120,7 @@ function withPage(
 ): void {
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   for (const key of ["document", "location", "HTMLInputElement", "Event",
-    "getComputedStyle"])
+    "getComputedStyle", "__blooketLoginFormWatch"])
     descriptors.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
 
   class InputFixture {}
@@ -148,6 +166,12 @@ function withPage(
   try {
     run();
   } finally {
+    const owned = (globalThis as typeof globalThis & {
+      __blooketLoginFormWatch?: {
+        document: unknown; dispose: () => void;
+      };
+    }).__blooketLoginFormWatch;
+    if (owned?.document === document) owned.dispose();
     for (const [key, descriptor] of descriptors) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else Reflect.deleteProperty(globalThis, key);
@@ -398,5 +422,67 @@ test("login rejects a challenge or changed form during password dispatch",
       assert.equal(page.submit.clicked, 0);
     });
   }
+  },
+);
+
+
+test("a lost login click acknowledgement never permits a second submit",
+  () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+    assert.deepEqual(submitBlooketLoginForm(credentials), { ok: true });
+    assert.equal(page.submit.clicked, 1);
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 1);
+  });
+  },
+);
+
+test("trusted teacher input vetoes login without exposing credential bytes",
+  () => {
+  for (const kind of ["pointerdown", "keydown", "input", "change"]) {
+    const page = fixture();
+    withPage(page.document, "https://id.blooket.com/login", () => {
+      assert.equal(prepareBlooketLoginForm(credentials).ok, true);
+      page.document.dispatchTrusted(kind);
+      assert.equal(isBlooketLoginFormPrepared(credentials), false);
+      assert.equal(submitBlooketLoginForm(credentials).ok, false);
+      assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+  },
+);
+
+test("login submit requires one owned preparation, not seeded field values",
+  () => {
+  const page = fixture();
+  page.identifier.value = credentials.loginIdentifier;
+  page.password.value = credentials.password;
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
+test("a replaced login field cannot inherit an owned submit", () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+    const replacement = node("INPUT");
+    replacement.value = credentials.password;
+    page.document.selectors[
+      'input[type="password"][placeholder="Password"]'
+    ] = [replacement];
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+  });
   },
 );
