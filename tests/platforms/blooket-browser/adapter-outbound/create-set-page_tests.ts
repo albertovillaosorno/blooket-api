@@ -910,3 +910,18 @@ test("Create Set description events cannot use changed privacy controls",
   }
   },
 );
+
+
+test("Create Set claim never adopts prefilled teacher draft fields", () => {
+  for (const field of ["title", "description"] as const) {
+    const page = fixture(true);
+    page[field].value = "Preexisting teacher draft";
+    Object.assign(page.form, { isConnected: true });
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(runBlooketCreateSetOwnership("claim"), false);
+      assert.equal(runBlooketCreateSetOwnership("check"), false);
+      assert.equal(page[field].value, "Preexisting teacher draft");
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+    }, false);
+  }
+});
