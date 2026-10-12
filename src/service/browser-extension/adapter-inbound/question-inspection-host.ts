@@ -94,7 +94,7 @@ export function createExtensionQuestionInspectionHost(
     const replies = await chrome.scripting.executeScript({
       target: { tabId }, func, args,
     });
-    if (!Array.isArray(replies) || replies.length !== 1 ||
+    if (!isExactDenseArray(replies) || replies.length !== 1 ||
         !replies[0] || typeof replies[0] !== "object")
       throw new Error("browser-question-script-failed");
     // Chrome adds frame metadata, but only its own enumerable result data

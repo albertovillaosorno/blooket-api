@@ -1395,3 +1395,27 @@ test("a stale return to the original edit document cannot open a probe",
     false);
   },
 );
+
+
+test("capability reads reject accessor-backed Chrome script arrays",
+  async () => {
+    const page = fixture();
+    const original = page.chrome.scripting.executeScript;
+    let getters = 0;
+    page.chrome.scripting.executeScript = async request => {
+      const result = await original(request);
+      if (request.func.name === "canLeaveBlooketPageForRead")
+        Object.defineProperty(result, "0", { enumerable: true, get() {
+          getters++;
+          return { result: true };
+        } });
+      return result;
+    };
+    assert.equal((await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, async () => undefined,
+    ).inspect()).ok, false);
+    assert.equal(getters, 0);
+    assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+      false);
+  },
+);

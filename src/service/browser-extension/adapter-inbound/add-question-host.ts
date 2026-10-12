@@ -131,7 +131,7 @@ export function createExtensionAddQuestionHost(
       func,
       args,
     });
-    if (!Array.isArray(replies) || replies.length !== 1 ||
+    if (!isExactDenseArray(replies) || replies.length !== 1 ||
         !replies[0] || typeof replies[0] !== "object")
       throw new Error("browser-write-script-failed");
     // Chrome adds frame metadata, but only its own enumerable result data

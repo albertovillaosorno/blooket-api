@@ -903,11 +903,26 @@ test(
     // accessor or concealed result field must not reach the read decoder.
     const scriptBeforeBadWrapper = browser.scripting.executeScript;
     let wrapperGetterCalls = 0;
-    for (const mode of ["getter", "hidden", "missing"] as const) {
+    for (const mode of ["getter", "hidden", "missing",
+      "array-accessor", "array-extra"] as const) {
       browser.scripting.executeScript = async options => {
         if (options.func.name !== "inspectBlooketPage" ||
             options.args?.[0]?.kind !== "sets.list")
           return await scriptBeforeBadWrapper(options);
+        if (mode === "array-accessor" || mode === "array-extra") {
+          const indexed = [{ result: { ok: true } }];
+          if (mode === "array-accessor")
+            Object.defineProperty(indexed, "0", {
+              enumerable: true, get() {
+                wrapperGetterCalls++;
+                return { result: { ok: true } };
+              },
+            });
+          else Object.defineProperty(indexed, "hidden", {
+            enumerable: false, value: "untrusted",
+          });
+          return indexed;
+        }
         const bad = {};
         if (mode === "getter") Object.defineProperty(bad, "result", {
           enumerable: true,

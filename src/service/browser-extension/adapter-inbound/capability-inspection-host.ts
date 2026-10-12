@@ -122,7 +122,7 @@ export function createExtensionCapabilityInspectionHost(
       func,
       args,
     });
-    if (!Array.isArray(replies) || replies.length !== 1 ||
+    if (!isExactDenseArray(replies) || replies.length !== 1 ||
         !replies[0] || typeof replies[0] !== "object")
       throw new Error("browser-capability-script-failed");
     // InjectionResult also contains Chrome-owned frame metadata. Trust only

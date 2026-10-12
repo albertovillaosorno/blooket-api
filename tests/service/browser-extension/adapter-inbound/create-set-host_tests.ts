@@ -1718,3 +1718,27 @@ test("Create Set verifies exact metadata without inherited serializers",
     assert.equal(fake.calls.filter(call => call === "detail-close").length, 1);
   },
 );
+
+test("Create Set never evaluates Chrome array index accessors",
+  async () => {
+    const fake = fakeChrome({ scripts: [observed, observed] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    const original = fake.chrome.scripting.executeScript;
+    let calls = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      const result = await original(request);
+      if (request.func.name === "observeBlooketCreateSetSuccess")
+        Object.defineProperty(result, "0", { enumerable: true, get() {
+          calls++;
+          throw new Error("untrusted-Chrome-array-slot");
+        } });
+      return result;
+    };
+    assert.equal((await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet()).ok, false);
+    assert.equal(calls, 0);
+  },
+);

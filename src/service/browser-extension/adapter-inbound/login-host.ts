@@ -30,6 +30,8 @@
 //   - Foreign pages, stale controls, challenges, and script failures fail
 //     closed.
 //
+import { isExactDenseArray } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 import {
   runBlooketLoginPageAction,
   type BlooketLoginPageInput,
@@ -86,7 +88,7 @@ export function createExtensionSessionAuthenticationHost(
       func,
       args,
     });
-    if (!Array.isArray(replies) || replies.length !== 1 ||
+    if (!isExactDenseArray(replies) || replies.length !== 1 ||
         !replies[0] || typeof replies[0] !== "object")
       throw new Error("browser-login-script-failed");
     // Chrome adds frame metadata, but only its own enumerable result data
