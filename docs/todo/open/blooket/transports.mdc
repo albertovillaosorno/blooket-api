@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, Create Set ownership checks began revoking a
+claimed document after a visible CAPTCHA, modal, security interstitial,
+password field or replaced form. Clearing the stop does not revive
+the old claim or allow a later Save click. Synthetic Create Set and
+host regressions cover challenge disappearance and form remounts.
+
 On 2026-10-12, login form preparation became single-use per
 claimed document. A lost first acknowledgement cannot re-fill the
 username/password or substitute different account credentials on the

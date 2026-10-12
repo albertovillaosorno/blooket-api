@@ -526,26 +526,37 @@ export function runBlooketCreateSetOwnership(
   action: "claim" | "check",
 ): boolean {
   try {
+    const revoke = (): false => {
+      const owned = (globalThis as typeof globalThis & {
+        __blooketCreateSetWatch?: { document: Document; dirty: boolean };
+      }).__blooketCreateSetWatch;
+      if (owned?.document === document) owned.dirty = true;
+      return false;
+    };
     if (location.origin !== "https://dashboard.blooket.com" ||
         location.pathname !== "/create" || location.search || location.hash ||
         document.title === "Just a moment..." ||
-        document.querySelector('input[type="password"]')) return false;
+        document.querySelector('input[type="password"]')) return revoke();
     const dialogs = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"]',
     ));
-    if (dialogs.some(node => {
+    const visibleStop = (node: Element): boolean => {
       const bounds = node.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return false;
       const style = getComputedStyle(node);
-      return style.display !== "none" && style.visibility !== "hidden" &&
-        style.visibility !== "collapse";
-    })) return false;
+      return style.display !== "none" && style.visibility === "visible";
+    };
+    const challenged = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some(visibleStop);
+    if (dialogs.some(visibleStop) || challenged) return revoke();
     const forms = Array.from(document.querySelectorAll(
       "form#question-set-form",
     ));
-    if (forms.length !== 1 || forms[0]?.tagName !== "FORM") return false;
+    if (forms.length !== 1 || forms[0]?.tagName !== "FORM")
+      return revoke();
     const form = forms[0] as HTMLFormElement;
-    if (!form.isConnected) return false;
+    if (!form.isConnected) return revoke();
     const world = globalThis as typeof globalThis & {
       __blooketCreateSetWatch?: {
         document: Document;
@@ -559,7 +570,8 @@ export function runBlooketCreateSetOwnership(
     const previous = world.__blooketCreateSetWatch;
     if (action === "check")
       return !!previous && previous.document === document &&
-        previous.form === form && !previous.dirty && !previous.submitted;
+        previous.form === form && !previous.dirty && !previous.submitted
+        ? true : revoke();
     if (action !== "claim") return false;
     // A still-mounted form was already claimed: never reassign a pending
     // submission or silently discard teacher interactions.
