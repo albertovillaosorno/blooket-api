@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, the read-owned Add Question capability probe now
+requires a visible, enabled, unique Cancel button before admitting a
+newly opened question panel. The Audio drawer's Plus-gate heading must
+be CSS-visible; a concealed title cannot manufacture an account
+entitlement. Synthetic page tests cover duplicate/hidden/disabled
+Cancel controls and concealed supported/unsupported headings without
+any remote submission.
+
 On 2026-10-12, read-only capability inspection also stopped
 calling inherited set-list iterators or browser `toJSON` methods.
 The first My Sets identity and both full snapshots are checked by

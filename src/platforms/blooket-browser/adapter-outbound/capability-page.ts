@@ -312,6 +312,21 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       watch.dirty = true;
       return false;
     }
+    // A hidden or missing Cancel would leave a read-owned panel stranded.
+    // Do not bind readiness until the panel can safely be relinquished.
+    const cancels = Array.from(form.querySelectorAll(
+      'button[type="button"]',
+    )).filter(button => button.textContent?.replace(/\s+/gu, " ").trim() ===
+      "Cancel");
+    if (cancels.length !== 1 || cancels[0]?.tagName !== "BUTTON")
+      return false;
+    const cancel = cancels[0] as HTMLButtonElement;
+    const bounds = cancel.getBoundingClientRect();
+    const style = getComputedStyle(cancel);
+    if (bounds.width <= 0 || bounds.height <= 0 ||
+        style.display === "none" || style.visibility !== "visible" ||
+        cancel.disabled || cancel.getAttribute("aria-disabled") === "true")
+      return false;
     // The first verified panel becomes the only owned read-only form.
     watch.form = form;
     watch.question = question;
@@ -541,6 +556,12 @@ export function inspectBlooketAudioCapabilityDrawer(
       // The live upsell repeats its title inside the subscription link.
       // Interactive labels are not drawer headings; duplicate headings stop.
       .filter((span) => !span.closest("a") && !span.closest("button"))
+      .filter((span) => {
+        const bounds = span.getBoundingClientRect();
+        const style = getComputedStyle(span);
+        return bounds.width > 0 && bounds.height > 0 &&
+          style.display !== "none" && style.visibility === "visible";
+      })
       .map((span) => normalized(span))
       .filter(
         (text) =>
