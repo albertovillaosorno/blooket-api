@@ -773,3 +773,58 @@ test("hidden and symbol-bearing browser read replies are rejected",
   }
   },
 );
+
+test("canonical set and question reads never execute reply getters",
+  async () => {
+  let getterCalls = 0;
+  const accessor = (value: Record<string, unknown>, field: string) => {
+    const copy = { ...value };
+    Object.defineProperty(copy, field, {
+      enumerable: true,
+      get() { getterCalls++; throw Error("read getter must not run"); },
+    });
+    return copy;
+  };
+  const concealed = (value: Record<string, unknown>, field: string) => {
+    const copy = { ...value };
+    Object.defineProperty(copy, field, {
+      enumerable: false, value: copy[field],
+    });
+    return copy;
+  };
+  for (const twist of [accessor, concealed]) {
+    for (const field of ["ok", "value", "completeness"]) {
+      const reply = twist({ ok: true, value: [],
+        completeness: "complete" }, field);
+      const sets = { list: async () => reply,
+        get: async () => ({ ok: false,
+          code: "blooket-browser-failed" }) } as unknown as
+        BlooketSetReadPort;
+      assert.deepEqual(await listBlooketSets(
+        browser([{ ok: true, state: "my-sets" }], []),
+        secretStore([]), sets, { readOnly: true }),
+      { ok: false, stage: "read", code: "blooket-browser-failed" });
+    }
+    for (const field of ["ok", "value"]) {
+      const reply = twist({ ok: true, value: [] }, field);
+      const questions = { list: async () => reply } as unknown as
+        BlooketQuestionReadPort;
+      assert.deepEqual(await listBlooketQuestions(
+        browser([{ ok: true, state: "edit" }], []),
+        secretStore([]), questions, "fixture"),
+      { ok: false, stage: "read", code: "blooket-browser-failed" });
+    }
+    for (const field of ["ok", "code"]) {
+      const reply = twist({ ok: false,
+        code: "blooket-browser-unavailable" }, field);
+      const sets = { list: async () => reply,
+        get: async () => reply } as unknown as BlooketSetReadPort;
+      assert.deepEqual(await getBlooketSet(
+        browser([{ ok: true, state: "edit" }], []),
+        secretStore([]), sets, "fixture"),
+      { ok: false, stage: "read", code: "blooket-browser-failed" });
+    }
+  }
+  assert.equal(getterCalls, 0);
+  },
+);

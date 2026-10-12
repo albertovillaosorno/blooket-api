@@ -359,9 +359,10 @@ async function safeListProbe(
     const result = await probe();
     if (!result || typeof result !== "object" || Array.isArray(result))
       return browserReadFailure();
-    if (result.ok === false) return validateReadFailure(result);
-    if (result.ok === true &&
-        exactProbeKeys(result, "completeness,ok,value") &&
+    if (exactProbeKeys(result, "code,ok") && result.ok === false)
+      return validateReadFailure(result);
+    if (exactProbeKeys(result, "completeness,ok,value") &&
+        result.ok === true &&
         (result.completeness === "complete" ||
           result.completeness === "unknown"))
       return {
@@ -382,9 +383,9 @@ async function safeProbe(
     const result = await probe();
     if (!result || typeof result !== "object" || Array.isArray(result))
       return browserReadFailure();
-    if (result.ok === false) return validateReadFailure(result);
-    if (result.ok === true &&
-        exactProbeKeys(result, "ok,value"))
+    if (exactProbeKeys(result, "code,ok") && result.ok === false)
+      return validateReadFailure(result);
+    if (exactProbeKeys(result, "ok,value") && result.ok === true)
       return { ok: true, value: result.value };
     return browserReadFailure();
   } catch {
@@ -411,9 +412,15 @@ function validateReadFailure(
 
 function exactProbeKeys(value: unknown, expected: string): boolean {
   try {
-    return !!value && typeof value === "object" &&
-      !Array.isArray(value) &&
-      Reflect.ownKeys(value).sort().join() === expected;
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return false;
+    const own = Reflect.ownKeys(value);
+    const names = expected.split(",");
+    return own.length === names.length && own.every(key => {
+      if (typeof key !== "string" || !names.includes(key)) return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return !!descriptor && descriptor.enumerable && "value" in descriptor;
+    });
   } catch { return false; }
 }
 

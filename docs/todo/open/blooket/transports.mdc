@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, canonical set, detail and saved-question browser
+read adapters also began requiring exact enumerable own data
+fields before looking at success, completeness or failure codes.
+Accessor-backed and concealed replies cannot execute getters or
+masquerade as positive saved evidence, consistently with the write
+reconciliation port. Synthetic port tests cover all read kinds.
+
 On 2026-10-12, publication reconciliation began validating each
 set list, saved detail and question port reply by exact enumerable own
 data descriptors before reading `ok`, `value`, completeness or a
