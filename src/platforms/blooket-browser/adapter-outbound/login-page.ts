@@ -175,6 +175,10 @@ export function runBlooketLoginPageAction(
         watch.dirty || watch.submitted))
       return action === "is-prepared" ? false : failed();
     if (action === "prepare") {
+      // An unclaimed login form may already contain teacher-entered values
+      // or password-manager data. Never replace them on the first fill.
+      if (!watch && (page.identifier.value !== "" ||
+          page.password.value !== "")) return failed();
       if (!watch) {
         const claimed = {
           document, identifier: page.identifier, password: page.password,

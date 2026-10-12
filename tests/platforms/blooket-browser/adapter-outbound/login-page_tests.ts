@@ -521,3 +521,23 @@ test("a reappearing login form cannot recover a lost document owner",
   });
   },
 );
+
+
+test("unowned login preparation never replaces teacher or autofill fields",
+  () => {
+  for (const field of ["identifier", "password"] as const) {
+    const page = fixture();
+    page[field].value = "preexisting teacher entry";
+    withPage(page.document, "https://id.blooket.com/login", () => {
+      assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+      assert.equal(page[field].value, "preexisting teacher entry");
+      assert.equal(page.identifier.value, field === "identifier"
+        ? "preexisting teacher entry" : "");
+      assert.equal(page.password.value, field === "password"
+        ? "preexisting teacher entry" : "");
+      assert.equal(submitBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+  },
+);
