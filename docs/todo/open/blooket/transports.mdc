@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, the portable Create Set browser write-surface
+adapter began validating each host reply's complete enumerable
+own-data descriptors before reading status fields. An accessor-backed
+`ok` field, hidden data field or symbol-owned extra cannot execute
+untrusted code or authorize a subsequent prepare, submit or receipt.
+Synthetic host tests exercise every step without provider mutation.
+
 On 2026-10-12, browser session observation stopped reporting an
 Edit-ready document for a set ID longer than 512 characters or one
 containing decoded control characters. It still admits normal opaque

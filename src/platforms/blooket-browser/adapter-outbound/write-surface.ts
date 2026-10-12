@@ -104,25 +104,32 @@ export function createBlooketBrowserWriteSurface(
 }
 
 function exactHostKeys(value: unknown, names: string): boolean {
-  return !!value && typeof value === "object" && !Array.isArray(value) &&
-    Reflect.ownKeys(value).sort().join() === names;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const expected = names.split(",");
+  const own = Reflect.ownKeys(value);
+  return own.length === expected.length && own.every(key => {
+    if (typeof key !== "string" || !expected.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !!descriptor && descriptor.enumerable && "value" in descriptor;
+  });
 }
 
 function admitHostStep(
   reply: unknown,
 ): { readonly ok: true } | BlooketBrowserWriteSurfaceFailure {
-  if (!reply || typeof reply !== "object" || !("ok" in reply))
-    return browserFailure();
-  if (reply.ok === true && exactHostKeys(reply, "ok"))
+  if (exactHostKeys(reply, "ok") && reply &&
+      typeof reply === "object" && "ok" in reply && reply.ok === true)
     return { ok: true };
-  if (reply.ok !== false || !("kind" in reply))
-    return browserFailure();
-  if (reply.kind === "browser" && exactHostKeys(reply, "code,kind,ok") &&
-      "code" in reply &&
+  if (exactHostKeys(reply, "code,kind,ok") && reply &&
+      typeof reply === "object" && "ok" in reply && reply.ok === false &&
+      "kind" in reply && reply.kind === "browser" && "code" in reply &&
       (reply.code === "blooket-browser-failed" ||
        reply.code === "blooket-browser-unavailable"))
     return { ok: false, kind: "browser", code: reply.code };
-  if (reply.kind === "navigation" && exactHostKeys(reply, "kind,ok,state") &&
+  if (exactHostKeys(reply, "kind,ok,state") && reply &&
+      typeof reply === "object" && "ok" in reply && reply.ok === false &&
+      "kind" in reply && reply.kind === "navigation" &&
       "state" in reply &&
       (reply.state === "signed-out" || reply.state === "expired-session" ||
        reply.state === "organization-prompt" ||
