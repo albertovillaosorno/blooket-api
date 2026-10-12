@@ -142,3 +142,27 @@ test(
   }
   },
 );
+
+test("session observation refuses getter-backed fields without invoking them",
+  async () => {
+  let reads = 0;
+  for (const [ordinary, field] of [
+    [{ ok: true, state: "dashboard" }, "ok"],
+    [{ ok: true, state: "dashboard" }, "state"],
+    [{ ok: false, code: "blooket-browser-unavailable" }, "ok"],
+    [{ ok: false, code: "blooket-browser-unavailable" }, "code"],
+  ] as const) {
+    const reply = { ...ordinary };
+    Object.defineProperty(reply, field, {
+      enumerable: true,
+      get() { reads++; throw Error("observation getter must not run"); },
+    });
+    const calls: string[] = [];
+    assert.deepEqual(await inspectBlooketSession(browser(
+      reply as BlooketBrowserObservationResult, calls,
+    )), { ok: false, code: "blooket-browser-failed" });
+    assert.deepEqual(calls, ["observe"]);
+  }
+  assert.equal(reads, 0);
+  },
+);
