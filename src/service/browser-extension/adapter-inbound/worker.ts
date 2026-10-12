@@ -191,7 +191,15 @@ function exactSessionObservation(value: unknown): boolean {
     OBSERVED_SESSION_STATES.has(value.value);
 }
 
-function admittedLibraryRead(value: unknown): boolean {
+function admittedLibraryRead(value: unknown): {
+  readonly ok: true;
+  readonly value: {
+    readonly completeness: "complete" | "unknown";
+    readonly items: readonly {
+      readonly schemaVersion: 1; readonly id: string; readonly title: string;
+    }[];
+  };
+} | undefined {
   if (!exactWorkerKeys(value, "ok,value") || !value ||
       typeof value !== "object" || !("ok" in value) ||
       value.ok !== true || !("value" in value) ||
@@ -202,8 +210,13 @@ function admittedLibraryRead(value: unknown): boolean {
       !Array.isArray(value.value.items) ||
       (value.value.items.length === 0
         ? value.value.completeness !== "complete"
-        : value.value.completeness !== "unknown")) return false;
-  return decodeBlooketSetList(value.value.items).ok;
+        : value.value.completeness !== "unknown")) return undefined;
+  const decoded = decodeBlooketSetList(value.value.items);
+  if (!decoded.ok) return undefined;
+  const completeness = value.value.completeness as "complete" | "unknown";
+  // Return locally owned decoded fields. A foreign prototype `toJSON`
+  // must not run during stability comparisons or bridge serialization.
+  return { ok: true, value: { items: decoded.value, completeness } };
 }
 
 function configured(value: unknown): Connection | undefined {
@@ -418,9 +431,9 @@ async function read(
         await pause(100);
         continue;
       }
-      if (!admittedLibraryRead(result))
-        throw new Error("browser-set-list-unavailable");
-      initial = result;
+      const admitted = admittedLibraryRead(result);
+      if (!admitted) throw new Error("browser-set-list-unavailable");
+      initial = admitted;
       captured = true;
       break;
     }
@@ -435,8 +448,9 @@ async function read(
     if (tabAfter.status !== "complete" || tabAfter.url !== target)
       throw new Error("browser-set-list-unavailable");
     const after = await observe();
-    if (Date.now() >= readDeadline || !admittedLibraryRead(after) ||
-        JSON.stringify(initial) !== JSON.stringify(after))
+    const admittedAfter = admittedLibraryRead(after);
+    if (Date.now() >= readDeadline || !admittedAfter ||
+        JSON.stringify(initial) !== JSON.stringify(admittedAfter))
       throw new Error("browser-set-list-unavailable");
     const checkedTab = await browser.tabs.get(current.tabId);
     if (checkedTab.status !== "complete" || checkedTab.url !== target)
@@ -490,7 +504,9 @@ async function read(
           !("description" in reply.value) ||
           typeof reply.value.description !== "string")
         throw new Error("browser-details-unavailable");
-      return reply.value as { title: string; description: string };
+      // Copy each descriptor-admitted scalar: comparison and Cancel must not
+      // invoke a prototype method supplied by the injected browser result.
+      return { title: reply.value.title, description: reply.value.description };
     };
     const baseline = await sidebarValue();
     await pause(0);
@@ -576,8 +592,7 @@ async function read(
           if (!again || typeof again !== "object" ||
               !exactWorkerKeys(again, "ok,value") ||
               !("ok" in again) || again.ok !== true ||
-              !("value" in again) ||
-              JSON.stringify(result) !== JSON.stringify(again))
+              ! ("value" in again))
             throw new Error("browser-details-unavailable");
           const againDecoded = decodeBlooketSetDetail(again.value);
           if (!againDecoded.ok ||
@@ -589,7 +604,7 @@ async function read(
             Date.now() >= readDeadline || after.status !== "complete" ||
             after.url !== target
           ) throw new Error("browser-details-unavailable");
-          savedDetail = result;
+          savedDetail = { ok: true, value: decoded.value };
           break;
         }
         if (
@@ -698,10 +713,12 @@ async function read(
       afterAgain.status !== "complete" ||
       afterAgain.url !== tab.url || finalOrigin !== sessionOrigin ||
       !exactSessionObservation(again) ||
-      JSON.stringify(observed) !== JSON.stringify(again)
+      observed.value !== again.value
     ) throw new Error("browser-session-changed");
   }
-  return observed;
+  return operation.kind === "session.observe"
+    ? { ok: true, value: (observed as { value: string }).value }
+    : observed;
 }
 function ownedBrowser(
   current: Connection,

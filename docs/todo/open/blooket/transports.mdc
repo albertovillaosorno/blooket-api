@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, the extension worker stopped serializing browser-owned
+My Sets, Edit Info and session reply objects to prove stability. It
+now compares decoded local collection/detail values and primitive
+navigation state, and returns only locally owned admitted fields.
+Synthetic worker replies with inherited throwing `toJSON` methods on
+set rows, arrays, metadata, panel and session envelopes execute none of
+those methods while preserving correct read-only behavior.
+
 On 2026-10-12, the canonical browser write adapter started
 requiring exact enumerable own data fields on Create Set receipts,
 Add Question acknowledgements and browser/navigation failures before
