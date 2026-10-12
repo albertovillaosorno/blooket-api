@@ -95,6 +95,10 @@ test(
   let listSecondAccessorEnvelope = false;
   let listSecondNonEnumerableField = false;
   let listSecondHiddenRow = false;
+  let listPrototypeSerialization = false;
+  let detailPrototypeSerialization = false;
+  let sessionPrototypeSerialization = false;
+  let inheritedSerializerCalls = 0;
   let listFirstInvalidRow = false;
   let listModelSource: string | null = null;
   let listReloadDuringCapture = false;
@@ -257,7 +261,7 @@ test(
             detailReloadDuringSidebar = false;
             documentOrigin += 1_000;
           }
-          return [{ result: detailSidebarMalformed ? {
+          const sidebar = detailSidebarMalformed ? {
             ok: true, extra: "not-admitted",
             value: { title: "Synthetic", description: "" },
           } : {
@@ -271,7 +275,14 @@ test(
                   ? "Local unsaved title" : "Synthetic",
               description: "",
             },
-          } }];
+          };
+          if (detailPrototypeSerialization) Object.setPrototypeOf(
+            sidebar.value, { toJSON() {
+              inheritedSerializerCalls++;
+              throw new Error("untrusted-sidebar-serializer");
+            } },
+          );
+          return [{ result: sidebar }];
         }
         if (func.name === "closeBlooketDetailPanel") {
           if (args?.[0] === "created-set-fixture") {
@@ -543,6 +554,19 @@ test(
                   (!listEmptyDrifts || setListReads % 2 !== 0))
                 ? "complete" : "unknown",
             } };
+          if (listPrototypeSerialization) {
+            const unexpected = { toJSON() {
+              inheritedSerializerCalls++;
+              throw new Error("untrusted-list-serializer");
+            } };
+            Object.setPrototypeOf(reply, unexpected);
+            Object.setPrototypeOf(reply.value, unexpected);
+            if (reply.value.items.length > 0) {
+              Object.setPrototypeOf(reply.value.items[0], unexpected);
+              Object.setPrototypeOf(reply.value.items,
+                Object.assign(Object.create(Array.prototype), unexpected));
+            }
+          }
           if (setListReads === 2 && listSecondHiddenEnvelope)
             Object.defineProperty(reply, "hidden", {
               value: "untrusted", enumerable: false,
@@ -600,6 +624,18 @@ test(
             },
           },
         ];
+        if (operation.kind === "session.observe" &&
+            sessionPrototypeSerialization)
+          Object.setPrototypeOf(reply[0]!.result, { toJSON() {
+            inheritedSerializerCalls++;
+            throw new Error("untrusted-session-serializer");
+          } });
+        if (operation.kind === "sets.get" &&
+            detailPrototypeSerialization)
+          Object.setPrototypeOf(reply[0]!.result.value, { toJSON() {
+            inheritedSerializerCalls++;
+            throw new Error("untrusted-detail-serializer");
+          } });
         if (operation.kind === "sets.get" && detailReadCount === 2 &&
             detailSecondReadHasHiddenField)
           Object.defineProperty(reply[0]!.result, "hidden", {
@@ -782,6 +818,13 @@ test(
     assert.equal(firstSets.value.completeness, "unknown");
     assert.equal(setListReads, 2);
     assert.equal(readReloads, 1);
+    listPrototypeSerialization = true;
+    setListReads = 0;
+    const inheritedList = await expectReply({ kind: "sets.list" });
+    assert.equal(inheritedList.ok, true);
+    assert.equal(inheritedList.value.items[0].title, "Synthetic");
+    assert.equal(inheritedSerializerCalls, 0);
+    listPrototypeSerialization = false;
     // The assembled worker must compare a real model envelope, not just
     // exercise the pure comparator in isolation.
     listModelSource = libraryModelFixture({ props: {
@@ -1272,6 +1315,10 @@ test(
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
     assert.equal((await message({ kind: "status" })).status, "connected");
+    sessionPrototypeSerialization = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
+    assert.equal(inheritedSerializerCalls, 0);
+    sessionPrototypeSerialization = false;
     sessionSecondHasHiddenField = true;
     sessionReadProbeCount = 0;
     assert.equal((await expectReply({ kind: "session.observe" })).ok, false);
