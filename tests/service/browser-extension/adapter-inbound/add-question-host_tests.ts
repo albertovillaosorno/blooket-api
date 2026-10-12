@@ -1265,3 +1265,29 @@ test("forged list-array prototype methods cannot authorize a Save receipt",
     assert.equal(fake.readBackReads(), 0);
   },
 );
+
+test("Add Question never invokes inherited saved-card serializers",
+  async () => {
+    let serializerCalls = 0;
+    const prototype = { toJSON() {
+      serializerCalls++;
+      throw new Error("untrusted-question-card-serializer");
+    } };
+    const cards = (items: number[]) => {
+      Object.setPrototypeOf(items,
+        Object.assign(Object.create(Array.prototype), prototype));
+      return Object.assign(Object.create(prototype), {
+        ok: true, value: items,
+      });
+    };
+    const fake = fakeChrome({
+      priorListReply: cards([]), listReply: cards([1]),
+    });
+    assert.deepEqual(await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input), { ok: true });
+    assert.equal(serializerCalls, 0);
+    assert.equal(fake.calls.filter(name =>
+      name === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
