@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, initial login preparation also began rejecting
+nonempty identifier/password inputs before installing an extension
+watch. Existing teacher typing or password-manager autofill is never
+overwritten by a new automation attempt. Synthetic tests cover both
+fields and verify there is no submit or credential return.
+
 On 2026-10-12, a temporary identity-page challenge, disappearing
 login control or failed preparation now permanently invalidates that
 owned login document. A later return of identical credential fields
