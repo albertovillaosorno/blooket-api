@@ -57,12 +57,22 @@ export function checkBlooketLibraryObservation(
     captured["source"], captured["build"],
   );
   if (!model) return failed;
-  const equal = (expected: typeof model.allSets) =>
-    expected.length === items.length && expected.every(set =>
-      items.filter(item => record(item) &&
-        ownDataField(item, "id") === set.id &&
-        ownDataField(item, "title") === set.title).length === 1,
-    );
+  // Never call methods inherited by an untrusted browser result array.
+  // Its dense own slots were checked above, but its prototype need not be
+  // the ordinary Array.prototype during adversarial local port tests.
+  const equal = (expected: typeof model.allSets) => {
+    if (expected.length !== items.length) return false;
+    for (const set of expected) {
+      let matches = 0;
+      for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        if (record(item) && ownDataField(item, "id") === set.id &&
+            ownDataField(item, "title") === set.title) matches++;
+      }
+      if (matches !== 1) return false;
+    }
+    return true;
+  };
   return equal(model.allSets) && equal(model.displayedSets) ? observed : failed;
 }
 
