@@ -1158,3 +1158,24 @@ text before claiming the form. These are deterministic Fedora browser
 fixtures, repository tests, and Linux x64 extracted-package checks.
 They do not establish live Blooket publication, account mutation, or
 native macOS/Safari acceptance; retain the open blooket-09 blocker.
+
+## One-shot login and challenge revocation follow-up (2026-10-12)
+
+The extension's public-login page helper now refuses its first credential
+fill when either field contains teacher or password-manager values. Each
+freshly owned document permits only one preparation and one submit click,
+with the latch set before invoking the provider's submit handler. No
+credential values are stored in the ownership watch.
+
+A visible security challenge, missing login control, actual teacher input
+or a form replacement permanently revokes that document's login authority.
+Create Set applies the same principle to an existing title/description,
+visible CAPTCHA, organization dialog, password overlay, security
+interstitial and changed form after claiming an empty create document.
+
+The capability probe and session readers also require CSS-visible Audio
+headings, a usable read-owned Cancel and exact bounded Edit set IDs.
+Portable Fedora tests, browser-extension integration and Linux x64
+extraction do not establish real authenticated Blooket publication or
+native macOS/Safari compatibility. Keep blooket-09 active until live
+fresh-state acceptance, without replaying ambiguous account writes.
