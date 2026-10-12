@@ -347,3 +347,63 @@ test("only the exact lost-ack flag can permit Create Set observation",
   }
   },
 );
+
+test("browser host accessors never execute or advance a Create Set step",
+  async () => {
+  for (const stage of ["open", "prepare", "submit", "observe"] as const) {
+    let reads = 0;
+    const accessor = Object.defineProperty({ kind: "browser",
+      code: "blooket-browser-failed" }, "ok", {
+      enumerable: true,
+      get() { reads++; throw new Error("untrusted accessor"); },
+    });
+    const calls: string[] = [];
+    const overrides: Partial<BlooketCreateSetBrowserHost> = {};
+    if (stage === "open") overrides.openCreateSet = async () => {
+      calls.push("open");
+      return accessor as never;
+    };
+    if (stage === "prepare") overrides.prepareCreateSet = async () => {
+      calls.push("prepare");
+      return accessor as never;
+    };
+    if (stage === "submit") overrides.submitCreateSet = async () => {
+      calls.push("submit");
+      return accessor as never;
+    };
+    if (stage === "observe") overrides.observeCreateSet = async () => {
+      calls.push("observe");
+      return accessor as never;
+    };
+    assert.deepEqual(await createBlooketBrowserWriteSurface(
+      host(calls, overrides),
+    ).createSet(submission, []), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(reads, 0, stage);
+    assert.equal(calls.at(-1), stage);
+  }
+  },
+);
+
+test("hidden and symbol host fields cannot grant browser write receipts",
+  async () => {
+  for (const malformed of [
+    Object.defineProperty({ ok: true }, "ok", { enumerable: false }),
+    Object.defineProperty({ ok: true }, Symbol("extra"), {
+      enumerable: false, value: "untrusted",
+    }),
+    Object.defineProperty({ ok: true, remoteSetId: "remote-1" },
+      "remoteSetId", { get() { throw new Error("untrusted getter"); },
+        enumerable: true }),
+  ]) {
+    const calls: string[] = [];
+    const surface = createBlooketBrowserWriteSurface(host(calls, {
+      openCreateSet: async () => malformed as never,
+    }));
+    assert.deepEqual(await surface.createSet(submission, []), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+    assert.deepEqual(calls, []);
+  }
+  },
+);
