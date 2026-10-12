@@ -380,6 +380,34 @@ test("a pending capability owner refuses repeated open and stale drawer",
   },
 );
 
+test("capability readiness requires a usable owned Cancel control", () => {
+  for (const reason of ["missing", "duplicate", "hidden", "disabled",
+    "aria"] as const) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      if (reason === "missing")
+        page.form.selectors['button[type="button"]'] = [page.audio];
+      if (reason === "duplicate")
+        page.form.selectors['button[type="button"]']!.push(
+          node("BUTTON", "Cancel", { type: "button" }),
+        );
+      if (reason === "hidden")
+        page.cancel.computedStyle.visibility = "hidden";
+      if (reason === "disabled")
+        Object.assign(page.cancel, { disabled: true });
+      if (reason === "aria")
+        page.cancel.attributes["aria-disabled"] = "true";
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"),
+        false, reason);
+      assert.equal(page.cancel.clicked, 0);
+    });
+  }
+});
+
 test("verified capability modal cannot transfer ownership to a remount", () => {
   const page = fixture();
   withPage(page.document, () => {
@@ -522,6 +550,28 @@ test("audio upsell link text is not a second drawer heading", () => {
     upsell.selectors["span"]!.push(node("SPAN", "Upgrade to Plus"));
     assert.equal(injected("set-fixture").ok, false);
   });
+});
+
+test("hidden Audio drawer headings never prove Plus entitlements", () => {
+  for (const kind of ["supported", "unsupported"] as const) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+      const observed = drawer(kind);
+      page.document.selectors['aside[data-drawer-open="true"]'] = [observed];
+      observed.selectors["span"]![0]!.computedStyle.display = "none";
+      assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+        false);
+      observed.selectors["span"]![0]!.computedStyle.display = "block";
+      assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
+        ok: true, value: kind,
+      });
+    });
+  }
 });
 
 test("capability controls refuse control-bearing set IDs", () => {
