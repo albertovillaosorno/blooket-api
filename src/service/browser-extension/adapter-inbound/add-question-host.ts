@@ -270,8 +270,9 @@ export function createExtensionAddQuestionHost(
           listBlooketQuestionNumbers as (...args: never[]) => unknown,
           [input.setId],
         );
-        if (!exactPreviousQuestionNumbers(priorAgain, input.number) ||
-            JSON.stringify(priorAgain) !== JSON.stringify(prior))
+        // Both replies already prove the same bounded contiguous 1..n-1
+        // slots; never stringify a browser-owned prototype to compare them.
+        if (!exactPreviousQuestionNumbers(priorAgain, input.number))
           return browserFailure();
         const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
@@ -532,8 +533,8 @@ async function observeQuestion(
           listBlooketQuestionNumbers as (...args: never[]) => unknown,
           [input.setId],
         ).catch(() => null);
-        return questionNumberPresent(finalAgain, input.number) &&
-            JSON.stringify(finalAgain) === JSON.stringify(finalList)
+        // Each list independently proves the exact same 1..n cards.
+        return questionNumberPresent(finalAgain, input.number)
           ? { ok: true } : browserFailure();
       }
       if (isClosed !== false) return browserFailure();

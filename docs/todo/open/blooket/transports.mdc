@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, Add Question stopped invoking browser-owned
+`toJSON` methods during the pre-open and post-Cancel question-card
+stability checks. Both independent observations already prove exact,
+contiguous, bounded numeric slots; they need no further untrusted
+serialization. A synthetic inherited throwing serializer cannot execute,
+while the host still makes at most one Save Question click.
+
 On 2026-10-12, Create Set read-back stopped serializing browser-owned
 Edit redirect and post-Cancel sidebar reply objects. Each redirect is
 already checked against the identical exact opaque ID, and both final
