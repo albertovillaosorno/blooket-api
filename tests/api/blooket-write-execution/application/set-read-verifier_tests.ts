@@ -921,3 +921,80 @@ test("a transient matching question cannot confirm an ambiguous write",
     { ok: true, outcome: "inconclusive" });
   },
 );
+
+test("reconciliation never invokes accessor-backed probe replies",
+  async () => {
+  let getters = 0;
+  const poisoned = (value: Record<string, unknown>, field: string) => {
+    const copy = { ...value };
+    Object.defineProperty(copy, field, {
+      enumerable: true,
+      get() { getters++; throw new Error("probe getter must not run"); },
+    });
+    return copy;
+  };
+  const changed = (value: Record<string, unknown>, field: string) => {
+    const copy = { ...value };
+    Object.defineProperty(copy, field, {
+      enumerable: false, value: copy[field],
+    });
+    return copy;
+  };
+  const target = { remoteSetId: "remote-set-1" };
+  for (const candidate of [
+    poisoned({ ok: true, completeness: "complete", value: [] }, "ok"),
+    poisoned({ ok: true, completeness: "complete", value: [] }, "value"),
+    changed({ ok: true, completeness: "complete", value: [] }, "ok"),
+    poisoned({ ok: false, code: "blooket-browser-unavailable" }, "ok"),
+    poisoned({ ok: false, code: "blooket-browser-unavailable" }, "code"),
+  ]) {
+    const verifier = blooketSetReadWriteVerifier({
+      list: async () => candidate as Awaited<ReturnType<
+        BlooketSetReadPort["list"]>>,
+      get: async () => { throw Error("detail must not run"); },
+    });
+    assert.deepEqual(await verifier.captureBaseline(operation,
+      { remoteSetId: null }),
+    { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  for (const candidate of [
+    poisoned({ ok: true, value: [] }, "ok"),
+    poisoned({ ok: true, value: [] }, "value"),
+    changed({ ok: true, value: [] }, "ok"),
+    poisoned({ ok: false, code: "blooket-browser-unavailable" }, "code"),
+  ]) {
+    const verifier = blooketSetReadWriteVerifier({
+      list: async () => { throw Error("set listing must not run"); },
+      get: async () => { throw Error("detail must not run"); },
+    }, { list: async () => candidate as Awaited<ReturnType<
+      BlooketQuestionReadPort["list"]>> });
+    assert.deepEqual(await verifier.captureBaseline(typingOperation(),
+      target),
+    { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  for (const candidate of [
+    poisoned({ ok: true, value: detail("new", "Astronomy") }, "ok"),
+    poisoned({ ok: true, value: detail("new", "Astronomy") }, "value"),
+    changed({ ok: true, value: detail("new", "Astronomy") }, "value"),
+    poisoned({ ok: false, code: "blooket-browser-unavailable" }, "code"),
+  ]) {
+    const capture = await blooketSetReadWriteVerifier({
+      list: async () => ({ ok: true, completeness: "complete", value: [] }),
+      get: async () => { throw Error("no initial detail"); },
+    }).captureBaseline(operation, { remoteSetId: null });
+    assert.ok(capture.ok && capture.baseline);
+    if (!capture.ok) continue;
+    const verifier = blooketSetReadWriteVerifier({
+      list: async () => ({ ok: true, completeness: "complete",
+        value: [summary("new", "Astronomy")] }),
+      get: async () => candidate as Awaited<ReturnType<
+        BlooketSetReadPort["get"]>>,
+    });
+    assert.deepEqual(await verifier.verify(operation, {
+      remoteSetId: null,
+    }, capture.baseline),
+    { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  assert.equal(getters, 0);
+  },
+);

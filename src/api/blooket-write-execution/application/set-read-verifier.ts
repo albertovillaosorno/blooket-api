@@ -30,6 +30,8 @@
 //   - Media writes and concurrent or ambiguous changes remain inconclusive.
 //
 import { createHash } from "node:crypto";
+import { isRecord, ownDataField } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 import {
   decodeBlooketQuestionReadList,
@@ -308,20 +310,20 @@ async function safeList(
 > {
   try {
     const probed = await reads.list();
-    if (!probed || probed.ok !== true)
-      return safeProbeFailure(probed);
     if (!exactProbeKeys(probed, "completeness,ok,value") ||
-      probed.completeness !== "complete"
-      && probed.completeness !== "unknown"
-    ) {
+        ownDataField(probed, "ok") !== true) {
+      return safeProbeFailure(probed);
+    }
+    const completeness = ownDataField(probed, "completeness");
+    if (completeness !== "complete" && completeness !== "unknown") {
       return browserFailure();
     }
-    const decoded = decodeBlooketSetList(probed.value);
+    const decoded = decodeBlooketSetList(ownDataField(probed, "value"));
     return decoded.ok
       ? {
           ok: true,
           value: decoded.value,
-          completeness: probed.completeness,
+          completeness,
         }
       : browserFailure();
   } catch {
@@ -341,10 +343,10 @@ async function safeGet(
 > {
   try {
     const probed = await reads.get(setId);
-    if (!probed || probed.ok !== true)
+    if (!exactProbeKeys(probed, "ok,value") ||
+        ownDataField(probed, "ok") !== true)
       return safeProbeFailure(probed);
-    if (!exactProbeKeys(probed, "ok,value")) return browserFailure();
-    const decoded = decodeBlooketSetDetail(probed.value);
+    const decoded = decodeBlooketSetDetail(ownDataField(probed, "value"));
     return decoded.ok
       ? { ok: true, value: decoded.value }
       : browserFailure();
@@ -362,10 +364,12 @@ async function safeQuestions(
 > {
   try {
     const probed = await reads.list(setId);
-    if (!probed || probed.ok !== true)
+    if (!exactProbeKeys(probed, "ok,value") ||
+        ownDataField(probed, "ok") !== true)
       return safeProbeFailure(probed);
-    if (!exactProbeKeys(probed, "ok,value")) return browserFailure();
-    const decoded = decodeBlooketQuestionReadList(probed.value);
+    const decoded = decodeBlooketQuestionReadList(
+      ownDataField(probed, "value"),
+    );
     return decoded.ok
       ? { ok: true, value: decoded.value }
       : browserFailure();
@@ -375,22 +379,28 @@ async function safeQuestions(
 }
 
 function exactProbeKeys(value: unknown, keys: string): boolean {
-  return !!value && typeof value === "object" && !Array.isArray(value) &&
-    Reflect.ownKeys(value).sort().join() === keys;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const own = Reflect.ownKeys(value);
+  const admitted = keys.split(",");
+  return own.length === admitted.length && own.every(key => {
+    if (typeof key !== "string" || !admitted.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return !!descriptor && descriptor.enumerable && "value" in descriptor;
+  });
 }
 
 function safeProbeFailure(value: unknown): Extract<
   BlooketWriteVerificationResult, { readonly ok: false }
 > {
-  if (!exactProbeKeys(value, "code,ok") ||
-      !value || typeof value !== "object" ||
-      !("ok" in value) || value.ok !== false ||
-      !("code" in value) ||
-      (value.code !== "blooket-browser-failed" &&
-       value.code !== "blooket-browser-unavailable" &&
-       value.code !== "blooket-browser-incompatible"))
+  if (!isRecord(value) || !exactProbeKeys(value, "code,ok") ||
+      ownDataField(value, "ok") !== false)
     return browserFailure();
-  return { ok: false, kind: "browser", code: value.code };
+  const code = ownDataField(value, "code");
+  if (code !== "blooket-browser-failed" &&
+      code !== "blooket-browser-unavailable" &&
+      code !== "blooket-browser-incompatible") return browserFailure();
+  return { ok: false, kind: "browser", code };
 }
 
 function setBaselineFor(

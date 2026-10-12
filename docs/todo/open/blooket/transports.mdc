@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, publication reconciliation began validating each
+set list, saved detail and question port reply by exact enumerable own
+data descriptors before reading `ok`, `value`, completeness or a
+failure code. Getter-backed and concealed fields can neither execute
+untrusted code nor promote an ambiguous write to confirmation.
+Synthetic probes cover malformed successes and failures at all reads.
+
 On 2026-10-12, model-backed My Sets correlation stopped calling
 `filter()` on the untrusted observed browser array. Once dense slots
 are admitted, it compares each numeric slot directly against the
