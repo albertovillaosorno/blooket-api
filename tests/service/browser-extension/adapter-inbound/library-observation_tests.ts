@@ -147,3 +147,26 @@ test("library model correlation does not execute observed row getters",
   }, captured), failed);
   },
 );
+
+
+test("model comparison never invokes a browser array filter override",
+  () => {
+  let calls = 0;
+  const items = [...observed.value.items];
+  Object.setPrototypeOf(items, Object.assign(Object.create(Array.prototype), {
+    filter() { calls++; throw new Error("inherited filter is untrusted"); },
+  }));
+  const result = { ...observed, value: { ...observed.value, items } };
+  assert.strictEqual(checkBlooketLibraryObservation(result, captured),
+    result);
+  assert.equal(calls, 0);
+  const mismatch = { ...result, value: {
+    ...result.value, items: Object.assign(items, { 0: {
+      schemaVersion: 1, id: "set-fixture", title: "Altered",
+    } }),
+  } };
+  assert.deepEqual(checkBlooketLibraryObservation(mismatch, captured),
+    failed);
+  assert.equal(calls, 0);
+  },
+);

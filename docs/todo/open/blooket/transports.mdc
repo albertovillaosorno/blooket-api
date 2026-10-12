@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, model-backed My Sets correlation stopped calling
+`filter()` on the untrusted observed browser array. Once dense slots
+are admitted, it compares each numeric slot directly against the
+local decoded build model, refusing changed or duplicate identities.
+A forged array prototype cannot execute arbitrary filter logic or
+promote an inconsistent page into saved remote collection evidence.
+
 On 2026-10-11, canonical set/question decoders also stopped
 calling `.entries()` on caller-supplied collection prototypes. They
 read every admitted dense array slot by index, including normalized
