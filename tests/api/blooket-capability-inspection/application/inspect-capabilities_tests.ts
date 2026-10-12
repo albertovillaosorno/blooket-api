@@ -441,3 +441,32 @@ test(
     assert.deepEqual(calls, ["observe", "observe"]);
   },
 );
+
+test("capability inspection rejects getter-backed browser replies",
+  async () => {
+  let getterCalls = 0;
+  for (const [value, field] of [
+    [{ ok: true, value: capabilities }, "ok"],
+    [{ ok: true, value: capabilities }, "value"],
+    [{ ok: false, code: "blooket-browser-unavailable" }, "ok"],
+    [{ ok: false, code: "blooket-browser-unavailable" }, "code"],
+  ] as const) {
+    const reply = { ...value };
+    Object.defineProperty(reply, field, {
+      enumerable: true,
+      get() { getterCalls++; throw Error("capability getter not allowed"); },
+    });
+    const calls: string[] = [];
+    const result = await inspectBlooketCapabilities(
+      browser([{ ok: true, state: "dashboard" }], calls),
+      secretStore([]), capabilityProbe(reply as BlooketCapabilityProbeResult,
+        calls),
+    );
+    assert.deepEqual(result, {
+      ok: false, stage: "inspection", code: "blooket-browser-failed",
+    });
+    assert.equal(calls.includes("inspect"), true);
+  }
+  assert.equal(getterCalls, 0);
+  },
+);

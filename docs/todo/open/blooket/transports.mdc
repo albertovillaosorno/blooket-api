@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, authenticated capability inspection began checking
+that an entire browser probe reply contains only admitted enumerable
+own data descriptors before reading `ok`, account capability values
+or provider stop codes. Getter-backed observations cannot execute
+untrusted code, create inferred feature entitlements or suppress the
+normal human-stop follow-up. Synthetic tests cover both outcomes.
+
 On 2026-10-12, the local browser bridge also began validating
 exact enumerable data fields at its transport and publication-write
 reply boundaries before reading `ok`, receipts or navigation states.
