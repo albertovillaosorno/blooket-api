@@ -205,9 +205,9 @@ async function safeRequest(
     const result = await transport.request(command);
     if (!result || typeof result !== "object" || Array.isArray(result))
       return browserFailure();
-    if (result.ok === true && exactKeys(result, "ok,value"))
+    if (exactKeys(result, "ok,value") && result.ok === true)
       return { ok: true as const, value: result.value };
-    if (result.ok === false && exactKeys(result, "code,ok") &&
+    if (exactKeys(result, "code,ok") && result.ok === false &&
         (result.code === "blooket-browser-failed" ||
           result.code === "blooket-browser-unavailable"))
       return { ok: false as const, code: result.code };
@@ -219,9 +219,15 @@ async function safeRequest(
 
 function exactKeys(value: unknown, names: string): boolean {
   try {
-    return !!value && typeof value === "object" &&
-      !Array.isArray(value) &&
-      Reflect.ownKeys(value).sort().join() === names;
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return false;
+    const own = Reflect.ownKeys(value);
+    const allowed = names.split(",");
+    return own.length === allowed.length && own.every(key => {
+      if (typeof key !== "string" || !allowed.includes(key)) return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return !!descriptor && descriptor.enumerable && "value" in descriptor;
+    });
   } catch { return false; }
 }
 
@@ -248,8 +254,8 @@ function decodeCreateSetSurfaceResult(value: unknown) {
   if (!value || typeof value !== "object") return browserFailureWithKind();
   const result = value as Record<string, unknown>;
   if (
-    result["ok"] === true &&
     exactKeys(result, "ok,remoteSetId") &&
+    result["ok"] === true &&
     Object.prototype.hasOwnProperty.call(result, "remoteSetId")
   )
     return {
@@ -257,11 +263,11 @@ function decodeCreateSetSurfaceResult(value: unknown) {
       remoteSetId: result["remoteSetId"],
     };
   if (
+    exactKeys(result, "kind,ok,state") &&
     result["ok"] === false &&
     result["kind"] === "navigation" &&
     typeof result["state"] === "string" &&
-    OBSERVED_STATES.has(result["state"]) &&
-    exactKeys(result, "kind,ok,state")
+    OBSERVED_STATES.has(result["state"])
   )
     return {
       ok: false as const,
@@ -269,13 +275,13 @@ function decodeCreateSetSurfaceResult(value: unknown) {
       state: result["state"] as ObservedBlooketNavigationStateKind,
     };
   if (
+    exactKeys(result, "code,kind,ok") &&
     result["ok"] === false &&
     result["kind"] === "browser" &&
     (
       result["code"] === "blooket-browser-unavailable" ||
       result["code"] === "blooket-browser-failed"
-    ) &&
-    exactKeys(result, "code,kind,ok")
+    )
   )
     return browserFailureWithKind(result["code"]);
   return browserFailureWithKind();
@@ -285,16 +291,16 @@ function decodeAddQuestionSurfaceResult(value: unknown) {
   if (!value || typeof value !== "object") return browserFailureWithKind();
   const result = value as Record<string, unknown>;
   if (
-    result["ok"] === true &&
-    exactKeys(result, "ok")
+    exactKeys(result, "ok") &&
+    result["ok"] === true
   )
     return { ok: true as const };
   if (
+    exactKeys(result, "kind,ok,state") &&
     result["ok"] === false &&
     result["kind"] === "navigation" &&
     typeof result["state"] === "string" &&
-    OBSERVED_STATES.has(result["state"]) &&
-    exactKeys(result, "kind,ok,state")
+    OBSERVED_STATES.has(result["state"])
   )
     return {
       ok: false as const,
@@ -302,13 +308,13 @@ function decodeAddQuestionSurfaceResult(value: unknown) {
       state: result["state"] as ObservedBlooketNavigationStateKind,
     };
   if (
+    exactKeys(result, "code,kind,ok") &&
     result["ok"] === false &&
     result["kind"] === "browser" &&
     (
       result["code"] === "blooket-browser-unavailable" ||
       result["code"] === "blooket-browser-failed"
-    ) &&
-    exactKeys(result, "code,kind,ok")
+    )
   )
     return browserFailureWithKind(result["code"]);
   return browserFailureWithKind();
