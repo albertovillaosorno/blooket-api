@@ -220,10 +220,9 @@ test("login preparation fills exact controls without submitting", () => {
     assert.equal(page.password.value, credentials.password);
     assert.equal(page.submit.clicked, 0);
     assert.equal(isBlooketLoginFormPrepared(credentials), true);
-    assert.equal(
-      JSON.stringify(prepareBlooketLoginForm(credentials)),
-      '{"ok":true}',
-    );
+    assert.deepEqual(prepareBlooketLoginForm(credentials), {
+      ok: false, code: "blooket-browser-failed",
+    });
   });
 });
 
@@ -539,5 +538,22 @@ test("unowned login preparation never replaces teacher or autofill fields",
       assert.equal(page.submit.clicked, 0);
     });
   }
+  },
+);
+
+
+test("a second login prepare cannot silently replace admitted credentials",
+  () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.equal(prepareBlooketLoginForm(credentials).ok, true);
+    const alternative = { loginIdentifier: "other@example.test",
+      password: "different-synthetic-password" };
+    assert.equal(prepareBlooketLoginForm(alternative).ok, false);
+    assert.equal(page.identifier.value, credentials.loginIdentifier);
+    assert.equal(page.password.value, credentials.password);
+    assert.equal(isBlooketLoginFormPrepared(credentials), true);
+    assert.equal(page.submit.clicked, 0);
+  });
   },
 );

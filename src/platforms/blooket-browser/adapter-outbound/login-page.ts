@@ -175,6 +175,9 @@ export function runBlooketLoginPageAction(
         watch.dirty || watch.submitted))
       return action === "is-prepared" ? false : failed();
     if (action === "prepare") {
+      // Repeated page injections must not silently switch the credential
+      // identity or refill after an acknowledgement was lost.
+      if (watch) return failed();
       // An unclaimed login form may already contain teacher-entered values
       // or password-manager data. Never replace them on the first fill.
       if (!watch && (page.identifier.value !== "" ||
