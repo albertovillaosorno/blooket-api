@@ -366,3 +366,50 @@ test("malformed or extra browser stop fields cannot escape the adapter",
   }
   },
 );
+
+test("browser write adapter never invokes accessor-backed acknowledgements",
+  async () => {
+  let getterCalls = 0;
+  const altered = (source: Record<string, unknown>, field: string) => {
+    const value = { ...source };
+    Object.defineProperty(value, field, {
+      enumerable: true,
+      get() { getterCalls++; throw Error("write getter must not run"); },
+    });
+    return value;
+  };
+  for (const [reply, field] of [
+    [{ ok: true, remoteSetId: "set-fixture" }, "ok"],
+    [{ ok: true, remoteSetId: "set-fixture" }, "remoteSetId"],
+    [{ ok: false, kind: "navigation", state: "security-challenge" }, "kind"],
+    [{ ok: false, kind: "navigation", state: "security-challenge" }, "state"],
+    [{ ok: false, kind: "browser", code: "blooket-browser-failed" }, "code"],
+  ] as const) {
+    const surface = blooketBrowserWriteExecutionPort({
+      createSet: async () => altered(reply, field) as Awaited<ReturnType<
+        BlooketBrowserWriteSurfacePort["createSet"]>>,
+      addQuestion: async () => ({ ok: true }),
+    });
+    assert.deepEqual(await surface.execute(setOperation,
+      { remoteSetId: null }, { preparedMedia: [] }), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  }
+  for (const [reply, field] of [
+    [{ ok: true }, "ok"],
+    [{ ok: false, kind: "navigation", state: "security-challenge" }, "ok"],
+    [{ ok: false, kind: "browser", code: "blooket-browser-failed" }, "kind"],
+  ] as const) {
+    const surface = blooketBrowserWriteExecutionPort({
+      createSet: async () => ({ ok: true, remoteSetId: "unused" }),
+      addQuestion: async () => altered(reply, field) as Awaited<ReturnType<
+        BlooketBrowserWriteSurfacePort["addQuestion"]>>,
+    });
+    assert.deepEqual(await surface.execute(questionOperation,
+      { remoteSetId: "set-fixture" }, { preparedMedia: [] }), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  }
+  assert.equal(getterCalls, 0);
+  },
+);
