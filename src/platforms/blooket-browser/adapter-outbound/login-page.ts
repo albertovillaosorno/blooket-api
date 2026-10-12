@@ -148,7 +148,54 @@ export function runBlooketLoginPageAction(
     if (!validInput()) return action === "is-prepared" ? false : failed();
     const page = controls();
     if (page === null) return action === "is-prepared" ? false : failed();
+    // Chrome runs each injection in the same isolated document world. Keep
+    // only DOM ownership and click state here, never credential values.
+    const world = globalThis as typeof globalThis & {
+      __blooketLoginFormWatch?: {
+        document: Document;
+        identifier: HTMLInputElement;
+        password: HTMLInputElement;
+        submit: HTMLButtonElement;
+        dirty: boolean;
+        submitted: boolean;
+        dispose: () => void;
+      };
+    };
+    let watch = world.__blooketLoginFormWatch;
+    if (watch?.document !== document) {
+      watch?.dispose();
+      delete world.__blooketLoginFormWatch;
+      watch = undefined;
+    }
+    if (watch && (watch.identifier !== page.identifier ||
+        watch.password !== page.password || watch.submit !== page.submit ||
+        watch.dirty || watch.submitted))
+      return action === "is-prepared" ? false : failed();
     if (action === "prepare") {
+      if (!watch) {
+        const claimed = {
+          document, identifier: page.identifier, password: page.password,
+          submit: page.submit, dirty: false, submitted: false,
+          dispose: () => {},
+        };
+        const onInteraction = (event: Event) => {
+          if (event.isTrusted) claimed.dirty = true;
+        };
+        const types = ["pointerdown", "keydown", "input", "change"];
+        claimed.dispose = () => {
+          for (const type of types)
+            document.removeEventListener(type, onInteraction, true);
+        };
+        try {
+          for (const type of types)
+            document.addEventListener(type, onInteraction, true);
+          world.__blooketLoginFormWatch = claimed;
+          watch = claimed;
+        } catch {
+          claimed.dispose();
+          return failed();
+        }
+      }
       const stillOwned = (): boolean => {
         const current = controls();
         return current !== null &&
@@ -169,10 +216,12 @@ export function runBlooketLoginPageAction(
       descriptor.set.call(page.password, input.password);
       page.password.dispatchEvent(new Event("input", { bubbles: true }));
       page.password.dispatchEvent(new Event("change", { bubbles: true }));
-      if (!stillOwned() || page.identifier.value !== input.loginIdentifier ||
+      if (!stillOwned() || watch.dirty ||
+          page.identifier.value !== input.loginIdentifier ||
           page.password.value !== input.password) return failed();
       return { ok: true };
     }
+    if (!watch) return action === "is-prepared" ? false : failed();
     const prepared =
       page.identifier.value === input.loginIdentifier &&
       page.password.value === input.password &&
@@ -180,6 +229,9 @@ export function runBlooketLoginPageAction(
       page.submit.getAttribute("aria-disabled") !== "true";
     if (action === "is-prepared") return prepared;
     if (!prepared) return failed();
+    // Latch before clicking: a lost Chrome reply can never replay login.
+    watch.submitted = true;
+    watch.dispose();
     page.submit.click();
     return { ok: true };
   } catch {
