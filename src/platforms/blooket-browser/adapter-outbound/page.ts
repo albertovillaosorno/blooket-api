@@ -151,14 +151,8 @@ export function inspectBlooketPage(
       document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
       ),
-    ).some((heading) => {
-      const bounds = heading.getBoundingClientRect();
-      return (
-        bounds.width > 0 &&
-        bounds.height > 0 &&
-        heading.textContent?.trim() === "Select your organization"
-      );
-    });
+    ).some((heading) => visible(heading) &&
+      heading.textContent?.trim() === "Select your organization");
     if (operation.kind === "session.observe" && visibleChallenges)
       return { ok: true, value: "security-challenge" };
     if (operation.kind === "session.observe" && organizationPrompt)
@@ -196,7 +190,9 @@ export function inspectBlooketPage(
       if (url.pathname === "/edit" && !url.hash &&
           url.searchParams.size === 1 &&
           url.searchParams.getAll("id").length === 1 &&
-          !!url.searchParams.get("id")) {
+          !!url.searchParams.get("id") &&
+          url.searchParams.get("id")!.length <= 512 &&
+          !/[\x00-\x1f\x7f]/u.test(url.searchParams.get("id")!)) {
         const heading = main.querySelector("h1");
         const saves = Array.from(main.querySelectorAll("button"))
           .filter((button) => button.textContent?.trim() === "Save Set");
