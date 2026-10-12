@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, all six extension Chrome injection hosts began
+validating that `executeScript` returned exactly one dense own-data
+array slot before indexing its frame result. Getter-backed numeric
+slots, sparse arrays and decorated arrays fail closed without running
+untrusted code or starting a provider mutation. Synthetic regression
+coverage spans session, Create Set, Add Question, capability inspection,
+saved-question reads and My Sets worker admission.
+
 On 2026-10-12, Add Question stopped invoking browser-owned
 `toJSON` methods during the pre-open and post-Cancel question-card
 stability checks. Both independent observations already prove exact,

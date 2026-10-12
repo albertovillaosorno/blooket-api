@@ -342,3 +342,28 @@ test("login acknowledgement fields must be enumerable data, not getters",
     }
   },
 );
+
+
+test("login scripts reject accessor-backed Chrome array slots",
+  async () => {
+    const page = fixture({});
+    const original = page.chrome.scripting.executeScript;
+    let getters = 0;
+    page.chrome.scripting.executeScript = async request => {
+      const result = await original(request);
+      if (request.func.name === "runBlooketLoginPageAction" &&
+          request.args?.[0] === "prepare")
+        Object.defineProperty(result, "0", { enumerable: true, get() {
+          getters++;
+          return { result: { ok: true } };
+        } });
+      return result;
+    };
+    const output = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => undefined,
+    ).authenticate(credentials);
+    assert.equal(output.ok, false);
+    assert.equal(getters, 0);
+    assert.equal(page.calls.includes("submit"), false);
+  },
+);

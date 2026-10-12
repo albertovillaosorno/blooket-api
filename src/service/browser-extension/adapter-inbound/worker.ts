@@ -31,6 +31,8 @@
 // - Defaults:
 //   - Restart invalidates service tokens; disconnect stops the owned relay.
 //
+import { isExactDenseArray } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 import {
   inspectBlooketPage,
   openBlooketDetailPanel,
@@ -309,7 +311,7 @@ async function script(
     func,
     args,
   });
-  if (!Array.isArray(replies) || replies.length !== 1 ||
+  if (!isExactDenseArray(replies) || replies.length !== 1 ||
       !replies[0] || typeof replies[0] !== "object")
     throw new Error("browser-read-unavailable");
   const descriptor = Object.getOwnPropertyDescriptor(replies[0], "result");

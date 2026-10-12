@@ -1291,3 +1291,26 @@ test("Add Question never invokes inherited saved-card serializers",
       name === "runBlooketAddQuestionPageAction:submit").length, 1);
   },
 );
+
+test("Add Question refuses Chrome array slot accessors before mutation",
+  async () => {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let called = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      const result = await original(request);
+      if (request.func.name === "canLeaveBlooketPageForRead")
+        Object.defineProperty(result, "0", { enumerable: true, get() {
+          called++;
+          return { result: true };
+        } });
+      return result;
+    };
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input)).ok, false);
+    assert.equal(called, 0);
+    assert.equal(fake.calls.some(name =>
+      name === "runBlooketAddQuestionPageAction:submit"), false);
+  },
+);

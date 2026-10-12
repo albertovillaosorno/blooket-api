@@ -203,6 +203,7 @@ function synthetic(options: Scenario = {}) {
   );
   return {
     host,
+    port,
     calls,
     enumerations: () => enumerations,
     inspections: () => inspections,
@@ -898,5 +899,28 @@ test("question enumeration does not run forged array prototype iterators",
       failed);
     assert.equal(prototypeCalls, 0);
     assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);
+
+
+test("question scans reject accessor-backed Chrome result array slots",
+  async () => {
+    const page = synthetic();
+    const original = page.port.scripting.executeScript;
+    let getterCalls = 0;
+    page.port.scripting.executeScript = async request => {
+      const reply = await original(request);
+      if (request.func.name === "listBlooketQuestionNumbers")
+        Object.defineProperty(reply, "0", { enumerable: true, get() {
+          getterCalls++;
+          return { result: { ok: true, value: [1] } };
+        } });
+      return reply;
+    };
+    assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(getterCalls, 0);
+    assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
