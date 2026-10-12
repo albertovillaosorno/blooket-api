@@ -486,3 +486,38 @@ test("a replaced login field cannot inherit an owned submit", () => {
   });
   },
 );
+
+
+test("a transient login challenge permanently revokes the owned click",
+  () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+    page.document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    page.document.selectors[
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+    ] = [];
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
+test("a reappearing login form cannot recover a lost document owner",
+  () => {
+  const page = fixture();
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.equal(prepareBlooketLoginForm(credentials).ok, true);
+    page.document.selectors["button"] = [];
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    page.document.selectors["button"] = [page.submit];
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
