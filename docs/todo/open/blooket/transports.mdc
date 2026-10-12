@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, browser session observation stopped reporting an
+Edit-ready document for a set ID longer than 512 characters or one
+containing decoded control characters. It still admits normal opaque
+IDs, while CSS-hidden organization headings no longer masquerade as
+visible human challenges. Synthetic page tests cover both transitions.
+
 On 2026-10-12, the read-owned Add Question capability probe now
 requires a visible, enabled, unique Cancel button before admitting a
 newly opened question panel. The Audio drawer's Plus-gate heading must

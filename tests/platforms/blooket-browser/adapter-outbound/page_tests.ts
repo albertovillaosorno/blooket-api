@@ -697,6 +697,25 @@ test(
   },
 );
 
+test("CSS-hidden organization headings are not human-stop evidence",
+  () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  const heading = node("H3", "Select your organization");
+  document.selectors['[role="dialog"][aria-modal="true"] h3'] = [heading];
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    heading.visibility = "hidden";
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "my-sets",
+    });
+    heading.visibility = "visible";
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "organization-prompt",
+    });
+  });
+  },
+);
+
 test("create page observation requires the exact observed form", () => {
   const { document } = base();
   const form = node("FORM");
@@ -733,6 +752,25 @@ test("create page observation requires the exact observed form", () => {
     });
   });
 });
+
+test("session edit state rejects unbounded or control-bearing set IDs",
+  () => {
+  const { document, main } = base();
+  main.selectors["button"] = [node("BUTTON", "Save Set")];
+  for (const id of ["x".repeat(513), "bad%0Aid", "bad%00id", "bad%7Fid"]) {
+    page(document, "https://dashboard.blooket.com/edit?id=" + id, () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "unexpected-page",
+      });
+    });
+  }
+  page(document, "https://dashboard.blooket.com/edit?id=opaque%2Fset", () => {
+    assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+      ok: true, value: "edit",
+    });
+  });
+  },
+);
 
 test("edit readiness refuses hidden or duplicate Save Set controls", () => {
   const { document, main } = base();
