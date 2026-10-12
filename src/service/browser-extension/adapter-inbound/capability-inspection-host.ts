@@ -255,12 +255,12 @@ export function createExtensionCapabilityInspectionHost(
           inspectBlooketPage as (...args: never[]) => unknown,
           [{ kind: "sets.list" }],
         );
-        // Decode both lists before serializing either. Otherwise a hidden
-        // accessor in the confirming read could run during stringify.
+        // Both snapshots are descriptor-validated before comparing their
+        // own numeric slots. Never run browser-owned toJSON or iterators.
         const confirmedSelection = firstSetId(listedAgain);
         if (confirmedSelection === undefined ||
             confirmedSelection !== selected ||
-            JSON.stringify(listed) !== JSON.stringify(listedAgain))
+            !sameAdmittedSetLists(listed, listedAgain))
           return browserFailure();
         const afterListConfirmation = await chrome.tabs.get(tabId);
         if (
@@ -664,7 +664,8 @@ function firstSetId(value: unknown): string | null | undefined {
     return undefined;
   let first: string | null = null;
   const seen = new Set<string>();
-  for (const item of value.value.items) {
+  for (let index = 0; index < value.value.items.length; index++) {
+    const item = value.value.items[index];
     if (!exactCapabilityFields(item, ["schemaVersion", "id", "title"]))
       return undefined;
     const record = item;
@@ -684,6 +685,24 @@ function firstSetId(value: unknown): string | null | undefined {
     if (first === null) first = record["id"];
   }
   return first;
+}
+
+// Call only after firstSetId admits both entire lists. Compare the
+// original rendered order and exact decoded primitives, not prototypes.
+function sameAdmittedSetLists(first: unknown, second: unknown): boolean {
+  const a = first as { value: { completeness: string; items: {
+    schemaVersion: number; id: string; title: string;
+  }[] } };
+  const b = second as typeof a;
+  if (a.value.completeness !== b.value.completeness ||
+      a.value.items.length !== b.value.items.length) return false;
+  for (let index = 0; index < a.value.items.length; index++) {
+    const left = a.value.items[index]!;
+    const right = b.value.items[index]!;
+    if (left.schemaVersion !== right.schemaVersion ||
+        left.id !== right.id || left.title !== right.title) return false;
+  }
+  return true;
 }
 
 function exactObservedState(value: unknown, state: string): boolean {

@@ -1419,3 +1419,63 @@ test("capability reads reject accessor-backed Chrome script arrays",
       false);
   },
 );
+
+test("capability set selection ignores inherited array iteration and JSON",
+  async () => {
+    let inheritedCalls = 0;
+    const recordPrototype = { toJSON() {
+      inheritedCalls++;
+      throw new Error("untrusted-capability-serializer");
+    } };
+    const arrayPrototype = Object.assign(Object.create(Array.prototype), {
+      toJSON() {
+        inheritedCalls++;
+        throw new Error("untrusted-capability-array-serializer");
+      },
+      [Symbol.iterator]() {
+        inheritedCalls++;
+        throw new Error("untrusted-capability-iterator");
+      },
+    });
+    const reply = () => {
+      const row = Object.assign(Object.create(recordPrototype), {
+        schemaVersion: 1, id: "set-fixture", title: "Synthetic fixture",
+      });
+      const items = [row];
+      Object.setPrototypeOf(items, arrayPrototype);
+      return Object.assign(Object.create(recordPrototype), {
+        ok: true, value: Object.assign(Object.create(recordPrototype), {
+          completeness: "unknown", items,
+        }),
+      });
+    };
+    const page = fixture({ setListReplies: [reply(), reply()] });
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.equal(result.ok, true);
+    assert.equal(inheritedCalls, 0);
+    assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+      true);
+  },
+);
+
+test("capability confirmation refuses reordered full My Sets lists",
+  async () => {
+    const first = { schemaVersion: 1, id: "set-fixture",
+      title: "Synthetic fixture" };
+    const second = { schemaVersion: 1, id: "another-fixture",
+      title: "Another synthetic fixture" };
+    const page = fixture({ setListReplies: [
+      { ok: true, value: { completeness: "unknown",
+        items: [first, second] } },
+      { ok: true, value: { completeness: "unknown",
+        items: [second, first] } },
+    ] });
+    assert.equal((await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect()).ok, false);
+    assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+      false);
+  },
+);

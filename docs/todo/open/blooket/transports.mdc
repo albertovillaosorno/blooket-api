@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, read-only capability inspection also stopped
+calling inherited set-list iterators or browser `toJSON` methods.
+The first My Sets identity and both full snapshots are checked by
+bounded numeric slots and exact admitted primitives before opening
+a question or Audio probe. Synthetic tests include forged inherited
+methods, a reordered two-set collection and preservation of the
+original teacher tab after conflicting evidence.
+
 On 2026-10-12, all six extension Chrome injection hosts began
 validating that `executeScript` returned exactly one dense own-data
 array slot before indexing its frame result. Getter-backed numeric
