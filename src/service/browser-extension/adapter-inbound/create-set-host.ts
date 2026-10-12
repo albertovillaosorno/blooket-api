@@ -280,8 +280,9 @@ export function createExtensionCreateSetHost(
       inspectBlooketDetailSidebar as (...args: never[]) => unknown,
       [setId],
     );
-    return await owns() && exactSavedSidebar(again, expected) &&
-      JSON.stringify(again) === JSON.stringify(sidebar);
+    // Both snapshots independently match the exact expected primitives.
+    // Serializing an injected browser object could invoke inherited toJSON.
+    return await owns() && exactSavedSidebar(again, expected);
   };
 
   return {
@@ -462,7 +463,6 @@ export function createExtensionCreateSetHost(
               if (afterAgain.status !== "complete" ||
                   afterAgain.url !== tab.url ||
                   !exactRedirectReceipt(again, ids[0]) ||
-                  JSON.stringify(result) !== JSON.stringify(again) ||
                   await editDocumentOrigin(tab.url) !== origin)
                 return browserFailure();
               if (expected !== undefined) {
