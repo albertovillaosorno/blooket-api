@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, an unclaimed Create Set form must now expose one
+empty title and one empty description before the extension can install
+its write-ownership watch. Preexisting teacher draft text refuses the
+claim without filling or clicking anything. Synthetic checks cover
+both fields and keep the independent human-event stop intact.
+
 On 2026-10-12, initial login preparation also began rejecting
 nonempty identifier/password inputs before installing an extension
 watch. Existing teacher typing or password-manager autofill is never

@@ -564,6 +564,20 @@ export function runBlooketCreateSetOwnership(
     // A still-mounted form was already claimed: never reassign a pending
     // submission or silently discard teacher interactions.
     if (previous && previous.form.isConnected) return false;
+    // The form might have been filled before the extension installed its
+    // input watch. Never adopt or overwrite existing teacher draft text.
+    const titles = Array.from(form.querySelectorAll(
+      'input#title[name="title"]',
+    ));
+    const descriptions = Array.from(form.querySelectorAll(
+      'textarea#desc[name="desc"]',
+    ));
+    if (titles.length !== 1 || titles[0]?.tagName !== "INPUT" ||
+        descriptions.length !== 1 ||
+        descriptions[0]?.tagName !== "TEXTAREA" ||
+        (titles[0] as HTMLInputElement).value !== "" ||
+        (descriptions[0] as HTMLTextAreaElement).value !== "")
+      return false;
     previous?.dispose();
     const watch: NonNullable<typeof world.__blooketCreateSetWatch> = {
       document, form, dirty: false, submitted: false, dispose: () => {},
