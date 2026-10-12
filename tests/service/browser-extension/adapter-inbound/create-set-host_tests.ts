@@ -1677,3 +1677,44 @@ test("Create Set refuses page evidence with accessor or hidden values",
     }
   },
 );
+
+test("Create Set verifies exact metadata without inherited serializers",
+  async () => {
+    let inheritedCalls = 0;
+    const prototype = { toJSON() {
+      inheritedCalls++;
+      throw new Error("untrusted-browser-serializer");
+    } };
+    const receipt = () => Object.assign(Object.create(prototype), observed);
+    const expected = { title: "Synthetic", description: "Example",
+      private: true };
+    const sidebar = () => Object.assign(Object.create(prototype), {
+      ok: true, value: Object.assign(Object.create(prototype), {
+        title: expected.title, description: expected.description,
+      }),
+    });
+    const fake = fakeChrome({ scripts: [
+      receipt(), receipt(), sidebar(), sidebar(),
+      receipt(), sidebar(), receipt(), sidebar(),
+    ] });
+    fake.setTab({ url:
+      "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete" });
+    const original = fake.chrome.scripting.executeScript;
+    fake.chrome.scripting.executeScript = async request => {
+      const result = await original(request);
+      if (request.func.name === "inspectBlooketDetailSidebar" &&
+          fake.calls.includes("detail-is-closed")) {
+        const reply = result[0]!.result as { ok: true; value: unknown };
+        Object.setPrototypeOf(reply, prototype);
+        Object.setPrototypeOf(reply.value, prototype);
+      }
+      return result;
+    };
+    assert.deepEqual(await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).observeCreateSet(expected), observed);
+    assert.equal(inheritedCalls, 0);
+    assert.equal(fake.calls.filter(call => call === "detail-close").length, 1);
+  },
+);
