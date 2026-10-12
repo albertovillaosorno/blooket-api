@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, the local browser bridge also began validating
+exact enumerable data fields at its transport and publication-write
+reply boundaries before reading `ok`, receipts or navigation states.
+Accessor-backed extension replies cannot execute getters, establish
+a session or confirm a remote write. Focused synthetic bridge tests
+cover both transport envelopes and write surface results.
+
 On 2026-10-12, session observation and credential-gated login also
 began requiring exact enumerable own data descriptors in browser
 result envelopes. Getter-backed navigation and authentication fields

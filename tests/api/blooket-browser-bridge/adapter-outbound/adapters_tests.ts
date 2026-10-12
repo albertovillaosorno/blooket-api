@@ -528,3 +528,52 @@ test("hidden or symbol-bearing bridge results cannot cross write ports",
   }
   },
 );
+
+test("bridge adapters never invoke getters in transport or write replies",
+  async () => {
+  let getterCalls = 0;
+  const accessor = (value: Record<string, unknown>, field: string) => {
+    const copy = { ...value };
+    Object.defineProperty(copy, field, {
+      enumerable: true,
+      get() { getterCalls++; throw Error("bridge getter must not run"); },
+    });
+    return copy;
+  };
+  for (const [value, key] of [
+    [{ ok: true, value: "my-sets" }, "ok"],
+    [{ ok: true, value: "my-sets" }, "value"],
+    [{ ok: false, code: "blooket-browser-unavailable" }, "code"],
+    [{ ok: false, code: "blooket-browser-unavailable" }, "ok"],
+  ] as const) {
+    const reply = accessor(value, key);
+    const ports = createBlooketBrowserBridgeAdapters({
+      request: async () => reply as BlooketBrowserBridgeTransportResult,
+    });
+    assert.deepEqual(await ports.session.observe(), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(await ports.sets.get("fixture"), {
+      ok: false, code: "blooket-browser-failed",
+    });
+  }
+  for (const [value, field] of [
+    [{ ok: true, remoteSetId: "fixture" }, "ok"],
+    [{ ok: true, remoteSetId: "fixture" }, "remoteSetId"],
+    [{ ok: false, kind: "navigation", state: "security-challenge" }, "state"],
+    [{ ok: false, kind: "browser", code: "blooket-browser-failed" }, "code"],
+  ] as const) {
+    const reply = accessor(value, field);
+    const ports = createBlooketBrowserBridgeAdapters({
+      request: async () => ({ ok: true, value: reply }),
+    });
+    assert.deepEqual(await ports.writes.createSet({
+      schemaVersion: 1, kind: "create-set", title: "Synthetic",
+      description: "", private: true, coverImage: null,
+    }, []), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  }
+  assert.equal(getterCalls, 0);
+  },
+);
