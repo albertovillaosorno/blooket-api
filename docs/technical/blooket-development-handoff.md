@@ -1132,3 +1132,29 @@ Task `blooket-09` remains open because authenticated loaded-extension
 Create Set and Add Question persistence has not been demonstrated.
 Native macOS/Safari checks and manual reconciliation of ambiguous prior
 publication journals are separate outstanding acceptance work.
+
+## Owned browser forms and capability evidence (2026-10-12)
+
+The read-only Add Question capability probe now requires an actual
+CSS-visible, enabled, unique Cancel control before treating the panel
+as read-owned. Its Audio drawer requires a visible heading before
+accepting the observed Plus-gate state. Hidden headings and abandoned
+question forms remain inconclusive rather than authorizing publication.
+
+The browser session reader also requires a bounded, control-free opaque
+Edit set ID, and a hidden organization heading cannot manufacture a
+human-stop observation. Portable Create Set composition accepts only
+exact enumerable own-data host acknowledgements. Browser accessors or
+hidden fields never authorize the next form step or an observed receipt.
+
+The login form helper now holds one secret-free isolated document watch.
+It refuses prefilled teacher/password-manager values, genuine user
+interactions, form replacement, re-preparation, and repeated submit.
+Once the current form encounters a security challenge or disappears,
+the watch cannot revive automatically after the same controls return.
+
+Create Set ownership also refuses preexisting title or description
+text before claiming the form. These are deterministic Fedora browser
+fixtures, repository tests, and Linux x64 extracted-package checks.
+They do not establish live Blooket publication, account mutation, or
+native macOS/Safari acceptance; retain the open blooket-09 blocker.
