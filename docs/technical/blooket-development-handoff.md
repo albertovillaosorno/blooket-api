@@ -1179,3 +1179,28 @@ Portable Fedora tests, browser-extension integration and Linux x64
 extraction do not establish real authenticated Blooket publication or
 native macOS/Safari compatibility. Keep blooket-09 active until live
 fresh-state acceptance, without replaying ambiguous account writes.
+
+## Read-owned capability and publication closure (2026-10-13)
+
+The capability Audio flow now requires an independently verified owned
+question panel before Audio can be opened, inspected, or canceled. The
+absence of a drawer before an owned Cancel click is not cleanup proof:
+React may still be hydrating it after the single Audio opener click.
+A delayed modal cannot authorize a repeat Audio or Cancel click.
+
+The extension capability host also needs two independently checked
+Audio and question-panel closure results before it restores the
+original teacher route. A transient first closed state followed by
+reappearing modal markup is inconclusive and preserves the edit page.
+The page's human-interaction watch remains binding through closure.
+
+Create Set and Add Question hosts now reconfirm the read-owned panel's
+closure after their two final saved-sidebar or question-card checks.
+A remounted editor in that final observation window never produces a
+positive publication receipt. No second Save is attempted.
+
+These findings come from synthetic Fedora/browser-extension tests, not
+from a successful authenticated product-owned Blooket publication.
+Keep task blooket-09 open until a current loaded extension and the
+canonical CLI/MCP path actually persist and verify the remote set and
+questions after reload. Do not replay ambiguous prior attempts.
