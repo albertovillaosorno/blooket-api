@@ -62,6 +62,26 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, the verified Linux package at revision 5555f93 started its
+independent managed supervisor against the preserved acceptance workspace.
+All 18 draft/publication JSON files remained byte-identical across graceful
+restart; the paired extension reconnected with no pending jobs. A canonical
+CLI My Sets read returned five rows with completeness still explicitly unknown.
+No new publication or fabricated complete baseline was admitted.
+
+The integrated controller could reload/read the local workspace but its fresh
+Quizzes click still timed out in native input dispatch. The existing Chrome's
+own loopback debugging listener was independently observed; its version route
+returned HTTP 404, and source inspection showed auto-connect already uses the
+profile-advertised WebSocket endpoint. No alternate endpoint, popup bypass,
+browser restart or account mutation was attempted to work around that state.
+
+The browser-controller guide now documents startup log/argument disclosure
+from the installed CLI and current official connection implementation.
+Connection endpoint nonces and headers were not printed or copied into this
+record. These diagnostics do not prove a current extension reload or close the
+remaining real canonical publication and media acceptance.
+
 On 2026-10-13, saved-state navigation gained a second independent
 permission-to-leave check immediately before a read-owned tab update or
 reload. A teacher starting work after the original safety inspection
