@@ -667,6 +667,11 @@ ordinary writer admission. Independent installer lifetime, publisher trust,
 and product restart/recovery still need composition; these tests do not enable
 automatic installation.
 
+The standalone launcher's manual diagnostics also acquire data admission before
+first-use settings or diagnostic persistence. A real launcher subprocess test
+under held installation admission preserves an existing diagnostic cache and
+refuses both settings initialization and runtime discovery.
+
 Production publisher keys/manifest publication, product staging integration,
 independent installer composition with all writer fences and actual runtime
 health, and opt-in product controls remain functional work. Existing identity,

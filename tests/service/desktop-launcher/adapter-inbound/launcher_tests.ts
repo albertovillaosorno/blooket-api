@@ -44,6 +44,8 @@ import { defaultTeacherPreferences } from
   "../../../../src/settings/teacher-preferences/domain/preferences.ts";
 import { savePreferences } from
   "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
+import { acquireCanonicalDataUpdateBoundary } from
+  "../../../../src/platforms/user-storage/adapter-outbound/writer-boundary.ts";
 
 const launcher = fileURLToPath(new URL(
   "../../../../src/service/desktop-launcher/adapter-inbound/launcher.ts",
@@ -93,6 +95,33 @@ test("launcher refuses diagnostics combined with a lifecycle action",
       await assert.rejects(readFile(join(root, "diagnostics.json")),
         { code: "ENOENT" });
     } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+test("manual diagnostics preserve cached evidence during installation",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "launcher-diagnostic-update-"));
+    const boundary = await acquireCanonicalDataUpdateBoundary(root);
+    assert.equal(boundary.ok, true);
+    if (!boundary.ok) return;
+    try {
+      const state = join(root, "diagnostics.json");
+      const evidence = "preserved-existing-diagnostic-evidence\n";
+      await writeFile(state, evidence);
+      await assert.rejects(promisify(execFile)(process.execPath, [
+        launcher, "--diagnostics",
+      ], {
+        env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
+        timeout: 6_000, maxBuffer: 8192,
+      }), { code: 1 });
+      assert.equal(await readFile(state, "utf8"), evidence);
+      await assert.rejects(readFile(join(root, "settings.json")),
+        { code: "ENOENT" });
+      await assert.rejects(readFile(join(root, "service-runtime.json")),
+        { code: "ENOENT" });
+    } finally {
+      await boundary.release();
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
 test("launcher stop refuses oversized and invalid local bootstrap replies",

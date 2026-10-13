@@ -42,6 +42,8 @@ import { openLocalWorkspace } from
   "../../../platforms/browser-opening/adapter-outbound/open.ts";
 import { runFirstUseDiagnostics } from
   "../../../api/teacher-configuration/application/configuration.ts";
+import { withCanonicalDataWriter } from
+  "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
 
 const args = process.argv.slice(2);
 const options = ["--no-open", "--stop", "--status", "--diagnostics"];
@@ -57,7 +59,8 @@ if (
     let runtime = args.includes("--diagnostics")
       ? undefined : await existingService(root);
     if (args.includes("--diagnostics")) {
-      const diagnostic = await runFirstUseDiagnostics(root, true);
+      const diagnostic = await withCanonicalDataWriter(root,
+        () => runFirstUseDiagnostics(root, true));
       process.stdout.write(JSON.stringify(diagnostic) + "\n");
       if (diagnostic.outcome === "failed") process.exitCode = 1;
     } else if (args.includes("--stop")) {
