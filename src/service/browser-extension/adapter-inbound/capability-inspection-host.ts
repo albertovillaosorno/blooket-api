@@ -49,8 +49,11 @@ import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
-import { isExactDenseArray, snapshotExactDenseArray } from
+import { exactOwnData, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
+
+import { decodeBlooketSetList } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
 
 interface BrowserTab {
   readonly url?: string;
@@ -668,61 +671,42 @@ async function closeQuestionPanel(
   ).catch(() => false);
 }
 
-function firstSetId(value: unknown): string | null | undefined {
-  if (
-    !exactCapabilityFields(value, ["ok", "value"]) ||
-    value.ok !== true ||
-    !exactCapabilityFields(value.value, ["completeness", "items"]) ||
-    !isExactDenseArray(value.value.items) ||
-    value.value.items.length > 200 ||
-    !("completeness" in value.value) ||
-    (value.value.completeness !== "complete" &&
-      value.value.completeness !== "unknown") ||
-    (value.value.completeness === "complete" &&
-      value.value.items.length !== 0) ||
-    (value.value.items.length === 0 &&
-      value.value.completeness !== "complete")
-  )
+function admittedSetList(value: unknown): {
+  readonly completeness: "complete" | "unknown";
+  readonly items: readonly { readonly schemaVersion: 1;
+    readonly id: string; readonly title: string }[];
+} | undefined {
+  const envelope = exactOwnData(value, ["ok", "value"]);
+  if (!envelope || envelope["ok"] !== true) return undefined;
+  const list = exactOwnData(envelope["value"], ["completeness", "items"]);
+  if (!list) return undefined;
+  const completeness = list["completeness"];
+  if (completeness !== "complete" && completeness !== "unknown")
     return undefined;
-  let first: string | null = null;
-  const seen = new Set<string>();
-  for (let index = 0; index < value.value.items.length; index++) {
-    const item = value.value.items[index];
-    if (!exactCapabilityFields(item, ["schemaVersion", "id", "title"]))
-      return undefined;
-    const record = item;
-    if (
-      record["schemaVersion"] !== 1 ||
-      typeof record["id"] !== "string" ||
-      record["id"].length < 1 ||
-      record["id"].length > 512 ||
-      /[\x00-\x1f\x7f]/u.test(record["id"]) ||
-      seen.has(record["id"]) ||
-      typeof record["title"] !== "string" ||
-      !record["title"].trim() ||
-      record["title"].length > 1_000
-    )
-      return undefined;
-    seen.add(record["id"]);
-    if (first === null) first = record["id"];
-  }
-  return first;
+  const decoded = decodeBlooketSetList(list["items"]);
+  if (!decoded.ok ||
+      (completeness === "complete" && decoded.value.length !== 0) ||
+      (decoded.value.length === 0 && completeness !== "complete"))
+    return undefined;
+  return { completeness, items: decoded.value };
 }
 
-// Call only after firstSetId admits both entire lists. Compare the
-// original rendered order and exact decoded primitives, not prototypes.
+function firstSetId(value: unknown): string | null | undefined {
+  const admitted = admittedSetList(value);
+  if (!admitted) return undefined;
+  return admitted.items[0]?.id ?? null;
+}
+
 function sameAdmittedSetLists(first: unknown, second: unknown): boolean {
-  const a = first as { value: { completeness: string; items: {
-    schemaVersion: number; id: string; title: string;
-  }[] } };
-  const b = second as typeof a;
-  if (a.value.completeness !== b.value.completeness ||
-      a.value.items.length !== b.value.items.length) return false;
-  for (let index = 0; index < a.value.items.length; index++) {
-    const left = a.value.items[index]!;
-    const right = b.value.items[index]!;
-    if (left.schemaVersion !== right.schemaVersion ||
-        left.id !== right.id || left.title !== right.title) return false;
+  const a = admittedSetList(first);
+  const b = admittedSetList(second);
+  if (!a || !b || a.completeness !== b.completeness ||
+      a.items.length !== b.items.length) return false;
+  for (let index = 0; index < a.items.length; index++) {
+    const left = a.items[index]!;
+    const right = b.items[index]!;
+    if (left.id !== right.id || left.title !== right.title)
+      return false;
   }
   return true;
 }

@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, My Sets Flight consistency comparisons began using
+bounded owned row snapshots and captured build/source data descriptors.
+Capability probing now reuses the versioned saved-set list decoder for
+both My Sets observations before selecting a set or comparing their
+order. A changing proxy index or inherited array method cannot supply
+new saved-state facts between validation and read-only panel opening.
+Portable library and capability regressions passed without account work.
+
 On 2026-10-13, Add Question saved-card confirmation and read-only
 question enumeration began capturing bounded own numeric slots instead
 of revisiting a Chrome-supplied array after structural validation.

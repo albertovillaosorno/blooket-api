@@ -33,7 +33,7 @@ import {
   BLOOKET_LIBRARY_MODEL_BUILD, decodeBlooketLibraryModel,
 } from "../../../ir/blooket-flight-records/contract/library-model.ts";
 import {
-  isExactDenseArray, ownDataField,
+  exactOwnData, ownDataField, snapshotExactDenseArray,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 export function checkBlooketLibraryObservation(
@@ -44,17 +44,19 @@ export function checkBlooketLibraryObservation(
       !record(ownDataField(observed, "value"))) return observed;
   const observation = ownDataField(observed, "value");
   if (!record(observation)) return observed;
-  const items = ownDataField(observation, "items");
-  if (!isExactDenseArray(items) || items.length > 200)
-    return { ok: false, code: "blooket-browser-failed" };
+  const items = snapshotExactDenseArray(
+    ownDataField(observation, "items"), 200,
+  );
+  if (!items) return { ok: false, code: "blooket-browser-failed" };
   if (captured === null) return observed;
   const failed = { ok: false, code: "blooket-browser-failed" };
-  if (!record(captured) || !exactKeys(captured, ["build", "source"]) ||
-      typeof captured["build"] !== "string" ||
-      typeof captured["source"] !== "string") return failed;
-  if (captured["build"] !== BLOOKET_LIBRARY_MODEL_BUILD) return observed;
+  const modelSource = exactOwnData(captured, ["build", "source"]);
+  if (!modelSource || typeof modelSource["build"] !== "string" ||
+      typeof modelSource["source"] !== "string") return failed;
+  if (modelSource["build"] !== BLOOKET_LIBRARY_MODEL_BUILD)
+    return observed;
   const model = decodeBlooketLibraryModel(
-    captured["source"], captured["build"],
+    modelSource["source"], modelSource["build"],
   );
   if (!model) return failed;
   // Never call methods inherited by an untrusted browser result array.
@@ -79,13 +81,4 @@ export function checkBlooketLibraryObservation(
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" &&
     !Array.isArray(value);
-}
-
-function exactKeys(value: Record<string, unknown>, keys: string[]): boolean {
-  const own = Reflect.ownKeys(value);
-  return own.length === keys.length && own.every(key => {
-    if (typeof key !== "string" || !keys.includes(key)) return false;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return !!descriptor && "value" in descriptor && descriptor.enumerable;
-  });
 }
