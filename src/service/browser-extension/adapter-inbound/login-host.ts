@@ -92,6 +92,12 @@ export function createExtensionSessionAuthenticationHost(
     const frame = frames?.length === 1 ? frames[0] : undefined;
     if (!frame || typeof frame !== "object")
       throw new Error("browser-login-script-failed");
+    // A login credential fill must never accept a frame result belonging
+    // to a nested document. Chrome uses frameId zero for the top frame.
+    const frameId = Object.getOwnPropertyDescriptor(frame, "frameId");
+    if (frameId && (!frameId.enumerable ||
+        !Object.hasOwn(frameId, "value") || frameId.value !== 0))
+      throw new Error("browser-login-script-failed");
     // Chrome adds frame metadata, but only its own enumerable result data
     // descriptor may carry evidence. Never invoke an accessor getter.
     const descriptor = Object.getOwnPropertyDescriptor(frame, "result");

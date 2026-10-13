@@ -1531,3 +1531,17 @@ test("capability set selection snapshots owned rows before proxy index reads",
   assert.equal(indexedReads, 0);
   },
 );
+
+test("capability inspection refuses nested-frame script acknowledgements",
+  async () => {
+  const page = fixture();
+  const injected = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 3 }));
+  assert.equal((await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect()).ok, false);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    false);
+  },
+);

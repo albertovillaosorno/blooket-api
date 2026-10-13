@@ -1361,3 +1361,16 @@ test("Add Question host owns card numbers before indexed proxy reads",
     name === "runBlooketAddQuestionPageAction:submit").length, 1);
   },
 );
+
+test("Add Question refuses nested-frame evidence before one Save click",
+  async () => {
+  const fake = fakeChrome({});
+  const injected = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 4 }));
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input)).ok, false);
+  assert.equal(fake.calls.some(name => name.includes(":submit")), false);
+  },
+);

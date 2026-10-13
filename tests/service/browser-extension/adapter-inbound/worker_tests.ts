@@ -101,6 +101,9 @@ test(
   let inheritedSerializerCalls = 0;
   let listFirstInvalidRow = false;
   let listModelSource: string | null = null;
+  let listModelNestedFrame = false;
+  let listModelFrameAccessor = false;
+  let listModelFrameAccessorReads = 0;
   let listReloadDuringCapture = false;
   let setListReads = 0;
   let questionPanelCloses = true;
@@ -240,9 +243,22 @@ test(
             // between the DOM and initial-model inspections.
             documentOrigin += 1_000;
           }
-          return [{ result: listModelSource === null ? null : {
+          const result = { result: listModelSource === null ? null : {
             build: BLOOKET_LIBRARY_MODEL_BUILD, source: listModelSource,
-          } }];
+          } } as { result: unknown; frameId?: number };
+          if (listModelNestedFrame) {
+            listModelNestedFrame = false;
+            result.frameId = 2;
+          }
+          if (listModelFrameAccessor) {
+            listModelFrameAccessor = false;
+            Object.defineProperty(result, "frameId", {
+              enumerable: true,
+              get() { listModelFrameAccessorReads++;
+                throw new Error("frame getter must not run"); },
+            });
+          }
+          return [result];
         }
         if (func.name === "runBlooketCreateSetOwnership") {
           assert.ok(args?.[0] === "claim" || args?.[0] === "check");
@@ -818,6 +834,12 @@ test(
     assert.equal(firstSets.value.completeness, "unknown");
     assert.equal(setListReads, 2);
     assert.equal(readReloads, 1);
+    for (const frameIssue of ["nested", "accessor"] as const) {
+      listModelNestedFrame = frameIssue === "nested";
+      listModelFrameAccessor = frameIssue === "accessor";
+      assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+      assert.equal(listModelFrameAccessorReads, 0);
+    }
     listPrototypeSerialization = true;
     setListReads = 0;
     const inheritedList = await expectReply({ kind: "sets.list" });

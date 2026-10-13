@@ -315,6 +315,11 @@ async function script(
   const frame = frames?.length === 1 ? frames[0] : undefined;
   if (!frame || typeof frame !== "object")
     throw new Error("browser-read-unavailable");
+  // Confirm the result belongs to the injected main frame, not an iframe.
+  const frameId = Object.getOwnPropertyDescriptor(frame, "frameId");
+  if (frameId && (!frameId.enumerable ||
+      !Object.hasOwn(frameId, "value") || frameId.value !== 0))
+    throw new Error("browser-read-unavailable");
   const descriptor = Object.getOwnPropertyDescriptor(frame, "result");
   if (!descriptor || !descriptor.enumerable ||
       !("value" in descriptor) || descriptor.value === undefined)

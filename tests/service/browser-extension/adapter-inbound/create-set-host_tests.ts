@@ -1775,3 +1775,17 @@ test("Create Set refuses Edit Info reopened after Cancel and sidebar proof",
   assert.equal(fake.calls.filter(name => name === "detail-open").length, 1);
   assert.equal(fake.calls.filter(name => name === "detail-close").length, 1);
 });
+
+test("Create Set cannot accept nested-frame browser navigation evidence",
+  async () => {
+  const fake = fakeChrome({});
+  const injected = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 9 }));
+  const outcome = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(outcome.ok, false);
+  assert.equal(fake.calls.some(name => name.startsWith("update:")), false);
+  },
+);
