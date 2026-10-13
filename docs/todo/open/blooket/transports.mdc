@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, a capability panel that was already verified can no
+longer recover after its hidden question form disappears, changes type
+or points at another set. Read-owned Audio helpers also permanently
+revoke their claim when a previously verified set binding changes,
+even if the original DOM returns. Synthetic tests cover six modal
+operations and all Audio follow-up paths without remote writes.
+
 On 2026-10-12, each read-owned capability panel and Audio drawer
 operation began permanently revoking its document claim on an
 unexpected Edit URL, extra query parameter or fragment. Restoring the

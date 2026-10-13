@@ -1104,3 +1104,71 @@ test("changing and restoring an owned capability route cannot revive clicks",
   }
   },
 );
+
+test("a verified capability panel cannot return after disappearing or rebinding",
+  () => {
+  for (const cause of ["disappeared", "wrong-id", "wrong-type"] as const) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      if (cause === "disappeared")
+        page.document.selectors['input#question[name="question"]'] = [];
+      if (cause === "wrong-id") page.setId.value = "teacher-changed";
+      if (cause === "wrong-type")
+        page.question.attributes.type = "text";
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false,
+        cause);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      page.setId.value = "set-fixture";
+      page.question.attributes.type = "hidden";
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(page.audio.clicked, 0);
+      assert.equal(page.cancel.clicked, 0);
+    });
+  }
+  },
+);
+
+test("Audio follow-up revokes a verified modal whose set identity changed",
+  () => {
+  const actions = ["open", "inspect", "close", "closed"] as const;
+  for (const action of actions) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      if (action === "inspect" || action === "close")
+        page.document.selectors['aside[data-drawer-open="true"]'] = [
+          drawer("unsupported"),
+        ];
+      page.setId.value = "other-set";
+      if (action === "open")
+        assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      if (action === "inspect")
+        assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+          false);
+      if (action === "close")
+        assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      if (action === "closed")
+        assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+      page.setId.value = "set-fixture";
+      page.document.selectors['aside[data-drawer-open="true"]'] = [];
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(page.audio.clicked, 0);
+      assert.equal(page.cancel.clicked, 0);
+    });
+  }
+  },
+);
