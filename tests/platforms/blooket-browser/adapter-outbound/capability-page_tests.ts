@@ -1278,3 +1278,43 @@ test("a lost Add Question opener acknowledgement preserves panel ownership",
   });
   },
 );
+
+test("unmounted capability modal is not cleanup before owned Cancel",
+  () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    assert.equal(isBlooketCapabilityQuestionPanelClosed("set-fixture"), false);
+    assert.equal(page.add.clicked, 1);
+    assert.equal(page.cancel.clicked, 0);
+  });
+  },
+);
+
+test("Cancel keeps human ownership until panel closure is proven",
+  () => {
+  for (const humanChange of [false, true]) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), true);
+      assert.equal(page.cancel.clicked, 1);
+      // The asynchronous provider modal is still mounted after click.
+      assert.equal(isBlooketCapabilityQuestionPanelClosed("set-fixture"), false);
+      if (humanChange) page.document.dispatchTrusted("pointerdown");
+      page.document.selectors['input#question[name="question"]'] = [];
+      assert.equal(isBlooketCapabilityQuestionPanelClosed("set-fixture"),
+        !humanChange);
+      if (humanChange) {
+        assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+        assert.equal(page.add.clicked, 1);
+      }
+      assert.equal(page.cancel.clicked, 1);
+    });
+  }
+  },
+);

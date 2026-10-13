@@ -1066,10 +1066,8 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     // A lost Cancel acknowledgement must not trigger a second click.
     watch.questionCancelled = true;
     control.click();
-    const owned = (globalThis as typeof globalThis & {
-      __blooketCapabilityEditWatch?: { dispose: () => void };
-    }).__blooketCapabilityEditWatch;
-    owned?.dispose();
+    // Retain trusted-human event ownership until the panel is really gone.
+    // A Cancel click is not a verified browser cleanup receipt.
     return true;
   } catch {
     return false;
@@ -1131,12 +1129,15 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
     }
     const pending = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
-        document: Document; dirty: boolean;
+        document: Document; setId: string; dirty: boolean;
+        questionCancelled?: boolean; dispose: () => void;
       };
     }).__blooketCapabilityEditWatch;
-    if (pending?.document === document && pending.dirty) return false;
+    if (!pending || pending.document !== document ||
+        pending.setId !== setId || pending.dirty ||
+        !pending.questionCancelled) return false;
     const url = new URL(location.href);
-    return (
+    const closed = (
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
       !/[\x00-\x1f\x7f]/u.test(setId) &&
@@ -1146,6 +1147,8 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
       document.querySelector('input#question[name="question"]') === null &&
       document.querySelectorAll('aside[data-drawer-open="true"]').length === 0
     );
+    if (closed) pending.dispose();
+    return closed;
   } catch {
     return false;
   }
