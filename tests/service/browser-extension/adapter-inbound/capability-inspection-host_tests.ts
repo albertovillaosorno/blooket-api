@@ -1479,3 +1479,31 @@ test("capability confirmation refuses reordered full My Sets lists",
       false);
   },
 );
+
+test("transient read-owned Cancel closure never restores an editor",
+  async () => {
+  for (const option of [
+    { audioClosedReplies: [false, true, false] },
+    { questionClosedReplies: [false, true, false] },
+    { audioClosedReplies: [true, false] },
+    { questionClosedReplies: [true, false] },
+  ]) {
+    const page = fixture(option);
+    const outcome = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect();
+    assert.deepEqual(outcome, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.currentUrl(),
+      "https://dashboard.blooket.com/edit?id=set-fixture");
+    const audio = "audioClosedReplies" in option;
+    const closure = audio ? "isBlooketAudioCapabilityDrawerClosed" :
+      "isBlooketCapabilityQuestionPanelClosed";
+    assert.ok(page.scripts.filter(name => name === closure).length >= 2);
+    assert.equal(page.scripts.filter(name => name === (
+      audio ? "closeBlooketAudioCapabilityDrawer" :
+        "closeBlooketCapabilityQuestionPanel")).length <= 1, true);
+  }
+  },
+);

@@ -584,6 +584,29 @@ async function pollCapability(
   return undefined;
 }
 
+async function stableClosure(
+  script: (
+    func: (...args: never[]) => unknown,
+    args?: unknown[],
+  ) => Promise<unknown>,
+  func: (...args: never[]) => unknown,
+  setId: string,
+  pause: (ms: number) => Promise<void>,
+  deadline: number,
+  now: () => number,
+  initiallyClosed: boolean,
+): Promise<boolean> {
+  if (!initiallyClosed && !await pollTrue(
+    script, func, [setId], pause, deadline, now,
+  )) return false;
+  if (now() >= deadline) return false;
+  // A single missing drawer/form can be a transient React detach. Require
+  // an independently checked next turn before restoring the teacher route.
+  await pause(0);
+  if (now() >= deadline) return false;
+  return await script(func, [setId]) === true && now() < deadline;
+}
+
 async function closeDrawer(
   script: (
     func: (...args: never[]) => unknown,
@@ -598,20 +621,19 @@ async function closeDrawer(
     isBlooketAudioCapabilityDrawerClosed as (...args: never[]) => unknown,
     [setId],
   ).catch(() => false);
-  if (alreadyClosed === true) return true;
+  if (alreadyClosed === true) return await stableClosure(
+    script, isBlooketAudioCapabilityDrawerClosed, setId,
+    pause, deadline, now, true,
+  );
   if (alreadyClosed !== false) return false;
   const closed = await script(
     closeBlooketAudioCapabilityDrawer as (...args: never[]) => unknown,
     [setId],
   ).catch(() => false);
   if (closed !== true) return false;
-  return await pollTrue(
-    script,
-    isBlooketAudioCapabilityDrawerClosed,
-    [setId],
-    pause,
-    deadline,
-    now,
+  return await stableClosure(
+    script, isBlooketAudioCapabilityDrawerClosed,
+    setId, pause, deadline, now, false,
   ).catch(() => false);
 }
 
@@ -629,20 +651,19 @@ async function closeQuestionPanel(
     isBlooketCapabilityQuestionPanelClosed as (...args: never[]) => unknown,
     [setId],
   ).catch(() => false);
-  if (alreadyClosed === true) return true;
+  if (alreadyClosed === true) return await stableClosure(
+    script, isBlooketCapabilityQuestionPanelClosed, setId,
+    pause, deadline, now, true,
+  );
   if (alreadyClosed !== false) return false;
   const closed = await script(
     closeBlooketCapabilityQuestionPanel as (...args: never[]) => unknown,
     [setId],
   ).catch(() => false);
   if (closed !== true) return false;
-  return await pollTrue(
-    script,
-    isBlooketCapabilityQuestionPanelClosed,
-    [setId],
-    pause,
-    deadline,
-    now,
+  return await stableClosure(
+    script, isBlooketCapabilityQuestionPanelClosed,
+    setId, pause, deadline, now, false,
   ).catch(() => false);
 }
 
