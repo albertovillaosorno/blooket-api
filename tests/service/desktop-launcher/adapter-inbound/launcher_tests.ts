@@ -45,7 +45,9 @@ import { defaultTeacherPreferences } from
   "../../../../src/settings/teacher-preferences/domain/preferences.ts";
 import { savePreferences } from
   "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
-import { acquireCanonicalDataUpdateBoundary } from
+import {
+  acquireCanonicalDataWriter, acquireCanonicalDataUpdateBoundary,
+} from
   "../../../../src/platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import { decodeServiceRuntime } from
   "../../../../src/platforms/service-lifecycle/adapter-outbound/runtime.ts";
@@ -182,6 +184,47 @@ test("real silent launcher starts, reuses and drains the supervised service",
       await rm(root, { recursive: true, force: true });
     }
   });
+
+test("launcher stop cannot claim drained while a separate writer remains",
+  { timeout: 18_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "launcher-held-writer-"));
+  const preferences = defaultTeacherPreferences(join(root, "media"));
+  await savePreferences(root, { ...preferences,
+    service: { ...preferences.service, portMode: "automatic", port: 1 } });
+  const marker = join(root, "teacher-marker");
+  await writeFile(marker, "preserve-synthetic-draft");
+  const command = (option: string) => promisify(execFile)(process.execPath,
+    [launcher, option], { timeout: 8_000, maxBuffer: 8192,
+      env: { PATH: process.env["PATH"], HOME: process.env["HOME"],
+        XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
+        DBUS_SESSION_BUS_ADDRESS: process.env["DBUS_SESSION_BUS_ADDRESS"],
+        BLOOKET_DATA_HOME: root } });
+  let held: Awaited<ReturnType<typeof acquireCanonicalDataWriter>> | undefined;
+  try {
+    await command("--no-open");
+    held = await acquireCanonicalDataWriter(root);
+    assert.equal(held.ok, true);
+    await assert.rejects(command("--stop"), (error: unknown) => {
+      assert.ok(error instanceof Error && "code" in error &&
+        error.code === 1 && "stderr" in error &&
+        typeof error.stderr === "string" &&
+        error.stderr.includes("Service stop is unconfirmed"));
+      return true;
+    });
+    assert.equal(await readFile(marker, "utf8"), "preserve-synthetic-draft");
+    assert.deepEqual(await acquireCanonicalDataUpdateBoundary(root), {
+      ok: false, reason: "writer-active",
+    });
+  } finally {
+    if (held?.ok) await held.release();
+    await command("--stop").catch(() => undefined);
+    const boundary = await acquireCanonicalDataUpdateBoundary(root);
+    assert.equal(boundary.ok, true);
+    if (boundary.ok) await boundary.release();
+    await rm(root, { recursive: true, force: true });
+  }
+  },
+);
 
 test("launcher stop refuses oversized and invalid local bootstrap replies",
   async () => {
