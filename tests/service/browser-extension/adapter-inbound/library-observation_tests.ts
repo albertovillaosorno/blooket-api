@@ -170,3 +170,46 @@ test("model comparison never invokes a browser array filter override",
   assert.equal(calls, 0);
   },
 );
+
+
+test("Flight comparison snapshots browser rows without proxy index reads",
+  () => {
+  let indexedReads = 0;
+  const rows = new Proxy([...observed.value.items], {
+    get(target, key, receiver) {
+      if (key === "0" || key === "length") {
+        indexedReads++;
+        throw new Error("Untrusted browser collection index getter");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const checked = { ...observed, value: { ...observed.value, items: rows } };
+  assert.strictEqual(checkBlooketLibraryObservation(checked, captured),
+    checked);
+  assert.equal(indexedReads, 0);
+  const revoked = Proxy.revocable([...observed.value.items], {});
+  revoked.revoke();
+  assert.deepEqual(checkBlooketLibraryObservation({ ...observed,
+    value: { ...observed.value, items: revoked.proxy },
+  }, captured), failed);
+  },
+);
+
+test("Flight comparison never accesses captured proxy values by getter",
+  () => {
+  let getterReads = 0;
+  const wrapped = new Proxy({ ...captured }, {
+    get(target, key, receiver) {
+      if (key === "build" || key === "source") {
+        getterReads++;
+        throw new Error("Untrusted Flight payload getter");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  assert.strictEqual(checkBlooketLibraryObservation(observed, wrapped),
+    observed);
+  assert.equal(getterReads, 0);
+  },
+);

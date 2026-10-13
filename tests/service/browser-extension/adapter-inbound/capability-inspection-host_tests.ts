@@ -1507,3 +1507,27 @@ test("transient read-owned Cancel closure never restores an editor",
   }
   },
 );
+
+test("capability set selection snapshots owned rows before proxy index reads",
+  async () => {
+  let indexedReads = 0;
+  const reply = () => ({ ok: true, value: {
+    completeness: "unknown",
+    items: new Proxy([{ schemaVersion: 1, id: "set-fixture",
+      title: "Synthetic fixture" }], {
+      get(target, key, receiver) {
+        if (key === "length" || key === "0") {
+          indexedReads++;
+          throw new Error("Untrusted capability card getter");
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    }),
+  } });
+  const page = fixture({ setListReplies: [reply(), reply()] });
+  assert.equal((await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect()).ok, true);
+  assert.equal(indexedReads, 0);
+  },
+);
