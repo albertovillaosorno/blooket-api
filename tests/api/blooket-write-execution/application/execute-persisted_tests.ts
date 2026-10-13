@@ -2061,6 +2061,47 @@ test("malformed baseline envelopes stop before pacing or mutation",
   },
 );
 
+test("baseline port accessors stop before budget and journal admission",
+  async () => {
+  const scenarios = ["ok", "baseline", "kind", "code", "state"] as const;
+  for (const field of scenarios) {
+    let called = 0;
+    const payload: Record<string, unknown> = field === "kind" ||
+        field === "code" ? { ok: false, kind: "browser",
+          code: "blooket-browser-failed" }
+      : field === "state" ? { ok: false, kind: "navigation",
+          state: "security-challenge" }
+        : { ok: true, baseline: SET_BASELINE };
+    Object.defineProperty(payload, field, { enumerable: true,
+      get() { called++; throw Error("untrusted baseline getter"); } });
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const budgetPath = join(directory, "budget.json");
+      const calls: string[] = [];
+      const result = await executePersistedBlooketWrite(
+        paths, plan, browser([]), secrets(),
+        writes(SET_SUCCESS, calls),
+        verification(payload as BlooketWriteVerificationBaselineResult),
+        { requireVerificationBaseline: true,
+          pacer: immediatePacer(calls),
+          budget: { path: budgetPath, policy: {
+            maximumStarts: 2, maximumDurationMs: 60_000,
+          } } },
+      );
+      assert.deepEqual(result, { ok: false,
+        stage: "verification-baseline",
+        code: "blooket-write-baseline-invalid" });
+      assert.equal(called, 0);
+      assert.deepEqual(calls, []);
+      assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+        { ok: true, kind: "missing" });
+      assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId),
+        { ok: true, state: null });
+    });
+  }
+  },
+);
+
 test("invalid second baseline is rejected after pacing without a write",
   async () => {
   await withTemporaryDirectory(async directory => {
@@ -2153,6 +2194,38 @@ test("untrusted pacing responses cannot bypass an execution lease",
       { ok: true, kind: "missing" });
   });
 });
+
+test("pacing result accessors never authorize a remote write",
+  async () => {
+  const fields = ["ok", "lease", "release", "startedAtMs", "code"] as const;
+  for (const field of fields) {
+    let called = 0;
+    const nested = { startedAtMs: 0, release() {} };
+    const reply: Record<string, unknown> = field === "code"
+      ? { ok: false, code: "mutation-pacing-cancelled" }
+      : { ok: true, lease: nested };
+    Object.defineProperty(field === "release" || field === "startedAtMs"
+      ? nested : reply, field, { enumerable: true,
+        get() { called++; throw Error("untrusted pacing getter"); } });
+    await withTemporaryDirectory(async directory => {
+      const paths = persistence(join(directory, "checkpoint.json"));
+      const calls: string[] = [];
+      const result = await executePersistedBlooketWrite(paths, plan,
+        browser([]), secrets(), writes(SET_SUCCESS, calls),
+        verification({ ok: true, baseline: SET_BASELINE }), {
+          pacer: { acquire: async () => reply as Awaited<ReturnType<
+            BlooketMutationPacer["acquire"]>> },
+        });
+      assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+        code: "mutation-pacing-failed" });
+      assert.equal(called, 0);
+      assert.deepEqual(calls, []);
+      assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+        { ok: true, kind: "missing" });
+    });
+  }
+  },
+);
 
 test("malformed media read replies stop before journal and mutation budget",
   async () => {

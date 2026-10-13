@@ -499,3 +499,26 @@ test("durable set IDs obey the canonical bounded opaque ID decoder",
   }
   },
 );
+
+
+test("receipt decoding refuses accessors without executing them", () => {
+  for (const field of ["kind", "remoteSetId"] as const) {
+    let called = 0;
+    const receipt = { kind: "set-created", remoteSetId: "set-fixture" };
+    Object.defineProperty(receipt, field, {
+      enumerable: true,
+      get() { called++; throw new Error("untrusted getter"); },
+    });
+    assert.equal(decodeBlooketWriteReceipt(receipt).ok, false);
+    assert.equal(called, 0);
+  }
+  for (const field of ["kind", "remoteSetId"] as const) {
+    const receipt = { kind: "set-created", remoteSetId: "set-fixture" };
+    Object.defineProperty(receipt, field, { enumerable: false,
+      value: receipt[field] });
+    assert.equal(decodeBlooketWriteReceipt(receipt).ok, false);
+  }
+  assert.equal(decodeBlooketWriteReceipt(new Proxy({
+    kind: "set-created", remoteSetId: "set-fixture",
+  }, { ownKeys() { throw new Error("untrusted trap"); } })).ok, false);
+});

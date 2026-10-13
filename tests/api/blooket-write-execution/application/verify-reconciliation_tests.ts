@@ -619,6 +619,34 @@ test("invalid verifier outcomes never clear or advance ambiguous attempts",
   },
 );
 
+test("reconciliation never executes verifier reply accessors", async () => {
+  const keys = ["ok", "outcome", "receipt", "kind", "state", "code"] as const;
+  for (const name of keys) {
+    let invoked = 0;
+    const reply: Record<string, unknown> = name === "kind" ||
+        name === "code"
+      ? { ok: false, kind: "browser", code: "blooket-browser-failed" }
+      : name === "state"
+        ? { ok: false, kind: "navigation", state: "signed-out" }
+        : { ok: true, outcome: "confirmed", receipt: SET_RECEIPT };
+    Object.defineProperty(reply, name, { enumerable: true,
+      get() { invoked++; throw Error("untrusted verifier getter"); } });
+    await withTemporaryDirectory(async directory => {
+      const value = paths(directory);
+      assert.equal((await beginWriteAttempt(value.attempt, plan, 0)).ok,
+        true);
+      const result = await verifyPersistedBlooketWrite(value, plan,
+        browser(), secrets(),
+        verifier(reply as BlooketWriteVerificationResult, []));
+      assert.deepEqual(result, { ok: false, stage: "verification",
+        code: "blooket-browser-failed" });
+      const attempt = await loadWriteAttemptFile(value.attempt, plan);
+      assert.equal(attempt.ok && attempt.kind === "record", true);
+      assert.equal(invoked, 0);
+    });
+  }
+});
+
 test("question reconciliation rejects forged set receipts before persistence",
   async () => {
   await withTemporaryDirectory(async directory => {

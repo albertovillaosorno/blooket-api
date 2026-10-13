@@ -351,50 +351,64 @@ async function safeVerify(
   const failed = (): BlooketWriteVerificationResult => ({
     ok: false, kind: "browser", code: "blooket-browser-failed",
   });
-  const exact = (value: unknown, keys: string): boolean =>
-    !!value && typeof value === "object" && !Array.isArray(value) &&
-    Reflect.ownKeys(value).sort().join() === keys;
   try {
     const raw: unknown = await verifier.verify(
       operation, { remoteSetId }, baseline,
     );
-    if (!raw || typeof raw !== "object" || !("ok" in raw))
-      return failed();
-    if (raw.ok === true && "outcome" in raw) {
-      if (exact(raw, "ok,outcome") &&
-          (raw.outcome === "inconclusive" ||
-           raw.outcome === "not-confirmed"))
-        return { ok: true, outcome: raw.outcome };
-      if (raw.outcome === "confirmed" &&
-          exact(raw, "ok,outcome,receipt") && "receipt" in raw) {
-        if (operation.kind === "question" && raw.receipt === null)
-          return { ok: true, outcome: "confirmed", receipt: null };
-        if (operation.kind === "set") {
-          const receipt = decodeBlooketWriteReceipt(raw.receipt);
-          if (receipt.ok)
-            return { ok: true, outcome: "confirmed",
-              receipt: receipt.value };
-        }
+    const own = (names: readonly string[]): Record<string, unknown> |
+      undefined => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw))
+        return undefined;
+      const keys = Reflect.ownKeys(raw);
+      if (keys.length !== names.length || keys.some(key =>
+          typeof key !== "string" || !names.includes(key)))
+        return undefined;
+      const descriptors = Object.getOwnPropertyDescriptors(raw);
+      const copy: Record<string, unknown> = {};
+      for (const name of names) {
+        const descriptor = descriptors[name];
+        if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+            !descriptor.enumerable) return undefined;
+        Object.defineProperty(copy, name, {
+          value: descriptor.value, enumerable: true, configurable: true,
+        });
+      }
+      return copy;
+    };
+    const pending = own(["ok", "outcome"]);
+    if (pending?.["ok"] === true &&
+        (pending["outcome"] === "inconclusive" ||
+         pending["outcome"] === "not-confirmed"))
+      return { ok: true, outcome: pending["outcome"] };
+    const confirmed = own(["ok", "outcome", "receipt"]);
+    if (confirmed?.["ok"] === true &&
+        confirmed["outcome"] === "confirmed") {
+      if (operation.kind === "question" && confirmed["receipt"] === null)
+        return { ok: true, outcome: "confirmed", receipt: null };
+      if (operation.kind === "set") {
+        const receipt = decodeBlooketWriteReceipt(confirmed["receipt"]);
+        if (receipt.ok) return { ok: true, outcome: "confirmed",
+          receipt: receipt.value };
       }
       return failed();
     }
-    if (raw.ok === false && "kind" in raw) {
-      if (raw.kind === "browser" && exact(raw, "code,kind,ok") &&
-          "code" in raw &&
-          (raw.code === "blooket-browser-failed" ||
-           raw.code === "blooket-browser-unavailable" ||
-           raw.code === "blooket-browser-incompatible"))
-        return { ok: false, kind: "browser", code: raw.code };
-      if (raw.kind === "navigation" && exact(raw, "kind,ok,state") &&
-          "state" in raw &&
-          ["signed-out", "expired-session", "organization-prompt",
-           "rate-limited", "security-challenge", "unexpected-page"]
-            .some(state => state === raw.state))
-        return { ok: false, kind: "navigation",
-          state: raw.state as "signed-out" | "expired-session" |
-            "organization-prompt" | "rate-limited" |
-            "security-challenge" | "unexpected-page" };
-    }
+    const browser = own(["code", "kind", "ok"]);
+    if (browser?.["ok"] === false && browser["kind"] === "browser" &&
+        (browser["code"] === "blooket-browser-failed" ||
+         browser["code"] === "blooket-browser-unavailable" ||
+         browser["code"] === "blooket-browser-incompatible"))
+      return { ok: false, kind: "browser", code: browser["code"] };
+    const navigation = own(["kind", "ok", "state"]);
+    if (navigation?.["ok"] === false &&
+        navigation["kind"] === "navigation" &&
+        (navigation["state"] === "signed-out" ||
+         navigation["state"] === "expired-session" ||
+         navigation["state"] === "organization-prompt" ||
+         navigation["state"] === "rate-limited" ||
+         navigation["state"] === "security-challenge" ||
+         navigation["state"] === "unexpected-page"))
+      return { ok: false, kind: "navigation",
+        state: navigation["state"] };
     return failed();
   } catch {
     return failed();

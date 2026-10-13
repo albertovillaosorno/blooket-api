@@ -62,6 +62,33 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, canonical publication request admission began
+requiring directly owned, enumerable data descriptors for draft IDs
+and saved revisions. Hidden or symbol-owned fields, inherited IDs,
+proxy traps and accessor-based values cannot invoke code or enter a
+publication command. Synthetic IR regressions cover each failure.
+
+On 2026-10-13, the prepared-media write boundary began reading
+only exact data envelopes and cloning native typed-array byte slots.
+An inherited byte iterator, overridden byte-length getter or
+property accessor cannot supply mutation bytes. Ordered media IDs
+are captured once before any asynchronous port read and remain stable
+even if an external caller later changes its operation object.
+
+On 2026-10-13, one-step write acknowledgements, reconciliation
+outcomes and persisted baselines began admitting only exact own data
+fields before inspecting confirmation or navigation values. The
+set-created receipt decoder also refuses accessor-backed identities.
+Synthetic regressions preserve attempt journals and checkpoints
+without calling hostile getters or contacting Blooket.
+
+On 2026-10-13, the explicit ambiguous-attempt reconciliation API
+began copying an exact owned decision before selecting whether to
+clear or confirm a durable attempt. The mutation pacing response and
+its lease also require owned descriptor evidence before reserving the
+write window. Synthetic tests verify that malformed replies never
+trigger local journal changes or provider mutations.
+
 On 2026-10-13, the self-contained Add Question page helper also
 began enforcing dense owned answer/match arrays at the final browser
 form boundary. Sparse typing modes, hidden array properties and

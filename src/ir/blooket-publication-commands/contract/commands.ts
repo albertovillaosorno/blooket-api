@@ -52,21 +52,33 @@ export function decodeBlooketPublicationCommand(
   name: BlooketPublicationCommandName, value: unknown,
 ): DecodeResult<BlooketPublicationPayload> {
   const step = name === "blooket.publication.step";
-  if (!isRecord(value) ||
-      Object.keys(value).sort().join() !==
-        (step ? "draftId,expectedRevision" : "draftId") ||
-      typeof value["draftId"] !== "string" ||
-      !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(value["draftId"]) ||
-      (step && (typeof value["expectedRevision"] !== "string" ||
-        !/^[a-f0-9]{64}$/u.test(value["expectedRevision"]))))
-    return { ok: false, issues: [{
+  const invalid = (): DecodeResult<BlooketPublicationPayload> => ({
+    ok: false, issues: [{
       path: "$.payload", code: "invalid-publication-request",
       message: "Expected a logical draft ID and, for a step, its exact " +
         "saved revision. Paths, provider state, and retry overrides are " +
         "not admitted.",
-    }] };
-  return { ok: true, value: {
-    draftId: value["draftId"],
-    ...(step ? { expectedRevision: value["expectedRevision"] as string } : {}),
-  } };
+    }],
+  });
+  try {
+    if (!isRecord(value)) return invalid();
+    const fields = step ? ["draftId", "expectedRevision"] : ["draftId"];
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== fields.length ||
+        keys.some(key => typeof key !== "string" || !fields.includes(key)))
+      return invalid();
+    const data = Object.getOwnPropertyDescriptors(value);
+    const draft = data["draftId"];
+    const revision = data["expectedRevision"];
+    if (!draft || !Object.hasOwn(draft, "value") || !draft.enumerable ||
+        typeof draft.value !== "string" ||
+        !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(draft.value) ||
+        (step && (!revision || !Object.hasOwn(revision, "value") ||
+          !revision.enumerable || typeof revision.value !== "string" ||
+          !/^[a-f0-9]{64}$/u.test(revision.value)))) return invalid();
+    return { ok: true, value: {
+      draftId: draft.value,
+      ...(step ? { expectedRevision: revision!.value as string } : {}),
+    } };
+  } catch { return invalid(); }
 }

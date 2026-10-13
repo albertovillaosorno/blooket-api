@@ -319,3 +319,52 @@ test("malformed negative reconciliation never clears the journal", async () => {
     },
   );
 });
+
+
+test("reconciliation does not execute getter-backed resolution fields",
+  async () => {
+  const fields = ["operationId", "outcome", "receipt"] as const;
+  for (const field of fields) {
+    let evaluated = 0;
+    const resolution = field === "receipt"
+      ? { operationId: "plan:reconcile-test:set",
+          outcome: "confirmed", receipt: SET_RECEIPT }
+      : { operationId: "plan:reconcile-test:set",
+          outcome: "not-confirmed" };
+    Object.defineProperty(resolution, field, { enumerable: true,
+      get() { evaluated++; throw Error("untrusted resolution getter"); } });
+    await withTemporaryDirectory(async directory => {
+      const value = paths(directory);
+      await beginWriteAttempt(value.attempt, plan, 0);
+      const result = await reconcilePersistedBlooketWrite(
+        value.checkpoint, value.attempt, plan,
+        resolution as Parameters<typeof reconcilePersistedBlooketWrite>[3],
+      );
+      assert.deepEqual(result, { ok: false, stage: "reconciliation",
+        code: "reconciliation-state-inconsistent" });
+      assert.equal(evaluated, 0);
+      const loaded = await loadWriteAttemptFile(value.attempt, plan);
+      assert.equal(loaded.ok && loaded.kind === "record" &&
+        loaded.record.phase, "attempting");
+    });
+  }
+  for (const field of ["hidden", "symbol"] as const) {
+    const resolution = { operationId: "plan:reconcile-test:set",
+      outcome: "not-confirmed" };
+    Object.defineProperty(resolution, field === "hidden" ? "unknown" :
+      Symbol("unknown"), { value: "untrusted", enumerable: false });
+    await withTemporaryDirectory(async directory => {
+      const value = paths(directory);
+      await beginWriteAttempt(value.attempt, plan, 0);
+      const result = await reconcilePersistedBlooketWrite(
+        value.checkpoint, value.attempt, plan,
+        resolution as Parameters<typeof reconcilePersistedBlooketWrite>[3],
+      );
+      assert.deepEqual(result, { ok: false, stage: "reconciliation",
+        code: "reconciliation-state-inconsistent" });
+      const loaded = await loadWriteAttemptFile(value.attempt, plan);
+      assert.equal(loaded.ok && loaded.kind === "record", true);
+    });
+  }
+  },
+);

@@ -81,7 +81,7 @@ export async function admitBlooketPreparedMedia(
       mediaId: required.find(id =>
         !snapshot.items.some(item => item.mediaId === id))! };
   const admitted: BlooketPreparedMedia[] = [];
-  for (const mediaId of operationMediaIds(operation)) {
+  for (const mediaId of required) {
     let read: Awaited<ReturnType<BlooketPreparedMediaReadPort["read"]>>;
     try {
       read = await media.read(mediaId);
@@ -94,24 +94,37 @@ export async function admitBlooketPreparedMedia(
     }
     let owned: BlooketPreparedMedia;
     try {
-      if (!read || typeof read !== "object" || Array.isArray(read))
-        return invalidMedia(mediaId);
-      if (read.ok === false) {
-        if (!exactKeys(read, "code,ok") ||
-            (read.code !== "blooket-media-not-prepared" &&
-             read.code !== "blooket-media-stale" &&
-             read.code !== "blooket-media-invalid" &&
-             read.code !== "blooket-media-unavailable"))
+      const envelope = exactData(read, ["ok", "value"]) ??
+        exactData(read, ["code", "ok"]);
+      if (!envelope) return invalidMedia(mediaId);
+      if (envelope["ok"] === false) {
+        const code = envelope["code"];
+        if (typeof code !== "string" ||
+            (code !== "blooket-media-not-prepared" &&
+             code !== "blooket-media-stale" &&
+             code !== "blooket-media-invalid" &&
+             code !== "blooket-media-unavailable"))
           return invalidMedia(mediaId);
-        return { ok: false, code: read.code, mediaId };
+        return { ok: false, code, mediaId };
       }
-      if (read.ok !== true || !exactKeys(read, "ok,value") ||
-          !validPreparedMedia(read.value, mediaId))
+      if (envelope["ok"] !== true ||
+          !Object.hasOwn(envelope, "value")) return invalidMedia(mediaId);
+      const data = exactData(envelope["value"],
+        ["bytes", "format", "mediaId", "revision"]);
+      if (!data || !validPreparedMedia(data, mediaId))
         return invalidMedia(mediaId);
-      // Own the exact validated bytes before another asynchronous lookup.
+      // Copy from the built-in typed-array slots, not its inherited
+      // iterator: an untrusted subclass cannot run custom code here.
+      const input = data["bytes"] as Uint8Array;
+      const byteCount = typedBytes(input);
+      if (byteCount === undefined) return invalidMedia(mediaId);
+      const copied = new Uint8Array(byteCount);
+      Uint8Array.prototype.set.call(copied, input);
       owned = Object.freeze({
-        mediaId: read.value.mediaId, revision: read.value.revision,
-        format: read.value.format, bytes: new Uint8Array(read.value.bytes),
+        mediaId: data["mediaId"] as string,
+        revision: data["revision"] as number,
+        format: data["format"] as "png" | "jpeg" | "gif",
+        bytes: copied,
       });
       if (!validPreparedMedia(owned, mediaId))
         return invalidMedia(mediaId);
@@ -162,28 +175,55 @@ function invalidMedia(mediaId: string): AdmitBlooketPreparedMediaResult {
   return { ok: false, code: "blooket-media-invalid", mediaId };
 }
 
-function exactKeys(value: unknown, names: string): boolean {
-  return !!value && typeof value === "object" && !Array.isArray(value) &&
-    Reflect.ownKeys(value).sort().join() === names;
+function exactData(value: unknown, names: readonly string[]):
+  Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
+  const keys = Reflect.ownKeys(value);
+  if (keys.length !== names.length || keys.some(key =>
+      typeof key !== "string" || !names.includes(key))) return undefined;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const owned: Record<string, unknown> = {};
+  for (const name of names) {
+    const descriptor = descriptors[name];
+    if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+        !descriptor.enumerable) return undefined;
+    Object.defineProperty(owned, name, {
+      value: descriptor.value, enumerable: true, writable: true,
+      configurable: true,
+    });
+  }
+  return owned;
+}
+
+function typedBytes(value: Uint8Array): number | undefined {
+  // Use the platform typed-array slot rather than a subclassed or own
+  // byteLength accessor. Never invoke an untrusted media buffer getter.
+  const getter = Object.getOwnPropertyDescriptor(
+    Object.getPrototypeOf(Uint8Array.prototype), "byteLength",
+  )?.get;
+  const count = getter?.call(value);
+  return typeof count === "number" ? count : undefined;
 }
 
 function validPreparedMedia(
-  value: BlooketPreparedMedia,
+  value: unknown,
   expectedMediaId: string,
 ): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const media = value as BlooketPreparedMedia;
   return (
-    !!value && typeof value === "object" && !Array.isArray(value) &&
-    exactKeys(value, "bytes,format,mediaId,revision") &&
-    decodeMediaId(value.mediaId).ok
-    && value.mediaId === expectedMediaId
-    && Number.isSafeInteger(value.revision)
-    && value.revision >= 1
+    decodeMediaId(media.mediaId).ok
+    && media.mediaId === expectedMediaId
+    && Number.isSafeInteger(media.revision)
+    && media.revision >= 1
     && (
-      value.format === "gif"
-      || value.format === "jpeg"
-      || value.format === "png"
+      media.format === "gif"
+      || media.format === "jpeg"
+      || media.format === "png"
     )
-    && value.bytes instanceof Uint8Array
-    && preparedMediaBytesAdmitted(value.bytes.byteLength)
+    && media.bytes instanceof Uint8Array
+    && preparedMediaBytesAdmitted(typedBytes(media.bytes) ?? 0)
   );
 }
