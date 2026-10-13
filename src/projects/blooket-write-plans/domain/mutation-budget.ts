@@ -29,6 +29,9 @@
 // - Defaults:
 //   - Clock rollback, malformed state, and unsafe policies fail closed.
 //
+import { exactOwnData } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
+
 export interface BlooketMutationTaskBudgetPolicy {
   readonly maximumStarts: number;
   readonly maximumDurationMs: number;
@@ -58,7 +61,10 @@ export function admitBlooketMutationTaskStart(
   policy: BlooketMutationTaskBudgetPolicy,
   nowMs: number,
 ): BlooketMutationTaskBudgetResult {
-  if (!validTaskBudgetPolicy(policy) || !safeTimestamp(nowMs))
+  const ownedPolicy = exactOwnData(policy,
+    ["maximumDurationMs", "maximumStarts"]);
+  if (!ownedPolicy || !validTaskBudgetPolicy(ownedPolicy) ||
+      !safeTimestamp(nowMs))
     return { ok: false, code: "mutation-task-budget-invalid" };
   const decoded = decodeBlooketMutationTaskBudgetState(candidate);
   if (decoded === undefined)
@@ -66,9 +72,9 @@ export function admitBlooketMutationTaskStart(
   const state = decoded ?? { version: 1, startedAtMs: nowMs, starts: 0 };
   if (nowMs < state.startedAtMs)
     return { ok: false, code: "mutation-task-budget-invalid" };
-  if (nowMs - state.startedAtMs >= policy.maximumDurationMs)
+  if (nowMs - state.startedAtMs >= ownedPolicy["maximumDurationMs"])
     return { ok: false, code: "mutation-task-duration-exhausted" };
-  if (state.starts >= policy.maximumStarts)
+  if (state.starts >= ownedPolicy["maximumStarts"])
     return { ok: false, code: "mutation-task-start-budget-exhausted" };
   return {
     ok: true,
@@ -80,16 +86,9 @@ export function decodeBlooketMutationTaskBudgetState(
   candidate: unknown,
 ): BlooketMutationTaskBudgetState | null | undefined {
   if (candidate === null) return null;
-  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate))
-    return undefined;
-  const value = candidate as Record<string, unknown>;
-  const keys = Object.keys(value).sort();
-  if (
-    keys.length !== 3 ||
-    keys[0] !== "startedAtMs" ||
-    keys[1] !== "starts" ||
-    keys[2] !== "version" ||
-    value["version"] !== 1 ||
+  const value = exactOwnData(candidate,
+    ["startedAtMs", "starts", "version"]);
+  if (!value || value["version"] !== 1 ||
     !safeTimestamp(value["startedAtMs"]) ||
     !Number.isSafeInteger(value["starts"]) ||
     (value["starts"] as number) < 0
@@ -103,16 +102,15 @@ export function decodeBlooketMutationTaskBudgetState(
 }
 
 function validTaskBudgetPolicy(
-  policy: BlooketMutationTaskBudgetPolicy,
-): boolean {
-  return (
-    Number.isSafeInteger(policy.maximumStarts) &&
-    policy.maximumStarts >= 1 &&
-    policy.maximumStarts <= 10_000 &&
-    Number.isSafeInteger(policy.maximumDurationMs) &&
-    policy.maximumDurationMs >= 1_000 &&
-    policy.maximumDurationMs <= 86_400_000
-  );
+  policy: Readonly<Record<string, unknown>>,
+): policy is Readonly<{ maximumStarts: number;
+  maximumDurationMs: number }> {
+  const starts = policy["maximumStarts"];
+  const duration = policy["maximumDurationMs"];
+  return typeof starts === "number" && typeof duration === "number" &&
+    Number.isSafeInteger(starts) && starts >= 1 && starts <= 10_000 &&
+    Number.isSafeInteger(duration) && duration >= 1_000 &&
+    duration <= 86_400_000;
 }
 
 function safeTimestamp(value: unknown): value is number {

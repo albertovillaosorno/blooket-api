@@ -31,7 +31,7 @@
 // - Defaults:
 //   - Unknown fields, duplicate IDs, and malformed identities fail closed.
 //
-import { isRecord } from
+import { exactOwnData } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { decodeProjectDocument, type ProjectDocument } from
   "../../project-documents/domain/project.ts";
@@ -44,18 +44,27 @@ import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
 export function decodeBlooketPublicationSnapshot(
   value: unknown, draftId: string,
 ) {
-  if (!isRecord(value) || value["draftId"] !== draftId ||
-      typeof value["revision"] !== "string" ||
-      !/^[a-f0-9]{64}$/u.test(value["revision"])) return undefined;
-  const version = value["schemaVersion"];
-  const keys = Object.keys(value).sort().join();
-  if ((version === 1 && keys !==
-        "capabilities,document,draftId,revision,schemaVersion") ||
-      (version === 2 && keys !==
-        "capabilities,document,draftId,expectedMedia,revision,schemaVersion") ||
-      (version !== 1 && version !== 2)) return undefined;
-  const document = decodeProjectDocument(value["document"]);
-  const capabilities = decodeBlooketCapabilitySnapshot(value["capabilities"]);
+  const current = exactOwnData(value, ["capabilities", "document",
+    "draftId", "expectedMedia", "revision", "schemaVersion"]);
+  const legacy = current === undefined
+    ? exactOwnData(value, ["capabilities", "document", "draftId",
+      "revision", "schemaVersion"]) : undefined;
+  const owned = current ?? legacy;
+  if (!owned || owned["draftId"] !== draftId ||
+      typeof owned["revision"] !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(owned["revision"]) ||
+      (current ? owned["schemaVersion"] !== 2 :
+        owned["schemaVersion"] !== 1)) return undefined;
+  const version = owned["schemaVersion"];
+  // Both nested decoders remain the authority for their respective
+  // versions. Never let a malformed caller-supplied object escape this
+  // public snapshot boundary as an exception.
+  let document: ReturnType<typeof decodeProjectDocument>;
+  let capabilities: ReturnType<typeof decodeBlooketCapabilitySnapshot>;
+  try {
+    document = decodeProjectDocument(owned["document"]);
+    capabilities = decodeBlooketCapabilitySnapshot(owned["capabilities"]);
+  } catch { return undefined; }
   if (!document.ok || !capabilities.ok) return undefined;
   if (version === 1 && publicationHasMedia(document.value)) return undefined;
   // Remote reads cannot establish cover or answer-image byte identity yet.
@@ -66,7 +75,7 @@ export function decodeBlooketPublicationSnapshot(
         question.answers.some(answer => answer.image !== null))))
     return undefined;
   const expectedMedia = version === 2
-    ? decodePreparedMediaIdentities(value["expectedMedia"]) : undefined;
+    ? decodePreparedMediaIdentities(owned["expectedMedia"]) : undefined;
   if (version === 2 && !expectedMedia) return undefined;
   const built = expectedMedia
     ? buildPreparedBlooketWritePlan(document.value, expectedMedia,
@@ -74,7 +83,7 @@ export function decodeBlooketPublicationSnapshot(
     : buildBlooketWritePlan(JSON.stringify(document.value), "",
         capabilities.value);
   if (!built.ok) return undefined;
-  return { document: document.value, revision: value["revision"],
+  return { document: document.value, revision: owned["revision"],
     plan: built.value, expectedMedia };
 }
 

@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  exactOwnData,
   isExactDenseArray,
   isRecord,
   ownDataField,
@@ -150,4 +151,31 @@ test("declared fields require enumerable owned data descriptors", () => {
     "$.accessor", "$.hidden",
   ]);
   assert.equal(accessorReads, 0);
+});
+
+
+test("exact own data copies values without invoking accessors", () => {
+  let called = 0;
+  const object = { name: "safe" };
+  assert.deepEqual(exactOwnData(object, ["name"]), object);
+  for (const value of [
+    Object.defineProperty({ name: "safe" }, "unexpected", {
+      enumerable: false, value: true,
+    }),
+    Object.defineProperty({ name: "safe" }, Symbol("hidden"), {
+      value: true,
+    }),
+    Object.defineProperty({}, "name", { enumerable: true,
+      get() { called++; throw Error("not called"); } }),
+    new Proxy({ name: "safe" }, {
+      ownKeys() { throw Error("untrusted proxy"); },
+    }),
+  ]) assert.equal(exactOwnData(value, ["name"]), undefined);
+  assert.equal(called, 0);
+  const revoked = Proxy.revocable({ name: "safe" }, {});
+  revoked.revoke();
+  assert.equal(exactOwnData(revoked.proxy, ["name"]), undefined);
+  const revokedArray = Proxy.revocable(["safe"], {});
+  revokedArray.revoke();
+  assert.equal(isExactDenseArray(revokedArray.proxy), false);
 });

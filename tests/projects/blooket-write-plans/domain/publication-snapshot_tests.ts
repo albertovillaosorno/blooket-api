@@ -120,3 +120,30 @@ test("unverifiable cover and answer media cannot enter a snapshot", () => {
       answerImages: "supported" } },
   }, "fixture"), undefined);
 });
+
+
+test("publication snapshots refuse accessors and hidden root fields",
+  () => {
+  let evaluated = 0;
+  for (const field of ["schemaVersion", "draftId", "revision",
+    "document", "capabilities"] as const) {
+    const candidate = Object.defineProperty({ ...legacy }, field, {
+      enumerable: true, get() { evaluated++; throw Error("getter called"); },
+    });
+    assert.equal(decodeBlooketPublicationSnapshot(candidate, "fixture"),
+      undefined);
+  }
+  const extra = Object.defineProperty({ ...legacy }, "hidden", {
+    value: true, enumerable: false,
+  });
+  assert.equal(decodeBlooketPublicationSnapshot(extra, "fixture"),
+    undefined);
+  assert.equal(decodeBlooketPublicationSnapshot({ ...legacy,
+    [Symbol("extra")]: true }, "fixture"), undefined);
+  const extraMedia = Object.defineProperty(mediaSnapshot(), "expectedMedia",
+    { enumerable: true, get() { evaluated++; throw Error("getter called"); } });
+  assert.equal(decodeBlooketPublicationSnapshot(extraMedia, "fixture"),
+    undefined);
+  assert.equal(evaluated, 0);
+  },
+);

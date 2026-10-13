@@ -95,3 +95,97 @@ test("identity hashes the actual byte view and compares every durable fact",
   assert.equal(identifyPreparedMedia({ ...identity,
     bytes: new Uint8Array(2_500_000) }), undefined);
 });
+
+
+test("durable media manifests refuse untrusted descriptors and iterators",
+  () => {
+  let getterCalls = 0;
+  const failGetter = () => { getterCalls++; throw Error("untrusted getter"); };
+  const outer = { schemaVersion: 1, items: [{ ...identity }] };
+  const invalid = [
+    Object.defineProperty({ ...outer }, "items", {
+      enumerable: true, get: failGetter,
+    }),
+    Object.defineProperty({ ...outer }, "hidden", { value: true }),
+    { ...outer, [Symbol("hidden")]: true },
+    { ...outer, items: [Object.defineProperty({ ...identity }, "sha256",
+      { enumerable: true, get: failGetter })] },
+    { ...outer, items: [Object.defineProperty({ ...identity },
+      "hidden", { value: true })] },
+    { ...outer, items: Object.defineProperty([{ ...identity }],
+      Symbol("hidden"), { value: true }) },
+    { ...outer, items: Object.defineProperty([{ ...identity }], "0",
+      { enumerable: true, get: failGetter }) },
+    { ...outer, items: new Array(1) },
+    { ...outer, items: new Proxy([{ ...identity }], {
+      ownKeys() { throw Error("untrusted proxy trap"); },
+    }) },
+  ];
+  for (const value of invalid)
+    assert.equal(decodePreparedMediaIdentities(value), undefined);
+  assert.equal(getterCalls, 0);
+  const shape = [{ ...identity }];
+  const mutable = new Proxy(shape, {
+    get(target, key, receiver) {
+      if (key === "length") throw Error("array proxy length trap");
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  assert.equal(decodePreparedMediaIdentities({ ...outer,
+    items: mutable }), undefined);
+  const revocable = Proxy.revocable([{ ...identity }], {});
+  revocable.revoke();
+  assert.equal(decodePreparedMediaIdentities({ ...outer,
+    items: revocable.proxy }), undefined);
+  const iterator = [{ ...identity }];
+  Object.defineProperty(iterator, Symbol.iterator,
+    { get: failGetter });
+  assert.equal(decodePreparedMediaIdentities({ ...outer,
+    items: iterator }), undefined);
+  assert.equal(getterCalls, 0);
+  },
+);
+
+
+test("media hashes native slots without subclass getters or iterators",
+  () => {
+  let calls = 0;
+  class HostileBytes extends Uint8Array {
+    override get byteLength(): number {
+      calls++; throw Error("untrusted length accessor");
+    }
+    override *[Symbol.iterator](): ArrayIterator<number> {
+      calls++; throw Error("untrusted iterator");
+    }
+  }
+  const value = identifyPreparedMedia({ ...identity,
+    bytes: new HostileBytes([97, 98, 99]) });
+  assert.equal(value?.sha256,
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  assert.equal(calls, 0);
+  for (const field of ["bytes", "revision", "format", "mediaId"] as const) {
+    const candidate = Object.defineProperty({ ...identity,
+      bytes: new Uint8Array([97, 98, 99]) }, field, {
+      enumerable: true, get() { calls++; throw Error("untrusted getter"); },
+    });
+    assert.equal(identifyPreparedMedia(candidate), undefined);
+  }
+  assert.equal(calls, 0);
+  },
+);
+
+test("media equality refuses unvalidated identities and accessors",
+  () => {
+  let calls = 0;
+  const forged = Object.defineProperty({ ...identity }, "sha256", {
+    enumerable: true, get() { calls++; throw Error("untrusted equality"); },
+  });
+  assert.equal(samePreparedMediaIdentity(forged, identity), false);
+  assert.equal(samePreparedMediaIdentity(identity, forged), false);
+  assert.equal(samePreparedMediaIdentity({ ...identity,
+    [Symbol("hidden")]: true }, identity), false);
+  assert.equal(samePreparedMediaIdentity({ ...identity,
+    byteLength: 0 }, { ...identity, byteLength: 0 }), false);
+  assert.equal(calls, 0);
+  },
+);

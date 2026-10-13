@@ -62,6 +62,21 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, recovery media identity manifests began requiring
+exact own enumerable data fields and dense manifest array slots.
+Accessor-backed metadata, hidden/symbol keys, custom iterators and
+revoked or throwing array proxies cannot masquerade as prepared media.
+Byte identities are hashed from copied native Uint8Array slots, not
+untrusted length getters or inherited iterators. Equality now refuses
+two equally malformed media identities rather than claiming a match.
+
+On 2026-10-13, frozen publication snapshot roots and mutation budget
+state/policies began using the same own-data envelope checks. A
+malformed budget accessor or hidden field cannot authorize a new
+remote mutation start, and untrusted snapshot root fields cannot
+select an old publication plan. Synthetic contract tests passed; no
+real provider request or account content mutation was performed.
+
 On 2026-10-13, canonical publication request admission began
 requiring directly owned, enumerable data descriptors for draft IDs
 and saved revisions. Hidden or symbol-owned fields, inherited IDs,
