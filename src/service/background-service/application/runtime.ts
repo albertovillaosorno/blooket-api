@@ -30,7 +30,6 @@
 //   - Unsupported hosts and invalid lifecycle inputs fail closed.
 //
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { startBrowserService } from
   "../../../api/browser-service/adapter-inbound/server.ts";
@@ -46,15 +45,28 @@ import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import type { OnlineConnectionController } from
   "../../../api/online-connection/contract/controller.ts";
+import { acquireCanonicalDataWriter } from
+  "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
 
 export async function startManagedBackgroundService(
   root: string,
   secrets: HostSecretStore,
   dependencies: { online?: OnlineConnectionController } = {},
 ) {
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  const lock = await tryAcquireFileLock(join(root, ".service.lock"));
-  if (!lock.ok) throw new Error("service-" + lock.reason);
+  // Startup, discovery and managed online writers belong to this lifetime.
+  // A dead service cannot silently relinquish an uncertain descendant's lease.
+  // The installer must drain the old service before acquiring data exclusion;
+  // candidate startup under that exclusion needs separate private authority.
+  const writer = await acquireCanonicalDataWriter(root);
+  if (!writer.ok) throw new Error(writer.reason === "busy"
+    ? "service-update-busy" : "service-storage-unavailable");
+  let lock: Awaited<ReturnType<typeof tryAcquireFileLock>>;
+  try { lock = await tryAcquireFileLock(join(root, ".service.lock")); }
+  catch (error) { await writer.release(); throw error; }
+  if (!lock.ok) {
+    await writer.release();
+    throw new Error("service-" + lock.reason);
+  }
   const online = dependencies.online ?? createOnlineConnection(root, secrets);
   const instance = randomUUID();
   let service: Awaited<ReturnType<typeof startBrowserService>> | undefined;
@@ -77,6 +89,9 @@ export async function startManagedBackgroundService(
         removeDurableFile(join(root, "service-runtime.json")),
       );
       await cleanup(() => lock.lock.release());
+      // A failed shutdown may leave a native writer unobserved. Keep the data
+      // lease in that case; only proven complete cleanup releases admission.
+      if (!failure) await cleanup(() => writer.release());
       if (failure) throw failure;
     })());
   try {

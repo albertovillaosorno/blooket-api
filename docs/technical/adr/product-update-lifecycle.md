@@ -123,10 +123,28 @@ and update-status observations remain available. Canonical commands keep their
 existing publication-before-data ownership order instead of gaining an outer
 data lease.
 
-This closes the direct request-writer gap, not startup or independent installer
-composition. Startup/discovery persistence and installer-owned startup authority
+This closes the direct request-writer gap, not independent installer
+composition. Installer-owned startup authority
 still need coordinated admission. The product installer must preserve those
 fences through replacement, restart, and recovery before it is enabled.
+
+Ordinary managed startup now acquires a canonical data lease before loading
+preferences or initializing the service. It retains that lease through online
+operation, discovery persistence, and actual shutdown drainage. A held
+installation marker refuses startup without creating teacher settings or
+runtime discovery. Development configuration uses the same admission before
+reading its local overrides or saving preferences.
+
+Failed shutdown retains the
+lease rather than inferring that a native descendant has stopped.
+
+Installation composition must hold publication exclusion, drain the owned old
+service, and then acquire exclusive data admission. The lifetime lease prevents
+acquiring installation admission around a still-running ordinary service.
+Candidate/rollback startup while exclusive admission is held still needs a
+private installer-issued authority; removing the fence to start a candidate
+would reopen the race. These lifecycle guarantees do not enable installation
+or grant such authority to CLI, HTTP, MCP, environment values, or stale PIDs.
 
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;

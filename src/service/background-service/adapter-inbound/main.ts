@@ -35,6 +35,8 @@ import {
   userDataRoot,
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
 import { startManagedBackgroundService } from "../application/runtime.ts";
+import { withCanonicalDataWriter } from
+  "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import { fileURLToPath } from "node:url";
 import { PRODUCT_VERSION } from
   "../../../ir/product-version/contract/version.ts";
@@ -55,15 +57,17 @@ const root = userDataRoot();
 let secrets = createHostSecretStore();
 if (process.argv.includes("--development")) {
   try {
-    const development = await developmentConfiguration(
-      await loadPreferences(root),
-      await readDevelopmentEnvironment(
-        fileURLToPath(new URL("../../../../.env", import.meta.url)),
-      ),
-      secrets,
-    );
-    await savePreferences(root, development.preferences);
-    secrets = development.secrets;
+    await withCanonicalDataWriter(root, async () => {
+      const development = await developmentConfiguration(
+        await loadPreferences(root),
+        await readDevelopmentEnvironment(
+          fileURLToPath(new URL("../../../../.env", import.meta.url)),
+        ),
+        secrets,
+      );
+      await savePreferences(root, development.preferences);
+      secrets = development.secrets;
+    });
   } catch {
     process.stderr.write(
       "Development configuration is invalid. " +
