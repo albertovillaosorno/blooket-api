@@ -38,15 +38,20 @@ export function isRecord(value: unknown): value is UnknownRecord {
 }
 
 export function isExactDenseArray(value: unknown): value is unknown[] {
-  if (!Array.isArray(value)) return false;
-  const keys = Reflect.ownKeys(value);
-  if (keys.length !== value.length + 1 ||
-      !Object.hasOwn(value, "length")) return false;
-  for (let index = 0; index < value.length; index++) {
-    const slot = Object.getOwnPropertyDescriptor(value, String(index));
-    if (!slot || !("value" in slot) || !slot.enumerable) return false;
-  }
-  return true;
+  try {
+    if (!Array.isArray(value)) return false;
+    const keys = Reflect.ownKeys(value);
+    const length = Object.getOwnPropertyDescriptor(value, "length");
+    if (!length || !Object.hasOwn(length, "value") ||
+        !Number.isSafeInteger(length.value) ||
+        keys.length !== length.value + 1) return false;
+    for (let index = 0; index < length.value; index++) {
+      const slot = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!slot || !Object.hasOwn(slot, "value") ||
+          !slot.enumerable) return false;
+    }
+    return true;
+  } catch { return false; }
 }
 
 /** Read only a directly owned data field; inherited getters are untrusted. */
@@ -56,6 +61,32 @@ export function ownDataField(
 ): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
   return descriptor && "value" in descriptor ? descriptor.value : undefined;
+}
+
+// Own an untrusted envelope without evaluating property getters or inherited
+// accessors. The result contains only the requested enumerable data fields.
+export function exactOwnData(
+  value: unknown, fields: readonly string[],
+): Readonly<Record<string, unknown>> | undefined {
+  try {
+    if (!isRecord(value)) return undefined;
+    const keys = Reflect.ownKeys(value);
+    if (keys.length !== fields.length || keys.some(key =>
+        typeof key !== "string" || !fields.includes(key)))
+      return undefined;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const owned: Record<string, unknown> = {};
+    for (const name of fields) {
+      const descriptor = descriptors[name];
+      if (!descriptor || !descriptor.enumerable ||
+          !Object.hasOwn(descriptor, "value")) return undefined;
+      Object.defineProperty(owned, name, {
+        value: descriptor.value, enumerable: true,
+        configurable: true, writable: true,
+      });
+    }
+    return owned;
+  } catch { return undefined; }
 }
 
 export function unknownFieldIssues(

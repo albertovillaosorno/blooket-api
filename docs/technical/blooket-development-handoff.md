@@ -1259,3 +1259,22 @@ These tests are synthetic, locally validated Fedora contract evidence.
 They do not establish loaded-extension authenticated acceptance, a
 native Safari run, or remote quiz publication. Continue from fresh
 provider state without replaying a previously ambiguous attempt.
+
+
+## Durable media and budget descriptor admission (2026-10-13)
+
+Media identity manifests used by publication reconciliation now
+require dense indexed arrays and exact owned data properties. They do
+not iterate caller-controlled arrays, execute inherited byte iterators,
+or accept hidden metadata keys. The byte hash helper copies the native
+typed-array slots before calculating SHA-256, and comparisons reject
+unvalidated identity pairs rather than treating matching invalid
+values as success.
+
+The frozen publication snapshot entrypoint now owns its top-level
+draft/revision/version fields before decoding the project and
+capability contracts. Local mutation budgets similarly own saved state
+and their admission policies without running property getters.
+Portable synthetic regressions cover accessors, hidden fields, and
+malformed proxies. They do not prove account publication or native
+macOS/Safari acceptance; blooket-09 remains open.

@@ -100,3 +100,33 @@ test(
     );
   },
 );
+
+
+test("budget policy and saved state require own enumerable data",
+  () => {
+  let reads = 0;
+  const policy = { maximumStarts: 2, maximumDurationMs: 60_000 };
+  for (const field of ["maximumStarts", "maximumDurationMs"] as const) {
+    const altered = Object.defineProperty({ ...policy }, field, {
+      enumerable: true, get() { reads++; throw Error("getter called"); },
+    });
+    assert.deepEqual(admitBlooketMutationTaskStart(null, altered, 0),
+      { ok: false, code: "mutation-task-budget-invalid" });
+  }
+  for (const field of ["version", "startedAtMs", "starts"] as const) {
+    const altered = Object.defineProperty({ version: 1, startedAtMs: 0,
+      starts: 0 }, field, { enumerable: true,
+      get() { reads++; throw Error("getter called"); } });
+    assert.equal(decodeBlooketMutationTaskBudgetState(altered), undefined);
+    assert.deepEqual(admitBlooketMutationTaskStart(altered, policy, 1),
+      { ok: false, code: "mutation-task-budget-invalid" });
+  }
+  const state = { version: 1, startedAtMs: 0, starts: 0 };
+  assert.equal(decodeBlooketMutationTaskBudgetState(
+    Object.defineProperty({ ...state }, "hidden", { value: true })),
+  undefined);
+  assert.equal(decodeBlooketMutationTaskBudgetState({ ...state,
+    [Symbol("hidden")]: true }), undefined);
+  assert.equal(reads, 0);
+  },
+);
