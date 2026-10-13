@@ -1237,3 +1237,25 @@ These checks do not demonstrate a loaded authenticated extension creating
 and rereading Blooket content. The first unfinished publication task remains
 open. Existing ambiguous write journals cannot be replayed automatically,
 and macOS/Safari acceptance is not implied by Linux checks.
+
+
+## Publication evidence admission follow-up (2026-10-13)
+
+The logical CLI/MCP publication request decoder now takes only exact
+own enumerable data fields for its draft ID and expected saved revision.
+It never calls an accessor or inherits fields from the request object.
+Untrusted preparation ports likewise supply exact owned media metadata,
+with bytes copied through native typed-array slots rather than an
+untrusted iterator or overridden length getter.
+
+One-step write responses, nested created-set receipts, verification
+results, and pre-write baselines reject getters, hidden fields and
+symbol-owned extra data before confirming remote state. Explicit
+reconciliation never clears an uncertain journal from an accessor-led
+decision, and pacing leases are validated before a mutation window
+can start. Media lookup IDs remain fixed across asynchronous reads.
+
+These tests are synthetic, locally validated Fedora contract evidence.
+They do not establish loaded-extension authenticated acceptance, a
+native Safari run, or remote quiz publication. Continue from fresh
+provider state without replaying a previously ambiguous attempt.

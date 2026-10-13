@@ -52,3 +52,35 @@ test("publication payloads admit logical IDs and exact saved revisions", () => {
     assert.equal(decodeBlooketPublicationCommand("blooket.publication.step",
       { draftId: "fixture", expectedRevision }).ok, false);
 });
+
+
+test("publication admission never evaluates or tolerates extra own fields",
+  () => {
+  for (const name of BLOOKET_PUBLICATION_COMMANDS) {
+    const step = name.endsWith(".step");
+    const input = step ? { draftId: "fixture",
+      expectedRevision: "a".repeat(64) } : { draftId: "fixture" };
+    let getterCalls = 0;
+    const accessor = Object.defineProperty({ ...input }, "draftId", {
+      enumerable: true, get() { getterCalls++; return "fixture"; },
+    });
+    const hidden = Object.defineProperty({ ...input }, "extra", {
+      enumerable: false, value: "untrusted",
+    });
+    const symbol = { ...input, [Symbol("extra")]: true };
+    const inherited = Object.create({ draftId: "fixture" }) as
+      Record<string, unknown>;
+    if (step) inherited.expectedRevision = "a".repeat(64);
+    const throwing = new Proxy(input, {
+      ownKeys() { throw new Error("untrusted key trap"); },
+    });
+    for (const value of [accessor, hidden, symbol, inherited, throwing])
+      assert.equal(decodeBlooketPublicationCommand(name, value).ok, false);
+    assert.equal(getterCalls, 0);
+    const admitted = decodeBlooketPublicationCommand(name, input);
+    assert.equal(admitted.ok, true);
+    if (admitted.ok) assert.equal(Object.getPrototypeOf(admitted.value),
+      Object.prototype);
+  }
+  },
+);

@@ -423,3 +423,39 @@ test("untrusted write acknowledgements never advance checkpoint", async () => {
     assert.deepEqual(calls, ["write:plan:test:set"]);
   }
 });
+
+
+test("write acknowledgement accessors cannot run or advance a checkpoint",
+  async () => {
+  for (const key of ["ok", "receipt", "kind", "code", "state"] as const) {
+    let evaluated = 0;
+    const base: Record<string, unknown> = key === "receipt" || key === "ok"
+      ? { ok: true, receipt: {
+        kind: "set-created", remoteSetId: "remote-set-1",
+      } } : key === "state"
+        ? { ok: false, kind: "navigation", state: "signed-out" }
+        : { ok: false, kind: "browser", code: "blooket-browser-failed" };
+    Object.defineProperty(base, key, {
+      enumerable: true, get() { evaluated++; throw Error("unsafe getter"); },
+    });
+    const result = await executeNextBlooketWrite(plan, checkpoint(),
+      browser([]), secrets([]),
+      writePort(base as BlooketWriteAttemptResult, []));
+    assert.deepEqual(result, { ok: false, stage: "write",
+      code: "blooket-browser-failed" });
+    assert.equal(evaluated, 0);
+  }
+  for (const key of ["hidden", "symbol"] as const) {
+    const base = { ok: true, receipt: {
+      kind: "set-created", remoteSetId: "remote-set-1",
+    } };
+    Object.defineProperty(base, key === "hidden" ? "secret" :
+      Symbol("secret"), { value: true });
+    const result = await executeNextBlooketWrite(plan, checkpoint(),
+      browser([]), secrets([]),
+      writePort(base as BlooketWriteAttemptResult, []));
+    assert.deepEqual(result, { ok: false, stage: "write",
+      code: "blooket-browser-failed" });
+  }
+  },
+);

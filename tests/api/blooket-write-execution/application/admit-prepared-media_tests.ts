@@ -326,3 +326,92 @@ test("malformed second-media replies cannot release partial media",
   assert.deepEqual(calls, ["shared", "moon"]);
   },
 );
+
+
+test("prepared media port getters cannot execute during admission",
+  async () => {
+  for (const variation of ["ok", "value", "mediaId", "bytes",
+    "hidden", "symbol"] as const) {
+    let reads = 0;
+    const detail = { mediaId: "shared", revision: 3, format: "png",
+      bytes: new Uint8Array([1, 2, 3]) };
+    let response: object = { ok: true, value: detail };
+    if (variation === "ok" || variation === "value") {
+      response = Object.defineProperty({ ...response }, variation, {
+        enumerable: true, get() { reads++; throw Error("executed"); },
+      });
+    } else if (variation === "mediaId" || variation === "bytes") {
+      Object.defineProperty(detail, variation, { enumerable: true,
+        get() { reads++; throw Error("executed"); } });
+    } else if (variation === "hidden") {
+      Object.defineProperty(detail, "hidden", { value: true });
+    } else {
+      Object.defineProperty(response, Symbol("hidden"), { value: true });
+    }
+    const calls: string[] = [];
+    assert.deepEqual(await admitBlooketPreparedMedia(multipleChoice,
+      port(() => response as BlooketPreparedMediaReadResult, calls)), {
+      ok: false, code: "blooket-media-invalid", mediaId: "shared",
+    });
+    assert.equal(reads, 0);
+    assert.deepEqual(calls, ["shared"]);
+  }
+  },
+);
+
+test("prepared media copies typed slots without inherited iterators",
+  async () => {
+    let iteratorCalls = 0;
+    let countCalls = 0;
+    class UntrustedBytes extends Uint8Array {
+      override get byteLength(): number {
+        countCalls++;
+        throw new Error("subclass length getter executed");
+      }
+      override *[Symbol.iterator](): ArrayIterator<number> {
+        iteratorCalls++;
+        throw new Error("subclass iterator executed");
+      }
+    }
+    const bytes = new UntrustedBytes([1, 2, 3]);
+    const admitted = await admitBlooketPreparedMedia({
+      operationId: "plan:test:q:typing", kind: "question",
+      localQuestionId: "q1", questionNumber: 1,
+      question: { type: "typing-answer", prompt: "Type sun.",
+        timeLimitSeconds: 15, imageMediaId: "shared",
+        matchMode: "exact", answer: "sun" },
+    }, { read: async () => ({ ok: true, value: {
+      mediaId: "shared", revision: 3, format: "png", bytes,
+    } }) });
+    assert.equal(admitted.ok, true);
+    if (!admitted.ok) return;
+    assert.deepEqual(Array.from(admitted.media[0]!.bytes), [1, 2, 3]);
+    assert.equal(iteratorCalls, 0);
+    assert.equal(countCalls, 0);
+  },
+);
+
+
+test("media lookup IDs stay fixed across asynchronous read callbacks",
+  async () => {
+  const operation: BlooketWriteOperation = {
+    ...multipleChoice,
+    question: { ...multipleChoice.question,
+      answers: [...multipleChoice.question.answers] },
+  };
+  const calls: string[] = [];
+  const result = await admitBlooketPreparedMedia(operation, {
+    read: async mediaId => {
+      calls.push(mediaId);
+      if (calls.length === 1 && operation.kind === "question" &&
+          operation.question.type === "multiple-choice") {
+        (operation.question.answers as { imageMediaId: string | null }[])[1]!
+          .imageMediaId = "injected-after-await";
+      }
+      return prepared(mediaId);
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, ["shared", "moon"]);
+  },
+);

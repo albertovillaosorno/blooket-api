@@ -469,16 +469,34 @@ async function captureVerificationBaseline(
     result: { ok: false, stage: "verification-baseline",
       code: "blooket-write-baseline-invalid" },
   });
-  const exactKeys = (value: unknown, names: string): boolean => {
+  const own = (names: readonly string[]): Record<string, unknown> |
+    undefined => {
     try {
-      return !!value && typeof value === "object" &&
-        !Array.isArray(value) && Reflect.ownKeys(value).sort().join() === names;
-    } catch { return false; }
+      if (!captured || typeof captured !== "object" ||
+          Array.isArray(captured)) return undefined;
+      const keys = Reflect.ownKeys(captured);
+      if (keys.length !== names.length || keys.some(key =>
+          typeof key !== "string" || !names.includes(key)))
+        return undefined;
+      const descriptors = Object.getOwnPropertyDescriptors(captured);
+      const clone: Record<string, unknown> = {};
+      for (const name of names) {
+        const descriptor = descriptors[name];
+        if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+            !descriptor.enumerable) return undefined;
+        Object.defineProperty(clone, name, {
+          value: descriptor.value, enumerable: true, configurable: true,
+        });
+      }
+      return clone;
+    } catch { return undefined; }
   };
-  if (!captured || (captured.ok !== true && captured.ok !== false))
-    return invalid();
+  const admitted = own(["baseline", "ok"]) ??
+    own(["code", "kind", "ok"]) ?? own(["kind", "ok", "state"]);
+  if (!admitted) return invalid();
+  captured = admitted as unknown as BlooketWriteVerificationBaselineResult;
+  if (captured.ok !== true && captured.ok !== false) return invalid();
   if (captured.ok === true) {
-    if (!exactKeys(captured, "baseline,ok")) return invalid();
     if (captured.baseline === null) {
       return missing();
     }
@@ -499,8 +517,7 @@ async function captureVerificationBaseline(
     return { ok: true, value: decoded.value };
   }
   if (captured.kind === "browser") {
-    if (!exactKeys(captured, "code,kind,ok") ||
-        (captured.code !== "blooket-browser-failed" &&
+    if ((captured.code !== "blooket-browser-failed" &&
          captured.code !== "blooket-browser-unavailable" &&
          captured.code !== "blooket-browser-incompatible")) return invalid();
     return {
@@ -513,7 +530,6 @@ async function captureVerificationBaseline(
     };
   }
   if (captured.kind !== "navigation" ||
-      !exactKeys(captured, "kind,ok,state") ||
       !["signed-out", "expired-session", "organization-prompt",
         "rate-limited", "security-challenge", "unexpected-page"]
         .some(state => state === captured.state)) return invalid();
@@ -605,46 +621,55 @@ async function executePersistedBlooketWriteLocked(
     return baseline.result;
   }
 
-  let pacing: Awaited<ReturnType<BlooketMutationPacer["acquire"]>> | undefined;
+  let lease: { readonly startedAtMs: number; release(): void } | undefined;
   try {
-    pacing = options.pacer === undefined
+    const pacing: unknown = options.pacer === undefined
       ? undefined
       : await options.pacer.acquire(options.signal);
+    const own = (value: unknown, names: readonly string[]):
+      Record<string, unknown> | undefined => {
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        return undefined;
+      const keys = Reflect.ownKeys(value);
+      if (keys.length !== names.length || keys.some(key =>
+          typeof key !== "string" || !names.includes(key)))
+        return undefined;
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const copy: Record<string, unknown> = {};
+      for (const name of names) {
+        const descriptor = descriptors[name];
+        if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+            !descriptor.enumerable) return undefined;
+        Object.defineProperty(copy, name, {
+          value: descriptor.value, enumerable: true, configurable: true,
+        });
+      }
+      return copy;
+    };
+    if (pacing !== undefined) {
+      const stopped = own(pacing, ["code", "ok"]);
+      if (stopped?.["ok"] === false &&
+          stopped["code"] === "mutation-pacing-cancelled")
+        return { ok: false, stage: "mutation-pacing",
+          code: "mutation-pacing-cancelled" };
+      const granted = own(pacing, ["lease", "ok"]);
+      const originalLease = granted?.["lease"];
+      const admitted = own(originalLease, ["release", "startedAtMs"]);
+      if (granted?.["ok"] !== true || !admitted ||
+          typeof admitted["release"] !== "function" ||
+          typeof admitted["startedAtMs"] !== "number" ||
+          !Number.isFinite(admitted["startedAtMs"]) ||
+          admitted["startedAtMs"] < 0)
+        return { ok: false, stage: "mutation-pacing",
+          code: "mutation-pacing-failed" };
+      const release = admitted["release"] as () => void;
+      lease = { startedAtMs: admitted["startedAtMs"],
+        release: () => release.call(originalLease) };
+    }
   } catch {
-    return {
-      ok: false,
-      stage: "mutation-pacing",
-      code: "mutation-pacing-failed",
-    };
+    return { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-failed" };
   }
-  if (pacing !== undefined) {
-    const exact = (value: unknown, names: string): boolean => {
-      try {
-        return !!value && typeof value === "object" &&
-          !Array.isArray(value) &&
-          Reflect.ownKeys(value).sort().join() === names;
-      } catch { return false; }
-    };
-    if (!pacing || (pacing.ok === false &&
-        (!exact(pacing, "code,ok") ||
-         pacing.code !== "mutation-pacing-cancelled")) ||
-        (pacing.ok === true &&
-         (!exact(pacing, "lease,ok") ||
-          !exact(pacing.lease, "release,startedAtMs") ||
-          typeof pacing.lease.release !== "function" ||
-          typeof pacing.lease.startedAtMs !== "number" ||
-          !Number.isFinite(pacing.lease.startedAtMs) ||
-          pacing.lease.startedAtMs < 0)) ||
-        (pacing.ok !== true && pacing.ok !== false)) {
-      return { ok: false, stage: "mutation-pacing",
-        code: "mutation-pacing-failed" };
-    }
-    if (pacing.ok === false) {
-      return { ok: false, stage: "mutation-pacing",
-        code: "mutation-pacing-cancelled" };
-    }
-  }
-  const lease = pacing?.ok === true ? pacing.lease : undefined;
   if (options.signal?.aborted) {
     lease?.release();
     return {

@@ -169,23 +169,42 @@ export async function reconcilePersistedBlooketWriteUnderLock(
   }
   // The public reconciliation API is callable without an IR decoder.
   // A malformed negative result must never erase a pending attempt.
-  const validResolution = !!resolution &&
-    typeof resolution === "object" && !Array.isArray(resolution) &&
-    typeof resolution.operationId === "string" &&
-    (resolution.outcome === "not-confirmed"
-      ? Reflect.ownKeys(resolution).sort().join() ===
-        "operationId,outcome"
-      : resolution.outcome === "confirmed" &&
-        Reflect.ownKeys(resolution).sort().join() ===
-          "operationId,outcome,receipt");
-  if (!validResolution) {
+  let owned: BlooketWriteReconciliationResolution | undefined;
+  try {
+    if (resolution && typeof resolution === "object" &&
+        !Array.isArray(resolution)) {
+      const keys = Reflect.ownKeys(resolution);
+      const fields = Object.getOwnPropertyDescriptors(resolution);
+      const operationId = fields["operationId"];
+      const outcome = fields["outcome"];
+      const receipt = fields["receipt"];
+      const data = (descriptor: PropertyDescriptor | undefined) =>
+        !!descriptor && descriptor.enumerable &&
+        Object.hasOwn(descriptor, "value");
+      const negative = outcome?.value === "not-confirmed" &&
+        keys.length === 2 && keys.every(key =>
+          key === "operationId" || key === "outcome");
+      const positive = outcome?.value === "confirmed" &&
+        keys.length === 3 && data(receipt) && keys.every(key =>
+          key === "operationId" || key === "outcome" || key === "receipt");
+      if (data(operationId) && data(outcome) &&
+          typeof operationId!.value === "string" &&
+          (negative || positive)) {
+        owned = outcome!.value === "not-confirmed"
+          ? { operationId: operationId!.value, outcome: "not-confirmed" }
+          : { operationId: operationId!.value, outcome: "confirmed",
+              receipt: receipt!.value };
+      }
+    }
+  } catch { /* Untrusted descriptors cannot clear an attempt. */ }
+  if (!owned) {
     return {
       ok: false,
       stage: "reconciliation",
       code: "reconciliation-state-inconsistent",
     };
   }
-  if (recovery.attempt.operationId !== resolution.operationId) {
+  if (recovery.attempt.operationId !== owned.operationId) {
     return {
       ok: false,
       stage: "reconciliation",
@@ -193,7 +212,7 @@ export async function reconcilePersistedBlooketWriteUnderLock(
     };
   }
 
-  if (resolution.outcome === "not-confirmed") {
+  if (owned.outcome === "not-confirmed") {
     const cleared = await clearWriteAttempt(attemptPath, plan);
     if (!cleared.ok) {
       return cleanupFailure(cleared, recovery.checkpoint);
@@ -208,8 +227,8 @@ export async function reconcilePersistedBlooketWriteUnderLock(
   const confirmed = await confirmWriteAttempt(
     attemptPath,
     plan,
-    resolution.operationId,
-    resolution.receipt,
+    owned.operationId,
+    owned.receipt,
   );
   if (!confirmed.ok) {
     return {

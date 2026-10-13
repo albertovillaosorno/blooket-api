@@ -306,20 +306,32 @@ export function decodeBlooketWriteReceipt(
       }],
     };
   }
-  const issues: ValidationIssue[] = [
-    ...unknownFieldIssues(value, RECEIPT_KEYS, path),
-  ];
+  let fields: PropertyDescriptorMap;
+  let issues: ValidationIssue[];
+  try {
+    fields = Object.getOwnPropertyDescriptors(value);
+    issues = [...unknownFieldIssues(value, RECEIPT_KEYS, path)];
+  } catch {
+    return { ok: false, issues: [{ path, code: "invalid-write-receipt",
+      message: "Receipt fields must be directly inspectable." }] };
+  }
+  const identity = fields["remoteSetId"];
+  const kind = fields["kind"];
+  if (!identity || !Object.hasOwn(identity, "value") ||
+      !identity.enumerable || !kind || !Object.hasOwn(kind, "value") ||
+      !kind.enumerable) return { ok: false, issues: [{
+    path, code: "invalid-write-receipt",
+    message: "Receipt fields must be owned enumerable data properties.",
+  }] };
   const remoteSetId = requiredString(
-    value["remoteSetId"],
-    path + ".remoteSetId",
-    issues,
+    identity.value, path + ".remoteSetId", issues,
   );
   if (remoteSetId !== undefined) {
     const decoded = decodeBlooketSetId(remoteSetId,
       path + ".remoteSetId");
     if (!decoded.ok) issues.push(...decoded.issues);
   }
-  if (value["kind"] !== "set-created") {
+  if (kind.value !== "set-created") {
     issues.push({
       path: path + ".kind",
       code: "invalid-write-receipt-kind",
