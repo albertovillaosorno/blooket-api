@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, the self-contained Add Question page helper also
+began enforcing dense owned answer/match arrays at the final browser
+form boundary. Sparse typing modes, hidden array properties and
+answer field getters fail before the form changes. Valid arrays are
+copied into ordinary text and match-mode lists so inherited iterators
+or serializers cannot alter the Save Question payload. Synthetic
+browser tests prove the one-click bound without provider mutation.
+
 On 2026-10-13, the in-memory browser bridge broker started
 rejecting non-string or oversized pairing tokens before allocation
 or job correlation. Its synthetic tests cover untyped inputs and

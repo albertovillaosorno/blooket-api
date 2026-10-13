@@ -1376,3 +1376,77 @@ test("prepared image change cannot confirm a replaced or challenged form",
   }
   },
 );
+
+test("final Add Question page rejects sparse and decorated match modes",
+  () => {
+  for (const modes of [
+    new Array(1),
+    Object.defineProperty(["exactly"], "hidden", {
+      value: "untrusted", enumerable: false,
+    }),
+    Object.defineProperty(["exactly"], Symbol("hidden"), {
+      value: "untrusted",
+    }),
+  ]) {
+    const page = fixture();
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+        assert.equal(prepareBlooketAddQuestionForm({
+          ...typing, answerTypes: modes as never,
+        }).ok, false);
+        assert.equal(page.hidden.value, "");
+        assert.equal(page.submit.clicked, 0);
+      });
+  }
+  },
+);
+
+test("final Add Question page never executes answer field getters", () => {
+  const page = fixture();
+  let invoked = 0;
+  const answer = Object.defineProperty({ text: "sun", correct: true },
+    "text", { enumerable: true, get: () => {
+      invoked++; throw new Error("untrusted");
+    } });
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(prepareBlooketAddQuestionForm({ ...typing,
+        answers: [answer] }).ok, false);
+      assert.equal(invoked, 0);
+      assert.equal(page.hidden.value, "");
+      assert.equal(page.submit.clicked, 0);
+    });
+});
+
+test("final Add Question serializes owned arrays without inherited methods",
+  () => {
+  let invoked = 0;
+  class ForeignModes extends Array<"exactly" | "contains"> {
+    override every(): boolean { invoked++; throw new Error("untrusted"); }
+    toJSON(): never { invoked++; throw new Error("untrusted"); }
+  }
+  class ForeignAnswers extends Array<{
+    readonly text: string; readonly correct: boolean;
+  }> {
+    override *[Symbol.iterator](): IterableIterator<{
+      readonly text: string; readonly correct: boolean;
+    }> { invoked++; throw new Error("untrusted"); }
+    toJSON(): never { invoked++; throw new Error("untrusted"); }
+  }
+  const modes = new ForeignModes();
+  modes.push("exactly");
+  const answers = new ForeignAnswers();
+  answers.push({ text: "sun", correct: true });
+  const page = fixture();
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      const input = { ...typing, answers, answerTypes: modes };
+      assert.deepEqual(prepareBlooketAddQuestionForm(input), { ok: true });
+      assert.deepEqual(JSON.parse(page.hidden.value).answerTypes,
+        ["exactly"]);
+      assert.deepEqual(submitBlooketAddQuestionForm(input), { ok: true });
+      assert.equal(page.submit.clicked, 1);
+      assert.equal(invoked, 0);
+    });
+  },
+);

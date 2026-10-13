@@ -1226,6 +1226,13 @@ security maintenance release, published on September 30, 2026, with its
 actual managed version matching the repository's Jig version authority.
 Reference: https://www.python.org/downloads/release/python-3148/
 
+The final injected Add Question form now independently rejects sparse or
+decorated answer and match arrays and getter-backed answer fields, even
+when upstream command decoding already passed. It constructs plain
+text/match arrays before preparing the hidden JSON form input or making
+the one Save Question click. Its portable synthetic tests demonstrate
+this defense without a real account mutation.
+
 These checks do not demonstrate a loaded authenticated extension creating
 and rereading Blooket content. The first unfinished publication task remains
 open. Existing ambiguous write journals cannot be replayed automatically,

@@ -181,75 +181,74 @@ export function runBlooketAddQuestionPageAction(
         return input.value === "" && (input.files?.length ?? 0) === 0;
       },
     );
+  const exactSlots = (candidate: unknown): candidate is unknown[] => {
+    if (!Array.isArray(candidate) || candidate.length > 100 ||
+        Reflect.ownKeys(candidate).length !== candidate.length + 1)
+      return false;
+    for (let index = 0; index < candidate.length; index++) {
+      const slot = Object.getOwnPropertyDescriptor(candidate, String(index));
+      if (!slot || !slot.enumerable || !("value" in slot)) return false;
+    }
+    return true;
+  };
   const serializedQuestion = (input: BlooketTextQuestionPageInput) => {
     if (
       typeof input.setId !== "string" ||
-      input.setId.length < 1 ||
-      input.setId.length > 512 ||
+      input.setId.length < 1 || input.setId.length > 512 ||
       /[\x00-\x1f\x7f]/u.test(input.setId) ||
       !Number.isSafeInteger(input.number) ||
-      input.number < 1 ||
-      input.number > 10_000 ||
+      input.number < 1 || input.number > 10_000 ||
       typeof input.question !== "string" ||
-      input.question.length < 1 ||
-      input.question.length > 20_000 ||
-      input.question.includes("`*`") ||
+      input.question.length < 1 || input.question.length > 20_000 ||
+      input.question.includes("`*") ||
       typeof input.random !== "boolean" ||
       !Number.isSafeInteger(input.timeLimit) ||
-      input.timeLimit < 1 ||
-      input.timeLimit > 86_400 ||
-      !Array.isArray(input.answers) ||
-      input.answers.length < 1 ||
-      input.answers.length > 100
+      input.timeLimit < 1 || input.timeLimit > 86_400 ||
+      !exactSlots(input.answers) || input.answers.length < 1
     ) return null;
     const answers: string[] = [];
     const correctAnswers: string[] = [];
     const seen = new Set<string>();
-    for (const answer of input.answers) {
-      if (
-        !answer ||
-        typeof answer !== "object" ||
-        typeof answer.text !== "string" ||
-        answer.text.length < 1 ||
-        answer.text.length > 10_000 ||
-        typeof answer.correct !== "boolean" ||
-        answer.text.includes("\0") ||
-        answer.text.includes("`*`") ||
-        answer.text.includes("`~`") ||
-        seen.has(answer.text)
-      ) return null;
-      seen.add(answer.text);
-      answers.push(answer.text);
-      if (answer.correct) correctAnswers.push(answer.text);
+    for (let index = 0; index < input.answers.length; index++) {
+      const answer = input.answers[index];
+      if (!answer || typeof answer !== "object" ||
+          Array.isArray(answer) || Reflect.ownKeys(answer).length !== 2)
+        return null;
+      const textField = Object.getOwnPropertyDescriptor(answer, "text");
+      const correctField = Object.getOwnPropertyDescriptor(answer, "correct");
+      if (!textField?.enumerable || !("value" in textField) ||
+          !correctField?.enumerable || !("value" in correctField) ||
+          typeof textField.value !== "string" ||
+          textField.value.length < 1 || textField.value.length > 10_000 ||
+          typeof correctField.value !== "boolean" ||
+          textField.value.includes("\0") ||
+          textField.value.includes("`*") ||
+          textField.value.includes("`~`") ||
+          seen.has(textField.value)) return null;
+      seen.add(textField.value);
+      answers.push(textField.value);
+      if (correctField.value) correctAnswers.push(textField.value);
     }
     if (correctAnswers.length < 1) return null;
+    const matchTypes: ("exactly" | "contains")[] = [];
     if (input.qType === "typing") {
-      if (
-        correctAnswers.length !== answers.length ||
-        input.random !== true ||
-        !Array.isArray(input.answerTypes) ||
-        input.answerTypes.length !== answers.length ||
-        !input.answerTypes.every(
-          (kind) => kind === "exactly" || kind === "contains",
-        )
-      ) return null;
+      if (correctAnswers.length !== answers.length ||
+          input.random !== true || !exactSlots(input.answerTypes) ||
+          input.answerTypes.length !== answers.length) return null;
+      for (let index = 0; index < input.answerTypes.length; index++) {
+        const mode = input.answerTypes[index];
+        if (mode !== "exactly" && mode !== "contains") return null;
+        matchTypes.push(mode);
+      }
     } else if (input.qType === "mc") {
-      if (
-        input.answerTypes !== null ||
-        answers.length < 2 ||
-        answers.length > 4
-      ) return null;
+      if (input.answerTypes !== null || answers.length < 2 ||
+          answers.length > 4) return null;
     } else return null;
     return {
-      number: input.number,
-      question: input.question,
-      answers,
-      correctAnswers,
-      image: "",
-      audio: "" as const,
-      qType: input.qType,
-      random: input.random,
-      answerTypes: input.answerTypes,
+      number: input.number, question: input.question, answers,
+      correctAnswers, image: "", audio: "" as const,
+      qType: input.qType, random: input.random,
+      answerTypes: input.qType === "typing" ? matchTypes : null,
       timeLimit: input.timeLimit,
     };
   };
