@@ -1172,3 +1172,88 @@ test("Audio follow-up revokes a verified modal whose set identity changed",
   }
   },
 );
+
+test("Audio drawer opener is single-shot even before visible hydration",
+  () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(page.audio.clicked, 1);
+    assert.equal(page.cancel.clicked, 0);
+  });
+  },
+);
+
+test("lost Audio click acknowledgement cannot be replayed",
+  () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    const clicked = page.audio.click.bind(page.audio);
+    page.audio.click = () => {
+      clicked();
+      throw new Error("synthetic lost acknowledgement");
+    };
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    page.audio.click = clicked;
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(page.audio.clicked, 1);
+    assert.equal(page.cancel.clicked, 0);
+  });
+  },
+);
+
+test("read-owned capability Cancel clicks are single-shot on lost replies",
+  () => {
+  for (const target of ["audio", "question"] as const) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      if (target === "audio") {
+        assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+        const opened = drawer("unsupported");
+        page.document.selectors['aside[data-drawer-open="true"]'] = [opened];
+        assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+          true);
+        const button = opened.selectors[
+          'button[aria-label="Cancel"]']![0]!;
+        const clicked = button.click.bind(button);
+        button.click = () => {
+          clicked();
+          throw new Error("synthetic lost Cancel acknowledgement");
+        };
+        assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+        button.click = clicked;
+        assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+        assert.equal(button.clicked, 1);
+        assert.equal(page.cancel.clicked, 0);
+      } else {
+        const clicked = page.cancel.click.bind(page.cancel);
+        page.cancel.click = () => {
+          clicked();
+          throw new Error("synthetic lost Cancel acknowledgement");
+        };
+        assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+        page.cancel.click = clicked;
+        assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+        assert.equal(page.cancel.clicked, 1);
+        assert.equal(page.audio.clicked, 0);
+      }
+    });
+  }
+  },
+);
