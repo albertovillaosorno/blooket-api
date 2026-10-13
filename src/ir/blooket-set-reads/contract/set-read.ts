@@ -36,7 +36,7 @@ import {
   type ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
-  isExactDenseArray,
+  snapshotExactDenseArray,
   isRecord,
   ownDataField,
   requiredString,
@@ -137,43 +137,29 @@ export function decodeBlooketSetSummary(
 export function decodeBlooketSetList(
   value: unknown,
 ): DecodeResult<readonly BlooketSetSummary[]> {
-  if (!Array.isArray(value)) {
-    return {
-      ok: false,
-      issues: [{
-        path: "$",
-        code: "expected-array",
-        message: "Expected a Blooket set summary array.",
-      }],
-    };
-  }
-
-  // Mirror the local browser extraction cap, not a provider account limit.
-  if (value.length > 200) {
-    return {
-      ok: false,
-      issues: [{
-        path: "$",
-        code: "too-many-sets",
-        message: "Expected at most 200 observed set summaries.",
-      }],
-    };
-  }
-  // An array received through a browser-port contract has only its dense
-  // indexed slots and length. Extra named/symbol fields or sparse holes
-  // must not become a successful saved-set collection.
-  if (!isExactDenseArray(value)) {
-    return {
-      ok: false,
-      issues: [{ path: "$", code: "unknown-field",
-        message: "Expected a dense set list without additional fields." }],
-    };
+  // Capture one immutable-enough set of owned slots before decoding;
+  // re-reading untrusted indices could run proxy traps or race a change.
+  const captured = snapshotExactDenseArray(value, 200);
+  if (!captured) {
+    let code = "unknown-field";
+    let message = "Expected a dense set list without additional fields.";
+    try {
+      if (!Array.isArray(value)) {
+        code = "expected-array";
+        message = "Expected a Blooket set summary array.";
+      } else if ((Object.getOwnPropertyDescriptor(value, "length")
+          ?.value as number | undefined ?? 0) > 200) {
+        code = "too-many-sets";
+        message = "Expected at most 200 observed set summaries.";
+      }
+    } catch { /* Revoked proxy: retain a stable failure. */ }
+    return { ok: false, issues: [{ path: "$", code, message }] };
   }
   const items: BlooketSetSummary[] = [];
   const issues: ValidationIssue[] = [];
   const seenIds = new Set<string>();
-  for (let index = 0; index < value.length; index++) {
-    const candidate = value[index];
+  for (let index = 0; index < captured.length; index++) {
+    const candidate = captured[index];
     const path = "$[" + String(index) + "]";
     const decoded = decodeBlooketSetSummary(candidate, path);
     if (!decoded.ok) {

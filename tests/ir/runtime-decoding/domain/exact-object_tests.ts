@@ -37,6 +37,7 @@ import {
   isExactDenseArray,
   isRecord,
   ownDataField,
+  snapshotExactDenseArray,
   requiredString,
   unknownFieldIssues,
 } from "../../../../src/ir/runtime-decoding/domain/exact-object.ts";
@@ -195,5 +196,30 @@ test("revoked records and throwing descriptors fail without an exception",
     { path: "$", code: "unknown-field",
       message: "Object descriptors could not be inspected." },
   ]);
+  },
+);
+
+
+test("bounded array snapshots read descriptors instead of proxy indices",
+  () => {
+  const input = ["trusted"];
+  let indexedReads = 0;
+  const watched = new Proxy(input, {
+    get(_target, key, receiver) {
+      if (key === "0" || key === "length") {
+        indexedReads++;
+        throw new Error("Untrusted array indexed getter");
+      }
+      return Reflect.get(input, key, receiver);
+    },
+  });
+  assert.deepEqual(snapshotExactDenseArray(watched, 2), ["trusted"]);
+  assert.equal(indexedReads, 0);
+  assert.equal(snapshotExactDenseArray(watched, 0), undefined);
+  const revoked = Proxy.revocable(["trusted"], {});
+  revoked.revoke();
+  assert.equal(snapshotExactDenseArray(revoked.proxy, 2), undefined);
+  assert.equal(snapshotExactDenseArray(Object.defineProperty(["trusted"],
+    "extra", { value: true }), 2), undefined);
   },
 );
