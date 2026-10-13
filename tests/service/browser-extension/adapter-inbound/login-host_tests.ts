@@ -367,3 +367,44 @@ test("login scripts reject accessor-backed Chrome array slots",
     assert.equal(page.calls.includes("submit"), false);
   },
 );
+
+test("login host owns Chrome frame slots without reading proxy indices",
+  async () => {
+  const page = fixture({});
+  const original = page.chrome.scripting.executeScript;
+  let indexedReads = 0;
+  page.chrome.scripting.executeScript = async request => new Proxy(
+    await original(request), {
+      get(target, key, receiver) {
+        if (key === "0" || key === "length") {
+          indexedReads++;
+          throw new Error("Untrusted script frame array getter");
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+  assert.deepEqual(await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => undefined,
+  ).authenticate(credentials), { ok: true, value: null });
+  assert.equal(indexedReads, 0);
+  assert.equal(page.calls.filter(name => name === "submit").length, 1);
+  },
+);
+
+test("login host fails closed on revoked Chrome frame collections",
+  async () => {
+  const page = fixture({});
+  const original = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async request => {
+    const frames = Proxy.revocable(await original(request), {});
+    frames.revoke();
+    return frames.proxy;
+  };
+  assert.deepEqual(await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => undefined,
+  ).authenticate(credentials), {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.calls.includes("submit"), false);
+  },
+);

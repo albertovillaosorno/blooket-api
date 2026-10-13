@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, six extension host script adapters began copying
+Chrome's single returned frame through a bounded own-data array
+snapshot. A proxy index getter cannot intervene between shape
+checking and the result descriptor read; revoked frame lists fail
+without permitting a login submit or publication action. Synthetic
+login and extension tests exercise these guards; no provider write ran.
+
 On 2026-10-13, browser-bridge Add Question admission began
 snapshotting directly owned answer and typing-mode slots before
 building a canonical command. Accessor-backed and revoked arrays fail

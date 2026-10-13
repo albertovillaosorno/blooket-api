@@ -33,7 +33,7 @@ import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import { blooketPreparedImageBytes } from
   "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
-import { isExactDenseArray } from
+import { isExactDenseArray, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -131,12 +131,13 @@ export function createExtensionAddQuestionHost(
       func,
       args,
     });
-    if (!isExactDenseArray(replies) || replies.length !== 1 ||
-        !replies[0] || typeof replies[0] !== "object")
+    const frames = snapshotExactDenseArray(replies, 1);
+    const frame = frames?.length === 1 ? frames[0] : undefined;
+    if (!frame || typeof frame !== "object")
       throw new Error("browser-write-script-failed");
     // Chrome adds frame metadata, but only its own enumerable result data
     // descriptor may carry evidence. Never invoke an accessor getter.
-    const descriptor = Object.getOwnPropertyDescriptor(replies[0], "result");
+    const descriptor = Object.getOwnPropertyDescriptor(frame, "result");
     if (!descriptor || !descriptor.enumerable ||
         !("value" in descriptor) || descriptor.value === undefined)
       throw new Error("browser-write-script-failed");

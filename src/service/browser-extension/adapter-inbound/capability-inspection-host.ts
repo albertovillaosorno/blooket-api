@@ -49,7 +49,7 @@ import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
-import { isExactDenseArray } from
+import { isExactDenseArray, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 interface BrowserTab {
@@ -122,12 +122,13 @@ export function createExtensionCapabilityInspectionHost(
       func,
       args,
     });
-    if (!isExactDenseArray(replies) || replies.length !== 1 ||
-        !replies[0] || typeof replies[0] !== "object")
+    const frames = snapshotExactDenseArray(replies, 1);
+    const frame = frames?.length === 1 ? frames[0] : undefined;
+    if (!frame || typeof frame !== "object")
       throw new Error("browser-capability-script-failed");
     // InjectionResult also contains Chrome-owned frame metadata. Trust only
     // its directly owned result data field, never an accessor getter.
-    const descriptor = Object.getOwnPropertyDescriptor(replies[0], "result");
+    const descriptor = Object.getOwnPropertyDescriptor(frame, "result");
     if (!descriptor || !descriptor.enumerable ||
         !("value" in descriptor) || descriptor.value === undefined)
       throw new Error("browser-capability-script-failed");
