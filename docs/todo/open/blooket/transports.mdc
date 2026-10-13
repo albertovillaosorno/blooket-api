@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, the in-memory browser bridge broker started
+rejecting non-string or oversized pairing tokens before allocation
+or job correlation. Its synthetic tests cover untyped inputs and
+oversized local capabilities while retaining authenticated delivery
+for the ordinary token. No persistent or remote browser job changed.
+
 On 2026-10-13, the command decoder also began cloning typing
 match modes into a plain owned array before broker delivery.
 Validated array subclasses cannot later run inherited `toJSON`
