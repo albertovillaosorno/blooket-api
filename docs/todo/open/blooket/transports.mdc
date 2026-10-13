@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, both Create Set and Add Question hosts began
+reconfirming that their read-owned verification panels remained
+closed after the final saved-sidebar or question-card reads. A React
+remount between the first Cancel closure and the last remote-state
+sample is not a valid publication receipt. The synthetic regression
+cases fail closed without replaying a Save or overwriting an editor.
+
 On 2026-10-13, the extension capability host began requiring two
 independently checked closed states after read-owned Audio or question
 Cancel. A single missing panel can be a transient React detach and
