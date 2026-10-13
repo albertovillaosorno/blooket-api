@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, capability openers stopped treating a post-click
+browser exception as a known rejected click. Instead, an Add Question
+or Audio opener that might already have executed surfaces an explicit
+unconfirmed error. The host retains its uncertainty and preserves the
+edit route rather than navigating away from a possibly open panel.
+Synthetic browser and extension-host regressions pin the no-replay
+boundary without remotely opening or saving any question.
+
 On 2026-10-12, read-owned capability Audio opening and both
 Audio/question Cancel controls became single-use per claimed panel.
 The ownership latch is set before the UI click, so a lost browser

@@ -93,6 +93,7 @@ export function canLeaveBlooketPageForRead(): boolean {
 }
 
 export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
+  let clicked = false;
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     // Chrome serializes this function without shared module helpers.
@@ -222,14 +223,13 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
     for (const type of types)
       document.addEventListener(type, onInteraction, true);
     world.__blooketCapabilityEditWatch = watch;
-    try {
-      control.click();
-      return true;
-    } catch {
-      watch.dispose();
-      return false;
-    }
+    clicked = true;
+    control.click();
+    return true;
   } catch {
+    // A browser click may have opened the panel before its acknowledgement
+    // failed. Throw a fixed failure so the host preserves the editor URL.
+    if (clicked) throw new Error("browser-capability-open-unconfirmed");
     return false;
   }
 }
@@ -368,6 +368,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
 }
 
 export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
+  let clicked = false;
   try {
     // Independently enforce the session and human-stop boundary on this tab.
     // Chrome serializes this function without shared module helpers.
@@ -496,9 +497,11 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     // Latch before the browser click. Lost acknowledgements must not
     // reopen or toggle a drawer while its first render is still pending.
     watch.audioOpened = true;
+    clicked = true;
     control.click();
     return true;
   } catch {
+    if (clicked) throw new Error("browser-capability-audio-open-unconfirmed");
     return false;
   }
 }
