@@ -184,6 +184,25 @@ const credentials = {
   password: "synthetic-password",
 };
 
+test("teacher activity during username dispatch blocks password fill",
+  () => {
+  const page = fixture();
+  page.identifier.dispatchEvent = () => {
+    page.document.dispatchTrusted("input");
+    return true;
+  };
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.identifier.value, credentials.loginIdentifier);
+    assert.equal(page.password.value, "");
+    assert.equal(isBlooketLoginFormPrepared(credentials), false);
+    assert.equal(submitBlooketLoginForm(credentials).ok, false);
+    assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+    assert.equal(page.submit.clicked, 0);
+  });
+  },
+);
+
 test("serialized login runner preserves injected-browser semantics", () => {
   const page = fixture();
   const serialized = Function(

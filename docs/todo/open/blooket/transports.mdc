@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, login preparation began rechecking the trusted
+interaction watch immediately after username input/change dispatch.
+A teacher event during that synchronous step permanently blocks the
+password fill, even if the login controls remain mounted and visible.
+Synthetic input-dispatch tests confirm the secret-free failure and
+absence of a login click without accessing a provider account.
+
 On 2026-10-13, the read-only capability navigation guard began
 refusing to leave a dashboard document with a visible CAPTCHA or
 hCaptcha frame even without a blocking document title. It also
