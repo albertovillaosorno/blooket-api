@@ -31,7 +31,9 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, readFile, writeFile } from
+  "node:fs/promises";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { acquirePublicationBoundary, publicationAttemptPresent } from
@@ -59,3 +61,33 @@ test("publication observation refuses an oversized physical catalog",
     } finally { await boundary.lock.release(); }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test("any write-attempt journal blocks replacement without touching evidence",
+  async () => {
+  for (const contents of [
+    '{"schemaVersion":3,"phase":"attempting"}\n',
+    '{"schemaVersion":3,"phase":"confirmed"}\n',
+    '{"corrupt":',
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "publication-attempt-stop-"));
+    try {
+      const directory = join(root, "publications", createHash("sha256")
+        .update("synthetic-draft").digest("hex"));
+      await mkdir(directory, { recursive: true });
+      const file = join(directory, "attempt.json");
+      await writeFile(file, contents);
+      const boundary = await acquirePublicationBoundary(root);
+      assert.ok(boundary.ok);
+      if (!boundary.ok) continue;
+      try {
+        assert.equal(await publicationAttemptPresent(root), true);
+        assert.equal(await readFile(file, "utf8"), contents);
+        const second = await acquirePublicationBoundary(root);
+        assert.equal(second.ok, false);
+      } finally { await boundary.lock.release(); }
+      assert.equal(await readFile(file, "utf8"), contents);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+  },
+);

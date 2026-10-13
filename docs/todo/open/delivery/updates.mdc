@@ -211,6 +211,14 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
 
+On 2026-10-13, explicit launcher `--stop` stopped treating HTTP 202
+as proof of completed shutdown. It now waits for the original process,
+discovery file, service lock, data leases and claimed listener to be
+independently gone, or reports an unconfirmed stop without killing
+writers. Disposable-service tests verify completed closure; synthetic
+still-responsive servers and a foreign-PID fixture refuse false success.
+This is not a production installation or recovered publication attempt.
+
 The launcher already owns service startup and duplicate-instance protection.
 `launchAtLogin` defaults false. The owning lifecycle record implements explicit
 local registration/removal and actual OS approval state; updates must reuse that

@@ -34,7 +34,7 @@ import test from "node:test";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { promisify } from "node:util";
-import { mkdtemp, rm, readFile, writeFile, readdir, lstat } from
+import { mkdtemp, rm, readFile, writeFile, readdir, lstat, mkdir } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -167,7 +167,11 @@ test("real silent launcher starts, reuses and drains the supervised service",
       assert.equal(second.stderr, "");
       assert.equal(await readFile(join(root, "teacher-marker"), "utf8"),
         "teacher-owned-data");
-      await command("--stop");
+      const stopped = await command("--stop");
+      assert.equal(stopped.stdout, "Service stopped.\n");
+      assert.equal(stopped.stderr, "");
+      // The launcher now reports completion only after actual service exit
+      // and removal of runtime discovery, service lock and writer leases.
       await drained();
       const boundary = await acquireCanonicalDataUpdateBoundary(root);
       assert.equal(boundary.ok, true);
@@ -182,7 +186,8 @@ test("real silent launcher starts, reuses and drains the supervised service",
 test("launcher stop refuses oversized and invalid local bootstrap replies",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "launcher-stop-safe-"));
-  let mode: "oversized" | "bad-csrf" | "valid" = "oversized";
+  let mode: "oversized" | "bad-csrf" | "valid" | "stale-pid" =
+    "oversized";
   let stopped = 0;
   const runtime = {
     version: 1, pid: process.pid,
@@ -205,6 +210,11 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
       assert.equal(request.headers["x-csrf-token"], "a".repeat(43));
       response.writeHead(202);
       response.end("{}");
+      if (mode === "stale-pid") {
+        // Simulate a dead old PID and removed discovery, but a *different*
+        // still-listening server on the same claimed origin.
+        void rm(join(root, "service-runtime.json"));
+      }
     } else {
       response.writeHead(404);
       response.end();
@@ -228,14 +238,37 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
       assert.equal(stopped, 0);
     }
     mode = "valid";
-    const accepted = await promisify(execFile)(process.execPath, [
+    // HTTP 202 from a still-running service is only an accepted request.
+    // Its runtime, owned process and journaled writers are not drained.
+    await assert.rejects(promisify(execFile)(process.execPath, [
       launcher, "--stop",
     ], {
       env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
-      timeout: 6_000, maxBuffer: 8192,
+      timeout: 8_000, maxBuffer: 8192,
+    }), (error: unknown) => {
+      assert.ok(error instanceof Error && "code" in error &&
+        error.code === 1 && "stdout" in error && error.stdout === "" &&
+        "stderr" in error && typeof error.stderr === "string" &&
+        error.stderr.includes("Service stop is unconfirmed"));
+      return true;
     });
-    assert.equal(accepted.stdout, "Service stopped.\n");
     assert.equal(stopped, 1);
+    assert.equal((await lstat(join(root, "service-runtime.json"))).isFile(),
+      true);
+    mode = "stale-pid";
+    runtime.pid = 99_999_999;
+    await writeFile(join(root, "service-runtime.json"),
+      JSON.stringify(runtime));
+    await mkdir(join(root, ".canonical-writers"));
+    await assert.rejects(promisify(execFile)(process.execPath, [
+      launcher, "--stop",
+    ], {
+      env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
+      timeout: 8_000, maxBuffer: 8192,
+    }), { code: 1 });
+    assert.equal(stopped, 2);
+    await assert.rejects(lstat(join(root, "service-runtime.json")),
+      { code: "ENOENT" });
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));

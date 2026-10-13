@@ -30,6 +30,9 @@
 //   - Unsupported hosts and invalid lifecycle inputs fail closed.
 //
 import { spawn } from "node:child_process";
+import { lstat, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { setTimeout as pause } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { userDataRoot } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
@@ -46,6 +49,62 @@ import { withCanonicalDataWriter } from
   "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import { decodeServiceSupervisorReady } from
   "../../../ir/application-updates/contract/supervision.ts";
+
+// HTTP 202 only admits a shutdown request. The explicit launcher cannot
+// present it as completed until this process has exited, its discovery and
+// service lock have vanished, and all canonical writer leases are gone.
+// This is a read-only observation, never update-installation authority.
+async function observeServiceClosure(root: string,
+  observed: { readonly pid: number; readonly origin: string }):
+  Promise<boolean> {
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    let exited = false;
+    try { process.kill(observed.pid, 0); }
+    catch (error) {
+      exited = error instanceof Error && "code" in error &&
+        error.code === "ESRCH";
+    }
+    if (exited) {
+      const missing = async (name: string): Promise<boolean> => {
+        try { await lstat(join(root, name)); return false; }
+        catch (error) { return error instanceof Error && "code" in error &&
+          error.code === "ENOENT"; }
+      };
+      const runtimeGone = await missing("service-runtime.json");
+      const lockGone = await missing(".service.lock");
+      let writersGone = false;
+      try {
+        const directory = join(root, ".canonical-writers");
+        const state = await lstat(directory);
+        writersGone = state.isDirectory() &&
+          (await readdir(directory)).length === 0;
+      } catch { /* Missing or ambiguous lease storage is not proof. */ }
+      if (runtimeGone && lockGone && writersGone) {
+        // PID reuse and a removed discovery file cannot establish that the
+        // original loopback listener is gone. Refuse every response and
+        // timeout; only an actual connection refusal completes this proof.
+        let listenerGone = false;
+        try {
+          const response = await fetch(observed.origin +
+            "/api/service-status", {
+            redirect: "error", signal: AbortSignal.timeout(350),
+          });
+          await response.body?.cancel().catch(() => undefined);
+        } catch (error) {
+          const cause = error instanceof Error && "cause" in error
+            ? error.cause : undefined;
+          listenerGone = error instanceof TypeError &&
+            cause instanceof Error && "code" in cause &&
+            cause.code === "ECONNREFUSED";
+        }
+        if (listenerGone) return true;
+      }
+    }
+    if (Date.now() >= deadline) return false;
+    await pause(75);
+  }
+}
 
 const args = process.argv.slice(2);
 const options = ["--no-open", "--stop", "--status", "--diagnostics"];
@@ -88,6 +147,9 @@ if (
           signal: AbortSignal.timeout(5000),
         });
         if (response.status !== 202) throw new Error("service-stop-failed");
+        await response.body?.cancel().catch(() => undefined);
+        if (!await observeServiceClosure(root, runtime))
+          throw new Error("service-stop-unconfirmed");
       }
       process.stdout.write("Service stopped.\n");
     } else if (args.includes("--status")) {
@@ -152,10 +214,11 @@ if (
       if (!args.includes("--no-open")) await openLocalWorkspace(runtime.origin);
     }
   } catch {
-    process.stderr.write(
-      "The service could not open. Check its local port " +
-        "and saved settings.\n",
-    );
+    process.stderr.write(args.includes("--stop")
+      ? "Service stop is unconfirmed. Preserve the service and check " +
+          "its status before replacing any app files.\n"
+      : "The service could not open. Check its local port " +
+          "and saved settings.\n");
     process.exitCode = 1;
   }
 }

@@ -320,3 +320,19 @@ was checked on that date for directory iteration/closure semantics.
 [node-filesystem]: https://github.com/nodejs/node/blob/main/doc/api/fs.md
 
 [node-parent-disconnect]: https://github.com/nodejs/node/issues/65646
+
+
+### Explicit launcher shutdown observation (2026-10-13)
+
+The local `--stop` launcher distinguishes an accepted HTTP 202 from
+completed service closure. After the explicit request, it observes the
+original PID disappear, its runtime and service-lock files vanish, and
+all canonical writer leases drain. It also refuses a still-responsive
+loopback listener, including a foreign-listener scenario.
+
+An inconclusive observation exits with an actionable failure; it never
+kills a service, removes a lease, or treats an HTTP acceptance as
+installation clearance. Synthetic responsive-server tests and a real
+temporary supervised service demonstrate refusal and completed normal
+shutdown. Installer replacement still requires independent publication
+and data locks, private IPC closure and trusted release evidence.
