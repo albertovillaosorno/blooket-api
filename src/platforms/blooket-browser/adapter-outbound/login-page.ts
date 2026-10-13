@@ -221,7 +221,8 @@ export function runBlooketLoginPageAction(
       descriptor.set.call(page.identifier, input.loginIdentifier);
       page.identifier.dispatchEvent(new Event("input", { bubbles: true }));
       page.identifier.dispatchEvent(new Event("change", { bubbles: true }));
-      if (!stillOwned() || page.identifier.value !== input.loginIdentifier) {
+      if (watch.dirty || !stillOwned() ||
+          page.identifier.value !== input.loginIdentifier) {
         watch.dirty = true;
         return failed();
       }
