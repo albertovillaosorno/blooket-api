@@ -339,6 +339,52 @@ test("read navigation respects computed modal visibility", () => {
   });
 });
 
+test("focused teacher select and inherited rich-text editors block read navigation",
+  () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  withPage(page.document, () => {
+    const active = page.document as FixtureNode & {
+      activeElement?: FixtureNode & { isContentEditable?: boolean };
+    };
+    active.activeElement = node("SELECT");
+    assert.equal(injected(), false);
+    active.activeElement = Object.assign(node("SPAN"), {
+      isContentEditable: true,
+    });
+    assert.equal(injected(), false);
+    active.activeElement = node("DIV", "", { role: "textbox" });
+    assert.equal(injected(), false);
+    active.activeElement = undefined;
+    assert.equal(injected(), true);
+  });
+});
+
+test("visible verification frames prevent abandoning a teacher tab", () => {
+  const page = fixture();
+  const challenge = node("IFRAME");
+  const selector = 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]';
+  page.document.selectors[selector] = [challenge];
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  withPage(page.document, () => {
+    assert.equal(injected(), false);
+    for (const visibility of ["hidden", "collapse"]) {
+      challenge.computedStyle.visibility = visibility;
+      assert.equal(injected(), true);
+    }
+    challenge.computedStyle = { display: "none", visibility: "visible" };
+    assert.equal(injected(), true);
+    challenge.computedStyle = { display: "block", visibility: "visible" };
+    assert.equal(injected(), false);
+    page.document.selectors[selector] = [];
+    assert.equal(injected(), true);
+  });
+});
+
 test("capability probe opens only the exact Add Question form", () => {
   const page = fixture();
   withPage(page.document, () => {

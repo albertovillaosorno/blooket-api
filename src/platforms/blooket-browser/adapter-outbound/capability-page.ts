@@ -71,6 +71,10 @@ export function canLeaveBlooketPageForRead(): boolean {
       return style.display !== "none" && style.visibility !== "hidden" &&
         style.visibility !== "collapse";
     };
+    const challenges = Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    ));
+    if (challenges.some(visible)) return false;
     const dialogs = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"]',
     ));
@@ -85,7 +89,10 @@ export function canLeaveBlooketPageForRead(): boolean {
     if (editorFields.some(visible)) return false;
     const active = document.activeElement;
     if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" ||
-        active?.getAttribute("contenteditable") === "true") return false;
+        active?.tagName === "SELECT" ||
+        (active as HTMLElement | null)?.isContentEditable === true ||
+        active?.getAttribute("contenteditable") === "true" ||
+        active?.getAttribute("role") === "textbox") return false;
     return true;
   } catch {
     return false;
