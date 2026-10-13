@@ -1083,7 +1083,8 @@ test("changing and restoring an owned capability route cannot revive clicks",
         ),
       });
       if (action === "ready")
-        assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+        assert.equal(isBlooketCapabilityQuestionPanelReady(
+          "set-fixture"), false);
       if (action === "open-audio")
         assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
       if (action === "inspect-audio")
@@ -1092,7 +1093,8 @@ test("changing and restoring an owned capability route cannot revive clicks",
       if (action === "close-audio")
         assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
       if (action === "audio-closed")
-        assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+        assert.equal(isBlooketAudioCapabilityDrawerClosed(
+          "set-fixture"), false);
       if (action === "close-question")
         assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
       Object.defineProperty(globalThis, "location", {
@@ -1114,7 +1116,7 @@ test("changing and restoring an owned capability route cannot revive clicks",
   },
 );
 
-test("a verified capability panel cannot return after disappearing or rebinding",
+test("a verified capability panel cannot return after disappearing",
   () => {
   for (const cause of ["disappeared", "wrong-id", "wrong-type"] as const) {
     const page = fixture();
@@ -1170,7 +1172,8 @@ test("Audio follow-up revokes a verified modal whose set identity changed",
       if (action === "close")
         assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
       if (action === "closed")
-        assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+        assert.equal(isBlooketAudioCapabilityDrawerClosed(
+          "set-fixture"), false);
       page.setId.value = "set-fixture";
       page.document.selectors['aside[data-drawer-open="true"]'] = [];
       assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
@@ -1313,7 +1316,8 @@ test("Cancel keeps human ownership until panel closure is proven",
       assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), true);
       assert.equal(page.cancel.clicked, 1);
       // The asynchronous provider modal is still mounted after click.
-      assert.equal(isBlooketCapabilityQuestionPanelClosed("set-fixture"), false);
+      assert.equal(isBlooketCapabilityQuestionPanelClosed(
+        "set-fixture"), false);
       if (humanChange) page.document.dispatchTrusted("pointerdown");
       page.document.selectors['input#question[name="question"]'] = [];
       assert.equal(isBlooketCapabilityQuestionPanelClosed("set-fixture"),
