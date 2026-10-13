@@ -804,5 +804,30 @@ supervisor/recovery composition, trusted production release publication or
 opt-in product controls. These remain functional requirements before closing
 this record; Mac/Safari execution remains only in the evergreen assurance task.
 
+### Independent managed service supervisor (2026-10-13)
+
+The normal launcher now starts an independent silent supervisor that retains
+the actual service child and IPC after the launcher exits. Startup readiness
+requires fresh owned health; a launcher timeout neither kills the service nor
+claims writer completion. A managed drainage notice from UI shutdown triggers
+a fresh private stop challenge, then joins the service child's final closure.
+Supervisor stop signals use the same challenge without killing service
+writers.
+
+Real launcher/subprocess tests demonstrate duplicate reuse, availability after
+launcher disconnect, completed UI and supervisor shutdown, preserved teacher
+data and released lifecycle admission. The disconnected launcher observes only
+supervisor exit, keeping private receipt plus actual service closure mandatory
+for installation proof. The [Node parent-disconnect issue][node-disconnect]
+was checked against a local Node 24.18.0 reproduction on the same date.
+
+Independent normal supervision is now composed into startup. Immutable helper
+preparation, trusted production publisher/release configuration, transactional
+installation/recovery composition and opt-in EN/ES controls remain functional
+work. These tests do not claim native Mac/Safari execution or a completed
+update.
+
+[node-disconnect]: https://github.com/nodejs/node/issues/65646
+
 [node-filesystem-current]:
   https://github.com/nodejs/node/blob/main/doc/api/fs.md

@@ -87,7 +87,12 @@ if (process.argv.includes("--development")) {
 }
 try {
   const service = await startManagedBackgroundService(root, secrets,
-    startup ? { startup } : {});
+    { ...(startup ? { startup } : {}), onStopped: (status, instance) => {
+      if (process.connected) process.send?.({
+        kind: "service-drain-complete", version: 1, pid: process.pid,
+        instance, status,
+      }, () => {});
+    } });
   process.stdout.write(service.origin + "\n");
   const runtime = {
     version: service.version,

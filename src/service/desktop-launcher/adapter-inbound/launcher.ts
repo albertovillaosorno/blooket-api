@@ -44,6 +44,8 @@ import { runFirstUseDiagnostics } from
   "../../../api/teacher-configuration/application/configuration.ts";
 import { withCanonicalDataWriter } from
   "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
+import { decodeServiceSupervisorReady } from
+  "../../../ir/application-updates/contract/supervision.ts";
 
 const args = process.argv.slice(2);
 const options = ["--no-open", "--stop", "--status", "--diagnostics"];
@@ -96,7 +98,7 @@ if (
       if (!runtime) {
         const entry = fileURLToPath(
           new URL(
-            "../../background-service/adapter-inbound/main.ts",
+            "../../background-service/adapter-inbound/supervisor.ts",
             import.meta.url,
           ),
         );
@@ -113,7 +115,10 @@ if (
             },
           });
           const timer = setTimeout(() => {
-            child.kill("SIGTERM");
+            // The supervisor retains its actual service child. A launcher
+            // deadline cannot prove that startup writers have stopped.
+            if (child.connected) child.disconnect();
+            child.unref();
             reject(new Error("service-start-timeout"));
           }, 30_000);
           child.once("error", () => {
@@ -127,12 +132,16 @@ if (
           child.once("message", (message: unknown) => {
             clearTimeout(timer);
             try {
-              const result = decodeServiceRuntime(message);
+              const ready = decodeServiceSupervisorReady(message);
+              if (!ready || ready.pid !== child.pid)
+                throw new Error("invalid-supervisor-ready");
+              const result = decodeServiceRuntime(ready.runtime);
               child.disconnect();
               child.unref();
               resolve(result);
             } catch {
-              child.kill("SIGTERM");
+              if (child.connected) child.disconnect();
+              child.unref();
               reject(new Error("service-start-failed"));
             }
           });
