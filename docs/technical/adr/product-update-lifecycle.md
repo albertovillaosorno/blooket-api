@@ -124,8 +124,7 @@ existing publication-before-data ownership order instead of gaining an outer
 data lease.
 
 This closes the direct request-writer gap, not independent installer
-composition. Installer-owned startup authority
-still need coordinated admission. The product installer must preserve those
+composition. The product installer must preserve those
 fences through replacement, restart, and recovery before it is enabled.
 
 Ordinary managed startup now acquires a canonical data lease before loading
@@ -135,16 +134,31 @@ installation marker refuses startup without creating teacher settings or
 runtime discovery. Development configuration uses the same admission before
 reading its local overrides or saving preferences.
 
-Failed shutdown retains the
-lease rather than inferring that a native descendant has stopped.
+Failed shutdown retains the lease rather than inferring that a native
+descendant has stopped.
 
 Installation composition must hold publication exclusion, drain the owned old
 service, and then acquire exclusive data admission. The lifetime lease prevents
 acquiring installation admission around a still-running ordinary service.
-Candidate/rollback startup while exclusive admission is held still needs a
+Candidate/rollback startup while exclusive admission is held requires a
 private installer-issued authority; removing the fence to start a candidate
 would reopen the race. These lifecycle guarantees do not enable installation
 or grant such authority to CLI, HTTP, MCP, environment values, or stale PIDs.
+
+The data boundary can issue a confidential startup request only from its live
+local capability for an actual connected child. The child accepts that request
+only through its existing parent IPC and authenticates the exact private
+installation owner before registering its own lifetime lease. A readiness
+notice prevents a listener race and grants neither health nor installation
+authority. A released boundary cannot issue requests, and forged ownership,
+wrong process identities, absent IPC and malformed messages refuse startup.
+
+Real silent service tests retain the update marker while starting a candidate,
+prove fresh private health, and refuse ordinary HTTP data access until the
+parent releases installation admission. The running candidate's lifecycle
+lease then excludes another installation until actual drained shutdown.
+Independent supervisor/recovery composition and production publisher trust
+remain required; this private startup capability is not a shipping updater.
 
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;

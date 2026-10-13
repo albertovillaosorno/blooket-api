@@ -44,6 +44,8 @@ import { installServiceStopResponder } from
   "../../../platforms/service-lifecycle/adapter-outbound/stop.ts";
 import { installServiceHealthResponder } from
   "../../../platforms/service-lifecycle/adapter-outbound/health.ts";
+import { receiveInstallerServiceStartup } from
+  "../../../platforms/service-lifecycle/adapter-outbound/startup.ts";
 
 import { createHostSecretStore } from
   "../../../platforms/host-secret-store/adapter-outbound/host-secret-store.ts";
@@ -54,6 +56,13 @@ import {
   "../../../platforms/development-environment/adapter-outbound/environment.ts";
 
 const root = userDataRoot();
+const installing = process.argv.includes("--installer-child");
+const startup = installing && process.argv.slice(2).length === 1
+  ? await receiveInstallerServiceStartup() : undefined;
+if (installing && !startup) {
+  process.stderr.write("Installer startup authorization is unavailable.\n");
+  process.exit(1);
+}
 let secrets = createHostSecretStore();
 if (process.argv.includes("--development")) {
   try {
@@ -77,7 +86,8 @@ if (process.argv.includes("--development")) {
   }
 }
 try {
-  const service = await startManagedBackgroundService(root, secrets);
+  const service = await startManagedBackgroundService(root, secrets,
+    startup ? { startup } : {});
   process.stdout.write(service.origin + "\n");
   const runtime = {
     version: service.version,

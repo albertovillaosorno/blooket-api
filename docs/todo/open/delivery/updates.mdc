@@ -661,9 +661,11 @@ installation admission is held. Ordinary managed startup and shutdown now
 retain a lifecycle data lease across online operations and discovery writes.
 
 The installer must drain the owned old service before acquiring exclusive data
-admission. Independent installer lifetime, publisher trust, and private
-installer-owned candidate startup still need
-their composition; these tests do not enable automatic installation.
+admission. Private installer-owned startup can now authenticate the actual
+parent's held marker and register a candidate's lifetime lease without opening
+ordinary writer admission. Independent installer lifetime, publisher trust,
+and product restart/recovery still need composition; these tests do not enable
+automatic installation.
 
 Production publisher keys/manifest publication, product staging integration,
 independent installer composition with all writer fences and actual runtime
@@ -718,7 +720,7 @@ versions/PIDs, overlapping probes, cancelled probes and unresponsive channels.
 The runtime also reports not-ready immediately while shutdown drains a held
 settings writer. These portable checks do not prove a completed update.
 
-The independent installer supervisor, complete persistent-writer fencing,
+The independent installer supervisor, complete persistent-writer composition,
 trusted production signing/release artifacts, restart/rollback composition
 and EN/ES installation controls still require implementation and acceptance.
 Native Mac/Safari assurance remains in the final ongoing record.
@@ -771,10 +773,31 @@ The [Node filesystem documentation][node-filesystem-current] was checked on
 the same date for bounded directory iteration and iterator-owned closure.
 
 This fences canonical user-data commands, not every persistent writer.
-Composition still must fence direct UI/settings/startup writers, hold the
+Composition still must join the direct UI/settings/lifecycle leases, hold the
 publication boundary first, supervise the installer independently, authenticate
 production artifacts, and implement opt-in install/recovery controls before
 enabling replacement. Native platform-only assurance remains in blooket-15.
+
+### Private installer-child startup (2026-10-13)
+
+The actual service entrypoint can accept a bounded private IPC startup request
+from its installer parent. Issuance requires the live held data boundary and
+the actual connected child; child admission verifies its own PID, actual parent
+PID and confidential ownership against the private installation marker.
+Neither a decoded message, argument, environment value nor stale PID alone
+grants this exception. A readiness notice only ensures the IPC listener exists.
+
+Real silent subprocess tests prove startup and fresh private health while
+ordinary data operations remain refused, preserved teacher data after drained
+shutdown, and exclusion of another installation while the candidate runs.
+Foreign owners/tokens/children, extra fields, absent IPC and released/fabricated
+boundary capabilities cannot obtain startup authority. Bounded deadline and
+malformed-message tests remove observation listeners without killing a service.
+
+This completes the private candidate-startup primitive, not independent
+supervisor/recovery composition, trusted production release publication or
+opt-in product controls. These remain functional requirements before closing
+this record; Mac/Safari execution remains only in the evergreen assurance task.
 
 [node-filesystem-current]:
   https://github.com/nodejs/node/blob/main/doc/api/fs.md
