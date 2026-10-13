@@ -62,3 +62,16 @@ test("image requests reject invented metadata fields", () => {
 
   assert.equal(result.ok, false);
 });
+
+
+test("image request fields refuse accessors without invoking them", () => {
+  let calls = 0;
+  for (const field of ["mediaId", "description"] as const) {
+    const request = Object.defineProperty({
+      description: "A synthetic image", mediaId: null,
+    }, field, { enumerable: true,
+      get() { calls++; throw Error("untrusted image getter"); } });
+    assert.equal(decodeImageRequest(request).ok, false);
+  }
+  assert.equal(calls, 0);
+});

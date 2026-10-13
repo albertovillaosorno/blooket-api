@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, canonical draft, question, answer and image-request
+readers began taking only directly owned data fields. Question and
+answer collections also require dense enumerable array slots, avoiding
+untrusted iterator or index accessors during write-plan admission.
+The shared object primitives now fail closed for revoked proxies and
+throwing descriptor inspections. Synthetic contract regressions test
+these cases without any provider account interaction.
+
 On 2026-10-13, recovery media identity manifests began requiring
 exact own enumerable data fields and dense manifest array slots.
 Accessor-backed metadata, hidden/symbol keys, custom iterators and

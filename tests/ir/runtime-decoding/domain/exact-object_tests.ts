@@ -179,3 +179,21 @@ test("exact own data copies values without invoking accessors", () => {
   revokedArray.revoke();
   assert.equal(isExactDenseArray(revokedArray.proxy), false);
 });
+
+
+test("revoked records and throwing descriptors fail without an exception",
+  () => {
+  const revoked = Proxy.revocable({ name: "safe" }, {});
+  revoked.revoke();
+  assert.equal(isRecord(revoked.proxy), false);
+  const unstable = new Proxy({ name: "safe" }, {
+    ownKeys() { throw Error("untrusted ownKeys trap"); },
+    getOwnPropertyDescriptor() { throw Error("untrusted field trap"); },
+  });
+  assert.equal(ownDataField(unstable, "name"), undefined);
+  assert.deepEqual(unknownFieldIssues(unstable, new Set(["name"]), "$"), [
+    { path: "$", code: "unknown-field",
+      message: "Object descriptors could not be inspected." },
+  ]);
+  },
+);

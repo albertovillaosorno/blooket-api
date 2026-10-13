@@ -35,7 +35,9 @@ import {
   type ValidationIssue,
 } from "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
+  isExactDenseArray,
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
@@ -83,22 +85,26 @@ export function decodeProjectDocument(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, PROJECT_KEYS, "$"),
   ];
-  const title = requiredString(value["title"], "$.title", issues);
+  const title = requiredString(
+    ownDataField(value, "title"), "$.title", issues,
+  );
   const description = requiredStringValue(
-    value["description"],
+    ownDataField(value, "description"),
     "$.description",
     issues,
   );
   const quizLanguage = requiredString(
-    value["quizLanguage"],
+    ownDataField(value, "quizLanguage"),
     "$.quizLanguage",
     issues,
   );
-  const visibility = value["visibility"];
-  const coverImage = decodeCoverImage(value["coverImage"], issues);
-  const questions = decodeQuestions(value["questions"], issues);
+  const visibility = ownDataField(value, "visibility");
+  const coverImage = decodeCoverImage(
+    ownDataField(value, "coverImage"), issues,
+  );
+  const questions = decodeQuestions(ownDataField(value, "questions"), issues);
 
-  if (value["schemaVersion"] !== PROJECT_SCHEMA_VERSION) {
+  if (ownDataField(value, "schemaVersion") !== PROJECT_SCHEMA_VERSION) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
@@ -114,7 +120,7 @@ export function decodeProjectDocument(
     });
   }
 
-  if (value["mediaIndex"] !== PROJECT_MEDIA_INDEX) {
+  if (ownDataField(value, "mediaIndex") !== PROJECT_MEDIA_INDEX) {
     issues.push({
       path: "$.mediaIndex",
       code: "invalid-media-index",
@@ -199,7 +205,7 @@ function decodeQuestions(
   value: unknown,
   issues: ValidationIssue[],
 ): readonly QuestionDocument[] | undefined {
-  if (!Array.isArray(value)) {
+  if (!isExactDenseArray(value)) {
     issues.push({
       path: "$.questions",
       code: "expected-array",
@@ -209,8 +215,11 @@ function decodeQuestions(
   }
 
   const questions: QuestionDocument[] = [];
-  for (const [index, candidate] of value.entries()) {
-    const decoded = decodeQuestionDocument(candidate, `$.questions[${index}]`);
+  for (let index = 0; index < value.length; index++) {
+    const candidate = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!candidate || !Object.hasOwn(candidate, "value")) return undefined;
+    const decoded = decodeQuestionDocument(
+      candidate.value, `$.questions[${index}]`);
     if (!decoded.ok) {
       issues.push(...decoded.issues);
       continue;

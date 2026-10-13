@@ -145,3 +145,23 @@ test("typing answers reject unknown matching modes", () => {
 
   assert.equal(result.ok, false);
 });
+
+
+test("question fields and answer slots never execute getters", () => {
+  let calls = 0;
+  const getter = () => { calls++; throw Error("untrusted accessor"); };
+  const unsafePrompt = Object.defineProperty({ ...typingAnswer }, "prompt", {
+    enumerable: true, get: getter,
+  });
+  assert.equal(decodeQuestionDocument(unsafePrompt).ok, false);
+  const unsafeAnswer = Object.defineProperty({ ...multipleChoice.answers[0] },
+    "text", { enumerable: true, get: getter });
+  assert.equal(decodeQuestionDocument({ ...multipleChoice,
+    answers: [unsafeAnswer, multipleChoice.answers[1]] }).ok, false);
+  const answers = Object.defineProperty([...multipleChoice.answers], "0", {
+    enumerable: true, get: getter,
+  });
+  assert.equal(decodeQuestionDocument({ ...multipleChoice, answers }).ok,
+    false);
+  assert.equal(calls, 0);
+});
