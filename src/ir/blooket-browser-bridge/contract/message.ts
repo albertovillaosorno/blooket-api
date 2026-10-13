@@ -37,6 +37,7 @@ import type {
 import {
   isExactDenseArray,
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
@@ -149,27 +150,27 @@ export function decodeBlooketBrowserBridgeRequest(
       "$",
     ),
   ];
-  if (value["schemaVersion"] !== BLOOKET_BROWSER_BRIDGE_VERSION)
+  if (ownDataField(value, "schemaVersion") !== BLOOKET_BROWSER_BRIDGE_VERSION)
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
       message: "Expected browser bridge version 1.",
     });
-  const id = requiredString(value["id"], "$.id", issues);
+  const id = requiredString(ownDataField(value, "id"), "$.id", issues);
   if (id && !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(id))
     issues.push({
       path: "$.id",
       code: "invalid-job-id",
       message: "Expected an opaque browser job UUID.",
     });
-  const candidate = value["command"];
+  const candidate = ownDataField(value, "command");
   if (!isRecord(candidate))
     return failure(
       "$.command",
       "expected-object",
       "Expected a browser command.",
     );
-  const kind = candidate["kind"];
+  const kind = ownDataField(candidate, "kind");
   let command: BlooketBrowserBridgeCommand | undefined;
   let keys = ["kind"];
   if (
@@ -181,7 +182,9 @@ export function decodeBlooketBrowserBridgeRequest(
     command = { kind };
   else if (kind === "sets.get" || kind === "questions.list") {
     keys = ["kind", "setId"];
-    const setId = requiredString(candidate["setId"], "$.command.setId", issues);
+    const setId = requiredString(
+      ownDataField(candidate, "setId"), "$.command.setId", issues,
+    );
     if (setId && setId.length <= 512 && !/[\x00-\x1f\x7f]/u.test(setId))
       command = { kind, setId };
     else
@@ -192,9 +195,11 @@ export function decodeBlooketBrowserBridgeRequest(
       });
   } else if (kind === "sets.create") {
     keys = ["kind", "title", "description", "private"];
-    const title = requiredString(candidate["title"], "$.command.title", issues);
-    const description = candidate["description"];
-    const privateValue = candidate["private"];
+    const title = requiredString(
+      ownDataField(candidate, "title"), "$.command.title", issues,
+    );
+    const description = ownDataField(candidate, "description");
+    const privateValue = ownDataField(candidate, "private");
     if (
       title &&
       title.length <= 1_000 &&
@@ -230,34 +235,39 @@ export function decodeBlooketBrowserBridgeRequest(
       "timeLimit",
       "image",
     ];
-    const setId = requiredString(candidate["setId"], "$.command.setId", issues);
+    const setId = requiredString(
+      ownDataField(candidate, "setId"), "$.command.setId", issues,
+    );
     const question = requiredString(
-      candidate["question"],
+      ownDataField(candidate, "question"),
       "$.command.question",
       issues,
     );
-    const number = candidate["number"];
-    const answersCandidate = candidate["answers"];
-    const qType = candidate["qType"];
-    const random = candidate["random"];
-    const answerTypesCandidate = candidate["answerTypes"];
-    const timeLimit = candidate["timeLimit"];
+    const number = ownDataField(candidate, "number");
+    const answersCandidate = ownDataField(candidate, "answers");
+    const qType = ownDataField(candidate, "qType");
+    const random = ownDataField(candidate, "random");
+    const answerTypesCandidate = ownDataField(candidate, "answerTypes");
+    const timeLimit = ownDataField(candidate, "timeLimit");
     const image = Object.hasOwn(candidate, "image")
-      ? decodeBlooketPreparedImage(candidate["image"], "$.command.image")
+      ? decodeBlooketPreparedImage(
+          ownDataField(candidate, "image"), "$.command.image",
+        )
       : undefined;
     if (image && !image.ok) issues.push(...image.issues);
     const answers: { text: string; correct: boolean }[] = [];
     const seen = new Set<string>();
     if (isExactDenseArray(answersCandidate) &&
         answersCandidate.length <= 100) {
-      answersCandidate.forEach((answer, index) => {
+      for (let index = 0; index < answersCandidate.length; index++) {
+        const answer = answersCandidate[index];
         if (!isRecord(answer)) {
           issues.push({
             path: "$.command.answers[" + index + "]",
             code: "invalid-question-answer",
             message: "Expected one text answer object.",
           });
-          return;
+          continue;
         }
         issues.push(
           ...unknownFieldIssues(
@@ -267,19 +277,20 @@ export function decodeBlooketBrowserBridgeRequest(
           ),
         );
         const text = requiredString(
-          answer["text"],
+          ownDataField(answer, "text"),
           "$.command.answers[" + index + "].text",
           issues,
         );
+        const correct = ownDataField(answer, "correct");
         if (
           text &&
           text.length <= 10_000 &&
           !text.includes("\0") &&
           !seen.has(text) &&
-          typeof answer["correct"] === "boolean"
+          typeof correct === "boolean"
         ) {
           seen.add(text);
-          answers.push({ text, correct: answer["correct"] });
+          answers.push({ text, correct });
         } else {
           issues.push({
             path: "$.command.answers[" + index + "]",
@@ -287,7 +298,7 @@ export function decodeBlooketBrowserBridgeRequest(
             message: "Expected one unique bounded text answer.",
           });
         }
-      });
+      }
     } else {
       issues.push({
         path: "$.command.answers",
@@ -295,15 +306,19 @@ export function decodeBlooketBrowserBridgeRequest(
         message: "Expected a bounded text answer list.",
       });
     }
-    const answerTypes =
-      answerTypesCandidate === null
-        ? null
-        : isExactDenseArray(answerTypesCandidate) &&
-            answerTypesCandidate.every(
-              (value) => value === "exactly" || value === "contains",
-            )
-          ? answerTypesCandidate as ("exactly" | "contains")[]
-          : undefined;
+    const validModes = (): boolean => {
+      if (!Array.isArray(answerTypesCandidate) ||
+          answerTypesCandidate.length > 100 ||
+          !isExactDenseArray(answerTypesCandidate)) return false;
+      for (let index = 0; index < answerTypesCandidate.length; index++) {
+        const match = answerTypesCandidate[index];
+        if (match !== "exactly" && match !== "contains") return false;
+      }
+      return true;
+    };
+    const answerTypes = answerTypesCandidate === null ? null
+      : validModes() ? answerTypesCandidate as ("exactly" | "contains")[]
+        : undefined;
     const correctCount = answers.filter((answer) => answer.correct).length;
     const typingValid =
       qType === "typing" &&
@@ -357,12 +372,12 @@ export function decodeBlooketBrowserBridgeRequest(
   } else if (kind === "session.authenticate") {
     keys = ["kind", "loginIdentifier", "password"];
     const loginIdentifier = requiredString(
-      candidate["loginIdentifier"],
+      ownDataField(candidate, "loginIdentifier"),
       "$.command.loginIdentifier",
       issues,
     );
     const password = requiredString(
-      candidate["password"],
+      ownDataField(candidate, "password"),
       "$.command.password",
       issues,
     );
@@ -406,18 +421,18 @@ export function decodeBlooketBrowserBridgeResponse(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(
       value,
-      value["ok"] === true ? SUCCESS_KEYS : FAILURE_KEYS,
+      ownDataField(value, "ok") === true ? SUCCESS_KEYS : FAILURE_KEYS,
       "$",
     ),
   ];
-  if (value["schemaVersion"] !== BLOOKET_BROWSER_BRIDGE_VERSION) {
+  if (ownDataField(value, "schemaVersion") !== BLOOKET_BROWSER_BRIDGE_VERSION) {
     issues.push({
       path: "$.schemaVersion",
       code: "unsupported-version",
       message: "Expected Blooket browser bridge version 1.",
     });
   }
-  const id = requiredString(value["id"], "$.id", issues);
+  const id = requiredString(ownDataField(value, "id"), "$.id", issues);
   if (id !== undefined && id !== expectedId) {
     issues.push({
       path: "$.id",
@@ -426,7 +441,7 @@ export function decodeBlooketBrowserBridgeResponse(
     });
   }
 
-  if (value["ok"] === true) {
+  if (ownDataField(value, "ok") === true) {
     if (!Object.prototype.hasOwnProperty.call(value, "value")) {
       issues.push({
         path: "$.value",
@@ -443,19 +458,19 @@ export function decodeBlooketBrowserBridgeResponse(
         schemaVersion: BLOOKET_BROWSER_BRIDGE_VERSION,
         id,
         ok: true,
-        value: value["value"],
+        value: ownDataField(value, "value"),
       },
     };
   }
 
-  if (value["ok"] !== false) {
+  if (ownDataField(value, "ok") !== false) {
     issues.push({
       path: "$.ok",
       code: "expected-boolean",
       message: "Expected true or false.",
     });
   }
-  const code = value["code"];
+  const code = ownDataField(value, "code");
   if (
     code !== "blooket-browser-unavailable" &&
     code !== "blooket-browser-failed"

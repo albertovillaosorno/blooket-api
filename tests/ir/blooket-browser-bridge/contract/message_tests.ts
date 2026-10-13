@@ -232,6 +232,53 @@ test("Add Question command rejects sparse or decorated answer arrays", () => {
   assert.equal(invoked, 0);
 });
 
+test("bridge decoder never invokes getters on command or reply fields",
+  () => {
+  let getterCalls = 0;
+  const getter = () => { getterCalls++; throw new Error("untrusted"); };
+  for (const make of [
+    () => Object.defineProperty(request({ kind: "sets.list" }),
+      "schemaVersion", { enumerable: true, get: getter }),
+    () => request(Object.defineProperty({ kind: "sets.list" },
+      "kind", { enumerable: true, get: getter })),
+    () => request({ kind: "questions.create", setId: "set-fixture",
+      number: 1, question: "Type sun.",
+      answers: [Object.defineProperty({ text: "sun", correct: true },
+        "text", { enumerable: true, get: getter })],
+      qType: "typing", random: true, answerTypes: ["exactly"],
+      timeLimit: 15 }),
+  ]) assert.equal(decodeBlooketBrowserBridgeRequest(make()).ok, false);
+  for (const field of ["ok", "id", "value"]) {
+    const reply = Object.defineProperty({ schemaVersion: 1,
+      id: "request-a", ok: true, value: null }, field,
+    { enumerable: true, get: getter });
+    assert.equal(decodeBlooketBrowserBridgeResponse(reply,
+      "request-a").ok, false);
+  }
+  assert.equal(getterCalls, 0);
+  },
+);
+
+test("Add Question bridge never invokes inherited array methods", () => {
+  let intercepted = 0;
+  class HostileAnswers extends Array<{ text: string; correct: boolean }> {
+    override forEach(): void { intercepted++; throw new Error("untrusted"); }
+  }
+  class HostileModes extends Array<string> {
+    override every(): boolean { intercepted++; throw new Error("untrusted"); }
+  }
+  const answers = new HostileAnswers();
+  answers.push({ text: "sun", correct: true });
+  const answerTypes = new HostileModes();
+  answerTypes.push("exactly");
+  assert.equal(decodeBlooketBrowserBridgeRequest(request({
+    kind: "questions.create", setId: "set-fixture", number: 1,
+    question: "Type sun.", answers, qType: "typing", random: true,
+    answerTypes, timeLimit: 15,
+  })).ok, true);
+  assert.equal(intercepted, 0);
+});
+
 test("invalid authentication requests never echo secret values", () => {
   const password = "synthetic-secret-that-must-not-be-returned";
   const result = decodeBlooketBrowserBridgeRequest(

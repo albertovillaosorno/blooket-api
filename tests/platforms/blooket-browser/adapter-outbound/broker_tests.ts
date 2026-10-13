@@ -119,6 +119,32 @@ test("another identified worker cannot settle an owned lease", async () => {
   }
 });
 
+test("broker correlation never invokes an extension reply ID getter",
+  async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const pending = broker.request({ kind: "sets.list" });
+    const job = broker.next(TOKEN);
+    assert.ok(job);
+    let invoked = 0;
+    const reply = Object.defineProperty({ schemaVersion: 1, ok: true,
+      value: { completeness: "complete", items: [] } }, "id", {
+      enumerable: true,
+      get: () => { invoked++; throw new Error("untrusted"); },
+    });
+    assert.equal(broker.complete(TOKEN, reply), false);
+    assert.equal(invoked, 0);
+    assert.equal(broker.status().pending, 1);
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: 1, id: job.id, ok: true,
+      value: { completeness: "complete", items: [] },
+    }), true);
+    assert.deepEqual(await pending, { ok: true,
+      value: { completeness: "complete", items: [] } });
+  } finally { broker.close(); }
+  },
+);
+
 test("pairing reset revokes old access and settles pending jobs", async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
   const pending = broker.request({ kind: "sets.list" });
