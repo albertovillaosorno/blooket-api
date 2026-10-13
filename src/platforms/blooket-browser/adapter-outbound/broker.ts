@@ -275,15 +275,13 @@ export function createBlooketBrowserBridgeBroker(
 
     complete: (candidate, value, client) => {
       if (closed || !authenticated(candidate)) return false;
-      if (
-        typeof value !== "object" ||
-        value === null ||
-        !("id" in value) ||
-        typeof value.id !== "string"
-      ) {
-        return false;
-      }
-      const job = pending.get(value.id);
+      if (typeof value !== "object" || value === null) return false;
+      // An untrusted extension reply may contain an ID accessor. Never
+      // execute it merely to select a pending browser mutation attempt.
+      const id = Object.getOwnPropertyDescriptor(value, "id");
+      if (!id || !id.enumerable || !("value" in id) ||
+          typeof id.value !== "string") return false;
+      const job = pending.get(id.value);
       if (!job || !job.dispatched) return false;
       if (job.client !== undefined && job.client !== client) return false;
       if (now() >= job.expiresAt) {
