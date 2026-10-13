@@ -137,6 +137,50 @@ test("another identified worker cannot settle an owned lease", async () => {
   }
 });
 
+test("broker normalizes caller arrays before serializing a question job",
+  async () => {
+  let inheritedCalls = 0;
+  class HostileModes extends Array<"exactly" | "contains"> {
+    toJSON(): never { inheritedCalls++; throw new Error("untrusted"); }
+  }
+  class HostileAnswers extends Array<{
+    readonly text: string; readonly correct: boolean;
+  }> {
+    toJSON(): never { inheritedCalls++; throw new Error("untrusted"); }
+  }
+  const modes = new HostileModes();
+  modes.push("exactly");
+  const answers = new HostileAnswers();
+  answers.push({ text: "sun", correct: true });
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const pending = broker.request({
+      kind: "questions.create", setId: "set-fixture", number: 1,
+      question: "Type sun.", answers, qType: "typing", random: true,
+      answerTypes: modes, timeLimit: 15,
+    });
+    const job = broker.next(TOKEN);
+    assert.ok(job);
+    assert.equal(job.command.kind, "questions.create");
+    if (job.command.kind === "questions.create") {
+      assert.deepEqual(job.command.answers, [{ text: "sun", correct: true }]);
+      assert.deepEqual(job.command.answerTypes, ["exactly"]);
+      assert.notEqual(job.command.answers, answers);
+      assert.notEqual(job.command.answerTypes, modes);
+    }
+    assert.equal(inheritedCalls, 0);
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: 1, id: job.id, ok: false,
+      code: "blooket-browser-failed",
+    }), true);
+    assert.deepEqual(await pending, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(inheritedCalls, 0);
+  } finally { broker.close(); }
+  },
+);
+
 test("broker correlation never invokes an extension reply ID getter",
   async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
