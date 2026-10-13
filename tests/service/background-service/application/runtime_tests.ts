@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -132,6 +132,9 @@ test("cleanup closes the service even when online shutdown fails", async () => {
     online,
   });
   await assert.rejects(service.stop(), /synthetic-online-stop-failure/u);
+  assert.deepEqual(await acquireCanonicalDataUpdateBoundary(root), {
+    ok: false, reason: "writer-active",
+  });
   assert.equal(service.server.listening, false);
   assert.equal(await existingService(root), undefined);
   await assert.rejects(readFile(join(root, "service-runtime.json")));
@@ -139,6 +142,67 @@ test("cleanup closes the service even when online shutdown fails", async () => {
   await restarted.stop();
   await rm(root, { recursive: true, force: true });
 });
+
+test("installation admission refuses startup before teacher data writes",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "managed-installation-start-"));
+    const installation = await acquireCanonicalDataUpdateBoundary(root);
+    assert.equal(installation.ok, true);
+    if (!installation.ok) return;
+    try {
+      const before = (await readdir(root)).sort();
+      await assert.rejects(startManagedBackgroundService(root,
+        createHostSecretStore()), /service-update-busy/u);
+      assert.deepEqual((await readdir(root)).sort(), before);
+      await assert.rejects(readFile(join(root, "service-runtime.json")));
+      await assert.rejects(readFile(join(root, "settings.json")));
+    } finally {
+      await installation.release();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+test("managed online startup and discovery retain a lifecycle writer lease",
+  { timeout: 10_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "managed-startup-writer-"));
+    const settings = await loadPreferences(root);
+    await savePreferences(root, { ...settings,
+      service: { ...settings.service, portMode: "automatic", port: 1 } });
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const online = {
+      status: () => ({ state: "synthetic" }), pending: () => [],
+      connections: () => [], approve: async () => undefined,
+      reject: () => undefined, revoke: () => undefined,
+      reload: async () => { entered.resolve(); await release.promise; },
+      stop: async () => undefined,
+    };
+    const starting = startManagedBackgroundService(root,
+      createHostSecretStore(), { online });
+    let service: Awaited<typeof starting> | undefined;
+    try {
+      await entered.promise;
+      assert.deepEqual(await acquireCanonicalDataUpdateBoundary(root), {
+        ok: false, reason: "writer-active",
+      });
+      await assert.rejects(readFile(join(root, "service-runtime.json")));
+      release.resolve();
+      service = await starting;
+      assert.deepEqual(await acquireCanonicalDataUpdateBoundary(root), {
+        ok: false, reason: "writer-active",
+      });
+      assert.equal((await existingService(root))?.instance, service.instance);
+      await service.stop();
+      const installation = await acquireCanonicalDataUpdateBoundary(root);
+      assert.equal(installation.ok, true);
+      if (installation.ok) await installation.release();
+    } finally {
+      release.resolve();
+      service ??= await starting;
+      await service.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 
 
 test("shutdown retains ownership until an admitted settings writer finishes",
