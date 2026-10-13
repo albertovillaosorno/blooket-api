@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, canonical saved-set and question-read decoders
+began taking bounded copies of directly owned, enumerable array slots
+before inspecting collection elements. Question answer, correctness,
+and match-mode arrays share this admission. Revoked proxies fail closed;
+index and length getter traps never run after slot validation.
+Portable IR regressions confirm normal provider-shaped arrays still
+decode without live account reads or mutations.
+
 On 2026-10-13, canonical draft, question, answer and image-request
 readers began taking only directly owned data fields. Question and
 answer collections also require dense enumerable array slots, avoiding

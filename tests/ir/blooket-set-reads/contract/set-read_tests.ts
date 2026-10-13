@@ -344,3 +344,27 @@ test("saved-set list decoder cannot use forged array iteration methods",
     assert.equal(calls, 0);
   },
 );
+
+
+test("set read lists own descriptors without executing array index traps",
+  () => {
+  const row = { schemaVersion: 1, id: "remote-fixture", title: "Synthetic" };
+  let indexedReads = 0;
+  const list = new Proxy([row], {
+    get(target, key, receiver) {
+      if (key === "length" || key === "0") {
+        indexedReads++;
+        throw new Error("Unexpected provider-array getter");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  assert.deepEqual(decodeBlooketSetList(list), {
+    ok: true, value: [row],
+  });
+  assert.equal(indexedReads, 0);
+  const revoked = Proxy.revocable([row], {});
+  revoked.revoke();
+  assert.equal(decodeBlooketSetList(revoked.proxy).ok, false);
+  },
+);

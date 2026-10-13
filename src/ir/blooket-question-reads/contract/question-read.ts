@@ -34,7 +34,7 @@ import {
   type ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
-  isExactDenseArray,
+  snapshotExactDenseArray,
   isRecord,
   ownDataField,
   requiredString,
@@ -294,20 +294,16 @@ export function decodeBlooketQuestionImageEvidence(
 export function decodeBlooketQuestionReadList(
   value: unknown,
 ): DecodeResult<readonly BlooketQuestionRead[]> {
-  if (!Array.isArray(value)) {
-    return failure("$", "expected-array", "Expected a question array.");
-  }
-  // Local adapter safety cap, not a provider question-count limit.
-  if (value.length > 200) {
-    return failure("$", "too-many-questions", "Expected at most 200 reads.");
-  }
-  if (!isExactDenseArray(value)) return failure("$", "unknown-field",
-    "Expected dense question slots without extra array properties.");
-  const questions: BlooketQuestionRead[] = [];
   const issues: ValidationIssue[] = [];
+  const captured = snapshotReadArray(value, "$", issues, 200,
+    "expected-array", "Expected a question array.",
+    "too-many-questions", "Expected at most 200 reads.",
+    "Expected dense question slots without extra array properties.");
+  if (!captured) return { ok: false, issues };
+  const questions: BlooketQuestionRead[] = [];
   const numbers = new Set<number>();
-  for (let index = 0; index < value.length; index++) {
-    const candidate = value[index];
+  for (let index = 0; index < captured.length; index++) {
+    const candidate = captured[index];
     const path = "$[" + String(index) + "]";
     const decoded = decodeBlooketQuestionRead(candidate, path);
     if (!decoded.ok) {
@@ -557,30 +553,14 @@ function decodeAnswers(
   qType: unknown,
   issues: ValidationIssue[],
 ): readonly BlooketAnswerRead[] | undefined {
-  if (!Array.isArray(value)) {
-    issues.push({
-      path,
-      code: "expected-array",
-      message: "Expected a normalized answer array.",
-    });
-    return undefined;
-  }
-  if (value.length > 100) {
-    issues.push({
-      path,
-      code: "too-many-answers",
-      message: "Expected at most 100 answers.",
-    });
-    return undefined;
-  }
-  if (!isExactDenseArray(value)) {
-    issues.push({ path, code: "unknown-field",
-      message: "Expected dense answers without extra array properties." });
-    return undefined;
-  }
+  const captured = snapshotReadArray(value, path, issues, 100,
+    "expected-array", "Expected a normalized answer array.",
+    "too-many-answers", "Expected at most 100 answers.",
+    "Expected dense answers without extra array properties.");
+  if (!captured) return undefined;
   const answers: BlooketAnswerRead[] = [];
-  for (let index = 0; index < value.length; index++) {
-    const candidate = value[index];
+  for (let index = 0; index < captured.length; index++) {
+    const candidate = captured[index];
     const decoded = decodeAnswer(
       candidate,
       path + "[" + String(index) + "]",
@@ -728,30 +708,14 @@ function stringArray(
   path: string,
   issues: ValidationIssue[],
 ): readonly string[] | undefined {
-  if (!Array.isArray(value)) {
-    issues.push({
-      path,
-      code: "expected-array",
-      message: "Expected a string array.",
-    });
-    return undefined;
-  }
-  if (value.length > 100) {
-    issues.push({
-      path,
-      code: "too-many-answers",
-      message: "Expected at most 100 answer values.",
-    });
-    return undefined;
-  }
-  if (!isExactDenseArray(value)) {
-    issues.push({ path, code: "unknown-field",
-      message: "Expected dense text answers without extra fields." });
-    return undefined;
-  }
+  const captured = snapshotReadArray(value, path, issues, 100,
+    "expected-array", "Expected a string array.",
+    "too-many-answers", "Expected at most 100 answer values.",
+    "Expected dense text answers without extra fields.");
+  if (!captured) return undefined;
   const result: string[] = [];
-  for (let index = 0; index < value.length; index++) {
-    const candidate = value[index];
+  for (let index = 0; index < captured.length; index++) {
+    const candidate = captured[index];
     const item = requiredString(
       candidate,
       path + "[" + String(index) + "]",
@@ -774,30 +738,14 @@ function decodeLegacyAnswerTypes(
   issues: ValidationIssue[],
 ): readonly BlooketAnswerMatch[] | null | undefined {
   if (value === null) return null;
-  if (!Array.isArray(value)) {
-    issues.push({
-      path,
-      code: "expected-answer-types",
-      message: "Expected null or an answer-type array.",
-    });
-    return undefined;
-  }
-  if (value.length > 100) {
-    issues.push({
-      path,
-      code: "too-many-answers",
-      message: "Expected at most 100 answer match modes.",
-    });
-    return undefined;
-  }
-  if (!isExactDenseArray(value)) {
-    issues.push({ path, code: "unknown-field",
-      message: "Expected dense answer types without extra fields." });
-    return undefined;
-  }
+  const captured = snapshotReadArray(value, path, issues, 100,
+    "expected-answer-types", "Expected null or an answer-type array.",
+    "too-many-answers", "Expected at most 100 answer match modes.",
+    "Expected dense answer types without extra fields.");
+  if (!captured) return undefined;
   const result: BlooketAnswerMatch[] = [];
-  for (let index = 0; index < value.length; index++) {
-    const candidate = value[index];
+  for (let index = 0; index < captured.length; index++) {
+    const candidate = captured[index];
     if (candidate !== "exactly" && candidate !== "contains") {
       issues.push({
         path: path + "[" + String(index) + "]",
@@ -809,6 +757,29 @@ function decodeLegacyAnswerTypes(
     result.push(candidate);
   }
   return result;
+}
+
+function snapshotReadArray(
+  value: unknown, path: string, issues: ValidationIssue[], max: number,
+  expectedCode: string, expectedMessage: string,
+  tooManyCode: string, tooManyMessage: string, invalidMessage: string,
+): readonly unknown[] | undefined {
+  const captured = snapshotExactDenseArray(value, max);
+  if (captured) return captured;
+  let code = "unknown-field";
+  let message = invalidMessage;
+  try {
+    if (!Array.isArray(value)) {
+      code = expectedCode;
+      message = expectedMessage;
+    } else if ((Object.getOwnPropertyDescriptor(value, "length")
+        ?.value as number | undefined ?? 0) > max) {
+      code = tooManyCode;
+      message = tooManyMessage;
+    }
+  } catch { /* Revoked or nonconforming proxy: retain a stable failure. */ }
+  issues.push({ path, code, message });
+  return undefined;
 }
 
 function failure<T>(

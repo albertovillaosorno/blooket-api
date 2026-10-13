@@ -676,3 +676,36 @@ test("saved questions and answer arrays ignore forged iteration methods",
     assert.equal(calls, 0);
   },
 );
+
+
+test("question reads snapshot owned array slots before inspecting values",
+  () => {
+  let indexedReads = 0;
+  const avoidIndexReads = <T>(items: T[]) => new Proxy(items, {
+    get(target, key, receiver) {
+      if (key === "length" || (typeof key === "string" &&
+          /^[0-9]+$/u.test(key))) {
+        indexedReads++;
+        throw new Error("Unexpected question-array getter");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const list = avoidIndexReads([{ ...question }]);
+  assert.equal(decodeBlooketQuestionReadList(list).ok, true);
+  const normalized = decodeBlooketQuestionRead(question);
+  assert.equal(normalized.ok, true);
+  if (!normalized.ok) return;
+  assert.equal(decodeBlooketQuestionRead({ ...normalized.value,
+    answers: avoidIndexReads([...normalized.value.answers]) }).ok, true);
+  assert.equal(decodeBlooketQuestionRead({ ...question,
+    answers: avoidIndexReads([...question.answers]),
+    correctAnswers: avoidIndexReads([...question.correctAnswers]),
+    answerTypes: avoidIndexReads([...question.answerTypes]),
+  }).ok, true);
+  assert.equal(indexedReads, 0);
+  const revoked = Proxy.revocable([{ ...question }], {});
+  revoked.revoke();
+  assert.equal(decodeBlooketQuestionReadList(revoked.proxy).ok, false);
+  },
+);

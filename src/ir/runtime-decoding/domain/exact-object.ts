@@ -57,6 +57,29 @@ export function isExactDenseArray(value: unknown): value is unknown[] {
   } catch { return false; }
 }
 
+/** Snapshot only dense, enumerable own array slots without invoking getters. */
+export function snapshotExactDenseArray(
+  value: unknown, maxLength: number,
+): readonly unknown[] | undefined {
+  try {
+    if (!Array.isArray(value) || !Number.isSafeInteger(maxLength) ||
+        maxLength < 0) return undefined;
+    const length = Object.getOwnPropertyDescriptor(value, "length");
+    if (!length || !Object.hasOwn(length, "value") ||
+        !Number.isSafeInteger(length.value) ||
+        length.value > maxLength) return undefined;
+    if (Reflect.ownKeys(value).length !== length.value + 1) return undefined;
+    const owned: unknown[] = [];
+    for (let index = 0; index < length.value; index++) {
+      const slot = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!slot || !slot.enumerable || !Object.hasOwn(slot, "value"))
+        return undefined;
+      owned.push(slot.value);
+    }
+    return owned;
+  } catch { return undefined; }
+}
+
 /** Read only a directly owned data field; inherited getters are untrusted. */
 export function ownDataField(
   value: UnknownRecord,
