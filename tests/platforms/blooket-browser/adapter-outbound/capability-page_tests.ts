@@ -471,6 +471,7 @@ test("audio drawer distinguishes the shared Plus gate and cancels", () => {
       page.document.selectors['input#question[name="question"]'] = [
         page.question,
       ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
       assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
       assert.equal(page.audio.clicked, 1);
       page.document.selectors['aside[data-drawer-open="true"]'] = [openDrawer];
@@ -534,6 +535,8 @@ test("audio upsell link text is not a second drawer heading", () => {
     page.document.selectors['input#question[name="question"]'] = [
       page.question,
     ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
     const upsell = drawer("unsupported");
     const link = node("A", "Upgrade to Plus");
     const label = node("SPAN", "Upgrade to Plus");
@@ -560,6 +563,7 @@ test("hidden Audio drawer headings never prove Plus entitlements", () => {
       page.document.selectors['input#question[name="question"]'] = [
         page.question,
       ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
       assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
       const observed = drawer(kind);
       page.document.selectors['aside[data-drawer-open="true"]'] = [observed];
@@ -818,6 +822,7 @@ test("every injected capability action works without module imports", () => {
     page.document.selectors['input#question[name="question"]'] = [
       page.question,
     ];
+    assert.equal(isReady("set-fixture"), true);
     assert.equal(openAudio("set-fixture"), true);
     page.document.selectors['aside[data-drawer-open="true"]'] = [
       activeDrawer,
@@ -853,6 +858,7 @@ test(
     page.document.selectors['input#question[name="question"]'] = [
       page.question,
     ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
     assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
     page.document.selectors['aside[data-drawer-open="true"]'] = [activeDrawer];
     assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
@@ -912,6 +918,7 @@ test("capability modal and Audio controls refuse disabled actions", () => {
     page.document.selectors['input#question[name="question"]'] = [
       page.question,
     ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
     page.audio.disabled = true;
     assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
     page.audio.disabled = false;
@@ -993,6 +1000,8 @@ test("hidden Audio drawers are not capability evidence", () => {
     page.document.selectors['input#question[name="question"]'] = [
       page.question,
     ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
     const panel = drawer("supported");
     page.document.selectors['aside[data-drawer-open="true"]'] = [panel];
     panel.computedStyle.visibility = "hidden";
@@ -1318,3 +1327,57 @@ test("Cancel keeps human ownership until panel closure is proven",
   }
   },
 );
+
+test("Audio proof refuses an unopened or not-yet-owned question modal", () => {
+  const page = fixture();
+  const unrelatedDrawer = drawer("unsupported");
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    // Matching inputs alone do not grant ownership of a provider control.
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(page.audio.clicked, 0);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [
+      unrelatedDrawer,
+    ];
+    assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+      false);
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(unrelatedDrawer.selectors[
+      'button[aria-label="Cancel"]']![0]!.clicked, 0);
+    page.document.selectors['aside[data-drawer-open="true"]'] = [];
+    assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+    assert.equal(page.audio.clicked, 1);
+  });
+});
+
+test("an opened Audio drawer is not closed until owned Cancel is observed",
+  () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), true);
+    // Before the drawer hydrates, missing markup proves nothing.
+    assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+    const openDrawer = drawer("unsupported");
+    page.document.selectors['aside[data-drawer-open="true"]'] = [openDrawer];
+    assert.deepEqual(inspectBlooketAudioCapabilityDrawer("set-fixture"), {
+      ok: true, value: "unsupported",
+    });
+    page.document.selectors['aside[data-drawer-open="true"]'] = [];
+    assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+    // Without the owned drawer the worker must preserve uncertainty.
+    assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.equal(page.cancel.clicked, 0);
+    assert.equal(openDrawer.selectors[
+      'button[aria-label="Cancel"]']![0]!.clicked, 0);
+  });
+});

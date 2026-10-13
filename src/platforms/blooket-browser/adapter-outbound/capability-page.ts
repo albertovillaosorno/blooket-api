@@ -429,7 +429,8 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
-        watch.dirty || watch.audioOpened) return false;
+        watch.dirty || watch.audioOpened || !watch.form || !watch.question)
+      return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -569,6 +570,7 @@ export function inspectBlooketAudioCapabilityDrawer(
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
         form?: Element; question?: Element; drawer?: Element;
+        audioOpened?: boolean;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -624,6 +626,9 @@ export function inspectBlooketAudioCapabilityDrawer(
       identities[0].getAttribute("type") !== "hidden" ||
       (identities[0] as HTMLInputElement).value !== setId
     ) return failed();
+    if (!watch.audioOpened || !watch.form || !watch.question)
+      return failed();
+
     const drawers = Array.from(
       document.querySelectorAll('aside[data-drawer-open="true"]'),
     );
@@ -733,7 +738,7 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
         form?: Element; question?: Element; drawer?: Element;
-        audioCancelled?: boolean;
+        audioOpened?: boolean; audioCancelled?: boolean;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
@@ -787,6 +792,9 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       identities[0].getAttribute("type") !== "hidden" ||
       (identities[0] as HTMLInputElement).value !== setId
     ) return false;
+    if (!watch.audioOpened || !watch.form || !watch.question)
+      return false;
+
     const drawers = Array.from(
       document.querySelectorAll('aside[data-drawer-open="true"]'),
     );
@@ -872,8 +880,11 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
         form?: Element; question?: Element; drawer?: Element;
+        audioOpened?: boolean; audioCancelled?: boolean;
       };
     }).__blooketCapabilityEditWatch;
+    // Absence alone cannot prove cleanup of an opener whose drawer may
+    // still hydrate. Only the owned one-click Cancel authorizes closure.
     if (!watch || watch.document !== document || watch.setId !== setId ||
         watch.dirty) return false;
     const url = new URL(location.href);
@@ -922,6 +933,10 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       identities[0].getAttribute("type") !== "hidden" ||
       (identities[0] as HTMLInputElement).value !== setId
     ) return false;
+    // A drawer that has not been canceled can still hydrate after this read.
+    if (!watch.audioOpened || !watch.audioCancelled ||
+        !watch.form || !watch.question) return false;
+
     return (
       url.origin === "https://dashboard.blooket.com" &&
       url.pathname === "/edit" &&
