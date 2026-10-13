@@ -1003,3 +1003,50 @@ test("hidden Audio drawers are not capability evidence", () => {
     });
   });
 });
+
+test("temporary human stops permanently revoke read-owned capability panels",
+  () => {
+  const causes = ["captcha", "organization", "interstitial",
+    "password", "lost-shell"] as const;
+  for (const cause of causes) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      const selector = cause === "captcha"
+        ? 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        : cause === "organization"
+          ? '[role="dialog"][aria-modal="true"] h3'
+          : cause === "password" ? 'input[type="password"]'
+            : 'a[href="https://id.blooket.com/logout"]';
+      if (cause === "interstitial")
+        (page.document as FixtureNode & { title: string }).title =
+          "Just a moment...";
+      else page.document.selectors[selector] = cause === "lost-shell"
+        ? [] : [node(cause === "captcha" ? "IFRAME" : "H3",
+          cause === "organization" ? "Select your organization" : "")];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"),
+        false, cause);
+      if (cause === "interstitial")
+        (page.document as FixtureNode & { title: string }).title = "Blooket";
+      else if (cause === "lost-shell")
+        page.document.selectors[selector] = [node("A", "Logout")];
+      else page.document.selectors[selector] = [];
+      // Clearing a challenge must not revive an old read-owned Cancel.
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      page.document.selectors['input#question[name="question"]'] = [];
+      assert.equal(isBlooketCapabilityQuestionPanelClosed("set-fixture"),
+        false);
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(page.add.clicked, 1);
+      assert.equal(page.audio.clicked, 0);
+      assert.equal(page.cancel.clicked, 0);
+    });
+  }
+  },
+);

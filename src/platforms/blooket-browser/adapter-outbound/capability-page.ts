@@ -136,8 +136,15 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -271,8 +278,15 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
@@ -380,8 +394,15 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
@@ -494,8 +515,15 @@ export function inspectBlooketAudioCapabilityDrawer(
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return failed();
+    }
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
@@ -634,8 +662,15 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
@@ -746,8 +781,15 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
@@ -839,8 +881,15 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
     const watch = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
@@ -950,8 +999,21 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+      const pending = (globalThis as typeof globalThis & {
+        __blooketCapabilityEditWatch?: {
+          document: Document; dirty: boolean;
+        };
+      }).__blooketCapabilityEditWatch;
+      if (pending?.document === document) pending.dirty = true;
       return false;
+    }
+    const pending = (globalThis as typeof globalThis & {
+      __blooketCapabilityEditWatch?: {
+        document: Document; dirty: boolean;
+      };
+    }).__blooketCapabilityEditWatch;
+    if (pending?.document === document && pending.dirty) return false;
     const url = new URL(location.href);
     return (
       url.origin === "https://dashboard.blooket.com" &&
