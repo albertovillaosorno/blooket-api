@@ -1316,7 +1316,7 @@ test("Add Question refuses Chrome array slot accessors before mutation",
 );
 
 
-test("Add Question does not confirm a panel remounted after Cancel", async () => {
+test("Add Question rejects a panel remounted after Cancel", async () => {
   const fake = fakeChrome({});
   const injected = fake.chrome.scripting.executeScript;
   let closures = 0;
