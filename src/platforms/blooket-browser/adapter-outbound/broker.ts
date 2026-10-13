@@ -114,7 +114,7 @@ export function createBlooketBrowserBridgeBroker(
     throw new Error("invalid-browser-bridge-capacity");
   }
   let token = options.token ?? randomBytes(32).toString("base64url");
-  if (Buffer.byteLength(token, "utf8") < 32) {
+  if (Buffer.byteLength(token, "utf8") < 32 || token.length > 1_024) {
     throw new Error("invalid-browser-bridge-token");
   }
   const now = options.now ?? Date.now;
@@ -137,6 +137,11 @@ export function createBlooketBrowserBridgeBroker(
   }
 
   function authenticated(candidate: string): boolean {
+    // Headers should always be strings, but an untyped caller must never
+    // allocate an arbitrarily large buffer or crash the local broker.
+    if (typeof candidate !== "string" || candidate.length > 1_024 ||
+        Buffer.byteLength(candidate, "utf8") !==
+          Buffer.byteLength(token, "utf8")) return false;
     const left = Buffer.from(token, "utf8");
     const right = Buffer.from(candidate, "utf8");
     return (

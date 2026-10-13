@@ -79,6 +79,24 @@ test("identified legacy workers cannot take subsequent jobs", async () => {
   }
 });
 
+test("malformed or oversized pairing headers never reach browser jobs",
+  () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    for (const token of [undefined, null, false, 0, {}, [],
+      "a".repeat(100_000)]) {
+      assert.equal(broker.authenticated(token as never), false);
+      assert.equal(broker.next(token as never), null);
+      assert.equal(broker.complete(token as never, {}), false);
+    }
+    assert.equal(broker.authenticated(TOKEN), true);
+  } finally { broker.close(); }
+  assert.throws(() => createBlooketBrowserBridgeBroker({
+    token: "x".repeat(1_025),
+  }), /invalid-browser-bridge-token/u);
+  },
+);
+
 test("unidentified clients warn without retiring a current worker", () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
   try {
