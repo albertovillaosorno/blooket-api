@@ -45,19 +45,25 @@ import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import type { OnlineConnectionController } from
   "../../../api/online-connection/contract/controller.ts";
-import { acquireCanonicalDataWriter } from
-  "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
+import {
+  acquireCanonicalDataWriter, acquireCanonicalInstallerServiceWriter,
+} from "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
+import type { UpdateStartupRequest } from
+  "../../../ir/application-updates/contract/startup.ts";
 
 export async function startManagedBackgroundService(
   root: string,
   secrets: HostSecretStore,
-  dependencies: { online?: OnlineConnectionController } = {},
+  dependencies: { online?: OnlineConnectionController;
+    startup?: UpdateStartupRequest } = {},
 ) {
   // Startup, discovery and managed online writers belong to this lifetime.
   // A dead service cannot silently relinquish an uncertain descendant's lease.
   // The installer must drain the old service before acquiring data exclusion;
-  // candidate startup under that exclusion needs separate private authority.
-  const writer = await acquireCanonicalDataWriter(root);
+  // candidate startup under that exclusion requires private parent authority.
+  const writer = dependencies.startup
+    ? await acquireCanonicalInstallerServiceWriter(root, dependencies.startup)
+    : await acquireCanonicalDataWriter(root);
   if (!writer.ok) throw new Error(writer.reason === "busy"
     ? "service-update-busy" : "service-storage-unavailable");
   let lock: Awaited<ReturnType<typeof tryAcquireFileLock>>;
