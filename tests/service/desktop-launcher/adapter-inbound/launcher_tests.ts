@@ -34,7 +34,8 @@ import test from "node:test";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { promisify } from "node:util";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, readdir, lstat } from
+  "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,8 @@ import { savePreferences } from
   "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 import { acquireCanonicalDataUpdateBoundary } from
   "../../../../src/platforms/user-storage/adapter-outbound/writer-boundary.ts";
+import { decodeServiceRuntime } from
+  "../../../../src/platforms/service-lifecycle/adapter-outbound/runtime.ts";
 
 const launcher = fileURLToPath(new URL(
   "../../../../src/service/desktop-launcher/adapter-inbound/launcher.ts",
@@ -120,6 +123,58 @@ test("manual diagnostics preserve cached evidence during installation",
         { code: "ENOENT" });
     } finally {
       await boundary.release();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+test("real silent launcher starts, reuses and drains the supervised service",
+  { timeout: 20_000 }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "launcher-supervised-service-"));
+    const preferences = defaultTeacherPreferences(join(root, "media"));
+    await savePreferences(root, { ...preferences,
+      service: { ...preferences.service, portMode: "automatic", port: 1 } });
+    await writeFile(join(root, "teacher-marker"), "teacher-owned-data");
+    const command = (option: string) => promisify(execFile)(process.execPath,
+      [launcher, option], { timeout: 8_000, maxBuffer: 8192,
+        env: { PATH: process.env["PATH"], HOME: process.env["HOME"],
+          XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
+          DBUS_SESSION_BUS_ADDRESS: process.env["DBUS_SESSION_BUS_ADDRESS"],
+          BLOOKET_DATA_HOME: root } });
+    const drained = async () => {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const runtime = await lstat(join(root, "service-runtime.json"))
+          .catch(error => { if (error.code === "ENOENT") return undefined;
+            throw error; });
+        const lock = await lstat(join(root, ".service.lock"))
+          .catch(error => { if (error.code === "ENOENT") return undefined;
+            throw error; });
+        const writers = await readdir(join(root, ".canonical-writers"));
+        if (!runtime && !lock && writers.length === 0) return;
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+      throw Error("owned-launcher-service-did-not-drain");
+    };
+    try {
+      const first = await command("--no-open");
+      assert.equal(first.stderr, "");
+      const runtime = decodeServiceRuntime(JSON.parse(await readFile(
+        join(root, "service-runtime.json"), "utf8")));
+      assert.equal(first.stdout, runtime.origin + "\n");
+      assert.equal((await fetch(runtime.origin + "/api/service-status")).status,
+        200);
+      const second = await command("--no-open");
+      assert.equal(second.stdout, first.stdout);
+      assert.equal(second.stderr, "");
+      assert.equal(await readFile(join(root, "teacher-marker"), "utf8"),
+        "teacher-owned-data");
+      await command("--stop");
+      await drained();
+      const boundary = await acquireCanonicalDataUpdateBoundary(root);
+      assert.equal(boundary.ok, true);
+      if (boundary.ok) await boundary.release();
+    } finally {
+      await command("--stop");
+      await drained();
       await rm(root, { recursive: true, force: true });
     }
   });

@@ -160,6 +160,27 @@ lease then excludes another installation until actual drained shutdown.
 Independent supervisor/recovery composition and production publisher trust
 remain required; this private startup capability is not a shipping updater.
 
+The ordinary installed launcher now starts a silent independent service
+supervisor, which keeps the actual service child and private IPC after the
+launcher disconnects. It admits readiness only after an owned fresh health
+challenge and retains uncertain startup on a launcher deadline. UI shutdown
+notifies this supervisor after managed drainage; the notice triggers a fresh
+private stop challenge and still requires final service child closure.
+
+The supervisor forwards its own stop signals through that same private
+challenge, with no signal/kill fallback against the service's writers. Real
+launcher and subprocess tests demonstrate continued service availability after
+launcher disconnect, duplicate-launch reuse, completed UI shutdown and preserved
+data. The disconnected launcher observes supervisor exit only, never using that
+observation as installation or service-writer completion evidence.
+
+The service's owned IPC remains connected through its actual termination,
+avoiding the parent-disconnect close-accounting issue reported in
+[Node issue 65646][node-parent-disconnect] and reproduced locally on Node
+24.18.0 on 2026-10-13. This establishes independent normal service supervision,
+not immutable installer preparation, production publisher selection or a
+completed replacement/recovery transaction.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
@@ -297,3 +318,5 @@ writer/installer death. The [Node filesystem documentation][node-filesystem]
 was checked on that date for directory iteration/closure semantics.
 
 [node-filesystem]: https://github.com/nodejs/node/blob/main/doc/api/fs.md
+
+[node-parent-disconnect]: https://github.com/nodejs/node/issues/65646

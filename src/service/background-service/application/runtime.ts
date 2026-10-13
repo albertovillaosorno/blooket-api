@@ -55,7 +55,9 @@ export async function startManagedBackgroundService(
   root: string,
   secrets: HostSecretStore,
   dependencies: { online?: OnlineConnectionController;
-    startup?: UpdateStartupRequest } = {},
+    startup?: UpdateStartupRequest;
+    onStopped?: (status: "drained" | "unavailable", instance: string) => void;
+  } = {},
 ) {
   // Startup, discovery and managed online writers belong to this lifetime.
   // A dead service cannot silently relinquish an uncertain descendant's lease.
@@ -98,6 +100,10 @@ export async function startManagedBackgroundService(
       // A failed shutdown may leave a native writer unobserved. Keep the data
       // lease in that case; only proven complete cleanup releases admission.
       if (!failure) await cleanup(() => writer.release());
+      // An IPC notice cannot substitute for private challenge/close evidence.
+      // Notification failure must not turn completed persistence into failure.
+      try { dependencies.onStopped?.(failure ? "unavailable" : "drained",
+        instance); } catch { /* The owner can still request private stop. */ }
       if (failure) throw failure;
     })());
   try {
