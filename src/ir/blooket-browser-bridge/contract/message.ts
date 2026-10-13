@@ -35,6 +35,7 @@ import type {
   ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
+  isExactDenseArray,
   isRecord,
   requiredString,
   unknownFieldIssues,
@@ -247,7 +248,8 @@ export function decodeBlooketBrowserBridgeRequest(
     if (image && !image.ok) issues.push(...image.issues);
     const answers: { text: string; correct: boolean }[] = [];
     const seen = new Set<string>();
-    if (Array.isArray(answersCandidate) && answersCandidate.length <= 100) {
+    if (isExactDenseArray(answersCandidate) &&
+        answersCandidate.length <= 100) {
       answersCandidate.forEach((answer, index) => {
         if (!isRecord(answer)) {
           issues.push({
@@ -296,7 +298,7 @@ export function decodeBlooketBrowserBridgeRequest(
     const answerTypes =
       answerTypesCandidate === null
         ? null
-        : Array.isArray(answerTypesCandidate) &&
+        : isExactDenseArray(answerTypesCandidate) &&
             answerTypesCandidate.every(
               (value) => value === "exactly" || value === "contains",
             )
