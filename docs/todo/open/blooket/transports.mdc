@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, the Add Question bridge command decoder began
+requiring dense canonical arrays for both answer objects and typing
+match modes. Sparse mode arrays cannot pass JavaScript `every()` by
+skipping holes; hidden, symbol-owned and accessor-backed array slots
+also fail before command delivery. Synthetic IR tests confirm that no
+getter executes and no remote mutation occurs.
+
 On 2026-10-13, login preparation began rechecking the trusted
 interaction watch immediately after username input/change dispatch.
 A teacher event during that synchronous step permanently blocks the

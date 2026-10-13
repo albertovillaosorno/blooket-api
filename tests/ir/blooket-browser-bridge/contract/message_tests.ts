@@ -200,6 +200,38 @@ test("Add Question bridge commands admit exact text-only semantics", () => {
   );
 });
 
+test("Add Question command rejects sparse or decorated answer arrays", () => {
+  const valid = {
+    kind: "questions.create", setId: "set-fixture", number: 1,
+    question: "Type sun.", answers: [{ text: "sun", correct: true }],
+    qType: "typing", random: true, answerTypes: ["exactly"],
+    timeLimit: 15,
+  };
+  const sparseAnswers = new Array(2);
+  sparseAnswers[0] = valid.answers[0];
+  const sparseModes = new Array(1);
+  const getterAnswers = [...valid.answers];
+  let invoked = 0;
+  Object.defineProperty(getterAnswers, "0", {
+    enumerable: true, configurable: true,
+    get: () => { invoked++; return valid.answers[0]; },
+  });
+  const hiddenModes = Object.defineProperty(["exactly"], "hidden", {
+    value: "untrusted", enumerable: false,
+  });
+  const symbolAnswers = [...valid.answers];
+  Object.defineProperty(symbolAnswers, Symbol("extra"), { value: true });
+  for (const candidate of [
+    { ...valid, answers: sparseAnswers },
+    { ...valid, answerTypes: sparseModes },
+    { ...valid, answers: getterAnswers },
+    { ...valid, answerTypes: hiddenModes },
+    { ...valid, answers: symbolAnswers },
+  ]) assert.equal(decodeBlooketBrowserBridgeRequest(
+    request(candidate)).ok, false);
+  assert.equal(invoked, 0);
+});
+
 test("invalid authentication requests never echo secret values", () => {
   const password = "synthetic-secret-that-must-not-be-returned";
   const result = decodeBlooketBrowserBridgeRequest(
