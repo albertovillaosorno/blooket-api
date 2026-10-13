@@ -62,8 +62,27 @@ chrome-devtools start --autoConnect \
 
 The profile root must be discovered from the actual running browser, not
 guessed or created. A start without existing-browser attachment can launch a
-separate session; it does not reuse the owner's Blooket login. Keep diagnostic
-logs bounded under `.temp/` and never enable protocol dumps containing tokens.
+separate session; it does not reuse the owner's Blooket login.
+
+Avoid raw connection logs for authenticated attachments. The installed CLI
+1.10.1 and Google's [connection implementation][devtools-connection], checked
+on 2026-10-13, serialize connection options into diagnostic logging, including
+the private WebSocket endpoint and any supplied WebSocket headers.
+`--redactNetworkHeaders` does not sanitize those startup options.
+
+Inspect controller output in memory and emit only necessary non-sensitive
+status fields. CLI status can print its full launch arguments; do not dump that
+output when arguments contain endpoints or credentials. Any necessary sanitized
+diagnostic file belongs under `.temp/`; never save raw protocol or connection
+dumps.
+
+An HTTP `/json/version` failure does not prove that the discovered browser is
+offline. The installed auto-connect implementation reads the existing profile's
+private `DevToolsActivePort` and uses its advertised WebSocket endpoint
+directly.
+Switching to that same endpoint is not a new connection strategy after an
+auto-connect failure; diagnose the existing attachment without exposing its
+nonce, weakening permissions, or restarting the owner's browser.
 
 Reload only the observed installed Blooket API extension after assembling its
 reviewed files at that same path:
@@ -107,3 +126,5 @@ for portable functionality or browser publication fixes.
 [devtools-attachment]: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md
 <!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
 [devtools-tools]: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/tool-reference.md
+<!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
+[devtools-connection]: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/src/BrowserManager.ts
