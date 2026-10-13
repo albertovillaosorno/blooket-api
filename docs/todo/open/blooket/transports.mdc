@@ -1465,6 +1465,20 @@ under `.temp/readme-ui-check/full-tests.log`.
 Acceptance remains open until the checks above run through the actual owning
 product surfaces; portable foundations alone do not complete this record.
 
+On 2026-10-13, the selected Chrome session still exposed its authenticated
+My Sets page and five development sets. Chrome DevTools CLI 1.10.1 could not
+complete existing-browser attachment to the restarted Chrome for Testing
+155 instance; extension inventory timed out without a confirmed reload.
+
+The session-owned controller was stopped and its stopped state verified.
+The existing local package was started silently with the retained development
+data root, and reloading the existing workspace restored its Library page.
+Browser input commands still timed out without changing the selected panel.
+
+Account-mutation authorization is present. Current loaded-extension control
+and independently justified nonempty completeness remain acceptance blockers;
+neither missing account permission nor absence of a Mac is the blocker.
+
 [input-activation]: https://html.spec.whatwg.org/multipage/input.html
 <!-- jig-ignore-next-line: Exact upstream documentation URL is indivisible. -->
 [trusted-events]: https://developer.mozilla.org/en-US/docs/Web/API/Event/isTrusted

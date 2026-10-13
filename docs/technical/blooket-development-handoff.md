@@ -1,5 +1,12 @@
 # Blooket development without a browser
 
+For integrated browser, Playwright MCP, Chrome DevTools MCP, and installed CLI
+selection/attachment, read [development browser controllers][browser-tools].
+The available controller must reach the authorized session; compiling an
+extension alone does not establish loaded-worker or publication acceptance.
+
+[browser-tools]: browser-acceptance-tools.md
+
 This guide records bounded evidence and the next implementation boundaries.
 Read `AGENTS.md`, the complete developer profile, `TODO.md`, and the owning
 record first. It does not declare quiz publication or automatic installation

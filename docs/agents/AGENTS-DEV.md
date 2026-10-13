@@ -252,6 +252,18 @@ explicit authorization. CAPTCHA, security challenges, organization prompts,
 and unfamiliar login states remain human stops, never automation targets.
 Clean up only session-created test profiles and other owned ephemeral files.
 
+Development browser control is not limited to an integrated browser. Use an
+available Playwright MCP, Chrome DevTools MCP, or installed CLI when its actual
+connection reaches the authorized Chrome/Chrome for Testing session. Read
+`docs/technical/browser-acceptance-tools.md` before selecting or attaching a
+controller; discover its current tools and help instead of inventing commands.
+
+Reuse existing account-mutation authorization within its stated test scope.
+Prefer a supported reload operation for the already installed extension and
+verify the loaded result; a compiled directory is not loaded-worker evidence.
+Browserless agents must use current official Web Search documentation and the
+development handoff while keeping real acceptance gaps explicit.
+
 ## Reliability
 
 Prefer failure with recoverable state over partial success with corrupted state.
