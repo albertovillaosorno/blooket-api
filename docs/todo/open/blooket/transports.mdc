@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, Add Question saved-card confirmation and read-only
+question enumeration began capturing bounded own numeric slots instead
+of revisiting a Chrome-supplied array after structural validation.
+The question read host requires contiguous slots from that snapshot;
+post-save hydration and conflicting-card decisions use one unchanged
+copy. Synthetic regressions demonstrate no proxy index or length getter
+runs and no write is replayed.
+
 On 2026-10-13, six extension host script adapters began copying
 Chrome's single returned frame through a bounded own-data array
 snapshot. A proxy index getter cannot intervene between shape

@@ -37,7 +37,7 @@ import {
   "../../../ir/blooket-question-reads/contract/question-read.ts";
 import { inspectOpenedBlooketQuestionImage } from
   "../../../platforms/blooket-browser/adapter-outbound/question-image-page.ts";
-import { isExactDenseArray, snapshotExactDenseArray } from
+import { isRecord, ownDataField, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
@@ -150,17 +150,17 @@ export function createExtensionQuestionInspectionHost(
         await pause(POLL_MS);
         continue;
       }
-      if (!result || typeof result !== "object" || Array.isArray(result) ||
-          !exactKeys(result, "ok,value") ||
-          !("ok" in result) || result.ok !== true ||
-          !("value" in result) || !isExactDenseArray(result.value) ||
-          result.value.length > MAX_QUESTIONS)
-        return undefined;
+      if (!isRecord(result) || !exactKeys(result, "ok,value") ||
+          ownDataField(result, "ok") !== true) return undefined;
+      const captured = snapshotExactDenseArray(
+        ownDataField(result, "value"), MAX_QUESTIONS,
+      );
+      if (!captured) return undefined;
       // The provider renders questions in one contiguous slot order.
       // An otherwise valid [2] or [2, 1] is not an entire saved set.
       const slots: number[] = [];
-      for (let index = 0; index < result.value.length; index++) {
-        const number = result.value[index];
+      for (let index = 0; index < captured.length; index++) {
+        const number = captured[index];
         if (!Number.isSafeInteger(number) || number !== index + 1 ||
             number > MAX_NUMBER) return undefined;
         slots.push(number);

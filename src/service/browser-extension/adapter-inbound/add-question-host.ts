@@ -33,7 +33,7 @@ import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import { blooketPreparedImageBytes } from
   "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
-import { isExactDenseArray, snapshotExactDenseArray } from
+import { isRecord, ownDataField, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -581,11 +581,9 @@ function matchingQuestion(
   result: unknown,
   input: BlooketTextQuestionPageInput,
 ): BlooketQuestionRead | undefined {
-  if (!result || typeof result !== "object" || Array.isArray(result) ||
-      !exactKeys(result, "ok,value") ||
-      !("ok" in result) || result.ok !== true ||
-      !("value" in result)) return undefined;
-  const decoded = decodeBlooketQuestionRead(result.value);
+  if (!isRecord(result) || !exactKeys(result, "ok,value") ||
+      ownDataField(result, "ok") !== true) return undefined;
+  const decoded = decodeBlooketQuestionRead(ownDataField(result, "value"));
   if (!decoded.ok) return undefined;
   const value = decoded.value;
   const answers = input.answers.map((answer, index) => ({
@@ -630,13 +628,11 @@ function pageUnavailable(result: unknown): boolean {
 }
 
 function exactPreviousQuestionNumbers(result: unknown, number: number) {
-  if (!result || typeof result !== "object" || Array.isArray(result) ||
-      !exactKeys(result, "ok,value") ||
-      !("ok" in result) || result.ok !== true ||
-      !("value" in result) || !isExactDenseArray(result.value) ||
-      result.value.length !== number - 1 || result.value.length > 200)
-    return false;
-  return exactNumericSlots(result.value);
+  if (!isRecord(result) || !exactKeys(result, "ok,value") ||
+      ownDataField(result, "ok") !== true) return false;
+  const slots = snapshotExactDenseArray(ownDataField(result, "value"), 200);
+  return slots !== undefined && slots.length === number - 1 &&
+    exactNumericSlots(slots);
 }
 
 // A still-hydrating card collection may contain exactly the previous
@@ -647,19 +643,19 @@ function postSaveQuestionRows(
   number: number,
 ): "pending" | "ready" | "conflict" {
   if (!Number.isSafeInteger(number) || number < 1 || number > 200 ||
-      !result || typeof result !== "object" || Array.isArray(result))
+      !isRecord(result))
     return "conflict";
-  if (exactKeys(result, "code,ok") && "ok" in result &&
-      result.ok === false && "code" in result &&
-      result.code === "blooket-browser-failed") return "pending";
-  if (!exactKeys(result, "ok,value") || !("ok" in result) ||
-      result.ok !== true || !("value" in result) ||
-      !isExactDenseArray(result.value) || result.value.length > 200 ||
-      (result.value.length !== number &&
-       result.value.length !== number - 1) ||
-      !exactNumericSlots(result.value))
+  if (exactKeys(result, "code,ok") &&
+      ownDataField(result, "ok") === false &&
+      ownDataField(result, "code") === "blooket-browser-failed")
+    return "pending";
+  if (!exactKeys(result, "ok,value") ||
+      ownDataField(result, "ok") !== true) return "conflict";
+  const slots = snapshotExactDenseArray(ownDataField(result, "value"), 200);
+  if (!slots || (slots.length !== number &&
+      slots.length !== number - 1) || !exactNumericSlots(slots))
     return "conflict";
-  return result.value.length === number ? "ready" : "pending";
+  return slots.length === number ? "ready" : "pending";
 }
 
 function exactNumericSlots(items: readonly unknown[]): boolean {
