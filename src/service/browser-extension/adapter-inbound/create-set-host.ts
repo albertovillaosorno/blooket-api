@@ -159,6 +159,13 @@ export function createExtensionCreateSetHost(
       throw new Error("browser-write-script-failed");
     // Chrome adds frame metadata, but only its own enumerable result data
     // descriptor may carry evidence. Never invoke an accessor getter.
+    // Chrome script results belong to the main document (frameId zero).
+    // A nested frame or accessor-owned frame identity cannot authorize a
+    // saved-state read or a write step even when its result looks plausible.
+    const frameId = Object.getOwnPropertyDescriptor(frame, "frameId");
+    if (frameId && (!frameId.enumerable ||
+        !Object.hasOwn(frameId, "value") || frameId.value !== 0))
+      throw new Error("browser-write-script-failed");
     const descriptor = Object.getOwnPropertyDescriptor(frame, "result");
     if (!descriptor || !descriptor.enumerable ||
         !("value" in descriptor) || descriptor.value === undefined)

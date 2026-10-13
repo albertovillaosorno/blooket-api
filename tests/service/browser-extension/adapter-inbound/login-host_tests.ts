@@ -51,6 +51,8 @@ function fixture(options: {
   readonly nextUrlAfterPrepare?: string;
   readonly reloadAfterAction?: "prepare" | "is-prepared";
   readonly nativeOrigin?: number | null;
+  readonly scriptFrameId?: number;
+  readonly scriptFrameGetter?: boolean;
 }) {
   const calls: string[] = [];
   const argumentsSeen: unknown[] = [];
@@ -73,9 +75,19 @@ function fixture(options: {
         readonly args?: unknown[];
       }) => {
         const args = request.args ?? [];
+        const frame = (result: unknown): { readonly result: unknown } => {
+          const item = { result } as { result: unknown; frameId?: number };
+          if (options.scriptFrameId !== undefined)
+            item.frameId = options.scriptFrameId;
+          if (options.scriptFrameGetter)
+            Object.defineProperty(item, "frameId", { enumerable: true,
+              get() { throw new Error("frame accessor must not run"); },
+            });
+          return item;
+        };
         if (request.func.name === "inspectBlooketSessionDocumentOrigin") {
           assert.deepEqual(args, [url]);
-          return [{ result: origin }];
+          return [frame(origin)];
         }
         const action = args[0];
         if (!reloaded && options.reloadAfterAction === action) {
@@ -89,15 +101,15 @@ function fixture(options: {
           case "prepare":
             if (options.nextUrlAfterPrepare)
               url = options.nextUrlAfterPrepare;
-            return [{ result: options.prepareReply ?? { ok: true } }];
+            return [frame(options.prepareReply ?? { ok: true })];
           case "is-prepared": {
             if (options.nextUrlAfterPoll)
               url = options.nextUrlAfterPoll;
             const observed = polls.shift();
-            return [{ result: observed === undefined ? false : observed }];
+            return [frame(observed === undefined ? false : observed)];
           }
           case "submit":
-            return [{ result: options.submitReply ?? { ok: true } }];
+            return [frame(options.submitReply ?? { ok: true })];
           default:
             throw new Error("unexpected-script");
         }
@@ -406,5 +418,29 @@ test("login host fails closed on revoked Chrome frame collections",
     ok: false, code: "blooket-browser-failed",
   });
   assert.equal(page.calls.includes("submit"), false);
+  },
+);
+
+
+test("login rejects non-main-frame and accessor-supplied script evidence",
+  async () => {
+  for (const options of [
+    { scriptFrameId: 1 }, { scriptFrameId: -1 },
+    { scriptFrameGetter: true },
+  ]) {
+    const page = fixture(options);
+    assert.deepEqual(await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => undefined,
+    ).authenticate(credentials), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(page.calls, []);
+    assert.deepEqual(page.argumentsSeen, []);
+  }
+  const page = fixture({ scriptFrameId: 0 });
+  assert.deepEqual(await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => undefined,
+  ).authenticate(credentials), { ok: true, value: null });
+  assert.equal(page.calls.filter(action => action === "submit").length, 1);
   },
 );

@@ -947,3 +947,16 @@ test("question enumeration copies card descriptors without proxy get traps",
   assert.equal(indexedReads, 0);
   },
 );
+
+test("saved question scans reject a nested-frame script result",
+  async () => {
+  const page = synthetic();
+  const injected = page.port.scripting.executeScript;
+  page.port.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 5 }));
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
+  },
+);

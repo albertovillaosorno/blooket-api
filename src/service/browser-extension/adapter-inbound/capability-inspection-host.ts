@@ -131,6 +131,13 @@ export function createExtensionCapabilityInspectionHost(
       throw new Error("browser-capability-script-failed");
     // InjectionResult also contains Chrome-owned frame metadata. Trust only
     // its directly owned result data field, never an accessor getter.
+    // Chrome script results belong to the main document (frameId zero).
+    // A nested frame or accessor-owned frame identity cannot authorize a
+    // saved-state read or a write step even when its result looks plausible.
+    const frameId = Object.getOwnPropertyDescriptor(frame, "frameId");
+    if (frameId && (!frameId.enumerable ||
+        !Object.hasOwn(frameId, "value") || frameId.value !== 0))
+      throw new Error("browser-capability-script-failed");
     const descriptor = Object.getOwnPropertyDescriptor(frame, "result");
     if (!descriptor || !descriptor.enumerable ||
         !("value" in descriptor) || descriptor.value === undefined)

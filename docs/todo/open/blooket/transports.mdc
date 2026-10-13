@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, extension page-script receipts began checking
+Chrome's optional `frameId` metadata when present. Only a main-frame
+`frameId: 0` can authorize session credential preparation, Create Set,
+Add Question, capability inspection, and saved-state reads. Nested
+frame values or accessor-backed frame identities fail closed without
+running getters; synthetic host and assembled-worker regressions passed.
+The connection to a loaded authenticated extension remains unverified.
+
 On 2026-10-13, My Sets Flight consistency comparisons began using
 bounded owned row snapshots and captured build/source data descriptors.
 Capability probing now reuses the versioned saved-set list decoder for
