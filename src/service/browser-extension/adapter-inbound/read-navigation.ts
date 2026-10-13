@@ -54,6 +54,7 @@ export async function confirmBlooketReadNavigation(
   now: () => number = Date.now,
   approvedSourceOrigin?: number,
   onConfirmedTargetOrigin?: (origin: number) => void,
+  safeBeforeNavigation?: () => Promise<boolean>,
 ): Promise<ReadTab | undefined> {
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (now() >= deadline) return undefined;
@@ -78,6 +79,19 @@ export async function confirmBlooketReadNavigation(
     const originAgain = await documentOrigin(current.url);
     if (now() >= deadline || originAgain !== previousOrigin)
       return undefined;
+    // A teacher can begin changing the already-confirmed document while
+    // navigation checks are pending. Recheck the actual editor right before
+    // leaving it, not just once at the beginning of the read.
+    if (safeBeforeNavigation) {
+      if (!await safeBeforeNavigation() || now() >= deadline)
+        return undefined;
+      const last = await tabs.get(tabId);
+      if (now() >= deadline || last.url !== current.url ||
+          last.status !== "complete") return undefined;
+      const lastOrigin = await documentOrigin(current.url);
+      if (now() >= deadline || lastOrigin !== previousOrigin)
+        return undefined;
+    }
     if (current.url === target) {
       await tabs.reload(tabId, { bypassCache: true });
     } else {

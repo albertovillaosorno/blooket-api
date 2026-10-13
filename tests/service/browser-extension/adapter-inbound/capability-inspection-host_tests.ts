@@ -1545,3 +1545,15 @@ test("capability inspection refuses nested-frame script acknowledgements",
     false);
   },
 );
+
+test("capability host admits Chrome main-frame result metadata",
+  async () => {
+  const page = fixture();
+  const injected = page.chrome.scripting.executeScript;
+  page.chrome.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 0 }));
+  assert.equal((await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect()).ok, true);
+  },
+);

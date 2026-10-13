@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, saved-state navigation gained a second independent
+permission-to-leave check immediately before a read-owned tab update or
+reload. A teacher starting work after the original safety inspection
+now stops the navigation; a route or native document epoch changed
+while this final check runs also fails closed. Synthetic navigation
+and assembled-worker regressions verified refusal without a provider
+mutation. The task still awaits loaded-extension live acceptance.
+
 On 2026-10-13, extension page-script receipts began checking
 Chrome's optional `frameId` metadata when present. Only a main-frame
 `frameId: 0` can authorize session credential preparation, Create Set,

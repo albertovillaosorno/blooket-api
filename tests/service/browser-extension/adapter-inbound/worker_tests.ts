@@ -59,6 +59,8 @@ test(
   let incompatibleStatus = false;
   let incompatiblePoll = false;
   let unsafeReadSource = false;
+  let denyFinalReadGuard = false;
+  let readGuardChecks = 0;
   let reloadDuringLeave = false;
   let detailOpenSucceeds = true;
   let detailSidebarDrifts = false;
@@ -230,11 +232,13 @@ test(
           return [{ result: documentOrigin }];
         }
         if (func.name === "canLeaveBlooketPageForRead") {
+          readGuardChecks++;
           if (reloadDuringLeave) {
             reloadDuringLeave = false;
             documentOrigin += 1_000;
           }
-          return [{ result: !unsafeReadSource }];
+          return [{ result: !unsafeReadSource &&
+            !(denyFinalReadGuard && readGuardChecks >= 2) }];
         }
         if (func.name === "captureBlooketLibraryModel") {
           if (listReloadDuringCapture) {
@@ -834,6 +838,15 @@ test(
     assert.equal(firstSets.value.completeness, "unknown");
     assert.equal(setListReads, 2);
     assert.equal(readReloads, 1);
+    // A teacher starts editing after the early permission-to-leave check.
+    // The final guard must refuse a same-route reload without displacing it.
+    denyFinalReadGuard = true;
+    readGuardChecks = 0;
+    const beforeNewEditor = readReloads;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(readGuardChecks, 2);
+    assert.equal(readReloads, beforeNewEditor);
+    denyFinalReadGuard = false;
     for (const frameIssue of ["nested", "accessor"] as const) {
       listModelNestedFrame = frameIssue === "nested";
       listModelFrameAccessor = frameIssue === "accessor";
@@ -1155,6 +1168,7 @@ test(
     assert.deepEqual(scripts.slice(beforeSwitchedOpen).filter(
       name => name !== "inspectBlooketDocumentOrigin",
     ), [
+      "canLeaveBlooketPageForRead",
       "canLeaveBlooketPageForRead",
       "inspectBlooketDetailSidebar",
       "inspectBlooketDetailSidebar",

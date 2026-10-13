@@ -1789,3 +1789,43 @@ test("Create Set cannot accept nested-frame browser navigation evidence",
   assert.equal(fake.calls.some(name => name.startsWith("update:")), false);
   },
 );
+
+test("Create Set accepts real Chrome-style main-frame evidence",
+  async () => {
+  const fake = fakeChrome({ afterUpdate: [{
+    url: "https://dashboard.blooket.com/create", status: "complete",
+  }], scripts: [createState] });
+  const injected = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 0 }));
+  assert.deepEqual(await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet(), { ok: true });
+  },
+);
+
+test("a nested-frame Create Set Save acknowledgement never replays Save",
+  async () => {
+  const fake = fakeChrome({ afterUpdate: [{
+    url: "https://dashboard.blooket.com/create", status: "complete",
+  }], scripts: [createState, prepared, prepared] });
+  const injected = fake.chrome.scripting.executeScript;
+  let saves = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    const frames = await injected(request);
+    if (request.func.name === "submitBlooketCreateSetForm") {
+      saves++;
+      return frames.map(frame => ({ ...frame, frameId: 8 }));
+    }
+    return frames;
+  };
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.openCreateSet(), { ok: true });
+  const input = { title: "Synthetic", description: "", private: true };
+  assert.deepEqual(await host.prepareCreateSet(input), { ok: true });
+  assert.equal((await host.submitCreateSet(input)).ok, false);
+  assert.equal(saves, 1);
+  assert.equal(fake.calls.filter(name => name === "script").length, 3);
+  },
+);
