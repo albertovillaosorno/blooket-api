@@ -339,7 +339,7 @@ test("read navigation respects computed modal visibility", () => {
   });
 });
 
-test("focused teacher select and inherited rich-text editors block read navigation",
+test("focused teacher select and rich-text editors block read navigation",
   () => {
   const page = fixture();
   const injected = Function(
