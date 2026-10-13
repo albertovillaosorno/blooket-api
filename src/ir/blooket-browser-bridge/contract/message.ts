@@ -35,7 +35,7 @@ import type {
   ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
-  isExactDenseArray,
+  snapshotExactDenseArray,
   isRecord,
   ownDataField,
   requiredString,
@@ -257,10 +257,10 @@ export function decodeBlooketBrowserBridgeRequest(
     if (image && !image.ok) issues.push(...image.issues);
     const answers: { text: string; correct: boolean }[] = [];
     const seen = new Set<string>();
-    if (isExactDenseArray(answersCandidate) &&
-        answersCandidate.length <= 100) {
-      for (let index = 0; index < answersCandidate.length; index++) {
-        const answer = answersCandidate[index];
+    const ownedAnswers = snapshotExactDenseArray(answersCandidate, 100);
+    if (ownedAnswers) {
+      for (let index = 0; index < ownedAnswers.length; index++) {
+        const answer = ownedAnswers[index];
         if (!isRecord(answer)) {
           issues.push({
             path: "$.command.answers[" + index + "]",
@@ -307,12 +307,11 @@ export function decodeBlooketBrowserBridgeRequest(
       });
     }
     const admittedModes = (): ("exactly" | "contains")[] | undefined => {
-      if (!Array.isArray(answerTypesCandidate) ||
-          answerTypesCandidate.length > 100 ||
-          !isExactDenseArray(answerTypesCandidate)) return undefined;
+      const captured = snapshotExactDenseArray(answerTypesCandidate, 100);
+      if (!captured) return undefined;
       const modes: ("exactly" | "contains")[] = [];
-      for (let index = 0; index < answerTypesCandidate.length; index++) {
-        const match = answerTypesCandidate[index];
+      for (let index = 0; index < captured.length; index++) {
+        const match = captured[index];
         if (match !== "exactly" && match !== "contains") return undefined;
         modes.push(match);
       }

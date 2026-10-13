@@ -445,3 +445,37 @@ test("bridge text controls reject every forbidden literal byte", () => {
     ...command, description: "Line one\nLine two\r\n\tIndented",
   })).ok, true);
 });
+
+
+test("Add Question bridge owns exact arrays before reading proxy slots",
+  () => {
+  let indexedReads = 0;
+  const wrapped = <T>(items: T[]) => new Proxy(items, {
+    get(target, key, receiver) {
+      if (key === "length" || key === "0") {
+        indexedReads++;
+        throw new Error("Untrusted bridge indexed read");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const candidate = request({
+    kind: "questions.create", setId: "set-fixture", number: 1,
+    question: "Type sun.",
+    answers: wrapped([{ text: "sun", correct: true }]),
+    qType: "typing", random: true,
+    answerTypes: wrapped(["exactly"]), timeLimit: 15,
+  });
+  const decoded = decodeBlooketBrowserBridgeRequest(candidate);
+  assert.equal(decoded.ok, true);
+  assert.equal(indexedReads, 0);
+  const revoked = Proxy.revocable(["exactly"], {});
+  revoked.revoke();
+  assert.equal(decodeBlooketBrowserBridgeRequest(request({
+    kind: "questions.create", setId: "set-fixture", number: 1,
+    question: "Type sun.", answers: [{ text: "sun", correct: true }],
+    qType: "typing", random: true,
+    answerTypes: revoked.proxy, timeLimit: 15,
+  })).ok, false);
+  },
+);
