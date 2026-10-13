@@ -42,6 +42,8 @@ import { startManagedBackgroundService } from
   "../../../../src/service/background-service/application/runtime.ts";
 import { existingService } from
   "../../../../src/platforms/service-lifecycle/adapter-outbound/runtime.ts";
+import { acquireCanonicalDataUpdateBoundary } from
+  "../../../../src/platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import { createHostSecretStore } from
 // jig-ignore-next-line: Preserve the exact mirrored source module path.
   "../../../../src/platforms/host-secret-store/adapter-outbound/host-secret-store.ts";
@@ -171,6 +173,11 @@ test("shutdown retains ownership until an admitted settings writer finishes",
       }).then(response => response.json(), () => undefined);
       await entered.promise;
       assert.equal(service.isReady(), true);
+      // The real HTTP settings writer also excludes an installer, even before
+      // service shutdown begins. Its lease follows actual secret/file closure.
+      assert.deepEqual(await acquireCanonicalDataUpdateBoundary(root), {
+        ok: false, reason: "writer-active",
+      });
       stopping = service.stop();
       assert.equal(service.isReady(), false);
       const outcome = await Promise.race([
@@ -187,6 +194,9 @@ test("shutdown retains ownership until an admitted settings writer finishes",
       await saving;
       assert.equal((await loadPreferences(root)).locale, "es");
       await assert.rejects(readFile(join(root, ".service.lock")));
+      const installation = await acquireCanonicalDataUpdateBoundary(root);
+      assert.equal(installation.ok, true);
+      if (installation.ok) await installation.release();
       const next = await startManagedBackgroundService(root, secrets);
       await next.stop();
     } finally {

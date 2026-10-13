@@ -68,6 +68,8 @@ import {
   savePreferences,
   userDataRoot,
 } from "../../../platforms/user-storage/adapter-outbound/root.ts";
+import { acquireCanonicalDataWriter } from
+  "../../../platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import {
   initializeLibrary,
   withLibraryLock,
@@ -282,6 +284,33 @@ export async function startBrowserService(
       return;
     }
     const url = new URL(request.url ?? "/", origin);
+    // Canonical commands retain their own publication-before-data lock order.
+    // Runtime/update status are pure observations while installation ownership
+    // is held; bridge replies only complete already-admitted jobs.
+    const directDataOperation =
+      (url.pathname.startsWith("/api/") ||
+        url.pathname.startsWith("/media/")) &&
+      url.pathname !== "/api/command" &&
+      !(request.method === "GET" &&
+        ["/api/service-status", "/api/update-status"].includes(url.pathname));
+    if (!directDataOperation) {
+      await handleLocal(request, response, url);
+      return;
+    }
+    const writer = await acquireCanonicalDataWriter(root);
+    if (!writer.ok) {
+      json(response, 503, { ok: false, code: writer.reason === "busy"
+        ? "service-busy" : "service-storage-unavailable" });
+      return;
+    }
+    try { await handleLocal(request, response, url); }
+    finally { await writer.release(); }
+  }
+  async function handleLocal(
+    request: IncomingMessage,
+    response: ServerResponse,
+    url: URL,
+  ): Promise<void> {
     if (request.method === "GET") {
       const files: Record<string, [string, string]> = {
         "/": ["index.html", "text/html"],

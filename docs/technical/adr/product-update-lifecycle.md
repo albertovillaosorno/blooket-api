@@ -116,6 +116,18 @@ publisher trust, and authenticate actual version/nonce health. Portable tests
 exercise actual journals and native Linux exchange with explicitly synthetic
 Apple/lifecycle ports; they do not enable installation or prove product restart.
 
+Direct local HTTP data handlers now retain the shared user-data writer lease
+through actual completion, including lazy library/media reads. Held installation
+admission refuses their persistent operations with a busy response; pure runtime
+and update-status observations remain available. Canonical commands keep their
+existing publication-before-data ownership order instead of gaining an outer
+data lease.
+
+This closes the direct request-writer gap, not startup or independent installer
+composition. Startup/discovery persistence and installer-owned startup authority
+still need coordinated admission. The product installer must preserve those
+fences through replacement, restart, and recovery before it is enabled.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and

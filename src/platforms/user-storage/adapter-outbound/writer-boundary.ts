@@ -9,7 +9,7 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Canonical user-data command admission and retained writer leases.
+//   - Local user-data command/request admission and retained writer leases.
 // - Must-Not:
 //   - Install apps, read lesson content, or reclaim uncertain writer leases.
 // - Allows:
@@ -21,7 +21,7 @@
 // - Merge-When:
 //   - Canonical user-data writes no longer cross process boundaries.
 // - Summary:
-//   - Keeps admitted command writers excluded from application replacement.
+//   - Keeps admitted local data writers excluded from application replacement.
 // - Description:
 //   - Unknown storage and symbolic paths fail closed without reading content.
 // - Usage:
@@ -151,7 +151,8 @@ export async function acquireCanonicalDataWriter(root: string):
 // Retain the installation marker throughout recovery; this excludes new
 // canonical commands, even while the old service is offline. Existing or
 // orphaned leases refuse admission; an independent PID never proves drainage.
-// This does not fence noncanonical UI/settings/startup writers or publication.
+// Direct local HTTP data handlers share these leases. Startup and publication
+// still require independently composed installation ownership.
 export async function acquireCanonicalDataUpdateBoundary(root: string):
   Promise<CanonicalDataBoundary> {
   let guard: FileLock | undefined, marker: FileLock | undefined;
