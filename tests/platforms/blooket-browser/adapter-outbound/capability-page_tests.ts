@@ -1050,3 +1050,57 @@ test("temporary human stops permanently revoke read-owned capability panels",
   }
   },
 );
+
+test("changing and restoring an owned capability route cannot revive clicks",
+  () => {
+  const actions = ["ready", "open-audio", "inspect-audio", "close-audio",
+    "audio-closed", "close-question"] as const;
+  for (const action of actions) {
+    const page = fixture();
+    withPage(page.document, () => {
+      assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+      page.document.selectors['input#question[name="question"]'] = [
+        page.question,
+      ];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+      if (action === "inspect-audio" || action === "close-audio")
+        page.document.selectors['aside[data-drawer-open="true"]'] = [
+          drawer("unsupported"),
+        ];
+      Object.defineProperty(globalThis, "location", {
+        configurable: true,
+        value: new URL(
+          "https://dashboard.blooket.com/edit?id=set-fixture#teacher",
+        ),
+      });
+      if (action === "ready")
+        assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false);
+      if (action === "open-audio")
+        assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      if (action === "inspect-audio")
+        assert.equal(inspectBlooketAudioCapabilityDrawer("set-fixture").ok,
+          false);
+      if (action === "close-audio")
+        assert.equal(closeBlooketAudioCapabilityDrawer("set-fixture"), false);
+      if (action === "audio-closed")
+        assert.equal(isBlooketAudioCapabilityDrawerClosed("set-fixture"), false);
+      if (action === "close-question")
+        assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      Object.defineProperty(globalThis, "location", {
+        configurable: true,
+        value: new URL(
+          "https://dashboard.blooket.com/edit?id=set-fixture",
+        ),
+      });
+      page.document.selectors['aside[data-drawer-open="true"]'] = [];
+      assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), false,
+        action);
+      assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+      assert.equal(closeBlooketCapabilityQuestionPanel("set-fixture"), false);
+      assert.equal(page.add.clicked, 1);
+      assert.equal(page.audio.clicked, 0);
+      assert.equal(page.cancel.clicked, 0);
+    });
+  }
+  },
+);
