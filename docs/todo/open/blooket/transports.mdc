@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, a read-owned capability probe began permanently
+revoking its document watch whenever an authenticated shell disappears
+or a CAPTCHA, organization prompt, password overlay, or verification
+interstitial interrupts an injected action. Clearing a temporary stop
+does not revive read-owned Audio or Cancel clicks. Synthetic regressions
+cover all five stops without provider mutation or prompt dismissal.
+
 On 2026-10-12, Create Set ownership checks began revoking a
 claimed document after a visible CAPTCHA, modal, security interstitial,
 password field or replaced form. Clearing the stop does not revive
