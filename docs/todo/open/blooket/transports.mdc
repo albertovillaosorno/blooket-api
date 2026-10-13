@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, read-owned question Cancel now retains its human
+interaction watch until the browser independently observes the modal
+closed. A missing question form before the owned Cancel click cannot
+count as successful cleanup. Trusted activity between Cancel and
+closure permanently invalidates the observation and prevents automatic
+route restoration. Synthetic panel regressions cover both closures.
+
 On 2026-10-12, capability openers stopped treating a post-click
 browser exception as a known rejected click. Instead, an Add Question
 or Audio opener that might already have executed surfaces an explicit
