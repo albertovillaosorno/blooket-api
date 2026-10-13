@@ -312,6 +312,13 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     const inputs = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
+    // A once-verified modal cannot vanish and later regain read ownership.
+    if (watch.form && (inputs.length !== 1 ||
+        inputs[0] !== watch.question ||
+        inputs[0]?.getAttribute("type") !== "hidden")) {
+      watch.dirty = true;
+      return false;
+    }
     if (inputs.length !== 1 || inputs[0]?.tagName !== "INPUT") return false;
     const question = inputs[0] as HTMLInputElement;
     if (question.getAttribute("type") !== "hidden") return false;
@@ -320,6 +327,14 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     const setIds = Array.from(
       form.querySelectorAll('input#setId[name="setId"]'),
     );
+    // Changes to a previously verified set binding are not hydration.
+    if (watch.form && (setIds.length !== 1 ||
+        setIds[0]?.tagName !== "INPUT" ||
+        setIds[0]?.getAttribute("type") !== "hidden" ||
+        (setIds[0] as HTMLInputElement).value !== setId)) {
+      watch.dirty = true;
+      return false;
+    }
     if (setIds.length !== 1 || setIds[0]?.tagName !== "INPUT" ||
         setIds[0].getAttribute("type") !== "hidden" ||
         (setIds[0] as HTMLInputElement).value !== setId) return false;
@@ -431,6 +446,13 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
+    // A once-verified modal cannot vanish and later regain read ownership.
+    if (watch.form && (questions.length !== 1 ||
+        questions[0] !== watch.question ||
+        questions[0]?.getAttribute("type") !== "hidden")) {
+      watch.dirty = true;
+      return false;
+    }
     if (questions.length !== 1 || questions[0]?.tagName !== "INPUT")
       return false;
     const question = questions[0]!;
@@ -445,6 +467,14 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
+    // Changes to a previously verified set binding are not hydration.
+    if (watch.form && (identities.length !== 1 ||
+        identities[0]?.tagName !== "INPUT" ||
+        identities[0]?.getAttribute("type") !== "hidden" ||
+        (identities[0] as HTMLInputElement).value !== setId)) {
+      watch.dirty = true;
+      return false;
+    }
     if (
       identities.length !== 1 ||
       identities[0]?.tagName !== "INPUT" ||
@@ -553,6 +583,13 @@ export function inspectBlooketAudioCapabilityDrawer(
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
+    // A once-verified modal cannot vanish and later regain read ownership.
+    if (watch.form && (questions.length !== 1 ||
+        questions[0] !== watch.question ||
+        questions[0]?.getAttribute("type") !== "hidden")) {
+      watch.dirty = true;
+      return failed();
+    }
     if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
         questions[0].getAttribute("type") !== "hidden")
       return failed();
@@ -566,6 +603,14 @@ export function inspectBlooketAudioCapabilityDrawer(
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
+    // Changes to a previously verified set binding are not hydration.
+    if (watch.form && (identities.length !== 1 ||
+        identities[0]?.tagName !== "INPUT" ||
+        identities[0]?.getAttribute("type") !== "hidden" ||
+        (identities[0] as HTMLInputElement).value !== setId)) {
+      watch.dirty = true;
+      return failed();
+    }
     if (
       identities.length !== 1 ||
       identities[0]?.tagName !== "INPUT" ||
@@ -700,6 +745,13 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
+    // A once-verified modal cannot vanish and later regain read ownership.
+    if (watch.form && (questions.length !== 1 ||
+        questions[0] !== watch.question ||
+        questions[0]?.getAttribute("type") !== "hidden")) {
+      watch.dirty = true;
+      return false;
+    }
     if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
         questions[0].getAttribute("type") !== "hidden")
       return false;
@@ -713,6 +765,14 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
+    // Changes to a previously verified set binding are not hydration.
+    if (watch.form && (identities.length !== 1 ||
+        identities[0]?.tagName !== "INPUT" ||
+        identities[0]?.getAttribute("type") !== "hidden" ||
+        (identities[0] as HTMLInputElement).value !== setId)) {
+      watch.dirty = true;
+      return false;
+    }
     if (
       identities.length !== 1 ||
       identities[0]?.tagName !== "INPUT" ||
@@ -818,6 +878,13 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
+    // A once-verified modal cannot vanish and later regain read ownership.
+    if (watch.form && (questions.length !== 1 ||
+        questions[0] !== watch.question ||
+        questions[0]?.getAttribute("type") !== "hidden")) {
+      watch.dirty = true;
+      return false;
+    }
     if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
         questions[0].getAttribute("type") !== "hidden")
       return false;
@@ -831,6 +898,14 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
+    // Changes to a previously verified set binding are not hydration.
+    if (watch.form && (identities.length !== 1 ||
+        identities[0]?.tagName !== "INPUT" ||
+        identities[0]?.getAttribute("type") !== "hidden" ||
+        (identities[0] as HTMLInputElement).value !== setId)) {
+      watch.dirty = true;
+      return false;
+    }
     if (
       identities.length !== 1 ||
       identities[0]?.tagName !== "INPUT" ||
@@ -932,6 +1007,13 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
+    // A once-verified modal cannot vanish and later regain read ownership.
+    if (watch.form && (questions.length !== 1 ||
+        questions[0] !== watch.question ||
+        questions[0]?.getAttribute("type") !== "hidden")) {
+      watch.dirty = true;
+      return false;
+    }
     if (questions.length !== 1 || questions[0]?.tagName !== "INPUT" ||
         questions[0].getAttribute("type") !== "hidden")
       return false;
@@ -945,6 +1027,14 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     const identities = Array.from(form.querySelectorAll(
       'input#setId[name="setId"]',
     ));
+    // Changes to a previously verified set binding are not hydration.
+    if (watch.form && (identities.length !== 1 ||
+        identities[0]?.tagName !== "INPUT" ||
+        identities[0]?.getAttribute("type") !== "hidden" ||
+        (identities[0] as HTMLInputElement).value !== setId)) {
+      watch.dirty = true;
+      return false;
+    }
     if (
       identities.length !== 1 ||
       identities[0]?.tagName !== "INPUT" ||
