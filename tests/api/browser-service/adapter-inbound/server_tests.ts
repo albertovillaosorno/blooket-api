@@ -46,6 +46,8 @@ import {
   loadPreferences,
   savePreferences,
 } from "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
+import { acquireCanonicalDataUpdateBoundary } from
+  "../../../../src/platforms/user-storage/adapter-outbound/writer-boundary.ts";
 
 test("local icons load and image intake requires origin and CSRF", async () => {
   const root = await mkdtemp(join(tmpdir(), "clipboard-service-"));
@@ -80,6 +82,62 @@ test("local icons load and image intake requires origin and CSRF", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("update ownership excludes direct HTTP data writers and lazy reads",
+  { timeout: 10_000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "http-writer-admission-"));
+  let secretWrites = 0;
+  const secrets = {
+    read: async () => ({ ok: true as const, kind: "missing" as const }),
+    write: async () => { secretWrites++; return { ok: true as const }; },
+    delete: async () => ({ ok: true as const }),
+  };
+  const service = await startBrowserService({ root, port: 0, secrets,
+    instance: "123e4567-e89b-42d3-a456-426614174000" });
+  let installation:
+    Awaited<ReturnType<typeof acquireCanonicalDataUpdateBoundary>> | undefined;
+  try {
+    const boot = await (await fetch(service.origin + "/api/bootstrap")).json();
+    const preferences = await loadPreferences(root);
+    const before = await readFile(join(root, "settings.json"));
+    const writesBefore = secretWrites;
+    // Bootstrap's owned data lease ends after the actual handler settles,
+    // which can be later than the client receiving its response bytes.
+    for (let attempt = 0; attempt < 50; attempt++) {
+      installation = await acquireCanonicalDataUpdateBoundary(root);
+      if (installation.ok || installation.reason !== "writer-active") break;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.equal(installation?.ok, true);
+    const response = await fetch(service.origin + "/api/settings", {
+      method: "POST", headers: { Origin: service.origin,
+        "Content-Type": "application/json", "X-CSRF-Token": boot.csrf },
+      body: JSON.stringify({ preferences: { ...preferences, locale: "es" },
+        password: "synthetic-test-value", tunnelToken: "" }),
+    });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      ok: false, code: "service-busy",
+    });
+    assert.equal(secretWrites, writesBefore);
+    assert.deepEqual(await readFile(join(root, "settings.json")), before);
+    assert.equal((await fetch(service.origin + "/api/bootstrap")).status, 503);
+    assert.equal((await fetch(service.origin + "/media/fictional")).status,
+      503);
+    assert.equal((await fetch(service.origin + "/api/service-status")).status,
+      200);
+    assert.equal((await fetch(service.origin + "/api/update-status")).status,
+      200);
+    if (installation?.ok) await installation.release();
+    installation = undefined;
+    assert.equal((await fetch(service.origin + "/api/bootstrap")).status, 200);
+  } finally {
+    if (installation?.ok) await installation.release();
+    await service.quiesce();
+    await rm(root, { recursive: true, force: true });
+  }
+  },
+);
 
 test(
   "fixed collisions stop; automatic ports honor " + "and persist loopback",

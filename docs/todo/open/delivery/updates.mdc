@@ -648,6 +648,19 @@ remains in blooket-15 and does not block this portable implementation.
 
 ## Blockers
 
+On 2026-10-13, direct local HTTP data operations began sharing canonical
+user-data writer leases, retained until their handlers finish. A held update
+boundary refuses settings/media operations and lazy reads while keeping pure
+service/update-status observations available. Canonical publication retains
+its existing ownership order, avoiding a data-before-publication inversion.
+
+Real local service tests demonstrate that a held settings writer excludes
+installation before shutdown begins, and remains protected through drainage.
+A separate HTTP test proves settings and secret stores remain untouched while
+installation admission is held. Startup/discovery persistence, independent
+installer lifetime, publisher trust, and installer-owned startup still need
+their composition; these tests do not enable automatic installation.
+
 Production publisher keys/manifest publication, product staging integration,
 independent installer composition with all writer fences and actual runtime
 health, and opt-in product controls remain functional work. Existing identity,
