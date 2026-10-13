@@ -336,3 +336,10 @@ installation clearance. Synthetic responsive-server tests and a real
 temporary supervised service demonstrate refusal and completed normal
 shutdown. Installer replacement still requires independent publication
 and data locks, private IPC closure and trusted release evidence.
+
+On Fedora, a disposable service retaining an unrelated canonical writer
+correctly refused launcher stop confirmation until that writer's owner
+released its lease. An isolated old-to-new Linux package change also
+preserved byte-identical synthetic draft and publication files, reused
+one new supervised instance, and confirmed a completed normal stop.
+No live account data was involved in that migration test.
