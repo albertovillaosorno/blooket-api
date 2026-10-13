@@ -424,10 +424,11 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
         form?: Element; question?: Element; drawer?: Element;
+        audioOpened?: boolean;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
-        watch.dirty) return false;
+        watch.dirty || watch.audioOpened) return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -492,6 +493,9 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
         style.display === "none" || style.visibility !== "visible" ||
         control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
+    // Latch before the browser click. Lost acknowledgements must not
+    // reopen or toggle a drawer while its first render is still pending.
+    watch.audioOpened = true;
     control.click();
     return true;
   } catch {
@@ -726,10 +730,11 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
         form?: Element; question?: Element; drawer?: Element;
+        audioCancelled?: boolean;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
-        watch.dirty) return false;
+        watch.dirty || watch.audioCancelled) return false;
     const url = new URL(location.href);
     if (
       url.origin !== "https://dashboard.blooket.com" ||
@@ -798,6 +803,8 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
         style.display === "none" || style.visibility !== "visible" ||
         control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
+    // A lost Cancel acknowledgement must not trigger a second click.
+    watch.audioCancelled = true;
     control.click();
     return true;
   } catch {
@@ -985,10 +992,11 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       __blooketCapabilityEditWatch?: {
         document: Document; setId: string; dirty: boolean;
         form?: Element; question?: Element; drawer?: Element;
+        questionCancelled?: boolean;
       };
     }).__blooketCapabilityEditWatch;
     if (!watch || watch.document !== document || watch.setId !== setId ||
-        watch.dirty) return false;
+        watch.dirty || watch.questionCancelled) return false;
     const normalized = (element: Element) =>
       (element.textContent ?? "").replace(/\s+/gu, " ").trim();
     const url = new URL(location.href);
@@ -1052,6 +1060,8 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
         style.display === "none" || style.visibility !== "visible" ||
         control.disabled ||
         control.getAttribute("aria-disabled") === "true") return false;
+    // A lost Cancel acknowledgement must not trigger a second click.
+    watch.questionCancelled = true;
     control.click();
     const owned = (globalThis as typeof globalThis & {
       __blooketCapabilityEditWatch?: { dispose: () => void };

@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, read-owned capability Audio opening and both
+Audio/question Cancel controls became single-use per claimed panel.
+The ownership latch is set before the UI click, so a lost browser
+acknowledgement never authorizes a second click or toggles an
+underlying teacher editor. Synthetic tests verify the one-click bound
+and preserve ambiguous cleanup without navigating away.
+
 On 2026-10-12, a capability panel that was already verified can no
 longer recover after its hidden question form disappears, changes type
 or points at another set. Read-owned Audio helpers also permanently
