@@ -1204,3 +1204,29 @@ from a successful authenticated product-owned Blooket publication.
 Keep task blooket-09 open until a current loaded extension and the
 canonical CLI/MCP path actually persist and verify the remote set and
 questions after reload. Do not replay ambiguous prior attempts.
+
+## Read-navigation and bridge-admission follow-up (2026-10-13)
+
+The capability read-navigation guard now refuses visible CAPTCHA/hCaptcha
+frames and focused teacher SELECT, contenteditable, or accessible textbox
+controls. A non-mutating probe must not discard a teacher's own work or
+leave an interactive challenge behind when navigating toward My Sets.
+
+The login preparer checks its trusted-interaction latch immediately after
+dispatching username events, before filling a password. The current bridge
+command decoder admits only dense canonical answer and typing-mode arrays,
+reads data descriptors rather than JavaScript getters, and normalizes the
+arrays into plain owned values before broker JSON delivery. The broker
+similarly rejects accessor-backed response IDs and malformed pairing tokens
+before selecting a pending job. Synthetic broker integration confirms that
+caller-provided array subclasses cannot execute inherited serializers.
+
+The Fedora development environment now uses the official Python 3.14.8
+security maintenance release, published on September 30, 2026, with its
+actual managed version matching the repository's Jig version authority.
+Reference: https://www.python.org/downloads/release/python-3148/
+
+These checks do not demonstrate a loaded authenticated extension creating
+and rereading Blooket content. The first unfinished publication task remains
+open. Existing ambiguous write journals cannot be replayed automatically,
+and macOS/Safari acceptance is not implied by Linux checks.
