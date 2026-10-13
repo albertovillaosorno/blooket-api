@@ -35,3 +35,10 @@ paths = ["docs/technical/blooket-development-handoff.md", "docs/technical/develo
 decision_id = "none"
 section_mode = "required"
 sections = []
+
+[profile.browser-acceptance-tools]
+kind = "adr"
+paths = ["docs/technical/browser-acceptance-tools.md"]
+decision_id = "none"
+section_mode = "required"
+sections = []
