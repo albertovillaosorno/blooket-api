@@ -50,8 +50,8 @@ target = "pnpm"
 template = "pnpm@{version}"
 
 [authority.python-tool]
-current = "3.14.7"
-stable = "3.14.7"
+current = "3.14.8"
+stable = "3.14.8"
 
 [authority.python-tool.projection.tool]
 kind = "tool"
