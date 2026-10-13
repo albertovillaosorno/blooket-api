@@ -924,3 +924,26 @@ test("question scans reject accessor-backed Chrome result array slots",
     assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
+
+test("question enumeration copies card descriptors without proxy get traps",
+  async () => {
+  let indexedReads = 0;
+  const numbers = new Proxy([1], {
+    get(target, key, receiver) {
+      if (key === "length" || key === "0") {
+        indexedReads++;
+        throw new Error("Untrusted question enumeration index");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const fixture = synthetic({
+    initial: { ok: true, value: numbers },
+    after: { ok: true, value: numbers },
+  });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
+    ok: true, value: [validQuestion],
+  });
+  assert.equal(indexedReads, 0);
+  },
+);

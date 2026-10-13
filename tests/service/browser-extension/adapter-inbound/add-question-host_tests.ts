@@ -1336,3 +1336,28 @@ test("Add Question rejects a panel remounted after Cancel", async () => {
     "runBlooketAddQuestionPageAction:submit").length, 1);
   assert.equal(fake.calls.includes("reload"), false);
 });
+
+test("Add Question host owns card numbers before indexed proxy reads",
+  async () => {
+  let indexedReads = 0;
+  const unreadable = (values: number[]) => new Proxy(values, {
+    get(target, key, receiver) {
+      if (key === "length" || key === "0") {
+        indexedReads++;
+        throw new Error("Untrusted saved-card index read");
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const fake = fakeChrome({
+    priorListReply: { ok: true, value: unreadable([]) },
+    listReply: { ok: true, value: unreadable([1]) },
+  });
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: true });
+  assert.equal(indexedReads, 0);
+  assert.equal(fake.calls.filter(name =>
+    name === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
