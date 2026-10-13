@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-12, each read-owned capability panel and Audio drawer
+operation began permanently revoking its document claim on an
+unexpected Edit URL, extra query parameter or fragment. Restoring the
+same route does not revive stale read-owned clicks or completion proof.
+Synthetic tests exercise all six operation paths without modifying a
+teacher set.
+
 On 2026-10-12, a read-owned capability probe began permanently
 revoking its document watch whenever an authenticated shell disappears
 or a CAPTCHA, organization prompt, password overlay, or verification

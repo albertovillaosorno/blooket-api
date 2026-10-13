@@ -305,8 +305,10 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
-    )
+    ) {
+      watch.dirty = true;
       return false;
+    }
     const inputs = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
@@ -422,8 +424,10 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId ||
       document.querySelectorAll('aside[data-drawer-open="true"]').length !== 0
-    )
+    ) {
+      watch.dirty = true;
       return false;
+    }
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
@@ -542,8 +546,10 @@ export function inspectBlooketAudioCapabilityDrawer(
       url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
-    )
+    ) {
+      watch.dirty = true;
       return failed();
+    }
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
@@ -687,8 +693,10 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       url.hash || url.searchParams.size !== 1 ||
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId
-    )
+    ) {
+      watch.dirty = true;
       return false;
+    }
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
@@ -799,6 +807,14 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     if (!watch || watch.document !== document || watch.setId !== setId ||
         watch.dirty) return false;
     const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || url.hash ||
+        url.searchParams.size !== 1 ||
+        url.searchParams.getAll("id").length !== 1 ||
+        url.searchParams.get("id") !== setId) {
+      watch.dirty = true;
+      return false;
+    }
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
@@ -909,8 +925,10 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       url.searchParams.getAll("id").length !== 1 ||
       url.searchParams.get("id") !== setId ||
       document.querySelectorAll('aside[data-drawer-open="true"]').length !== 0
-    )
+    ) {
+      watch.dirty = true;
       return false;
+    }
     const questions = Array.from(
       document.querySelectorAll('input#question[name="question"]'),
     );
