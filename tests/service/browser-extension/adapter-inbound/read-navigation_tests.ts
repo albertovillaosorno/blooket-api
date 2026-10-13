@@ -350,3 +350,51 @@ test("failed or stale navigation cannot export a target document epoch",
   assert.deepEqual(origins, []);
   },
 );
+
+test("a teacher edit admitted after first read checks blocks navigation",
+  async () => {
+  for (const target of [SETS, EDIT]) {
+    const page = fixture();
+    let lateChecks = 0;
+    const result = await confirmBlooketReadNavigation(
+      page.tabs, 7, page.previous, target, 8_000, page.pause,
+      page.documentOrigin, page.now, undefined, undefined,
+      async () => { lateChecks++; return false; },
+    );
+    assert.equal(result, undefined);
+    assert.equal(lateChecks, 1);
+    assert.equal(page.updates(), 0);
+    assert.equal(page.reloads(), 0);
+  }
+  },
+);
+
+test("a late read-leave guard never extends the shared deadline",
+  async () => {
+  const page = fixture();
+  let called = 0;
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 200, page.pause,
+    page.documentOrigin, page.now, undefined, undefined,
+    async () => { called++; await page.pause(200); return true; },
+  );
+  assert.equal(result, undefined);
+  assert.equal(called, 1);
+  assert.equal(page.updates(), 0);
+  },
+);
+
+test("a final safe editor check still admits one fresh read navigation",
+  async () => {
+  const page = fixture();
+  let checks = 0;
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, EDIT, 8_000, page.pause,
+    page.documentOrigin, page.now, undefined, undefined,
+    async () => { checks++; return true; },
+  );
+  assert.deepEqual(result, { url: EDIT, status: "complete" });
+  assert.equal(checks, 1);
+  assert.equal(page.updates(), 1);
+  },
+);

@@ -1374,3 +1374,62 @@ test("Add Question refuses nested-frame evidence before one Save click",
   assert.equal(fake.calls.some(name => name.includes(":submit")), false);
   },
 );
+
+test("Add Question accepts main-frame Chrome result metadata",
+  async () => {
+  const fake = fakeChrome({});
+  const injected = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 0 }));
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: true });
+  assert.equal(fake.calls.filter(name => name.includes(":submit")).length, 1);
+  },
+);
+
+test("nested-frame Add Question Save needs fresh proof without replay",
+  async () => {
+  const fake = fakeChrome({});
+  const injected = fake.chrome.scripting.executeScript;
+  let saves = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    const frames = await injected(request);
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "submit") {
+      saves++;
+      return frames.map(frame => ({ ...frame, frameId: 7 }));
+    }
+    return frames;
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: true });
+  assert.equal(saves, 1);
+  // Only a separate post-Save reload and saved-question readback can
+  // confirm an acknowledgement the first script could not establish.
+  assert.equal(fake.calls.includes("reload"), true);
+  },
+);
+
+test("invalid Save frame cannot confirm an unsaved question or retry it",
+  async () => {
+  const fake = fakeChrome({ savePersists: false });
+  const injected = fake.chrome.scripting.executeScript;
+  let saves = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    const frames = await injected(request);
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "submit") {
+      saves++;
+      return frames.map(frame => ({ ...frame, frameId: 4 }));
+    }
+    return frames;
+  };
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input)).ok, false);
+  assert.equal(saves, 1);
+  assert.equal(fake.calls.includes("reload"), true);
+  },
+);

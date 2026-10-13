@@ -386,6 +386,8 @@ async function read(
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [url]),
     Date.now, approvedSourceOrigin,
     origin => { confirmedTargetOrigin = origin; },
+    async () => await script(current, browser,
+      canLeaveBlooketPageForRead as (...args: never[]) => unknown) === true,
   );
   if (!confirmed || (target !== null &&
       confirmedTargetOrigin === undefined))

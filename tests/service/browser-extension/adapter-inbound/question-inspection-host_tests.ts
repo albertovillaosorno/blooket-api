@@ -960,3 +960,15 @@ test("saved question scans reject a nested-frame script result",
   assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
+
+test("saved question scans admit Chrome main-frame evidence",
+  async () => {
+  const page = synthetic();
+  const injected = page.port.scripting.executeScript;
+  page.port.scripting.executeScript = async request =>
+    (await injected(request)).map(frame => ({ ...frame, frameId: 0 }));
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), {
+    ok: true, value: [validQuestion],
+  });
+  },
+);

@@ -1299,3 +1299,39 @@ Shared runtime-decoding primitives also return failure evidence when a
 record is revoked or property descriptors cannot be inspected. These
 are synthetic Fedora tests only. They do not establish a live Create
 Set/Add Question acceptance run or permit replay of ambiguous writes.
+
+## Chrome main-frame script result admission (2026-10-13)
+
+The browser extension now checks the directly owned Chrome `frameId` data
+field on each injected page-script receipt when supplied. `frameId: 0`
+represents the tab's main frame; nested frame IDs or accessor-backed
+metadata cannot confirm credential, capability, saved-state, or write
+observations. Synthetic tests cover both refusal and valid frame zero.
+
+The official [Chrome scripting reference][chrome-scripting] documents the
+`InjectionResult.frameId` field and serialized function semantics;
+[Chrome's webNavigation reference][chrome-frames] specifies main frame
+zero. Both were checked on 2026-10-13. A real authenticated loaded
+extension still needs separate verification; none of these frame fixtures
+prove provider publication or native Safari compatibility.
+
+<!-- jig-ignore-next-line: Preserve the exact vendor URL. -->
+[chrome-scripting]: https://developer.chrome.com/docs/extensions/reference/api/scripting
+<!-- jig-ignore-next-line: Preserve the exact vendor URL. -->
+[chrome-frames]: https://developer.chrome.com/docs/extensions/reference/api/webNavigation
+
+
+## Read-only navigation race guard (2026-10-13)
+
+A browser-host read that needs to reload or navigate an owned Blooket
+tab now probes the native source document and its permission to leave
+again immediately before that tab operation. A teacher edit begun
+while the preceding asynchronous checks were pending invalidates the
+read instead of navigating away from newly owned work. Route and
+native document origin still must match across both checks.
+
+These are Fedora synthetic tests. Browser-control attachment to the
+existing authenticated Chrome window was unavailable during this
+session, so live loaded-extension acceptance and native Safari remain
+unverified. The final guard narrows a race but cannot make separate
+Chrome commands an atomic transaction with arbitrary human input.
