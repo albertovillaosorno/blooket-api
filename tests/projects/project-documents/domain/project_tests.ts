@@ -111,3 +111,23 @@ test("project documents require the canonical media index", () => {
 
   assert.equal(result.ok, false);
 });
+
+
+test("project fields and question slots never call accessors", () => {
+  let calls = 0;
+  const getter = () => { calls++; throw Error("unexpected getter"); };
+  const hiddenTitle = Object.defineProperty({ ...project }, "title", {
+    enumerable: true, get: getter,
+  });
+  assert.equal(decodeProjectDocument(hiddenTitle).ok, false);
+  const questions = Object.defineProperty([question], "0", {
+    enumerable: true, get: getter,
+  });
+  assert.equal(decodeProjectDocument({ ...project, questions }).ok, false);
+  const extra = Object.defineProperty([question], Symbol("hidden"), {
+    value: true,
+  });
+  assert.equal(decodeProjectDocument({ ...project, questions: extra }).ok,
+    false);
+  assert.equal(calls, 0);
+});

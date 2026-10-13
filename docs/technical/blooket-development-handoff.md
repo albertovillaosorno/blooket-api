@@ -1278,3 +1278,17 @@ and their admission policies without running property getters.
 Portable synthetic regressions cover accessors, hidden fields, and
 malformed proxies. They do not prove account publication or native
 macOS/Safari acceptance; blooket-09 remains open.
+
+
+## Canonical draft decoder ownership (2026-10-13)
+
+Project, question, answer and image-request decoders now inspect only
+owned data properties before planning a publication. Their question
+and multiple-choice answer arrays require dense indexed slots and do
+not iterate through caller-defined array methods. Hidden or accessor
+properties cannot provide successful canonical draft facts.
+
+Shared runtime-decoding primitives also return failure evidence when a
+record is revoked or property descriptors cannot be inspected. These
+are synthetic Fedora tests only. They do not establish a live Create
+Set/Add Question acceptance run or permit replay of ambiguous writes.

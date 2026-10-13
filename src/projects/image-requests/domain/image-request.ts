@@ -36,6 +36,7 @@ import {
 } from "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
@@ -61,11 +62,11 @@ export function decodeImageRequest(
     ...unknownFieldIssues(value, IMAGE_KEYS, path),
   ];
   const description = requiredString(
-    value["description"],
+    ownDataField(value, "description"),
     `${path}.description`,
     issues,
   );
-  const mediaId = value["mediaId"];
+  const mediaId = ownDataField(value, "mediaId");
 
   if (mediaId !== null) {
     const decoded = decodeMediaId(mediaId, `${path}.mediaId`);

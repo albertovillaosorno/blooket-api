@@ -35,7 +35,9 @@ import {
   type ValidationIssue,
 } from "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
+  isExactDenseArray,
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
@@ -107,11 +109,11 @@ export function decodeQuestionDocument(
     );
   }
 
-  if (value["type"] === "multiple-choice") {
+  if (ownDataField(value, "type") === "multiple-choice") {
     return decodeMultipleChoice(value, path);
   }
 
-  if (value["type"] === "typing-answer") {
+  if (ownDataField(value, "type") === "typing-answer") {
     return decodeTypingAnswer(value, path);
   }
 
@@ -129,20 +131,24 @@ function decodeMultipleChoice(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, MULTIPLE_CHOICE_KEYS, path),
   ];
-  const id = decodeQuestionId(value["id"], `${path}.id`, issues);
-  const prompt = requiredString(value["prompt"], `${path}.prompt`, issues);
+  const id = decodeQuestionId(ownDataField(value, "id"), `${path}.id`, issues);
+  const prompt = requiredString(
+    ownDataField(value, "prompt"), `${path}.prompt`, issues,
+  );
   const timeLimitSeconds = decodeTimeLimit(
-    value["timeLimitSeconds"],
+    ownDataField(value, "timeLimitSeconds"),
     `${path}.timeLimitSeconds`,
     issues,
   );
-  const randomOrder = value["randomOrder"];
+  const randomOrder = ownDataField(value, "randomOrder");
   const image = decodeNullableImage(
-    value["image"],
+    ownDataField(value, "image"),
     `${path}.image`,
     issues,
   );
-  const answers = decodeAnswers(value["answers"], `${path}.answers`, issues);
+  const answers = decodeAnswers(
+    ownDataField(value, "answers"), `${path}.answers`, issues,
+  );
 
   if (typeof randomOrder !== "boolean") {
     issues.push({
@@ -203,20 +209,24 @@ function decodeTypingAnswer(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, TYPING_ANSWER_KEYS, path),
   ];
-  const id = decodeQuestionId(value["id"], `${path}.id`, issues);
-  const prompt = requiredString(value["prompt"], `${path}.prompt`, issues);
+  const id = decodeQuestionId(ownDataField(value, "id"), `${path}.id`, issues);
+  const prompt = requiredString(
+    ownDataField(value, "prompt"), `${path}.prompt`, issues,
+  );
   const timeLimitSeconds = decodeTimeLimit(
-    value["timeLimitSeconds"],
+    ownDataField(value, "timeLimitSeconds"),
     `${path}.timeLimitSeconds`,
     issues,
   );
   const image = decodeNullableImage(
-    value["image"],
+    ownDataField(value, "image"),
     `${path}.image`,
     issues,
   );
-  const matchMode = value["matchMode"];
-  const answer = requiredString(value["answer"], `${path}.answer`, issues);
+  const matchMode = ownDataField(value, "matchMode");
+  const answer = requiredString(
+    ownDataField(value, "answer"), `${path}.answer`, issues,
+  );
 
   if (matchMode !== "exact" && matchMode !== "contains") {
     issues.push({
@@ -264,7 +274,7 @@ function decodeAnswers(
   path: string,
   issues: ValidationIssue[],
 ): readonly MultipleChoiceAnswer[] | undefined {
-  if (!Array.isArray(value)) {
+  if (!isExactDenseArray(value)) {
     issues.push({
       path,
       code: "expected-array",
@@ -282,8 +292,10 @@ function decodeAnswers(
   }
 
   const answers: MultipleChoiceAnswer[] = [];
-  for (const [index, candidate] of value.entries()) {
-    const decoded = decodeAnswer(candidate, `${path}[${index}]`);
+  for (let index = 0; index < value.length; index++) {
+    const candidate = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!candidate || !Object.hasOwn(candidate, "value")) return undefined;
+    const decoded = decodeAnswer(candidate.value, `${path}[${index}]`);
     if (!decoded.ok) {
       issues.push(...decoded.issues);
       continue;
@@ -305,13 +317,13 @@ function decodeAnswer(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, ANSWER_KEYS, path),
   ];
-  const textValue = value["text"];
+  const textValue = ownDataField(value, "text");
   const text = textValue === null
     ? null
     : requiredString(textValue, `${path}.text`, issues);
-  const correct = value["correct"];
+  const correct = ownDataField(value, "correct");
   const image = decodeNullableImage(
-    value["image"],
+    ownDataField(value, "image"),
     `${path}.image`,
     issues,
   );

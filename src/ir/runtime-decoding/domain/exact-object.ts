@@ -34,7 +34,10 @@ import type { ValidationIssue } from "./decode-result.js";
 export type UnknownRecord = Readonly<Record<string, unknown>>;
 
 export function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  try {
+    return typeof value === "object" && value !== null &&
+      !Array.isArray(value);
+  } catch { return false; }
 }
 
 export function isExactDenseArray(value: unknown): value is unknown[] {
@@ -59,8 +62,11 @@ export function ownDataField(
   value: UnknownRecord,
   key: string,
 ): unknown {
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && "value" in descriptor ? descriptor.value : undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && "value" in descriptor
+      ? descriptor.value : undefined;
+  } catch { return undefined; }
 }
 
 // Own an untrusted envelope without evaluating property getters or inherited
@@ -94,7 +100,8 @@ export function unknownFieldIssues(
   allowed: ReadonlySet<string>,
   path: string,
 ): readonly ValidationIssue[] {
-  return Reflect.ownKeys(value)
+  try {
+    return Reflect.ownKeys(value)
     .map(key => {
       const name = typeof key === "string" ? key : "[symbol]";
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -112,6 +119,10 @@ export function unknownFieldIssues(
       code: "unknown-field",
       message: "Field is not admitted by this contract.",
     }));
+  } catch {
+    return [{ path, code: "unknown-field",
+      message: "Object descriptors could not be inspected." }];
+  }
 }
 
 export function requiredString(
