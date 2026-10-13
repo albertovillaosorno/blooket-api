@@ -1204,7 +1204,8 @@ test("lost Audio click acknowledgement cannot be replayed",
       clicked();
       throw new Error("synthetic lost acknowledgement");
     };
-    assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
+    assert.throws(() => openBlooketAudioCapabilityDrawer("set-fixture"),
+      /browser-capability-audio-open-unconfirmed/u);
     page.audio.click = clicked;
     assert.equal(openBlooketAudioCapabilityDrawer("set-fixture"), false);
     assert.equal(page.audio.clicked, 1);
@@ -1255,5 +1256,25 @@ test("read-owned capability Cancel clicks are single-shot on lost replies",
       }
     });
   }
+  },
+);
+
+
+test("a lost Add Question opener acknowledgement preserves panel ownership",
+  () => {
+  const page = fixture();
+  withPage(page.document, () => {
+    const clicked = page.add.click.bind(page.add);
+    page.add.click = () => {
+      clicked();
+      throw new Error("synthetic late opener failure");
+    };
+    assert.throws(() => openBlooketCapabilityQuestionPanel("set-fixture"),
+      /browser-capability-open-unconfirmed/u);
+    page.add.click = clicked;
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), false);
+    assert.equal(page.add.clicked, 1);
+    assert.equal(page.cancel.clicked, 0);
+  });
   },
 );
