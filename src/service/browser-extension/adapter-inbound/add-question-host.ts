@@ -534,7 +534,14 @@ async function observeQuestion(
           [input.setId],
         ).catch(() => null);
         // Each list independently proves the exact same 1..n cards.
-        return questionNumberPresent(finalAgain, input.number)
+        // The owned panel must remain closed after the delayed list render;
+        // a remount cannot turn a transient Cancel into a success receipt.
+        const stillClosed = await script(
+          isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
+          [input.setId],
+        ).catch(() => false);
+        return stillClosed === true &&
+            questionNumberPresent(finalAgain, input.number)
           ? { ok: true } : browserFailure();
       }
       if (isClosed !== false) return browserFailure();

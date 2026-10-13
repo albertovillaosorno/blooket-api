@@ -1301,7 +1301,7 @@ test("fresh Create Set observes saved private and public visibility",
     assert.deepEqual(fake.calls.filter(call => call.startsWith("detail-")),
       ["detail-open", "detail-read", "detail-read", "detail-close",
         "detail-is-closed", "detail-final-sidebar",
-        "detail-final-sidebar"]);
+        "detail-final-sidebar", "detail-is-closed"]);
     assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   }
   },
@@ -1742,3 +1742,36 @@ test("Create Set never evaluates Chrome array index accessors",
     assert.equal(calls, 0);
   },
 );
+
+
+test("Create Set refuses Edit Info reopened after Cancel and sidebar proof",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: {
+    title: expected.title, description: expected.description,
+  } };
+  const fake = fakeChrome({ scripts: [
+    observed, observed, sidebar, sidebar,
+    observed, sidebar, observed, sidebar,
+  ] });
+  fake.setTab({
+    url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete",
+  });
+  const injected = fake.chrome.scripting.executeScript;
+  let closures = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "isBlooketDetailPanelClosed" &&
+        ++closures === 2) return [{ result: false }];
+    return await injected(request);
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(closures, 2);
+  assert.equal(fake.calls.filter(name => name === "detail-open").length, 1);
+  assert.equal(fake.calls.filter(name => name === "detail-close").length, 1);
+});

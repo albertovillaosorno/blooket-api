@@ -1314,3 +1314,25 @@ test("Add Question refuses Chrome array slot accessors before mutation",
       name === "runBlooketAddQuestionPageAction:submit"), false);
   },
 );
+
+
+test("Add Question does not confirm a panel remounted after Cancel", async () => {
+  const fake = fakeChrome({});
+  const injected = fake.chrome.scripting.executeScript;
+  let closures = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "isBlooketQuestionPanelClosed" &&
+        ++closures === 2) return [{ result: false }];
+    return await injected(request);
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.deepEqual(result, {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(closures, 2);
+  assert.equal(fake.calls.filter(call => call ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.includes("reload"), false);
+});

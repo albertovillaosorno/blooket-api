@@ -284,7 +284,14 @@ export function createExtensionCreateSetHost(
     );
     // Both snapshots independently match the exact expected primitives.
     // Serializing an injected browser object could invoke inherited toJSON.
-    return await owns() && exactSavedSidebar(again, expected);
+    if (!await owns() || !exactSavedSidebar(again, expected)) return false;
+    // Recheck the canceled panel after the delayed sidebar hydration too.
+    // An Edit Info remount must not become a durable Create Set receipt.
+    const stillClosed = await script(
+      isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+      [setId],
+    ).catch(() => false);
+    return stillClosed === true && await owns();
   };
 
   return {
