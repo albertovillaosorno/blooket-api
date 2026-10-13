@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-13, the command decoder also began cloning typing
+match modes into a plain owned array before broker delivery.
+Validated array subclasses cannot later run inherited `toJSON`
+methods when the pending browser job is serialized. Synthetic IR
+tests verify preserved match semantics without calling the supplied
+serializer or altering an account.
+
 On 2026-10-13, browser bridge commands and reply envelopes began
 using directly owned data descriptors rather than executing accessor
 properties. Broker completion reads a pending-job ID only through its

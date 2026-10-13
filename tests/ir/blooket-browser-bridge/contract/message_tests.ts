@@ -266,16 +266,23 @@ test("Add Question bridge never invokes inherited array methods", () => {
   }
   class HostileModes extends Array<string> {
     override every(): boolean { intercepted++; throw new Error("untrusted"); }
+    toJSON(): never { intercepted++; throw new Error("untrusted"); }
   }
   const answers = new HostileAnswers();
   answers.push({ text: "sun", correct: true });
   const answerTypes = new HostileModes();
   answerTypes.push("exactly");
-  assert.equal(decodeBlooketBrowserBridgeRequest(request({
+  const decoded = decodeBlooketBrowserBridgeRequest(request({
     kind: "questions.create", setId: "set-fixture", number: 1,
     question: "Type sun.", answers, qType: "typing", random: true,
     answerTypes, timeLimit: 15,
-  })).ok, true);
+  }));
+  assert.equal(decoded.ok, true);
+  if (decoded.ok && decoded.value.command.kind === "questions.create") {
+    assert.deepEqual(decoded.value.command.answerTypes, ["exactly"]);
+    assert.notEqual(decoded.value.command.answerTypes, answerTypes);
+    assert.equal(JSON.stringify(decoded.value).includes("Type sun."), true);
+  }
   assert.equal(intercepted, 0);
 });
 

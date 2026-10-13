@@ -306,19 +306,20 @@ export function decodeBlooketBrowserBridgeRequest(
         message: "Expected a bounded text answer list.",
       });
     }
-    const validModes = (): boolean => {
+    const admittedModes = (): ("exactly" | "contains")[] | undefined => {
       if (!Array.isArray(answerTypesCandidate) ||
           answerTypesCandidate.length > 100 ||
-          !isExactDenseArray(answerTypesCandidate)) return false;
+          !isExactDenseArray(answerTypesCandidate)) return undefined;
+      const modes: ("exactly" | "contains")[] = [];
       for (let index = 0; index < answerTypesCandidate.length; index++) {
         const match = answerTypesCandidate[index];
-        if (match !== "exactly" && match !== "contains") return false;
+        if (match !== "exactly" && match !== "contains") return undefined;
+        modes.push(match);
       }
-      return true;
+      return modes;
     };
     const answerTypes = answerTypesCandidate === null ? null
-      : validModes() ? answerTypesCandidate as ("exactly" | "contains")[]
-        : undefined;
+      : admittedModes();
     const correctCount = answers.filter((answer) => answer.correct).length;
     const typingValid =
       qType === "typing" &&
