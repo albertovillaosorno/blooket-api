@@ -237,6 +237,27 @@ function browserHost(fixtureState: Awaited<ReturnType<typeof state>>,
   }) };
 }
 
+test("missing text-capability worker cannot begin publication",
+  async () => { await fixture(async state => {
+    const host = { ...state.host, blooket: { ...state.host.blooket,
+      capabilities: { inspect: async purpose => {
+        assert.equal(purpose, "text-publication");
+        return { ok: false as const,
+          code: "blooket-browser-failed" as const };
+      } },
+    } };
+    const result = await executeBlooketPublicationCommand(
+      command("step", state.revision), host);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues[0]?.code,
+      "blooket-browser-failed");
+    assert.equal(state.writes(), 0);
+    const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.snapshot));
+    await assert.rejects(readFile(files.attempt));
+    await assert.rejects(readFile(files.budget));
+  }); });
+
 test("old browser confirmation stops before a new attempt or budget",
   async () => { await fixture(async state => {
     const host = browserHost(state, false, false);

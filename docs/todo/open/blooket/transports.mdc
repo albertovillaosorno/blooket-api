@@ -1680,6 +1680,14 @@ under `.temp/readme-ui-check/full-tests.log`.
 
 ## Blockers
 
+On 2026-10-14, the exact observed unpacked extension path was rebuilt
+with the text-only command and the previous package retained locally.
+A single authorized reload via the attached Chrome DevTools CLI timed
+out with no reply; neither success nor failure of that reload is proven.
+The authenticated canonical session still read an existing Edit page.
+Do not retry an uncertain reload or issue provider writes until the
+worker and clean read-only admission are independently confirmed.
+
 Acceptance remains open until the checks above run through the actual owning
 product surfaces; portable foundations alone do not complete this record.
 
