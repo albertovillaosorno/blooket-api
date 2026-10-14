@@ -5,7 +5,7 @@ import {
   clipboardImageUrl,
   readClipboardImage,
 } from "./library.js";
-import { publishTextDraft } from "./publication.js";
+import { publishTextDraft, publicationStopReason } from "./publication.js";
 
 const words = {
   es: {
@@ -280,6 +280,20 @@ const words = {
     publicationStopped: "Publicación detenida: ",
     publicationWritesDone: "Escrituras completas; falta verificar",
     publicationRefresh: "Actualizar estado",
+    publicationRateLimited:
+      "Blooket limitó las operaciones. Detente y vuelve a revisar más tarde.",
+    publicationStopSignIn:
+      "Inicia sesión en la pestaña conectada y actualiza el estado.",
+    publicationStopExtension:
+      "La extensión requiere actualización o recarga antes de publicar.",
+    publicationStopConflict:
+      "El quiz remoto o el borrador cambió. Revisa y no repitas la escritura.",
+    publicationStopMedia:
+      "La publicación de este contenido multimedia aún no está admitida.",
+    publicationStopBusy:
+      "Ya hay otra operación en curso. Revisa el estado antes de continuar.",
+    publicationStopStorage:
+      "No se pudo comprobar el journal. No repitas la escritura.",
     configured: "Configurado",
     missing: "Sin configurar",
     saved: "Guardado. Reinicia el servicio si cambiaste el puerto.",
@@ -576,6 +590,20 @@ const words = {
     publicationStopped: "Publication stopped: ",
     publicationWritesDone: "Writes complete; verification pending",
     publicationRefresh: "Refresh status",
+    publicationRateLimited:
+      "Blooket rate-limited the workflow. Stop and retry the check later.",
+    publicationStopSignIn:
+      "Sign in using the connected Blooket tab, then refresh status.",
+    publicationStopExtension:
+      "The browser companion needs an update or reload before publication.",
+    publicationStopConflict:
+      "The remote quiz or draft changed. Inspect it; do not replay the write.",
+    publicationStopMedia:
+      "Publication of this media content is not yet supported.",
+    publicationStopBusy:
+      "Another operation is running. Refresh status before proceeding.",
+    publicationStopStorage:
+      "The journal could not be verified. Do not replay the write.",
     configured: "Configured",
     missing: "Not configured",
     saved: "Saved. Restart the service if you changed the port.",
@@ -1936,6 +1964,7 @@ function publicationLabel(value) {
         value.state === "expired-session") return t("readSignedOut");
     return t("publicationPaused");
   }
+  if (phase === "wait") return t("publicationRateLimited");
   if (phase === "paused") return t("publicationPaused");
   if (phase === "not-started") return t("publicationNotStarted");
   if (phase === "writes-complete") return t("publicationWritesDone");
@@ -1946,6 +1975,18 @@ function publicationLabel(value) {
     return t("publicationProgress") + value.completedOperations +
       "/" + value.totalOperations;
   return t("publicationStopped") + String(phase ?? "unknown");
+}
+function publicationFailureText(error) {
+  const message = {
+    "sign-in": "publicationStopSignIn",
+    extension: "publicationStopExtension",
+    conflict: "publicationStopConflict",
+    media: "publicationStopMedia",
+    busy: "publicationStopBusy",
+    storage: "publicationStopStorage",
+    paused: "publicationPaused",
+  }[publicationStopReason(error)];
+  return t(message ?? "publicationPaused");
 }
 async function loadQuizzes() {
   if (activePublication) return;
@@ -2012,8 +2053,8 @@ async function loadQuizzes() {
           }
           state.textContent = publicationLabel(latest);
         } catch (error) {
-          state.textContent = t("publicationPaused");
-          if (!controller.signal.aborted) report(error);
+          state.textContent = controller.signal.aborted
+            ? t("publicationPaused") : publicationFailureText(error);
         } finally {
           activePublication = null;
           // A lost browser result must not automatically enable another step.
@@ -2038,8 +2079,7 @@ async function loadQuizzes() {
     };
     try { await refreshState(); }
     catch (error) {
-      state.textContent = t("publicationPaused");
-      report(error);
+      state.textContent = publicationFailureText(error);
     }
   }
 }
