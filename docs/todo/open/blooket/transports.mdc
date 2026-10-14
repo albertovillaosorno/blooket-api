@@ -62,6 +62,26 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the retained local development service was absent and
+`127.0.0.1:2607` refused connections while Chrome for Testing remained
+open. Restarting the owning service with the existing repository-local
+data root restored HTTP 200, and a later fresh CLI session inspection
+confirmed authenticated My Sets with six visible entries. Read-only
+capability inspection still returned `blooket-browser-failed`, so no new
+account mutation was admitted or journaled.
+
+The observed installed Chrome extension points at the repository-owned
+`.temp/distributions/browser-extension` directory. Its previously compiled
+capability helper predated current source, so the current signed-off
+repository source was reassembled at that exact path with the prior
+unpacked files retained in an ignored sibling recovery directory. This is
+on-disk preparation only: loaded worker and real write receipts are still
+unverified, and old ambiguous publication journals remain untouched.
+
+Portable workspace relay regressions now verify recovery after a refused
+bootstrap and ensure concurrent timer ticks never duplicate an in-flight
+bootstrap. They do not replace Chrome loaded-worker evidence.
+
 On 2026-10-14, Add Question form opening acquired a distinct
 pre-click versus possible-click boundary. If the browser opener throws
 after its click may have executed, the isolated-world form watch remains
