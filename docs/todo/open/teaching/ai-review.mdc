@@ -69,6 +69,18 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+A restarted localhost service on 2026-10-14 served the new publication
+module with HTTP 200 and JavaScript content type. In the owner's existing
+Chrome for Testing profile, a newly opened background localhost test tab
+loaded Quizzes with ten saved-draft cards and twenty controls, and no UI
+error. Only the local read-only view was opened; the test tab was closed.
+
+The connected browser reported zero pending jobs before and after the check.
+All twenty-seven durable publication journal files retained their original
+modification times, including seven unresolved attempt files. The rebuilt
+Linux x64 development package also passed extracted-package verification.
+These observations validate UI wiring and packaging, not remote publication.
+
 On 2026-10-14, the Quizzes orchestrator was hardened for interrupted
 publication across local draft edits. A resumed journal uses the immutable
 snapshot revision reported by canonical status, not the latest saved draft
