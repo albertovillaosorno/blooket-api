@@ -62,6 +62,12 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the integrated Chrome controller explicitly required updating
+its ChatGPT extension before further browser operations. The product service
+remained available and connected with no pending bridge jobs; the unused
+one-question draft stayed ready at zero of two operations, without an attempt.
+The product companion correction on disk is still not loaded-worker evidence.
+
 On 2026-10-14, after the owner reloaded the extension, the canonical
 one-question draft passed the new companion confirmation declaration and
 stopped at fresh capability inspection with `blooket-browser-failed`.
