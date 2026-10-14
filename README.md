@@ -444,7 +444,11 @@ completeness acceptance remain pending.
 
 Text-only new-quiz publication also has canonical `publication step`, `status`,
 `reconcile`, and `verify` CLI commands and matching `blooket_publication_*` MCP
-tools. Supply the saved draft ID and exact revision for each step; each call
+tools. The local **Quizzes** view now shows the saved drafts' durable status
+and has explicit Publish, Stop, Reconcile, and Verify controls for the same
+canonical commands. Opening Quizzes never submits a Blooket write.
+
+Supply the saved draft ID and exact revision for each step; each call
 performs at most one journaled write. Final fresh verification alone reports
 `published: true`; local progress does not prove remote state.
 

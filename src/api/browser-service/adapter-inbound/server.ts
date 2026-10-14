@@ -316,6 +316,7 @@ export async function startBrowserService(
         "/": ["index.html", "text/html"],
         "/app.js": ["app.js", "text/javascript"],
         "/library.js": ["library.js", "text/javascript"],
+        "/publication.js": ["publication.js", "text/javascript"],
         "/style.css": ["style.css", "text/css"],
       };
       const asset = files[url.pathname];

@@ -101,6 +101,17 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, the local Quizzes UI began using the existing server-owned
+shared publication pacer and journaled command boundary. It dispatches a
+single step at a time and checks the durable operation count before another.
+Explicit cancellation interrupts the active request and prevents later steps.
+A reconciliation-required result stops the UI; only a separate human-selected
+read-only reconcile request can inspect it without submitting another write.
+
+Portable UI tests cover cancellation after a confirmed step, uncertain writes,
+changed plan lengths and nonadvancing results. These are not live cancellation
+or external-provider pacing acceptance, so this task remains open.
+
 On 2026-10-10, the durable mutation-budget reader began opening the exact
 local file descriptor with `O_NOFOLLOW` before inspecting or reading it.
 Previously an `lstat` followed by a pathname-based `readFile` permitted a
