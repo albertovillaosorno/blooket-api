@@ -31,14 +31,44 @@
 //
 import test from "node:test";
 import assert from "node:assert/strict";
-import { publishTextDraft } from
+import { publishTextDraft, publicationStopReason } from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 const ID = "synthetic-draft";
 const REV = "a".repeat(64);
 const state = (phase: string, done: number, total = 3) => ({
-  draftId: ID, phase, completedOperations: done,
+  draftId: ID, revision: REV, phase, completedOperations: done,
   totalOperations: total, published: phase === "verified",
+});
+
+test("resumption uses immutable journal revision after local draft changes",
+  async () => {
+  const newerRevision = "b".repeat(64);
+  const sent: unknown[] = [];
+  const replies = [state("ready", 1, 2), state("advanced", 2, 2),
+    state("verified", 2, 2)];
+  const result = await publishTextDraft(ID, newerRevision,
+    async (name, payload) => {
+      sent.push({ name, payload });
+      return replies.shift();
+    });
+  assert.equal(result.published, true);
+  assert.deepEqual(sent, [
+    { name: "blooket.publication.status", payload: { draftId: ID } },
+    { name: "blooket.publication.step", payload: {
+      draftId: ID, expectedRevision: REV,
+    } },
+    { name: "blooket.publication.verify", payload: { draftId: ID } },
+  ]);
+});
+
+test("a malformed frozen revision stops before another mutation", async () => {
+  const names: string[] = [];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    names.push(name);
+    return { ...state("ready", 1, 2), revision: "invalid" };
+  }), /publication-progress-invalid/u);
+  assert.deepEqual(names, ["blooket.publication.status"]);
 });
 
 test("one UI publish intent advances and verifies each durable operation",
@@ -147,6 +177,63 @@ test("status cannot claim publication without fresh verification",
   assert.equal(calls, 1);
 });
 
+test("a preexisting human stop needs no frozen revision or new write",
+  async () => {
+  const calls: string[] = [];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return { draftId: ID, phase: "human-action-required",
+      state: "security-challenge", published: false };
+  });
+  assert.equal(result.phase, "human-action-required");
+  assert.deepEqual(calls, ["blooket.publication.status"]);
+});
+
+test("a preflight human stop does not start an account write", async () => {
+  const calls: string[] = [];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return name.endsWith("status")
+      ? { draftId: ID, phase: "not-started", published: false }
+      : { draftId: ID, phase: "human-action-required",
+        state: "organization-prompt", published: false };
+  });
+  assert.equal(result.phase, "human-action-required");
+  assert.equal(result.state, "organization-prompt");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
+test("rate-limited preflight stays a stop without busy retry", async () => {
+  const calls: string[] = [];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return name.endsWith("status")
+      ? { draftId: ID, phase: "not-started", published: false }
+      : { draftId: ID, phase: "wait", state: "rate-limited",
+        published: false };
+  });
+  assert.equal(result.phase, "wait");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
+test("cross-draft progress and impossible success cannot advance writes",
+  async () => {
+  for (const bad of [
+    { ...state("ready", 0), draftId: "another-draft" },
+    { draftId: ID, phase: "not-started", published: true },
+    { ...state("ready", 0), published: true },
+  ]) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return bad;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status"]);
+  }
+});
+
 test("completed publication only performs fresh verification", async () => {
   const calls: string[] = [];
   const result = await publishTextDraft(ID, REV, async name => {
@@ -157,4 +244,26 @@ test("completed publication only performs fresh verification", async () => {
   assert.equal(result.published, true);
   assert.deepEqual(calls, ["blooket.publication.status",
     "blooket.publication.verify"]);
+});
+
+test("publication error labels classify only owned safe codes", () => {
+  assert.equal(publicationStopReason(
+    Error("blooket-authentication-required")), "sign-in");
+  assert.equal(publicationStopReason(
+    Error("blooket-browser-companion-update-required")), "extension");
+  assert.equal(publicationStopReason(
+    Error("blooket-publication-remote-conflict")), "conflict");
+  assert.equal(publicationStopReason(
+    Error("blooket-publication-media-unsupported")), "media");
+  assert.equal(publicationStopReason(
+    Error("blooket-publication-busy")), "busy");
+  assert.equal(publicationStopReason(
+    Error("publication-storage-unavailable")), "storage");
+  assert.equal(publicationStopReason(
+    Error("blooket-publication-cancelled")), "paused");
+  assert.equal(publicationStopReason(
+    Error("private browser token: should-not-render")), "unknown");
+  assert.equal(publicationStopReason({
+    message: "blooket-authentication-required",
+  }), "unknown");
 });
