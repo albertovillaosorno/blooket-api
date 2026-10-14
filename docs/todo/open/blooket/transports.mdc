@@ -62,6 +62,26 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, after the owner reloaded the extension, the canonical
+one-question draft passed the new companion confirmation declaration and
+stopped at fresh capability inspection with `blooket-browser-failed`.
+Its status remained `ready`, zero of two operations, with no mutation attempt.
+No existing ambiguous creation was replayed or adopted.
+
+The product's connected-tab focus endpoint returned success and identified its
+current My Sets tab. Fresh integrated-browser observations of that tab showed
+an authenticated account, six existing development sets, no visible blocking
+dialog, and no question form. Native input still timed out; another attachment
+attempt failed and its owned controller was stopped with stopped state checked.
+
+Capability navigation now waits for the actual destination document rather
+than treating a complete tab descriptor as sufficient readiness. A regression
+delays native readiness during both probe navigations and restoration; the
+54-test host suite passes. This fixes a reproducible navigation race, but is
+not evidence that the latest live capability failure has been resolved.
+The current loaded declaration proves protocol compatibility, not this newer
+host correction or successful Create Set/Add Question acceptance.
+
 On 2026-10-14, committed revision 5c2422d passed a fresh 1,673-test suite
 with no failures, skips or cancellations, plus strict TypeScript, roadmap
 integrity and zero Jig validation diagnostics. Its clean Linux package passed
@@ -1608,9 +1628,12 @@ The existing local package was started silently with the retained development
 data root, and reloading the existing workspace restored its Library page.
 Browser input commands still timed out without changing the selected panel.
 
-Account-mutation authorization is present. Current loaded-extension control
-and real receipt-confirmed browser publication remain acceptance blockers;
-neither missing account permission nor absence of a Mac is the blocker.
+Account-mutation authorization is present. The owner subsequently reloaded
+the prepared companion and canonical publication passed its confirmation
+declaration. Fresh capability inspection still fails before an attempt is
+journaled. Loading the newer navigation correction and obtaining real
+receipt-confirmed publication remain outstanding; neither missing account
+permission nor absence of a Mac is the blocker.
 
 The 2026-10-14 canonical acceptance created one empty private quiz but did not
 obtain a durable receipt. Keep that attempt and the older ambiguous journal;
