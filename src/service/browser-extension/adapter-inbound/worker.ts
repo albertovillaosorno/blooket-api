@@ -501,7 +501,13 @@ async function read(
         inspectBlooketDetailSidebar as (...args: never[]) => unknown,
         [operation.setId],
       );
-      if (!await ownsDetailRoute() || !reply ||
+      if (!await ownsDetailRoute())
+        throw new Error("browser-details-unavailable");
+      if (exactWorkerKeys(reply, "code,ok") && reply &&
+          typeof reply === "object" && "ok" in reply && reply.ok === false &&
+          "code" in reply && reply.code === "blooket-browser-failed")
+        return undefined;
+      if (!reply ||
           typeof reply !== "object" || Array.isArray(reply) ||
           !exactWorkerKeys(reply, "ok,value") ||
           !("ok" in reply) || reply.ok !== true ||
@@ -518,10 +524,21 @@ async function read(
       // invoke a prototype method supplied by the injected browser result.
       return { title: reply.value.title, description: reply.value.description };
     };
-    const baseline = await sidebarValue();
+    // Chrome's complete event can precede hydration of the saved sidebar.
+    // Retry only its first unavailable read, bound to this native lifetime.
+    // The independent confirmation below is never retried or adopted later.
+    let baseline: Awaited<ReturnType<typeof sidebarValue>>;
+    for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
+      attempt++) {
+      baseline = await sidebarValue();
+      if (baseline) break;
+      await pause(100);
+    }
+    if (!baseline) throw new Error("browser-details-unavailable");
     await pause(0);
     const baselineAgain = await sidebarValue();
-    if (JSON.stringify(baseline) !== JSON.stringify(baselineAgain))
+    if (!baselineAgain ||
+        JSON.stringify(baseline) !== JSON.stringify(baselineAgain))
       throw new Error("browser-details-unavailable");
     let opened = false;
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
