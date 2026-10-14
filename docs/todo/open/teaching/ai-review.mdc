@@ -69,6 +69,13 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-14, a regression rejected impossible durable publication
+status: a ready journal already at its final operation, a completed journal
+with incomplete operations, or any progressed journal without a remote set ID.
+The UI performs no new command after malformed status. The service remains the
+write-plan and receipt authority; this presentation check cannot adopt an
+unknown provider result.
+
 On 2026-10-14, two more red-to-green UI regressions stopped a malformed
 Create Set receipt with no remote identity, and a later Add Question step
 that changed remote set identity. The UI rejects an impossible progress jump

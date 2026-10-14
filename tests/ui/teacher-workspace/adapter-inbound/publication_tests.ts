@@ -200,6 +200,23 @@ test("remote set identity cannot switch after one confirmed operation",
     "blooket.publication.step"]);
 });
 
+test("impossible ready states never authorize a new publication step",
+  async () => {
+  for (const invalid of [
+    state("ready", 3, 3),
+    { ...state("ready", 1, 3), remoteSetId: null },
+    state("writes-complete", 2, 3),
+    { ...state("writes-complete", 3, 3), remoteSetId: null },
+  ]) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return invalid;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status"]);
+  }
+});
+
 test("a missing first Create Set identity never advances to Add Question",
   async () => {
   const calls: string[] = [];

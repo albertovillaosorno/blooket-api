@@ -53,6 +53,14 @@ function progress(value, draftId) {
       value.totalOperations > MAX_UI_STEPS ||
       value.completedOperations > value.totalOperations)
     throw Error("publication-progress-invalid");
+  if (["ready", "writes-complete"].includes(value.phase) && (
+    (value.phase === "ready" &&
+      value.completedOperations === value.totalOperations) ||
+    (value.phase === "writes-complete" &&
+      value.completedOperations !== value.totalOperations) ||
+    (value.completedOperations > 0 &&
+      (typeof value.remoteSetId !== "string" || !value.remoteSetId))
+  )) throw Error("publication-progress-invalid");
   return value;
 }
 
