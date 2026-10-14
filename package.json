@@ -15,6 +15,8 @@
     "launch": "node src/service/desktop-launcher/adapter-inbound/launcher.ts",
     "package": "node src/platforms/distribution/adapter-inbound/package.ts",
     "package:verify": "npm run package -- --verify",
+    "release:manifest":
+      "node src/platforms/distribution/adapter-inbound/update-manifest.ts",
     "macos:safari-smoke":
       "node src/platforms/distribution/adapter-inbound/macos-safari-smoke.ts",
     "roadmap:check":

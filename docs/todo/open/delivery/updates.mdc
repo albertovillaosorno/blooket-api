@@ -211,6 +211,31 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
 
+On 2026-10-14, release-only signing and manifest production gained a concrete
+local implementation. Actual final archive bytes supply size and SHA-256;
+physical ZIP inspection rejects malformed layouts. Adjacent package metadata
+must hash to the embedded distribution entry and declare an exact clean ARM64
+version/source identity before its minimum OS and archive facts can be signed.
+
+Only an in-memory Ed25519 private key matching an explicitly admitted public
+publisher can sign the canonical existing context. Empty/foreign roots and
+other key algorithms stop without public output; no production key was
+generated or provisioned. The producer preserves existing release metadata,
+bounds reads and its deadline, and retains the independent Apple assessment
+gate.
+
+Real-file fixtures verify producer output through the existing signature and
+archive-byte receivers and cover malformed/symbolic/oversized archives,
+metadata drift, dirty/foreign packages, cancellation and output conflicts.
+These synthetic key/package fixtures are portable evidence, not production
+publisher, native signing, release publication or completed updater acceptance.
+
+The `release:manifest` command composes that producer from clean committed
+Git identity and explicitly configured local signing inputs. It reads no `.env`,
+passes no key values in arguments or Git child environments, and emits only
+public results or sanitized failures. Argument/configuration tests reject
+path escapes, private material disguised as public roots and diagnostic leaks.
+
 On 2026-10-13, explicit launcher `--stop` stopped treating HTTP 202
 as proof of completed shutdown. It now waits for the original process,
 discovery file, service lock, data leases and claimed listener to be

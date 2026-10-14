@@ -77,6 +77,14 @@ const KEYS = new Set([
 ]);
 const ASSET_KEYS = new Set(["target", "name", "url", "size", "sha256"]);
 
+export function isAdmittedMinimumMacos(value: unknown): value is string {
+  if (typeof value !== "string" ||
+      !/^(?:1[3-9]|[2-9][0-9])\.(?:0|[1-9][0-9]?)(?:\.(?:0|[1-9][0-9]?))?$/u
+        .test(value)) return false;
+  const [major, minor] = value.split(".").map(Number);
+  return major !== 13 || minor! >= 5;
+}
+
 export function decodeUpdateManifest(
   value: unknown,
 ): DecodeResult<UpdateManifest> {
@@ -97,10 +105,7 @@ export function decodeUpdateManifest(
     value["tag"] !== "v" + value["version"] ||
     typeof value["sourceCommit"] !== "string" ||
     !/^[a-f0-9]{40}$/u.test(value["sourceCommit"]) ||
-    typeof value["minimumMacos"] !== "string" ||
-    !/^(?:1[3-9]|[2-9][0-9])\.(?:0|[1-9][0-9]?)(?:\.(?:0|[1-9][0-9]?))?$/u.test(
-      value["minimumMacos"],
-    ) ||
+    !isAdmittedMinimumMacos(value["minimumMacos"]) ||
     !Array.isArray(value["assets"]) ||
     value["assets"].length !== 1
   )
@@ -110,8 +115,6 @@ export function decodeUpdateManifest(
   } catch {
     return failure();
   }
-  const [major, minor] = value["minimumMacos"].split(".").map(Number);
-  if (major === 13 && minor! < 5) return failure();
   const assets: ManifestAsset[] = [];
   const targets = new Set<string>();
   for (const [index, entry] of value["assets"].entries()) {

@@ -68,6 +68,39 @@ Verified metadata must match the selected release; actual archive bytes must
 match its signed size/hash. Apple trust and transactional installation remain
 independent mandatory checks.
 
+Release metadata production now has a bounded local implementation. It hashes
+the actual final ARM64 archive, validates its physical ZIP layout, and matches
+the adjacent distribution metadata bytes to the identical embedded ZIP entry.
+The exact schema-one package identity must be clean and match the requested
+version/source commit; its admitted minimum OS becomes signed metadata.
+
+The signing adapter consumes only a local in-memory Ed25519 private key whose
+public fingerprint belongs to the explicitly admitted publisher roots. It
+neither generates roots nor exports/persists key material. The producer
+exclusively creates `update-manifest.json`, retaining existing output on
+conflict.
+
+Malformed archives, metadata mismatches, dirty/foreign builds, absent trust,
+cancellation and a bounded deadline refuse creation. Real-file portable
+fixtures verify the produced signature and archive bytes through the actual
+receiver; their ephemeral keys do not establish a production publisher.
+
+This operation still needs production key provisioning and post-signing CI
+composition. It does not run Apple signing/notarization, publish a release,
+or enable application installation. Node's [Ed25519 signing contract][node-sign]
+was checked on 2026-10-14; the existing canonical signing context is preserved.
+
+The repository command is `npm run release:manifest -- <output-name>`; omitting
+the name selects the normal distribution directory. The trusted local/CI
+environment must supply `BLOOKET_UPDATE_SIGNING_KEY` and
+`BLOOKET_UPDATE_PUBLISHER_KEYS`, a bounded JSON array of canonical public PEMs.
+These roots must be independently provisioned for the receiving application.
+
+The command loads no `.env` file, accepts no key/path argument and observes
+only clean committed Git source before producing public metadata. Git children
+receive no publisher key environment, and errors expose only stable codes.
+This is a producer entrypoint, not release authorization or an installer tool.
+
 `src/platforms/update-downloads/` streams publisher-authenticated archives into
 private owned staging directories, with bounded anonymous HTTPS, exact signed
 size/hash, restricted redirects, cancellation, and partial cleanup. The product
@@ -234,6 +267,9 @@ not establish Safari, Keychain, signing, notarization, or recipient acceptance.
 [apple]:   https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
 [api]: https://docs.github.com/en/rest/releases/releases
+
+<!-- jig-ignore-next-line: Exact upstream URL is indivisible. -->
+[node-sign]: https://nodejs.org/docs/latest-v24.x/api/crypto.html#cryptosignalgorithm-data-key-callback
 
 ### Fresh owned runtime health
 
