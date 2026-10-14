@@ -51,6 +51,13 @@ export function canLeaveBlooketPageForRead(): boolean {
     // The Create Set page is itself a draft form, even when no control has
     // focus. A route change could silently discard the teacher's work.
     if (path === "/create") return false;
+    // An owned opener can have clicked before React mounts its modal. DOM
+    // absence alone never authorizes navigation over a pending read or write.
+    // Property existence is read without invoking extension-world accessors.
+    if ([
+      "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
+      "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+    ].some(key => Object.hasOwn(globalThis, key))) return false;
     if (path !== "/my-sets" && path !== "/edit" &&
         !path.startsWith("/set/")) return false;
     // Do not abandon a teacher-selected variant that may carry page state
