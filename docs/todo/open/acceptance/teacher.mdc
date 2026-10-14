@@ -118,6 +118,14 @@ this final record.
 
 ## Evidence
 
+On 2026-10-14, the installed ClangFormat 23.1.2 rejected a read-only
+`--dry-run --Werror` of the existing native C exchange helper against its
+committed Jig C formatting profile. ClangTidy also exited nonzero, with 101
+error diagnostic lines under the committed warnings-as-errors profile.
+These profiles cannot truthfully be marked active and passing in Jig merely
+because the executables exist. The native C17 compiler syntax gate remains
+green; formatter/linter adoption requires a separate reviewed correction.
+
 On 2026-10-14, nine previously untracked Markdown, YAML, Clang and
 TypeScript lint profiles became committed, reviewed repository assets.
 Jig 26.3.0 refused enabling executable ClangFormat/ClangTidy without
