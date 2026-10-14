@@ -211,6 +211,19 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
 
+On 2026-10-14, retained old-bundle assessment gained a concrete native adapter.
+Its trusted local caller supplies the captured previously installed version;
+it checks that exact product identity, admitted minimum OS, ARM64 runtime,
+Apple publisher requirement and notarized Gatekeeper result. It does not
+invent an old signed manifest or replace the new candidate's signature gate.
+
+Forty-three targeted assessment/controller tests passed with strict TypeScript
+and zero Jig validation diagnostics. One controller regression connects this
+old-bundle adapter to actual Linux native directory exchange and durable
+journal rollback, preserving the old bundle and synthetic teacher data.
+Apple commands and runtime health remain explicit doubles; immutable installer
+preparation, independent production supervision and UI integration are pending.
+
 On 2026-10-14, the release caller began forwarding only the explicit manifest
 signing secret to reusable CI. After Safari assembly and smoke, release tags
 must pass final release package assessment before the manifest producer runs.

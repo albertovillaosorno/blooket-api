@@ -129,6 +129,21 @@ read-only native tools with bounded output, cancellation, and a shared deadline.
 It neither extracts nor installs a bundle; portable command doubles do not
 establish native acceptance or a production publisher trust root.
 
+Retained old applications now have a separate native reassessment entrypoint.
+Only trusted installation composition supplies their previously captured
+version; their exact bundle metadata, ARM64 runtime, Apple Team requirement
+and notarized Gatekeeper result must pass the same native assessment engine.
+Their admitted minimum OS is read from their own authenticated bundle metadata.
+Apple's [requirement checks][apple-requirements] and
+[Gatekeeper test output][apple-assessment] were inspected on 2026-10-14.
+
+This baseline need not have an earlier update manifest, so no synthetic signed
+context is constructed to recover it. Newly downloaded candidates still need
+their independently verified signed release context. Portable controller tests
+connect old reassessment to Linux directory exchange and durable rollback with
+explicitly synthetic Apple and runtime-health commands; production installer
+composition and native acceptance remain unproven.
+
 `src/platforms/update-extraction/` copies and authenticates a private immutable
 archive, validates its bounded physical ZIP layout, and invokes only silent
 native extraction. The extracted tree must match byte hashes, executable bits,
@@ -283,6 +298,10 @@ not establish Safari, Keychain, signing, notarization, or recipient acceptance.
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
 [workflow-secrets]:
   https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
+<!-- jig-ignore-next-line: Exact Apple documentation URL is indivisible. -->
+[apple-requirements]: https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements
+[apple-assessment]:
+  https://help.apple.com/xcode/mac/current/en.lproj/dev1cc22a95c.html
 [api]: https://docs.github.com/en/rest/releases/releases
 
 <!-- jig-ignore-next-line: Exact upstream URL is indivisible. -->
