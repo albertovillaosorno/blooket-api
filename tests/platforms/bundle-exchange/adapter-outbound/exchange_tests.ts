@@ -67,6 +67,27 @@ test("native exchange retains both directories and cannot blindly repeat",
     } finally { await item.cleanup(); }
   });
 
+test("denied native exchange restores both frozen app directory modes",
+  { skip: process.getuid?.() === 0 }, async () => {
+    const item = await fixture();
+    try {
+      await chmod(item.options.installedPath, 0o555);
+      await chmod(item.options.candidatePath, 0o555);
+      const result = await exchangeBundles({ ...item.options,
+        execute: async (file, args) => {
+          // Force the real syscall to fail after the held-app permission step.
+          await chmod(item.root, 0o500);
+          await execute(file, [...args]);
+        } });
+      assert.deepEqual(result, { status: "exchange-failed", reason: "native",
+        orientation: "original" });
+      assert.deepEqual(await markers(item), ["old version", "new version"]);
+      for (const path of [item.options.installedPath,
+        item.options.candidatePath])
+        assert.equal((await lstat(path)).mode & 0o777, 0o555);
+    } finally { await item.cleanup(); }
+  });
+
 test("a lost native acknowledgement is inspected rather than blindly replayed",
   async () => {
     const item = await fixture();

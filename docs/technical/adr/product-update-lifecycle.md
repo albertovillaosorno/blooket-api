@@ -158,6 +158,19 @@ no delete/rename fallback is admitted. Application composition must hold the
 installation lock, quiesce writers, journal the operation, and manage health
 and recovery independently; the primitive cannot establish installation success.
 
+Frozen application roots still need directory write permission while their
+parent entries change. The helper holds both exact application directories,
+temporarily enables owner write only where needed, then restores and syncs
+each original mode through its held descriptor after success or failure.
+It never restores modes by path after swapping the application names.
+
+Actual signed preparation followed by forward and inverse Linux exchange
+reproduced and verified this requirement on 2026-10-14. A denied kernel
+exchange preserves both frozen directories and their contents. The Linux
+[rename documentation][directory-reparent] describes the directory-parent
+write requirement; Apple's [swap capability][apple-swap] documents the
+separate native operation, without supplying Mac execution evidence.
+
 The exact local installation journal preserves signed metadata and both
 directory identities through intent, observation, health, and rollback phases.
 Private bounded durable storage rejects conflicting or unsafe records and
@@ -392,6 +405,10 @@ was checked on that date for directory iteration/closure semantics.
 [node-filesystem]: https://github.com/nodejs/node/blob/main/doc/api/fs.md
 
 [node-parent-disconnect]: https://github.com/nodejs/node/issues/65646
+
+[directory-reparent]: https://man7.org/linux/man-pages/man2/renameat2.2.html
+<!-- jig-ignore-next-line: Exact official Apple URL is indivisible. -->
+[apple-swap]: https://developer.apple.com/documentation/foundation/urlresourcevalues/volumesupportsswaprenaming
 
 
 ### Explicit launcher shutdown observation (2026-10-13)
