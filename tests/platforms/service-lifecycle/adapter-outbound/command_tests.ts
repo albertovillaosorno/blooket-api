@@ -69,13 +69,16 @@ test("local reads and MCP traverse the real CLI and service bridge",
     browserBridge: bridge,
   });
   let legacyList = false;
+  const browserKinds: string[] = [];
   const poll = setInterval(() => {
     const job = bridge.next(bridge.pairingToken());
     if (!job) return;
+    browserKinds.push(job.command.kind);
     const value =
       job.command.kind === "session.observe"
         ? "my-sets"
-        : job.command.kind === "capabilities.inspect"
+        : job.command.kind === "capabilities.inspect" ||
+            job.command.kind === "capabilities.inspect-text"
           ? {
               schemaVersion: 3,
               verifiedOn: "2026-10-07",
@@ -198,6 +201,17 @@ test("local reads and MCP traverse the real CLI and service bridge",
       assert.equal(value.kind, "capabilities");
       assert.equal(value.value?.features?.audio, "unsupported");
     }
+    const readBefore = browserKinds.length;
+    const textOnly = await executeJsonCommand(
+      "blooket.capabilities.inspect",
+      { scope: "text-publication" },
+      "cli:text-only-preflight", root,
+    );
+    assert.equal(textOnly.ok, true);
+    assert.ok(browserKinds.slice(readBefore).includes(
+      "capabilities.inspect-text"));
+    assert.equal(browserKinds.slice(readBefore).includes(
+      "capabilities.inspect"), false);
     const detail = await callTeacherTool(
       "blooket_sets_get",
       { setId: "fixture" },

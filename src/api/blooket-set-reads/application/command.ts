@@ -85,7 +85,7 @@ export async function executeBlooketReadCommand(
             session,
             secrets,
             capabilities,
-            { readOnly: true },
+            { readOnly: true, textOnly: payload.textOnly === true },
           )
         : payload.kind === "list"
           ? await listBlooketSets(session, secrets, sets, { readOnly: true })

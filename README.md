@@ -423,6 +423,7 @@ They run through the canonical CLI and the same local browser ports:
 
 ```sh
 npm run blooket -- session inspect --json
+npm run blooket -- capabilities inspect --text-only --json
 npm run blooket -- sets list --json
 npm run blooket -- sets get '<remote-set-id>' --json
 ```
@@ -432,6 +433,10 @@ Use the same user-data root as the running service. Development commands need
 These commands reuse the confirmed browser session and never load `.env`, read
 credentials, or submit a login. A closed session requires signing in locally;
 security challenges and organization prompts preserve the human-action stop.
+
+The `--text-only` capabilities inspection is read-only preflight for text quiz
+publication, not a Create Set attempt. It does not inspect Audio or claim
+account media entitlements.
 
 Listing returns observed summaries, not a non-empty collection completeness
 guarantee. The explicit empty-account state is bounded; pagination and remote

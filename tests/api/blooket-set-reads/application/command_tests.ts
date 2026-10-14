@@ -187,6 +187,22 @@ test("incompatible extension reads give actionable canonical diagnostics",
     assert.equal(lists, 1);
   });
 
+test("canonical text-only preflight delegates the explicit safe scope",
+  async () => {
+  const fixture = dependencies("my-sets");
+  const purposes: unknown[] = [];
+  const result = await executeCommand(
+    envelope("blooket.capabilities.inspect", { scope: "text-publication" }),
+    undefined,
+    { ...fixture.ports, capabilities: { inspect: async purpose => {
+      purposes.push(purpose);
+      return await fixture.ports.capabilities.inspect();
+    } } },
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(purposes, ["text-publication"]);
+});
+
 test("canonical reads reuse a ready session without secret access",
   async () => {
   const fixture = dependencies("my-sets");

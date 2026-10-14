@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the canonical CLI read gained
+`capabilities inspect --text-only --json`, using an exact versioned read scope.
+Focused validation and a simulated MCP/CLI/service integration passed; the
+scope invokes `capabilities.inspect-text`, not the Audio-editing probe.
+The already-running development service initially rejected the new scope as
+`unknown-field` because it had not been restarted on the updated code.
+This response does not prove that the Chrome worker supports the new command.
+
 On 2026-10-14, text-only canonical publication gained an explicitly
 bounded `capabilities.inspect-text` browser request. It rechecks the
 authenticated source document, verifies two stable My Sets reads, and

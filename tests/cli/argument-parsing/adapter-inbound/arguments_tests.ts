@@ -132,6 +132,22 @@ test("read arguments preserve opaque IDs and reject extra authority", () => {
 });
 
 
+test("CLI exposes a text-only capability preflight without a write",
+  () => {
+  assert.deepEqual(parseCliArguments([
+    "capabilities", "inspect", "--text-only", "--json",
+  ]), { ok: true, invocation: {
+    kind: "blooket-read", command: "blooket.capabilities.inspect",
+    payload: { scope: "text-publication" }, json: true,
+  } });
+  for (const args of [
+    ["capabilities", "inspect", "--text-only", "--text-only"],
+    ["capabilities", "inspect", "--json", "--text-only"],
+    ["capabilities", "inspect", "--text-only", "unexpected"],
+    ["sets", "list", "--text-only"],
+  ]) assert.equal(parseCliArguments(args).ok, false);
+});
+
 test("publication arguments require a saved revision and bounded draft ID",
   () => {
     const revision = "a".repeat(64);
