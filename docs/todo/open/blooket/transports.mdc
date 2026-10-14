@@ -62,6 +62,24 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, known browser publication began capturing an explicitly partial
+`set-observation` precondition instead of requiring global My Sets completeness
+for a fresh receipt-confirmed creation. The visible count/digest is captured
+before and after pacing; changed observations still stop before any budget,
+attempt journal or mutation. No completeness value is fabricated or upgraded.
+
+Only an execution port made by the trusted browser adapter factory selects
+this policy; copied/unknown writers retain complete-collection admission.
+Creation success still requires the existing owned form, edit redirect and
+exact saved metadata after reload. Full question baselines remain mandatory,
+and an observed set baseline never reconciles a lost receipt from a matching
+visible addition. Old null-baseline journals remain unchanged and unreplayed.
+
+Portable full-publication tests cover confirmed creation and final verification
+with partial My Sets, post-pacing changes, lost acknowledgement after an actual
+fixture set appears, and retained ambiguous evidence without another write.
+These foundations still require the real canonical acceptance below.
+
 On 2026-10-13, the verified Linux package at revision 5555f93 started its
 independent managed supervisor against the preserved acceptance workspace.
 All 18 draft/publication JSON files remained byte-identical across graceful
@@ -1549,7 +1567,7 @@ data root, and reloading the existing workspace restored its Library page.
 Browser input commands still timed out without changing the selected panel.
 
 Account-mutation authorization is present. Current loaded-extension control
-and independently justified nonempty completeness remain acceptance blockers;
+and real receipt-confirmed browser publication remain acceptance blockers;
 neither missing account permission nor absence of a Mac is the blocker.
 
 [input-activation]: https://html.spec.whatwg.org/multipage/input.html

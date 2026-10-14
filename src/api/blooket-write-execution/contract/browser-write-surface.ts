@@ -24,7 +24,8 @@
 // - Summary:
 //   - Isolates DOM/form mechanics beneath semantic write lowering.
 // - Description:
-//   - Success means the browser observed the provider's success result.
+//   - Create Set success requires an owned fresh form, its edit redirect,
+//     and exact saved metadata after reload; a callback alone is insufficient.
 // - Usage:
 //   - Implement with verified page behavior and resolve media slots there.
 // - Defaults:

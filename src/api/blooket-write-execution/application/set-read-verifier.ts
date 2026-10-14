@@ -75,6 +75,7 @@ export function blooketSetReadWriteVerifier(
   reads: BlooketSetReadPort,
   questionReads?: BlooketQuestionReadPort,
   expectedMedia?: PreparedMediaIdentities,
+  creationBaseline: "complete" | "observed" = "complete",
 ): BlooketWriteVerificationPort {
   // Never fetch current library bytes to decide an old ambiguous attempt.
   // Clone the exact admitted durable identity before any browser awaits.
@@ -99,12 +100,15 @@ export function blooketSetReadWriteVerifier(
 
       const listed = await safeList(reads);
       if (!listed.ok) return listed;
-      if (listed.completeness !== "complete") {
+      if (listed.completeness !== "complete" &&
+          creationBaseline !== "observed") {
         return { ok: true, baseline: null };
       }
       return {
         ok: true,
-        baseline: setBaselineFor(listed.value),
+        baseline: { ...setBaselineFor(listed.value),
+          kind: listed.completeness === "complete"
+            ? "set-list" : "set-observation" },
       };
     },
 

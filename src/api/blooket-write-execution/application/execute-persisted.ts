@@ -62,7 +62,7 @@ import type { BlooketMutationTaskBudgetPolicy } from
 import {
   decodeBlooketWriteVerificationBaseline,
   sameBlooketWriteVerificationBaseline,
-  verificationBaselineKindForOperation,
+  verificationBaselineKindsForOperation,
   type BlooketWriteVerificationBaseline,
 } from
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
@@ -502,7 +502,7 @@ async function captureVerificationBaseline(
     }
     const decoded = decodeBlooketWriteVerificationBaseline(
       captured.baseline,
-      verificationBaselineKindForOperation(operation.kind),
+      verificationBaselineKindsForOperation(operation.kind),
     );
     if (!decoded.ok) {
       return {

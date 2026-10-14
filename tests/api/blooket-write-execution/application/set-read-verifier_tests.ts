@@ -75,6 +75,35 @@ function detail(
   };
 }
 
+test("observed creation preconditions cannot reconcile a missing receipt",
+  async () => {
+    let rows = [summary("old", "Existing")];
+    let detailReads = 0;
+    const reads: BlooketSetReadPort = {
+      list: async () => ({ ok: true, completeness: "unknown", value: rows }),
+      get: async id => { detailReads++; return { ok: true,
+        value: detail(id, "Astronomy") }; },
+    };
+    const strict = blooketSetReadWriteVerifier(reads);
+    assert.deepEqual(await strict.captureBaseline(operation,
+      { remoteSetId: null }), { ok: true, baseline: null });
+    const verifier = blooketSetReadWriteVerifier(reads, undefined, undefined,
+      "observed");
+    const before = await verifier.captureBaseline(operation,
+      { remoteSetId: null });
+    assert.ok(before.ok && before.baseline);
+    assert.equal(before.baseline.kind, "set-observation");
+    assert.equal(before.baseline.itemCount, 1);
+    rows = [...rows, summary("new", "Astronomy")];
+    const after = await verifier.captureBaseline(operation,
+      { remoteSetId: null });
+    assert.ok(after.ok && after.baseline);
+    assert.notEqual(after.baseline.sha256, before.baseline.sha256);
+    assert.deepEqual(await verifier.verify(operation, { remoteSetId: null },
+      before.baseline), { ok: true, outcome: "inconclusive" });
+    assert.equal(detailReads, 0);
+  });
+
 test("Create Set verifies only one exact post-state addition", async () => {
   const before = [summary("old-1", "Existing")];
   const after = [

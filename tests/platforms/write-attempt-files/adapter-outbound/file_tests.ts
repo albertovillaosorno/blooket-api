@@ -192,6 +192,34 @@ test(
   },
 );
 
+test("observed set baselines survive durable confirmation", async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "observed.json");
+    const baseline = {
+      schemaVersion: 1,
+      kind: "set-observation" as const,
+      itemCount: 4,
+      sha256: "b".repeat(64),
+    };
+    assert.equal((await beginWriteAttempt(path, plan, 0, baseline)).ok, true);
+    const loaded = await loadWriteAttemptFile(path, plan);
+    assert.equal(loaded.ok && loaded.kind === "record", true);
+    if (loaded.ok && loaded.kind === "record") {
+      assert.deepEqual(loaded.record.baseline, baseline);
+    }
+    assert.equal((await confirmWriteAttempt(path, plan,
+      "plan:attempt-test:set",
+      { kind: "set-created", remoteSetId: "remote-set-1" },
+    )).ok, true);
+    const confirmed = await loadWriteAttemptFile(path, plan);
+    assert.equal(confirmed.ok && confirmed.kind === "record", true);
+    if (confirmed.ok && confirmed.kind === "record") {
+      assert.equal(confirmed.record.phase, "confirmed");
+      assert.deepEqual(confirmed.record.baseline, baseline);
+    }
+  });
+});
+
 test("version-two journals migrate with no invented baseline", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "attempt.json");

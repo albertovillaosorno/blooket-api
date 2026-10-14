@@ -82,6 +82,7 @@ import { verifyPersistedBlooketWrite } from "./verify-reconciliation.ts";
 import { blooketSetReadWriteVerifier, questionMatches } from
   "./set-read-verifier.ts";
 import { lowerBlooketWriteSubmission } from "./lower-submission.ts";
+import { isBrowserWriteExecutionPort } from "./browser-write-adapter.ts";
 
 export interface BlooketPublicationDependencies {
   readonly root: string;
@@ -198,6 +199,7 @@ export async function executeBlooketPublicationCommand(
       });
     const verifier = blooketSetReadWriteVerifier(
       blooket.sets, blooket.questions, expectedMedia,
+      isBrowserWriteExecutionPort(writes) ? "observed" : "complete",
     );
     if (command.command === "blooket.publication.reconcile") {
       const result = await verifyPersistedBlooketWrite(

@@ -48,7 +48,7 @@ import {
 } from "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import {
   decodeBlooketWriteVerificationBaseline,
-  verificationBaselineKindForOperation,
+  verificationBaselineKindsForOperation,
   type BlooketWriteVerificationBaseline,
 } from
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
@@ -505,7 +505,7 @@ function decodeAttemptBaseline(
   }
   return decodeBlooketWriteVerificationBaseline(
     value,
-    verificationBaselineKindForOperation(operationKind),
+    verificationBaselineKindsForOperation(operationKind),
   );
 }
 
