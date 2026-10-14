@@ -85,6 +85,17 @@ export async function publishTextDraft(
     const verified = progress(await send(
       "blooket.publication.verify", payload,
     ), draftId);
+    // The product owns fresh provider verification. Presentation may show
+    // success only if its receipt still belongs to this frozen plan and set.
+    if (verified.published && (
+      verified.revision !== frozenRevision ||
+      typeof current.remoteSetId !== "string" ||
+      !current.remoteSetId ||
+      verified.remoteSetId !== current.remoteSetId ||
+      verified.totalOperations !== current.totalOperations ||
+      verified.completedOperations !== current.completedOperations ||
+      verified.completedOperations !== verified.totalOperations
+    )) throw Error("publication-progress-invalid");
     onProgress(verified);
     return verified;
   };

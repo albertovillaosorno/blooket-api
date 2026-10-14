@@ -38,7 +38,8 @@ const ID = "synthetic-draft";
 const REV = "a".repeat(64);
 const state = (phase: string, done: number, total = 3) => ({
   draftId: ID, revision: REV, phase, completedOperations: done,
-  totalOperations: total, published: phase === "verified",
+  totalOperations: total, remoteSetId: done === 0 ? null : "synthetic-set",
+  published: phase === "verified",
 });
 
 test("resumption uses immutable journal revision after local draft changes",
@@ -261,6 +262,32 @@ test("cross-draft progress and impossible success cannot advance writes",
       return bad;
     }), /publication-progress-invalid/u);
     assert.deepEqual(calls, ["blooket.publication.status"]);
+  }
+});
+
+test("final verify rejects a different revision, set, or operation count",
+  async () => {
+  const confirmed = {
+    ...state("writes-complete", 2, 2), remoteSetId: "set-original",
+  };
+  const valid = {
+    ...state("verified", 2, 2), remoteSetId: "set-original",
+  };
+  const invalid = [
+    { ...valid, revision: "b".repeat(64) },
+    { ...valid, remoteSetId: "set-replaced" },
+    { ...valid, completedOperations: 1 },
+    { ...valid, totalOperations: 3 },
+    { ...valid, remoteSetId: null },
+  ];
+  for (const reply of invalid) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return name.endsWith("status") ? confirmed : reply;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.verify"]);
   }
 });
 

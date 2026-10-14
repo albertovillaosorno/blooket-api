@@ -69,6 +69,13 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-14, a separate red-to-green UI regression rejected forged
+final verification of a different revision, remote set ID, or operation count.
+The presentation now requires the verified receipt to match its frozen
+publication plan and retained remote identity before showing success.
+An empty or replaced remote set ID also fails closed. The canonical service
+still owns provider read-back, and no browser write was used in this test.
+
 On 2026-10-14, a red-to-green UI regression demonstrated that a 133-step
 admitted text quiz previously paused solely because the presentation layer
 imposed a fixed 128-write limit. The orchestration loop now uses the same
