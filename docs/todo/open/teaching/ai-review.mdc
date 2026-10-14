@@ -69,6 +69,20 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-14, the local Quizzes view began exposing explicit publication
+controls for saved text-only drafts through existing canonical commands.
+One user intent checks durable status, advances only confirmed operations,
+and performs a separate fresh verify after the last saved question.
+Cancel stops the next operation and aborts the active local request.
+An uncertain journal disables automatic progress and offers a separate
+read-only reconciliation action; no status read triggers a remote write.
+
+The browser module is served from the local service's explicit asset whitelist.
+Portable regression tests cover orderly progress, cancellation, mismatched
+plans, uncertain writes, and the rule that a step cannot claim verification.
+Image/audio publication, editing existing quizzes, real autonomous AI client
+acceptance, and the affected pending Chrome journals remain unresolved.
+
 The browser runtime now has guarded text-only Create Set and Add Question
 mechanics with exact post-submit read-back and persisted journal/budget
 integration. Local drafts remain recovery/authoring state rather than a remote

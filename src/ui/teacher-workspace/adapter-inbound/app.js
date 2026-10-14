@@ -5,6 +5,7 @@ import {
   clipboardImageUrl,
   readClipboardImage,
 } from "./library.js";
+import { publishTextDraft } from "./publication.js";
 
 const words = {
   es: {
@@ -261,8 +262,24 @@ const words = {
       "Prepara quizzes con la IA y revisa tus borradores aquí.",
     connection: "Publicación en Blooket",
     publicationPending:
-      "La publicación automática en Blooket todavía no está disponible. " +
-      "Tus borradores se guardan en este espacio local.",
+      "Publica quizzes de texto desde tus borradores guardados. " +
+      "Cada escritura requiere confirmación remota; imágenes y audio " +
+      "aún no están admitidos.",
+    publishDraft: "Publicar y verificar",
+    stopPublication: "Detener publicación",
+    reconcileDraft: "Reconciliar sin reenviar",
+    verifyDraft: "Verificar en Blooket",
+    publicationProgress: "Operaciones confirmadas: ",
+    publicationVerified: "Publicado y verificado remotamente",
+    publicationUncertain:
+      "Escritura incierta. Reconcíliala antes de publicar de nuevo.",
+    publicationPaused:
+      "Detenido. Consulta el estado antes de continuar.",
+    publicationReady: "Listo para publicar",
+    publicationNotStarted: "Sin publicar",
+    publicationStopped: "Publicación detenida: ",
+    publicationWritesDone: "Escrituras completas; falta verificar",
+    publicationRefresh: "Actualizar estado",
     configured: "Configurado",
     missing: "Sin configurar",
     saved: "Guardado. Reinicia el servicio si cambiaste el puerto.",
@@ -543,8 +560,22 @@ const words = {
       "Prepare quizzes with AI and review your drafts here.",
     connection: "Blooket publication",
     publicationPending:
-      "Automatic Blooket publication is not available yet. " +
-      "Your drafts are saved in this local workspace.",
+      "Publish text-only quizzes from saved drafts. Each write needs " +
+      "remote confirmation; image and audio publication is not ready.",
+    publishDraft: "Publish and verify",
+    stopPublication: "Stop publication",
+    reconcileDraft: "Reconcile without replay",
+    verifyDraft: "Verify on Blooket",
+    publicationProgress: "Confirmed operations: ",
+    publicationVerified: "Published and remotely verified",
+    publicationUncertain:
+      "Uncertain write. Reconcile before publishing again.",
+    publicationPaused: "Stopped. Check status before continuing.",
+    publicationReady: "Ready to publish",
+    publicationNotStarted: "Not published",
+    publicationStopped: "Publication stopped: ",
+    publicationWritesDone: "Writes complete; verification pending",
+    publicationRefresh: "Refresh status",
     configured: "Configured",
     missing: "Not configured",
     saved: "Saved. Restart the service if you changed the port.",
@@ -766,13 +797,13 @@ async function api(path, body, signal) {
     );
   return value;
 }
-async function command(name, payload) {
+async function command(name, payload, signal) {
   const result = await api("/api/command", {
     version: 1,
     operationId: "ui:" + crypto.randomUUID(),
     command: name,
     payload,
-  });
+  }, signal);
   return result.value;
 }
 async function refresh() {
@@ -1889,6 +1920,129 @@ document
       $("#" + button.dataset.close).close(),
     ),
   );
+// UI requests reuse one service-owned pacer and journaled operation boundary.
+// Reopening Quizzes cannot create a second in-flight caller for the same draft.
+let activePublication = null;
+function publicationLabel(value) {
+  const phase = value?.phase;
+  if (phase === "verified" && value.published === true)
+    return t("publicationVerified");
+  if (phase === "reconciliation-required")
+    return t("publicationUncertain");
+  if (phase === "human-action-required") {
+    if (value.state === "organization-prompt") return t("readOrganization");
+    if (value.state === "security-challenge") return t("readChallenge");
+    if (value.state === "signed-out" ||
+        value.state === "expired-session") return t("readSignedOut");
+    return t("publicationPaused");
+  }
+  if (phase === "paused") return t("publicationPaused");
+  if (phase === "not-started") return t("publicationNotStarted");
+  if (phase === "writes-complete") return t("publicationWritesDone");
+  if (phase === "ready" && value.completedOperations === 0)
+    return t("publicationReady");
+  if (Number.isSafeInteger(value?.completedOperations) &&
+      Number.isSafeInteger(value?.totalOperations))
+    return t("publicationProgress") + value.completedOperations +
+      "/" + value.totalOperations;
+  return t("publicationStopped") + String(phase ?? "unknown");
+}
+async function loadQuizzes() {
+  if (activePublication) return;
+  const ids = await command("drafts.list", {});
+  const container = $("#drafts");
+  container.replaceChildren();
+  if (!ids.length) {
+    const text = document.createElement("p");
+    text.textContent = t("noDrafts");
+    container.append(text);
+  }
+  for (const id of ids) {
+    const record = await command("drafts.get", { id });
+    const article = document.createElement("article");
+    const title = document.createElement("h2");
+    const preview = document.createElement("pre");
+    const state = document.createElement("p");
+    const actions = document.createElement("div");
+    state.setAttribute("role", "status");
+    state.setAttribute("aria-live", "polite");
+    title.textContent = record.document.title;
+    preview.textContent = JSON.stringify(record.document, null, 2);
+    article.append(title, preview, state, actions);
+    container.append(article);
+    let latest;
+    const refreshState = async () => {
+      latest = await command("blooket.publication.status", { draftId: id });
+      state.textContent = publicationLabel(latest);
+      actions.replaceChildren();
+      const add = (label, name, callback) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = t(label);
+        button.dataset.publicationAction = name;
+        button.addEventListener("click", callback);
+        actions.append(button);
+        return button;
+      };
+      const finish = async (action) => {
+        if (activePublication) return;
+        const controller = new AbortController();
+        activePublication = { id, controller };
+        const buttons = Array.from(document.querySelectorAll(
+          "[data-publication-action]",
+        ));
+        buttons.forEach(button => { button.disabled = true; });
+        const cancel = add("stopPublication", "stop", () => {
+          controller.abort();
+          cancel.disabled = true;
+        });
+        try {
+          if (action === "publish") {
+            latest = await publishTextDraft(
+              id, record.revision,
+              (name, payload) => command(name, payload, controller.signal),
+              observed => { state.textContent = publicationLabel(observed); },
+              () => controller.signal.aborted,
+            );
+          } else {
+            const name = action === "reconcile"
+              ? "blooket.publication.reconcile"
+              : "blooket.publication.verify";
+            latest = await command(name, { draftId: id }, controller.signal);
+          }
+          state.textContent = publicationLabel(latest);
+        } catch (error) {
+          state.textContent = t("publicationPaused");
+          if (!controller.signal.aborted) report(error);
+        } finally {
+          activePublication = null;
+          // A lost browser result must not automatically enable another step.
+          // The teacher requests a fresh status read before another action.
+          actions.replaceChildren();
+          add("publicationRefresh", "refresh", () => {
+            void refreshState().catch(report);
+          });
+        }
+      };
+      if (latest.phase === "not-started" || latest.phase === "ready")
+        add("publishDraft", "publish", () => { void finish("publish"); });
+      else if (latest.phase === "reconciliation-required")
+        add("reconcileDraft", "reconcile", () => {
+          void finish("reconcile");
+        });
+      else if (latest.phase === "writes-complete")
+        add("verifyDraft", "verify", () => { void finish("verify"); });
+      add("publicationRefresh", "refresh", () => {
+        if (!activePublication) void refreshState().catch(report);
+      });
+    };
+    try { await refreshState(); }
+    catch (error) {
+      state.textContent = t("publicationPaused");
+      report(error);
+    }
+  }
+}
 document.querySelectorAll("[data-tab]").forEach((button) =>
   button.addEventListener("click", async () => {
     document.querySelectorAll(".view").forEach((view) => {
@@ -1899,28 +2053,8 @@ document.querySelectorAll("[data-tab]").forEach((button) =>
     });
     button.setAttribute("aria-current", "page");
     if (button.dataset.tab === "quizzes") {
-      try {
-        const ids = await command("drafts.list", {});
-        $("#drafts").replaceChildren();
-        if (!ids.length) {
-          const text = document.createElement("p");
-          text.dataset.i18n = "noDrafts";
-          text.textContent = t("noDrafts");
-          $("#drafts").append(text);
-        }
-        for (const id of ids) {
-          const result = await command("drafts.get", { id });
-          const article = document.createElement("article"),
-            title = document.createElement("h2"),
-            text = document.createElement("pre");
-          title.textContent = result.document.title;
-          text.textContent = JSON.stringify(result.document, null, 2);
-          article.append(title, text);
-          $("#drafts").append(article);
-        }
-      } catch (error) {
-        report(error);
-      }
+      try { await loadQuizzes(); }
+      catch (error) { report(error); }
     }
   }),
 );

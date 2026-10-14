@@ -53,7 +53,8 @@ test("local icons load and image intake requires origin and CSRF", async () => {
   const root = await mkdtemp(join(tmpdir(), "clipboard-service-"));
   const service = await startBrowserService({ root, port: 0 });
   try {
-    for (const path of ["/icon.svg", "/mcp-icon.png", "/library.js"]) {
+    for (const path of ["/icon.svg", "/mcp-icon.png", "/library.js",
+      "/publication.js"]) {
       const response = await fetch(service.origin + path);
       assert.equal(response.status, 200);
       assert.ok((await response.arrayBuffer()).byteLength > 100);
