@@ -160,8 +160,11 @@ Blooket page and extension-host regressions. It passed 290 synthetic tests
 before adding a separate read-only shape inspector for the question editor.
 The inspector's fixture cases distinguish a valid Typing/Multiple Choice form
 from renamed answer slots, missing selectors, changed time controls, malformed
-JSON, wrong set identity and missing or duplicated fields. No fixture uses
-personal account content or claims a confirmed remote Save.
+JSON, wrong set identity and missing or duplicated fields. Later red-to-green
+cases added semantic drift: invalid correct answers, match modes, time limits,
+question numbering, randomization and media-field types. Security and
+organization overlays produce human stops. No fixture uses personal account
+content or claims a confirmed remote Save.
 
 An authorized read-only Chrome DevTools observation of an existing unsaved
 Typing editor reported compatible structural controls and matching visible and
