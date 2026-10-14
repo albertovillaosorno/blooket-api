@@ -63,6 +63,7 @@ test(
     minimumStartIntervalMs: 2_000,
     maximumStartsPerMinute: 20,
   });
+  assert.equal(Object.isFrozen(DEFAULT_BLOOKET_MUTATION_PACING), true);
   for (const policy of [
     { minimumStartIntervalMs: 1_999, maximumStartsPerMinute: 20 },
     { minimumStartIntervalMs: 2_000, maximumStartsPerMinute: 21 },
@@ -287,4 +288,67 @@ test("rollback on the final grant releases the exclusive slot", async () => {
   const recovered = await pacer.acquire();
   assert.equal(recovered.ok, true);
   if (recovered.ok) recovered.lease.release();
+});
+
+
+test("mutable caller policy cannot accelerate an admitted pacing queue",
+  async () => {
+  const policy = {
+    minimumStartIntervalMs: 2_000,
+    maximumStartsPerMinute: 20,
+  };
+  const clock = virtualRuntime();
+  const pacer = createBlooketMutationPacer(policy, clock.runtime);
+  const first = await pacer.acquire();
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  first.lease.release();
+  // A configuration object may be retained by a settings adapter and later
+  // modified. Its validated lease policy must be frozen at construction.
+  policy.minimumStartIntervalMs = 0;
+  policy.maximumStartsPerMinute = 10_000;
+  const second = await pacer.acquire();
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  assert.equal(second.lease.startedAtMs, 2_000);
+  assert.deepEqual(clock.sleeps, [2_000]);
+  second.lease.release();
+});
+
+
+test("queued starts retain the original rolling-minute policy",
+  async () => {
+  const policy = {
+    minimumStartIntervalMs: 2_000,
+    maximumStartsPerMinute: 1,
+  };
+  const clock = virtualRuntime();
+  const pacer = createBlooketMutationPacer(policy, clock.runtime);
+  const first = await pacer.acquire();
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  first.lease.release();
+  policy.maximumStartsPerMinute = 20;
+  const second = await pacer.acquire();
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  assert.equal(second.lease.startedAtMs, 60_000);
+  assert.deepEqual(clock.sleeps, [60_000]);
+  second.lease.release();
+});
+
+test("runtime pacing rejects policy accessors without evaluating them", () => {
+  let accessed = false;
+  const policy: Record<string, unknown> = {
+    maximumStartsPerMinute: 20,
+  };
+  Object.defineProperty(policy, "minimumStartIntervalMs", {
+    enumerable: true,
+    get() { accessed = true; return 2_000; },
+  });
+  assert.throws(() => createBlooketMutationPacer(
+    policy as unknown as typeof DEFAULT_BLOOKET_MUTATION_PACING,
+    virtualRuntime().runtime,
+  ), /invalid-mutation-pacing-policy/u);
+  assert.equal(accessed, false);
 });

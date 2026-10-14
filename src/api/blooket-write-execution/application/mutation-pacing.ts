@@ -36,10 +36,11 @@ export interface BlooketMutationPacingPolicy {
   readonly maximumStartsPerMinute: number;
 }
 
-export const DEFAULT_BLOOKET_MUTATION_PACING: BlooketMutationPacingPolicy = {
-  minimumStartIntervalMs: 2_000,
-  maximumStartsPerMinute: 20,
-};
+export const DEFAULT_BLOOKET_MUTATION_PACING: BlooketMutationPacingPolicy =
+  Object.freeze({
+    minimumStartIntervalMs: 2_000,
+    maximumStartsPerMinute: 20,
+  });
 
 export interface BlooketMutationLease {
   readonly startedAtMs: number;
@@ -65,7 +66,9 @@ export function createBlooketMutationPacer(
   policy: BlooketMutationPacingPolicy = DEFAULT_BLOOKET_MUTATION_PACING,
   runtime: BlooketMutationPacingRuntime = systemRuntime,
 ): BlooketMutationPacer {
-  validatePolicy(policy);
+  // A later settings change cannot rewrite the policy of an already running
+  // queue. Read only exact own data fields; never invoke injected accessors.
+  const admittedPolicy = snapshotPolicy(policy);
   let tail: Promise<void> = Promise.resolve();
   let starts: number[] = [];
   // The in-process queue uses one nondecreasing timeline, independent of the
@@ -100,7 +103,7 @@ export function createBlooketMutationPacer(
         return cancelled();
       }
       try {
-        await waitForStart(policy, clock, starts, signal);
+        await waitForStart(admittedPolicy, clock, starts, signal);
       } catch (error) {
         releaseSlot();
         if (signal?.aborted || isAbort(error)) return cancelled();
@@ -183,6 +186,26 @@ async function waitForStart(
 
 function pruneStarts(starts: readonly number[], now: number): number[] {
   return starts.filter((startedAt) => startedAt > now - WINDOW_MS);
+}
+
+function snapshotPolicy(
+  policy: BlooketMutationPacingPolicy,
+): BlooketMutationPacingPolicy {
+  const keys = ["minimumStartIntervalMs", "maximumStartsPerMinute"];
+  if (!policy || typeof policy !== "object" || Array.isArray(policy) ||
+      Reflect.ownKeys(policy).length !== keys.length)
+    throw Error("invalid-mutation-pacing-policy");
+  const own = keys.map(key =>
+    Object.getOwnPropertyDescriptor(policy, key));
+  if (own.some(descriptor => !descriptor || !descriptor.enumerable ||
+      !("value" in descriptor)))
+    throw Error("invalid-mutation-pacing-policy");
+  const fixed = Object.freeze({
+    minimumStartIntervalMs: own[0]!.value as number,
+    maximumStartsPerMinute: own[1]!.value as number,
+  });
+  validatePolicy(fixed);
+  return fixed;
 }
 
 function validatePolicy(policy: BlooketMutationPacingPolicy): void {

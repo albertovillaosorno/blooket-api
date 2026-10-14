@@ -279,6 +279,44 @@ test("changed visible editor echo prevents the single Save click",
   },
 );
 
+test("a replaced editor during echo cannot reach Save or reuse tab proof",
+  async () => {
+  const fake = fakeChrome({});
+  const script = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    const reply = await script(request);
+    if (request.func.name === "inspectBlooketPreparedQuestionEcho")
+      fake.setTab("https://dashboard.blooket.com/my-sets");
+    return reply;
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+  assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
+test("throwing echo scripts cannot be treated as successful pre-submit state",
+  async () => {
+  const fake = fakeChrome({});
+  const script = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPreparedQuestionEcho")
+      throw Error("browser-script-transport-failed");
+    return await script(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+  },
+);
+
 test("Add Question waits through a transient unknown shell after one Save",
   async () => {
   const fake = fakeChrome({});
