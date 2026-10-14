@@ -300,7 +300,7 @@ test("MCP publication crosses CLI service and journaled browser transport",
       const request = job.command;
       switch (request.kind) {
         case "session.observe": value = "my-sets"; break;
-        case "capabilities.inspect": value = capabilities; break;
+        case "capabilities.inspect-text": value = capabilities; break;
         case "writes.inspect":
           confirmationInspections++;
           value = { createSetConfirmation: "reload-and-privacy-v1" }; break;
