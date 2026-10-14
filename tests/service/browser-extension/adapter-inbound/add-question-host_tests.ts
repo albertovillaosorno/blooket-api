@@ -69,6 +69,7 @@ function fakeChrome(options: {
   readonly priorListReply?: unknown;
   readonly closeFails?: boolean;
   readonly prepareFails?: boolean;
+  readonly echoValid?: unknown;
   readonly imageReady?: boolean;
   readonly finalizeFails?: boolean;
   readonly imageProbeReply?: unknown;
@@ -138,6 +139,9 @@ function fakeChrome(options: {
             }];
           case "prepareBlooketQuestionControls":
             return [{ result: true }];
+          case "inspectBlooketPreparedQuestionEcho":
+            return [{ result: options.echoValid === undefined
+              ? true : options.echoValid }];
           case "runBlooketAddQuestionPageAction":
             if (args?.[0] === "open" || args?.[0] === "open-image") {
               modalOpen = args?.[1] === "set-fixture";
@@ -256,6 +260,24 @@ test("host confirms Add Question only after exact read-back", async () => {
   assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
   assert.equal(fake.readBackReads(), 4);
 });
+
+test("changed visible editor echo prevents the single Save click",
+  async () => {
+  for (const echoValid of [false, null, { ok: true }, "true", 1]) {
+    const fake = fakeChrome({ echoValid });
+    const host = createExtensionAddQuestionHost(fake.chrome, 7,
+      async () => undefined);
+    assert.deepEqual(await host.addQuestion(input), {
+      ok: false, kind: "browser", code: "blooket-browser-failed",
+    });
+    assert.equal(fake.calls.filter(call =>
+      call === "inspectBlooketPreparedQuestionEcho").length, 1);
+    assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+      false);
+    assert.equal(fake.calls.includes("reload"), false);
+  }
+  },
+);
 
 test("Add Question waits through a transient unknown shell after one Save",
   async () => {

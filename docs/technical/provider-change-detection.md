@@ -45,6 +45,12 @@ The observed states mean:
 - `human-stop`: the page visibly requires provider/security interaction.
 - `other-page`: the observed document is not the exact provider Edit route.
 
+The extension's automatic Add Question write now has a second, read-only
+visible-control echo check directly before the single Save. Its result is
+internal to the admitted browser host and cannot be replayed as a command.
+It detects visible React state that changed after preparation, while the
+canonical journal still owns interruption and remote verification.
+
 An open question modal may contain unsaved human work and an unresolved
 mutation. Do not navigate away from it, dismiss it, reload the extension or
 create another question merely to run a compatibility check. When browser
