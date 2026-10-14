@@ -62,6 +62,19 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the authorized Chrome DevTools CLI confirmed the existing
+My Sets tab is loaded and the selected Edit page contains an open dialog.
+The canonical session and list reads returned `blooket-browser-failed`.
+The dialog was not closed or navigated away because its unsaved ownership was
+not independently established. No pending Create Set journal was replayed.
+
+A read-only Edit Info opener previously disposed its ownership watch when a
+click could already have executed but its acknowledgment threw. A subsequent
+read could then open the same editor again before React mounted its controls.
+The opener now retains that claim, and the read-navigation guard also refuses
+a pending detail editor watch. Red-to-green portable page regressions verify
+both cases; they do not establish provider publication success.
+
 On 2026-10-14, the supported installed CLI confirmed a reload of the existing
 companion in the original authenticated Chrome profile. The canonical scoped
 capability probe succeeded, and one new canonical Create Set step produced

@@ -971,6 +971,29 @@ test("read routes encode IDs and panel opening never submits a form", () => {
   }
 });
 
+test("lost Edit Info click acknowledgment retains its owner watch", () => {
+  const { document } = base();
+  const opener = node("BUTTON", "Edit Info");
+  let clicks = 0;
+  opener.click = () => { clicks++; throw Error("lost-click-ack"); };
+  document.selectors["main button"] = [opener];
+  const form = node("FORM");
+  const identity = node("INPUT", "", { type: "hidden", name: "setId" });
+  identity.value = "fixture";
+  form.selectors['input[type="hidden"][name="setId"]'] = [identity];
+  document.selectors['form#question-set-form'] = [form];
+  const title = node("INPUT");
+  title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  form.selectors['input#title[name="title"]'] = [title];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    assert.equal(Object.hasOwn(globalThis, "__blooketDetailEditWatch"),
+      true);
+    assert.equal(openBlooketDetailPanel("fixture"), false);
+    assert.equal(clicks, 1);
+  });
+});
+
 test("Edit Info opener refuses human-action overlays and lost sessions", () => {
   for (const mode of [
     "organization", "challenge", "password-overlay", "missing-shell",

@@ -226,6 +226,7 @@ test("navigation refuses pending owned forms before React hydration", () => {
     for (const key of [
       "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
       "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+      "__blooketDetailEditWatch",
     ]) {
       const previous = Object.getOwnPropertyDescriptor(globalThis, key);
       try {
