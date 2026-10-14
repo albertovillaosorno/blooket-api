@@ -37,11 +37,26 @@ import {
   frameBlooketWriteVerificationCollection,
   sameBlooketWriteVerificationBaseline,
   verificationBaselineKindForOperation,
+  verificationBaselineKindsForOperation,
 } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/projects/blooket-write-plans/domain/verification-baseline.ts";
 
 const DIGEST = "a".repeat(64);
+
+test("observed set rows never become complete collection evidence", () => {
+  const observed = { schemaVersion: 1, kind: "set-observation",
+    itemCount: 5, sha256: DIGEST };
+  const decoded = decodeBlooketWriteVerificationBaseline(observed,
+    verificationBaselineKindsForOperation("set"));
+  assert.equal(decoded.ok, true);
+  assert.equal(decodeBlooketWriteVerificationBaseline(observed,
+    "set-list").ok, false);
+  assert.equal(decodeBlooketWriteVerificationBaseline(observed,
+    verificationBaselineKindsForOperation("question")).ok, false);
+  if (decoded.ok) assert.equal(sameBlooketWriteVerificationBaseline(
+    decoded.value, { ...decoded.value, kind: "set-list" }), false);
+});
 
 test(
   "set and question baselines decode exact count and digest evidence",

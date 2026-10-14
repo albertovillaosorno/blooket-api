@@ -144,15 +144,32 @@ A concrete verifier should compare a post-attempt collection against the
 persisted pre-attempt count/digest. It may confirm only when removing the one
 expected effect reproduces the exact baseline and all other observed state is
 unchanged. Set-list baselines additionally require an explicitly complete
-collection; `unknown` completeness produces no baseline and cannot confirm or
-disconfirm an ambiguous write. Multiple candidates, concurrent changes, absent
-baselines, or weak page matches remain `inconclusive`.
+collection; `unknown` completeness cannot confirm or disconfirm an ambiguous
+write from collection differences. Multiple candidates, concurrent changes,
+absent baselines, or weak page matches remain `inconclusive`.
 
 Canonical publication requires a valid verification baseline before admitting
 a new remote attempt, including a second capture after pacing and media
 admission. Missing evidence stops before the budget reservation, attempt
-journal, and remote mutation. A normal receipt might otherwise advance, but
-a lost receipt would leave an unrecoverable new set on a nonempty account.
+journal, and remote mutation.
+
+Known browser execution captures a distinct `set-observation` baseline when
+My Sets completeness is unknown. This records only the visible count/digest
+for the precondition comparison; it never claims global absence or upgrades
+the collection's completeness. Only the actual browser adapter's in-process
+identity enables that policy; an unknown writer retains complete-list admission.
+
+A new browser creation advances only on its confirmed receipt, obtained from
+an owned fresh Create Set form, edit redirect and exact saved metadata after
+reload. Question operations still require their full question baseline.
+The required second capture after pacing detects changes to the observed rows
+before budget reservation or mutation. An observed baseline cannot reconcile
+a lost creation acknowledgement, even when a new matching set is visible.
+
+Such uncertain attempts retain their journal, block another write/update and
+require stronger recovery evidence or human action. A surface callback, label,
+matching title or missing row never authorizes retry or adoption.
+
 The trusted low-level executor retains optional baseline policy for existing
 receipt-only callers; CLI and MCP publication always enable the requirement.
 

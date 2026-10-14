@@ -32,7 +32,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { blooketBrowserWriteExecutionPort } from
+import { blooketBrowserWriteExecutionPort, isBrowserWriteExecutionPort } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/api/blooket-write-execution/application/browser-write-adapter.ts";
 import type { BlooketBrowserWriteSurfacePort } from
@@ -49,6 +49,18 @@ const setOperation: BlooketWriteOperation = {
   visibility: "private",
   coverMediaId: null,
 };
+
+test("browser transport identity cannot be copied into another writer", () => {
+  const port = blooketBrowserWriteExecutionPort({
+    createSet: async () => ({ ok: false, kind: "browser",
+      code: "blooket-browser-failed" }),
+    addQuestion: async () => ({ ok: false, kind: "browser",
+      code: "blooket-browser-failed" }),
+  });
+  assert.equal(isBrowserWriteExecutionPort(port), true);
+  assert.equal(isBrowserWriteExecutionPort({ ...port }), false);
+  assert.equal(Object.isFrozen(port), true);
+});
 
 const questionOperation: BlooketWriteOperation = {
   operationId: "plan:test:q:0",

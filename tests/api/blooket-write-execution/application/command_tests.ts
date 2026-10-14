@@ -44,6 +44,11 @@ import { createBlooketMutationPacer } from
   "../../../../src/api/blooket-write-execution/application/mutation-pacing.ts";
 import { lowerBlooketWriteSubmission } from
   "../../../../src/api/blooket-write-execution/application/lower-submission.ts";
+import { blooketBrowserWriteExecutionPort } from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/api/blooket-write-execution/application/browser-write-adapter.ts";
+import { buildBlooketWritePlan } from
+  "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
 import type { BlooketQuestionRead } from
   "../../../../src/ir/blooket-question-reads/contract/question-read.ts";
 import type { BlooketSetDetail } from
@@ -181,6 +186,124 @@ function value(result: Awaited<ReturnType<
   assert.ok(result.ok, JSON.stringify(result));
   return result.value as Record<string, unknown>;
 }
+
+function browserHost(fixtureState: Awaited<ReturnType<typeof state>>,
+  loseCreationReceipt = false): BlooketPublicationDependencies {
+  const built = buildBlooketWritePlan(JSON.stringify(document), "",
+    capabilities);
+  assert.ok(built.ok);
+  const host = fixtureState.host;
+  return { ...host, blooket: { ...host.blooket, sets: {
+    ...host.blooket.sets,
+    list: async () => {
+      const listed = await host.blooket.sets.list();
+      assert.ok(listed.ok && Array.isArray(listed.value));
+      return { ok: true, completeness: "unknown", value: [
+        { schemaVersion: 1, id: "other-owned-set", title: "Other lesson" },
+        ...listed.value,
+      ] };
+    },
+  } }, writes: blooketBrowserWriteExecutionPort({
+    createSet: async (submission, media) => {
+      const operation = built.value.operations[0]!;
+      assert.equal(operation.kind, "set");
+      const lowered = lowerBlooketWriteSubmission(operation,
+        { remoteSetId: null });
+      assert.ok(lowered.ok);
+      assert.deepEqual(submission, lowered.value);
+      const result = await host.writes.execute(operation, { remoteSetId: null },
+        { preparedMedia: media });
+      if (!result.ok) return result;
+      assert.ok(result.receipt?.kind === "set-created");
+      return loseCreationReceipt ? { ok: false, kind: "browser",
+        code: "blooket-browser-failed" } : { ok: true,
+        remoteSetId: result.receipt.remoteSetId };
+    },
+    addQuestion: async (submission, media) => {
+      const operation = built.value.operations[1]!;
+      const target = { remoteSetId: submission.remoteSetId };
+      const lowered = lowerBlooketWriteSubmission(operation, target);
+      assert.ok(lowered.ok);
+      assert.deepEqual(submission, lowered.value);
+      const result = await host.writes.execute(operation, target,
+        { preparedMedia: media });
+      return result.ok ? { ok: true } : result;
+    },
+  }) };
+}
+
+test("confirmed browser creation uses an explicitly partial observation",
+  async () => { await fixture(async state => {
+    const host = browserHost(state);
+    const first = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), host));
+    assert.equal(first["completedOperations"], 1);
+    assert.equal(first["remoteSetId"], "synthetic-remote");
+    assert.equal(state.writes(), 1);
+    const second = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), host));
+    assert.equal(second["completedOperations"], 2);
+    const verified = value(await executeBlooketPublicationCommand(
+      command("verify"), host));
+    assert.equal(verified["published"], true);
+    await executeBlooketPublicationCommand(command("step", state.revision),
+      host);
+    assert.equal(state.writes(), 2);
+    const listed = await host.blooket.sets.list();
+    assert.ok(listed.ok);
+    assert.equal(listed.completeness, "unknown");
+  }); });
+
+test("lost browser creation receipt stays ambiguous despite a visible new set",
+  async () => { await fixture(async state => {
+    const host = browserHost(state, true);
+    const first = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), host));
+    assert.equal(first["phase"], "reconciliation-required");
+    assert.equal(first["completedOperations"], 0);
+    assert.equal(state.writes(), 1);
+    const files = await publicationFiles(state.root, "fixture");
+    const original = await readFile(files.attempt, "utf8");
+    const record = JSON.parse(original);
+    assert.equal(record.baseline.kind, "set-observation");
+    assert.equal(record.baseline.itemCount, 1);
+    const reconciled = value(await executeBlooketPublicationCommand(
+      command("reconcile"), host));
+    assert.equal(reconciled["phase"], "reconciliation-required");
+    assert.equal(reconciled["reason"], "verification-inconclusive");
+    await executeBlooketPublicationCommand(command("step", state.revision),
+      host);
+    assert.equal(state.writes(), 1);
+    assert.equal(await readFile(files.attempt, "utf8"), original);
+  }); });
+
+test("browser creation rechecks observed changes after pacing before mutation",
+  async () => { await fixture(async state => {
+    const host = browserHost(state);
+    const list = host.blooket.sets.list;
+    let changed = false;
+    const guarded = { ...host, blooket: { ...host.blooket,
+      sets: { ...host.blooket.sets, list: async () => {
+        const result = await list();
+        assert.ok(result.ok && Array.isArray(result.value));
+        return { ...result, value: changed ? [...result.value,
+          { schemaVersion: 1, id: "new-other", title: "Another lesson" }]
+          : result.value };
+      } },
+    }, pacer: { acquire: async () => {
+      changed = true;
+      return { ok: true as const, lease: { startedAtMs: 0,
+        release: () => undefined } };
+    } } };
+    const result = await executeBlooketPublicationCommand(
+      command("step", state.revision), guarded);
+    assert.ok(!result.ok);
+    assert.equal(result.issues[0]?.code, "blooket-remote-state-changed");
+    assert.equal(state.writes(), 0);
+    const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.attempt));
+    await assert.rejects(readFile(files.budget));
+  }); });
 
 test("each draft step writes once and requires separate fresh verification",
   async () => { await fixture(async state => {

@@ -40,6 +40,7 @@ export const BLOOKET_WRITE_VERIFICATION_BASELINE_VERSION = 1 as const;
 
 export type BlooketWriteVerificationBaselineKind =
   | "set-list"
+  | "set-observation"
   | "question-list";
 
 export interface BlooketWriteVerificationBaseline {
@@ -61,7 +62,8 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
 export function decodeBlooketWriteVerificationBaseline(
   value: unknown,
-  expectedKind?: BlooketWriteVerificationBaselineKind,
+  expectedKind?: BlooketWriteVerificationBaselineKind |
+    readonly BlooketWriteVerificationBaselineKind[],
 ):
   | { readonly ok: true; readonly value: BlooketWriteVerificationBaseline }
   | {
@@ -96,13 +98,16 @@ export function decodeBlooketWriteVerificationBaseline(
       message: "Expected Blooket write verification baseline version 1.",
     });
   }
-  if (kind !== "set-list" && kind !== "question-list") {
+  if (kind !== "set-list" && kind !== "set-observation" &&
+      kind !== "question-list") {
     issues.push({
       path: "$.kind",
       code: "invalid-verification-baseline-kind",
-      message: 'Expected "set-list" or "question-list".',
+      message: "Expected an admitted set or question baseline kind.",
     });
-  } else if (expectedKind !== undefined && kind !== expectedKind) {
+  } else if (expectedKind !== undefined &&
+      !(Array.isArray(expectedKind) ? expectedKind : [expectedKind])
+        .some(expected => expected === kind)) {
     issues.push({
       path: "$.kind",
       code: "verification-baseline-kind-mismatch",
@@ -132,7 +137,8 @@ export function decodeBlooketWriteVerificationBaseline(
     return { ok: false, issues };
   }
   if (
-    (kind !== "set-list" && kind !== "question-list")
+    (kind !== "set-list" && kind !== "set-observation" &&
+      kind !== "question-list")
     || typeof itemCount !== "number"
     || typeof sha256 !== "string"
   ) {
@@ -163,6 +169,15 @@ export function verificationBaselineKindForOperation(
   return operationKind === "set"
     ? "set-list"
     : "question-list";
+}
+
+// Observed rows are a precondition only. Their count/digest cannot establish
+// global absence or reconcile uncertain creation. Persist that distinction.
+export function verificationBaselineKindsForOperation(
+  operationKind: "set" | "question",
+): readonly BlooketWriteVerificationBaselineKind[] {
+  return operationKind === "set"
+    ? ["set-list", "set-observation"] : ["question-list"];
 }
 
 export function frameBlooketWriteVerificationCollection(
