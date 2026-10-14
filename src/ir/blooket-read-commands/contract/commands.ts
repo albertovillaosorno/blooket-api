@@ -33,6 +33,7 @@ import { decodeBlooketSetId } from
   "../../blooket-set-reads/contract/set-read.ts";
 import {
   isRecord,
+  ownDataField,
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 import type { DecodeResult } from
@@ -48,7 +49,7 @@ export const BLOOKET_READ_COMMANDS = [
 export type BlooketReadCommandName = (typeof BLOOKET_READ_COMMANDS)[number];
 export type BlooketReadPayload =
   | { readonly kind: "session" }
-  | { readonly kind: "capabilities" }
+  | { readonly kind: "capabilities"; readonly textOnly?: true }
   | { readonly kind: "list" }
   | { readonly kind: "get"; readonly setId: string }
   | { readonly kind: "questions"; readonly setId: string };
@@ -76,9 +77,20 @@ export function decodeBlooketReadCommand(
     };
   const needsSetId =
     name === "blooket.sets.get" || name === "blooket.questions.list";
-  const keys = new Set(needsSetId ? ["setId"] : []);
+  const keys = new Set(needsSetId ? ["setId"]
+    : name === "blooket.capabilities.inspect" ? ["scope"] : []);
   const issues = [...unknownFieldIssues(value, keys, "$.payload")];
   if (issues.length) return { ok: false, issues };
+  let textOnly = false;
+  if (name === "blooket.capabilities.inspect" &&
+      Object.hasOwn(value, "scope")) {
+    if (ownDataField(value, "scope") !== "text-publication")
+      return { ok: false, issues: [{
+        path: "$.payload.scope", code: "invalid-capability-scope",
+        message: "Expected the text-publication capability scope.",
+      }] };
+    textOnly = true;
+  }
   if (needsSetId) {
     const id = decodeBlooketSetId(value["setId"], "$.payload.setId");
     if (!id.ok) return id;
@@ -109,6 +121,7 @@ export function decodeBlooketReadCommand(
         : name === "blooket.capabilities.inspect"
           ? "capabilities"
           : "list",
+      ...(textOnly ? { textOnly: true as const } : {}),
     },
   };
 }

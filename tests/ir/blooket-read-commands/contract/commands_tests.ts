@@ -79,3 +79,17 @@ test("Blooket read payloads reject credentials, paths and coercion", () => {
     false,
   );
 });
+
+
+test("capability read scope admits only explicit text publication", () => {
+  assert.deepEqual(decodeBlooketReadCommand(
+    "blooket.capabilities.inspect", { scope: "text-publication" },
+  ), { ok: true, value: { kind: "capabilities", textOnly: true } });
+  for (const scope of ["full", "media", null, false, 0, undefined])
+    assert.equal(decodeBlooketReadCommand(
+      "blooket.capabilities.inspect", { scope },
+    ).ok, false);
+  assert.equal(decodeBlooketReadCommand(
+    "blooket.sets.list", { scope: "text-publication" },
+  ).ok, false);
+});

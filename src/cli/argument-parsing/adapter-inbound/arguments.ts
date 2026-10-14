@@ -265,9 +265,12 @@ function parseBlooketRead(
   const needsSetId =
     command === "blooket.sets.get" ||
     command === "blooket.questions.list";
+  const textOnly = command === "blooket.capabilities.inspect" &&
+    args[0] === "--text-only";
   const payload: Record<string, string> =
-    needsSetId ? { setId: args[0] ?? "" } : {};
-  const options = needsSetId ? args.slice(1) : args;
+    needsSetId ? { setId: args[0] ?? "" }
+      : textOnly ? { scope: "text-publication" } : {};
+  const options = needsSetId || textOnly ? args.slice(1) : args;
   if (
     (options.length !== 0 &&
       (options.length !== 1 || options[0] !== "--json")) ||
