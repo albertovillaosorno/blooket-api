@@ -3,11 +3,11 @@ schema_version = 1
 
 [applicability.clang-format]
 enabled = false
-reason = "The repository contains no C, C++, or CUDA source."
+reason = "The C helper exists, but Jig has no ClangFormat native validation capability configured."
 
 [applicability.clang-tidy]
 enabled = false
-reason = "The repository contains no C, C++, or CUDA source."
+reason = "The C helper exists, but Jig has no ClangTidy native validation capability configured."
 
 [applicability.clippy-config]
 enabled = false
@@ -67,7 +67,7 @@ reason = "The repository contains no Rust source."
 
 [applicability.typescript]
 enabled = false
-reason = "Jig 26.3.0 has no native TypeScript validation capability; pnpm run check is authoritative."
+reason = "Application TypeScript is strictly checked by npm run check; Jig expects a different tooling-only root tsconfig."
 
 [applicability.unreal]
 enabled = false
