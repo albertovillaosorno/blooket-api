@@ -62,6 +62,24 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the loaded corrected companion returned an ordinary
+confirmed Create Set receipt through the canonical CLI. The durable checkpoint
+advanced to one of two operations with the remote identity, after the existing
+reload, title, description and privacy checks. No developer receipt adoption
+or title-based reconciliation was used.
+
+The next Add Question step stopped before writing during its fresh metadata
+precondition. Status remained ready at one of two operations, and a canonical
+question read confirmed an empty remote set. A bounded developer trace located
+the failure at the first saved-sidebar read, before Edit Info was opened.
+
+The worker now waits for initial sidebar hydration within its existing
+read deadline and native document ownership. The independent second saved
+read is never retried; malformed data, changing documents and missing later
+confirmation still stop. Six worker tests passed, including regressions for
+initial hydration, persistent absence and loss of the second snapshot.
+Add Question and final publication acceptance remain pending.
+
 On 2026-10-14, a bounded in-memory developer trace identified the exact
 post-submit result: `unexpected-page` while the native tab still advertised
 Create. The provider subsequently showed the newly created Edit page, but

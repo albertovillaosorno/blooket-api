@@ -68,6 +68,8 @@ test(
   let detailSecondAfterCancelDrifts = false;
   let detailCancelObserved = false;
   let detailSidebarReadCount = 0;
+  let detailSidebarFailuresRemaining = 0;
+  let detailSidebarFailureAtRead = 0;
   let detailSidebarMalformed = false;
   let detailCancelSucceeds = true;
   let detailClosedSucceeds = true;
@@ -277,6 +279,14 @@ test(
             } } }];
           assert.deepEqual(args, ["opaque id/with spaces"]);
           detailSidebarReadCount++;
+          if (detailSidebarFailuresRemaining > 0 ||
+              detailSidebarReadCount === detailSidebarFailureAtRead) {
+            detailSidebarFailuresRemaining = Math.max(0,
+              detailSidebarFailuresRemaining - 1);
+            return [{ result: {
+              ok: false, code: "blooket-browser-failed",
+            } }];
+          }
           if (detailReloadDuringSidebar) {
             detailReloadDuringSidebar = false;
             documentOrigin += 1_000;
@@ -1029,6 +1039,39 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    detailSidebarReadCount = 0;
+    detailSidebarFailuresRemaining = 1;
+    const beforeHydration = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, true, "fresh sidebar must hydrate before its first saved read");
+    assert.equal(detailSidebarFailuresRemaining, 0);
+    assert.equal(scripts.slice(beforeHydration).filter(name =>
+      name === "openBlooketDetailPanel").length, 1);
+    assert.equal(scripts.slice(beforeHydration).includes(
+      "closeBlooketDetailPanel"), true);
+
+    detailSidebarReadCount = 0;
+    detailSidebarFailuresRemaining = 20;
+    const beforeMissingSidebar = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.ok(detailSidebarReadCount > 0 && detailSidebarReadCount <= 15);
+    assert.equal(scripts.slice(beforeMissingSidebar).includes(
+      "openBlooketDetailPanel"), false);
+    detailSidebarFailuresRemaining = 0;
+
+    detailSidebarReadCount = 0;
+    detailSidebarFailureAtRead = 2;
+    const beforeLostConfirmation = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(detailSidebarReadCount, 2);
+    assert.equal(scripts.slice(beforeLostConfirmation).includes(
+      "openBlooketDetailPanel"), false);
+    detailSidebarFailureAtRead = 0;
     // Saved set metadata can change while a read-owned panel is canceled.
     // Such a result must not leave the browser as a confirmed remote read.
     detailCancelObserved = false;
