@@ -62,6 +62,24 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, a bounded in-memory developer trace identified the exact
+post-submit result: `unexpected-page` while the native tab still advertised
+Create. The provider subsequently showed the newly created Edit page, but
+the observer had already returned its recoverable stop without a receipt.
+This is narrower evidence than the earlier Edit-before-tab-metadata regression.
+
+The observer now also waits through this unknown shell solely on its exact
+Create route, within the existing post-submit read budget. It never accepts
+unknown state as success or submits again; persistent unknown state returns
+the explicit unexpected-page stop. Login, organization and challenge stops
+remain immediate, and native redirect, reload, metadata and privacy proof
+remain mandatory before confirmation.
+
+Portable regressions cover the transient and persistent unknown shell. The
+combined Create page/host suites passed 99 tests. The trace contains only
+phase names and bounded scalar outcomes; it is temporary development
+instrumentation, not a receipt or a committed account capture.
+
 On 2026-10-14, Computer Use recovered the existing authenticated development
 account after its browser session changed and the local service stopped.
 The service reused the same data root and preserved every prior journal.

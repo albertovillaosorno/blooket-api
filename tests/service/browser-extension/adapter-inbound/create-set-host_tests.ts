@@ -1025,6 +1025,45 @@ test("Create Set awaits its Edit redirect when DOM precedes tab metadata",
   },
 );
 
+test("Create Set waits through an unknown shell before its native redirect",
+  async () => {
+  const fake = fakeChrome({ scripts: [
+    { ok: true, value: "unexpected-page" }, observed, observed,
+  ] });
+  fake.setTab({ url: "https://dashboard.blooket.com/create",
+    status: "complete" });
+  let polls = 0;
+  const host = createExtensionCreateSetHost(fake.chrome, 7, async () => {
+    if (++polls === 1) fake.setTab({
+      url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+      status: "complete",
+    });
+  });
+  assert.deepEqual(await host.observeCreateSet(), observed);
+  assert.equal(fake.calls.filter(call => call === "script").length, 3);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  },
+);
+
+test("a persistently unknown Create page stops within the observation budget",
+  async () => {
+  const fake = fakeChrome({ scripts: Array.from({ length: 140 }, () =>
+    ({ ok: true, value: "unexpected-page" })) });
+  fake.setTab({ url: "https://dashboard.blooket.com/create",
+    status: "complete" });
+  let polls = 0;
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => { polls++; });
+  assert.deepEqual(await host.observeCreateSet(), {
+    ok: false, kind: "navigation", state: "unexpected-page",
+  });
+  assert.ok(polls > 0 && polls <= 140);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  assert.equal(fake.calls.includes("reload"), false);
+  assert.equal(fake.calls.includes("create-ownership:claim"), false);
+  },
+);
+
 test("Edit page state alone never confirms creation or delays human stops",
   async () => {
   for (const [url, state] of [
