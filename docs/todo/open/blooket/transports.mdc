@@ -62,6 +62,29 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the canonical text-only capability probe succeeded against
+the authenticated Chrome session and reported current browser-build evidence.
+One subsequent canonical Create Set step entered reconciliation-required;
+read-only reconciliation remained inconclusive. Computer Use observed the
+fresh Create form with empty title/description and a disabled Create Set
+button. It could read the page, but native clicks and screenshots timed out.
+
+No receipt or successful submission is inferred from that blank form, and
+the pending attempt is preserved without replay.
+
+The preparer incorrectly required Create Set to be enabled before filling
+the required title. It now permits this initial disabled state while keeping
+the enabled-button check immediately after title input and at submission.
+Two red-to-green regressions cover title-driven enabling and a button that
+stays disabled; the latter never submits.
+
+The Create page/host suites passed 93 tests. This correction still requires
+loaded-worker and live acceptance.
+
+The official [creation guide][create-required-title], checked on 2026-10-14,
+places title entry before Create; the disabled state comes from the actual
+Chrome DOM observation, not from that guide.
+
 On 2026-10-14, the restarted service ran the scoped CLI probe against
 the authenticated Chrome session. `session inspect` reported an owned Edit
 page, but `capabilities inspect --text-only --json` returned the explicit
@@ -1755,3 +1778,6 @@ neither may be replayed or adopted from a matching visible title alone.
 [next-flight]: https://github.com/vercel/next.js/discussions/42170
 
 [node-nofollow]: https://nodejs.org/docs/latest-v24.x/api/fs.html
+
+<!-- jig-ignore-next-line: Preserve the exact official documentation URL. -->
+[create-required-title]: https://help.blooket.com/hc/en-us/articles/15980599804823-How-to-Create-a-Blooket-Question-Set

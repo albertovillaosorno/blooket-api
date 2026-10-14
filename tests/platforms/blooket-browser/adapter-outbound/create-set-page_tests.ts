@@ -242,6 +242,37 @@ test("preparation fills observed controls without submitting", () => {
   });
 });
 
+test("blank title can enable Create Set during owned preparation", () => {
+  const page = fixture(false);
+  const submit = page.form.selectors["button"]![0]!;
+  submit.disabled = true;
+  page.title.dispatchEvent = () => {
+    submit.disabled = page.title.value.length === 0;
+    return true;
+  };
+  const expected = { title: "Synthetic", description: "Draft", private: true };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.deepEqual(prepareBlooketCreateSetForm(expected), { ok: true });
+    assert.equal(submit.disabled, false);
+    assert.equal(submit.clicked, 0);
+    assert.deepEqual(submitBlooketCreateSetForm(expected), { ok: true });
+    assert.equal(submit.clicked, 1);
+  });
+});
+
+test("Create Set staying disabled after a title never submits", () => {
+  const page = fixture(true);
+  const submit = page.form.selectors["button"]![0]!;
+  submit.disabled = true;
+  const expected = { title: "Synthetic", description: "Draft", private: true };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.equal(prepareBlooketCreateSetForm(expected).ok, false);
+    assert.equal(page.title.value, expected.title);
+    assert.equal(submitBlooketCreateSetForm(expected).ok, false);
+    assert.equal(submit.clicked, 0);
+  });
+});
+
 test("privacy changes only through the observed switch", () => {
   const page = fixture(false);
   withPage(page.document, "https://dashboard.blooket.com/create", () => {

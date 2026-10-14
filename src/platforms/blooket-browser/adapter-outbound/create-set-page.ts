@@ -147,8 +147,10 @@ export function prepareBlooketCreateSetForm(
     const buttons = Array.from(form.querySelectorAll("button")).filter(
       (button) => button.textContent?.trim() === "Create Set",
     );
+    // Blooket disables Create Set while the fresh required title is empty.
+    // Preparation may fill that title; intact() below still requires the same
+    // enabled button after input, and submission independently checks it.
     if (buttons.length !== 1 || buttons[0]?.tagName !== "BUTTON" ||
-        (buttons[0] as HTMLButtonElement).disabled ||
         buttons[0]?.getAttribute("aria-disabled") === "true")
       return failed();
     const submitStyle = getComputedStyle(buttons[0]!);
