@@ -173,6 +173,27 @@ function page(document: FixtureNode, href: string, run: () => void): void {
   }
 }
 
+test("pending question reader cannot open a second editor before hydration",
+  () => {
+    const document = node("DOCUMENT");
+    const card = node("DIV", "", {
+      role: "button", "aria-label": "Edit question 1",
+    });
+    const edit = node("BUTTON", "Edit");
+    let clicks = 0;
+    edit.click = () => { clicks++; };
+    card.selectors["button"] = [edit];
+    document.selectors[
+      '[role="button"][aria-label="Edit question 1"]'
+    ] = [card];
+    page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+      assert.equal(openBlooketQuestionPanel("fixture", 1), true);
+      // A lost reply or a still-hydrating panel cannot authorize a new click.
+      assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+      assert.equal(clicks, 1);
+    });
+  });
+
 test("question panels expose normalized read facts without saving", () => {
   const document = node("DOCUMENT");
   const group = node("DIV", "", {

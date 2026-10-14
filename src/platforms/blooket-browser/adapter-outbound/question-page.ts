@@ -264,7 +264,11 @@ export function openBlooketQuestionPanel(
         dispose: () => void;
       };
     };
-    world.__blooketQuestionEditWatch?.dispose();
+    const previous = world.__blooketQuestionEditWatch;
+    // A previous read-owned click may have opened a modal even if React has
+    // not hydrated it. Never transfer its claim or click again in this DOM.
+    if (previous?.document === document) return false;
+    previous?.dispose();
     const watch = {
       document,
       setId,
