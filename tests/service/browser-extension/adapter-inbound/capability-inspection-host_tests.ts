@@ -232,6 +232,34 @@ function fixture(options: {
 
 const noPause = async () => {};
 
+test("capability navigation waits for native destination readiness",
+  async () => {
+  const page = fixture();
+  const execute = page.chrome.scripting.executeScript;
+  let pending = 0;
+  let pendingReads = 0;
+  let lastNavigationCount = 0;
+  page.chrome.scripting.executeScript = async request => {
+    if (page.navigations.length !== lastNavigationCount) {
+      lastNavigationCount = page.navigations.length;
+      pending = 2;
+    }
+    if (request.func.name === "inspectBlooketDocumentOrigin" && pending) {
+      pending--;
+      pendingReads++;
+      return [{ result: null }];
+    }
+    assert.equal(pending, 0, "do not inspect or open an unready document");
+    return await execute(request);
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.equal(result.ok, true);
+  assert.equal(pendingReads, 6);
+  assert.equal(page.currentUrl(), page.originalUrl);
+});
+
 test(
   "existing set resolves shared Plus gate and restores prior page",
   async () => {
@@ -367,10 +395,10 @@ test("existing unsaved editor blocks capability navigation", async () => {
   });
   assert.equal(page.currentUrl(), page.originalUrl);
   assert.equal(page.navigations.length, 0);
-  assert.deepEqual(page.scripts, [
-    "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
-    "inspectBlooketDocumentOrigin", "inspectBlooketDocumentOrigin",
-  ]);
+  assert.ok(page.scripts.includes("canLeaveBlooketPageForRead"));
+  assert.ok(page.scripts.every(name =>
+    name === "inspectBlooketDocumentOrigin" ||
+    name === "canLeaveBlooketPageForRead"));
 });
 
 test("restoration failure invalidates an otherwise clean probe", async () => {

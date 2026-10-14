@@ -199,6 +199,11 @@ export function createExtensionCapabilityInspectionHost(
         ) throw new Error("browser-capability-tab-changed");
         return result;
       };
+      const nativeDocument = async (url: string): Promise<unknown> =>
+        await script(
+          inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+          [url],
+        );
       const editorReady = async (url: string): Promise<boolean> => {
         if (now() >= probeDeadline) return false;
         const tab = await chrome.tabs.get(tabId);
@@ -239,6 +244,7 @@ export function createExtensionCapabilityInspectionHost(
           chrome, tabId, MY_SETS_URL, originalUrl, pause,
           probeDeadline, now,
           async () => await ownsDocument(sourceUrl, probeDeadline),
+          nativeDocument,
         ))
           return browserFailure();
         const observed = await readScript(
@@ -289,6 +295,7 @@ export function createExtensionCapabilityInspectionHost(
             chrome, tabId, editUrl, MY_SETS_URL, pause,
             probeDeadline, now,
             async () => await ownsDocument(MY_SETS_URL, probeDeadline),
+            nativeDocument,
           ))
             return browserFailure();
           // The selected edit route may equal the original teacher tab URL.
@@ -473,6 +480,7 @@ export function createExtensionCapabilityInspectionHost(
             now,
             unclaimedListing ? undefined : async () =>
               await ownsDocument(current!.url!, finishDeadline),
+            nativeDocument,
           ).catch(() => false);
           if (!restored) outcome = browserFailure();
         }
@@ -491,7 +499,8 @@ async function navigate(
   pause: (ms: number) => Promise<void>,
   deadline: number,
   now: () => number,
-  sourceDocument?: () => Promise<boolean>,
+  sourceDocument: (() => Promise<boolean>) | undefined,
+  nativeDocument: (url: string) => Promise<unknown>,
 ): Promise<boolean> {
   if (now() >= deadline) return false;
   const current = await chrome.tabs.get(tabId);
@@ -502,12 +511,33 @@ async function navigate(
   const checked = await chrome.tabs.get(tabId);
   if (now() >= deadline || checked.url !== current.url ||
       (sourceDocument && checked.status !== "complete")) return false;
-  if (current.url !== url) await chrome.tabs.update(tabId, { url });
+  const changingDocument = current.url !== url;
+  const sourceOrigin = changingDocument && current.url
+    ? await nativeDocument(current.url) : undefined;
+  if (changingDocument &&
+      (typeof sourceOrigin !== "number" ||
+       !Number.isFinite(sourceOrigin) || sourceOrigin <= 0)) return false;
+  if (now() >= deadline ||
+      (sourceDocument && !await sourceDocument())) return false;
+  if (changingDocument) await chrome.tabs.update(tabId, { url });
   for (let attempt = 0; attempt < MAX_POLLS && now() < deadline;
     attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (now() >= deadline) return false;
-    if (tab.status === "complete" && tab.url === url) return true;
+    if (tab.status === "complete" && tab.url === url) {
+      // tabs.update/get may expose the destination URL while its previous
+      // document is still complete. Wait for the actual destination document,
+      // rather than failing the capability probe on that transitional reply.
+      const origin = await nativeDocument(url);
+      if (typeof origin === "number" &&
+          Number.isFinite(origin) && origin > 0 &&
+          (!changingDocument || origin !== sourceOrigin)) {
+        const after = await chrome.tabs.get(tabId);
+        return now() < deadline && after.status === "complete" &&
+          after.url === url;
+      }
+      if (origin !== null && origin !== sourceOrigin) return false;
+    } else if (tab.url !== url && tab.url !== current.url) return false;
     await pause(Math.min(POLL_MS, deadline - now()));
   }
   return false;
@@ -521,7 +551,8 @@ async function restore(
   pause: (ms: number) => Promise<void>,
   deadline: number,
   now: () => number,
-  sourceDocument?: () => Promise<boolean>,
+  sourceDocument: (() => Promise<boolean>) | undefined,
+  nativeDocument: (url: string) => Promise<unknown>,
 ): Promise<boolean> {
   if (new URL(url).origin !== DASHBOARD_ORIGIN) return false;
   // The user may have navigated the tab independently. An unfamiliar route,
@@ -539,6 +570,7 @@ async function restore(
   return await navigate(
     chrome, tabId, url, current.url ?? url, pause, deadline, now,
     sourceDocument,
+    nativeDocument,
   );
 }
 
