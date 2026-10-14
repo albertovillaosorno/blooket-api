@@ -157,7 +157,9 @@ test("CI validates before ARM Safari and release only publishes", async () => {
   assert.equal(ci.on.push.branches, undefined);
   assert.equal(ci.on.pull_request, undefined);
   assert.equal(ci.on.workflow_dispatch, undefined);
-  assert.equal(ci.on.workflow_call, null);
+  assert.deepEqual(ci.on.workflow_call.secrets, {
+    "update-signing-key": { required: false },
+  });
 
   assert.equal(ci.jobs.validate["runs-on"], "ubuntu-latest");
   const setupNode = ci.jobs.validate.steps.find(
@@ -238,3 +240,54 @@ test("CI validates before ARM Safari and release only publishes", async () => {
     visit(value);
   }
 });
+
+test("release metadata is signed after final validation and published with ZIP",
+  async () => {
+    const ci = await workflow("ci");
+    const release = await workflow("release");
+    const steps = ci.jobs["macos-arm"].steps;
+    const signing = steps.findIndex((step: { run?: string }) =>
+      step.run === "npm run release:manifest");
+    const assessment = steps.findIndex((step: { run?: string }) =>
+      step.run?.includes("npm run package:verify -- darwin-arm64 --release"));
+    const smoke = steps.findIndex((step: { run?: string }) =>
+      step.run?.includes("npm run macos:safari-smoke"));
+    const upload = steps.findIndex((step: { uses?: string }) =>
+      step.uses === "actions/upload-artifact@v7");
+    assert.ok(smoke >= 0 && assessment > smoke && signing > assessment);
+    assert.ok(upload > signing);
+    const releaseOnly = "startsWith(github.ref, 'refs/tags/v')";
+    assert.equal(steps[assessment].if, releaseOnly);
+    assert.equal(steps[signing].if, releaseOnly);
+    assert.ok(steps[assessment].run.includes(
+      '[[ "$RELEASE_ENABLED" == true ]]'));
+    assert.ok(steps[assessment].run.includes("release-tag.ts"));
+    assert.deepEqual(steps[signing].env, {
+      BLOOKET_UPDATE_SIGNING_KEY: "$" + "{{ secrets.update-signing-key }}",
+      BLOOKET_UPDATE_PUBLISHER_KEYS:
+        "$" + "{{ vars.BLOOKET_UPDATE_PUBLISHER_KEYS }}",
+    });
+    // CI tags and portable/native test tools receive no signing environment.
+    for (const job of Object.values(ci.jobs) as { env?: unknown;
+      steps: { env?: Record<string, unknown> }[] }[]) {
+      assert.equal(job.env, undefined);
+      for (const step of job.steps)
+        if (step !== steps[signing])
+          assert.equal(step.env?.["BLOOKET_UPDATE_SIGNING_KEY"], undefined);
+    }
+    assert.deepEqual(release.jobs.ci.secrets, {
+      "update-signing-key": "$" + "{{ secrets.BLOOKET_UPDATE_SIGNING_KEY }}",
+    });
+    assert.deepEqual(steps[upload].with.path.trim().split("\n"), [
+      ".temp/distributions/darwin-arm64.zip",
+      ".temp/distributions/update-manifest.json",
+    ]);
+    const publish = release.jobs.publish.steps.at(-1).run as string;
+    assert.ok(publish.indexOf('test -s "$manifest"') >= 0);
+    assert.ok(publish.indexOf('test -s "$manifest"') <
+      publish.indexOf("gh release create"));
+    assert.ok(publish.includes('"$app" "$manifest"'));
+    assert.equal(release.jobs.publish.steps.some(
+      (step: { env?: Record<string, unknown> }) =>
+        step.env?.["BLOOKET_UPDATE_SIGNING_KEY"] !== undefined), false);
+  });

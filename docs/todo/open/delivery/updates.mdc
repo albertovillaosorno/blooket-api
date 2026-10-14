@@ -149,7 +149,7 @@ Linux is a development package and is never an automatic-update target.
 
 ### Trust and release pipeline
 
-The current pipeline publishes no update manifest or final archive checksums.
+The pipeline now carries a final signed update manifest alongside the app ZIP.
 Dependency hashes in `distribution.json` do not verify a downloaded app archive.
 Add a bounded CI-owned manifest with canonical version/tag, source commit,
 target, minimum OS, asset name, byte size, and SHA-256 after
@@ -210,6 +210,20 @@ restart, rollback/data retention, and EN/ES states. Platform-only Apple trust
 acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
+
+On 2026-10-14, the release caller began forwarding only the explicit manifest
+signing secret to reusable CI. After Safari assembly and smoke, release tags
+must pass final release package assessment before the manifest producer runs.
+Only that producer receives signing inputs; ordinary CI tags do not sign.
+The artifact transfer and publish step require both the final ZIP and its
+public signed manifest, without rebuilding or re-signing at publication.
+
+Parsed workflow regressions cover ordering, release-only signing, private-key
+environment isolation, exact artifact names and mandatory manifest publication.
+No release tag was pushed, no secret was provisioned and no hosted/native
+execution is claimed. The current unsigned native assembly still needs actual
+production Apple signing/notarization and admitted publisher provisioning;
+the newly required final assessment refuses its promotion as a trusted release.
 
 On 2026-10-14, release-only signing and manifest production gained a concrete
 local implementation. Actual final archive bytes supply size and SHA-256;
