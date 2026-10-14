@@ -69,6 +69,13 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-14, two more red-to-green UI regressions stopped a malformed
+Create Set receipt with no remote identity, and a later Add Question step
+that changed remote set identity. The UI rejects an impossible progress jump
+or changed frozen plan before displaying advancement or sending another step.
+These are defense-in-depth checks atop service journal verification, not proof
+of a newly executed provider mutation.
+
 On 2026-10-14, a separate red-to-green UI regression rejected forged
 final verification of a different revision, remote set ID, or operation count.
 The presentation now requires the verified receipt to match its frozen

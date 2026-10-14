@@ -174,7 +174,8 @@ test("nonadvancing or malformed replies fail closed", async () => {
       return name.endsWith("status") ? state("ready", 0) : step;
     };
     if (typeof step.completedOperations !== "number" ||
-        step.published === true)
+        step.published === true ||
+        (step.phase === "advanced" && step.completedOperations !== 1))
       await assert.rejects(publishTextDraft(ID, REV, send),
         /publication-progress-invalid/u);
     else {
@@ -185,16 +186,42 @@ test("nonadvancing or malformed replies fail closed", async () => {
   }
 });
 
+test("remote set identity cannot switch after one confirmed operation",
+  async () => {
+  const calls: string[] = [];
+  const result = publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return name.endsWith("status") ? state("ready", 1) : {
+      ...state("advanced", 2), remoteSetId: "different-set",
+    };
+  });
+  await assert.rejects(result, /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
+test("a missing first Create Set identity never advances to Add Question",
+  async () => {
+  const calls: string[] = [];
+  const result = publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return name.endsWith("status")
+      ? { draftId: ID, phase: "not-started", published: false }
+      : { ...state("advanced", 1, 2), remoteSetId: null };
+  });
+  await assert.rejects(result, /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
 test("a changed frozen plan cannot schedule the next operation",
   async () => {
   const calls: string[] = [];
   const replies = [state("ready", 1), state("advanced", 2, 4)];
-  const result = await publishTextDraft(ID, REV, async name => {
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
     calls.push(name);
     return replies.shift();
-  });
-  assert.equal(result.phase, "advanced");
-  assert.equal(result.completedOperations, 2);
+  }), /publication-progress-invalid/u);
   assert.equal(calls.filter(name => name.endsWith("step")).length, 1);
 });
 
