@@ -136,7 +136,7 @@ export const portableExtract: ArchiveExtractionCommand =
     });
   };
 
-export async function fixture(entries = baseEntries()) {
+export async function fixture(entries = baseEntries(), version = "26.4.1") {
   const root = await realpath(await mkdtemp(join(tmpdir(), "update-extract-")));
   const archivePath = join(root, "darwin-arm64.zip");
   const bytes = zipBytes(entries);
@@ -144,10 +144,11 @@ export async function fixture(entries = baseEntries()) {
   const keys = generateKeyPairSync("ed25519");
   const manifest: UpdateManifest = { schemaVersion: 1,
     repository: RELEASE_REPOSITORY, bundleId: UPDATE_BUNDLE_ID,
-    version: "26.4.1", tag: "v26.4.1", sourceCommit: "a".repeat(40),
+    version, tag: "v" + version, sourceCommit: "a".repeat(40),
     minimumMacos: "13.5", assets: [{ target: "darwin-arm64",
       name: "darwin-arm64.zip",
-      url: releaseAssetUrl("v26.4.1", "darwin-arm64.zip"), size: bytes.length,
+      url: releaseAssetUrl("v" + version, "darwin-arm64.zip"),
+      size: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex") }],
   };
   const verification = {

@@ -169,6 +169,21 @@ async function installationOwner(root: string): Promise<InstallationOwner> {
   } finally { await handle.close(); }
 }
 
+// Fresh local capability proof before spawning an installer-owned service.
+// It exposes neither the confidential marker token nor startup authority.
+export async function canonicalDataUpdateBoundaryOwned(
+  boundary: CanonicalDataBoundary, root: string,
+): Promise<boolean> {
+  const owned = installationOwners.get(boundary);
+  if (!owned || owned.root !== root) return false;
+  try {
+    const current = await installationOwner(root);
+    return current.pid === process.pid && current.pid === owned.pid &&
+      current.token === owned.token && current.dev === owned.dev &&
+      current.ino === owned.ino && installationOwners.get(boundary) === owned;
+  } catch { return false; }
+}
+
 // Only a live capability returned by this process's update acquisition can
 // issue this confidential message for an actual connected child it owns.
 // Send it only over that child's private IPC; never publish it in diagnostics.

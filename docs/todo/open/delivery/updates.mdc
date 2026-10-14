@@ -211,6 +211,33 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
 
+On 2026-10-14, an installer-owned service manager gained concrete silent
+bundle startup, private admission, fresh health and drained shutdown.
+It requires the actual held data capability and captures the real child;
+concurrent checks reuse that child and deadlines retain its startup observer.
+A fresh wrong-version receipt refuses candidate health while supplying only
+the version needed to close that same owned process safely for rollback.
+
+Signed preparation now connects to the actual journal/controller, real Linux
+exchange, held publication/data fences and real background-service children
+in two portable transaction fixtures. One applies and proves fresh product
+health; the other drains a wrong-version candidate, reverses the exchange
+and starts the retained old version. Rechecking both completed transactions
+does not replay an exchange or spawn another service, and saved data/locale
+remain preserved with the usable local workspace available after release.
+
+Eighty-three focused tests passed with strict TypeScript and zero Jig
+diagnostics. Apple assessment and bundle launch locations are explicit test
+substitutions; service startup, health, closure, journal storage and Linux
+syscalls are actual execution. The Node 24
+[child-process contract][node-v24-ipc] was checked on the same date for IPC,
+ignored output and final child closure.
+
+The manager does not authenticate publisher trust or release installation
+ownership. Production independent installer supervision, immutable program
+preparation, real release trust configuration and local EN/ES install/recovery
+controls remain functional work before this record can close.
+
 On 2026-10-14, real signed preparation followed by native exchange reproduced
 a functional failure: the frozen candidate's root prevented cross-parent
 directory replacement. The native helper now temporarily admits owner write
@@ -933,3 +960,6 @@ update.
 
 [node-filesystem-current]:
   https://github.com/nodejs/node/blob/main/doc/api/fs.md
+
+[node-v24-ipc]:
+  https://github.com/nodejs/node/blob/v24.x/doc/api/child_process.md
