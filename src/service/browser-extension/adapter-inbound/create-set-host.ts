@@ -460,7 +460,13 @@ export function createExtensionCreateSetHost(
                   /[\x00-\x1f\x7f]/u.test(ids[0]))
                 return browserFailure();
               const origin = await editDocumentOrigin(tab.url);
-              if (origin === null) return browserFailure();
+              if (origin === null) {
+                // The destination tab can be complete before its previous
+                // document has been replaced. Wait only before binding the
+                // first edit lifetime; later replacements still fail closed.
+                await pause(POLL_MS);
+                continue;
+              }
               const result = await script(
                 observeBlooketCreateSetSuccess as
                   (...args: never[]) => unknown,

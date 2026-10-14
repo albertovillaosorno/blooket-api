@@ -62,6 +62,22 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the supported installed CLI confirmed a reload of the existing
+companion in the original authenticated Chrome profile. The canonical scoped
+capability probe succeeded, and one new canonical Create Set step produced
+an Edit page with the expected fictional title and description. The step
+still returned reconciliation-required without a durable receipt. A fresh
+canonical set-detail read failed; no success, question write, title-based
+adoption or retry is inferred from the visible set.
+
+The post-submit observer also rejected a temporarily unavailable native Edit
+document immediately, unlike the corrected Create navigation. A red-to-green
+regression now proves bounded waiting before the first Edit lifetime is bound,
+with exactly two receipt reads and no claim, navigation or resubmission.
+Later document replacements and permanently missing origins still fail closed.
+The combined Create page/host suites passed 95 tests. This portable correction
+does not establish which phase caused the observed live confirmation failure.
+
 On 2026-10-14, Computer Use read a freshly opened local workspace tab in the
 existing authorized Chrome session. Its documented debugger diagnostic
 responded, with no paused-script or JavaScript-dialog event on that tab,
