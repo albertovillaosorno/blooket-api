@@ -68,9 +68,10 @@ mutations retain the consumed budget start, and budget exhaustion stops before a
 journal or remote write.
 
 The durable budget adapter is lock-protected, plan-bound, strictly decoded, and
-atomically persisted; restart reloads the same start count and deadline. Shared
-MCP/CLI/UI product composition remains pending because those publication
-entrypoints are not yet active, so owning-surface acceptance is still open.
+atomically persisted; restart reloads the same start count and deadline. The
+actual CLI, MCP and UI publication commands now share the running service's
+publication pacer. Owning-surface acceptance remains pending for uninterrupted
+multi-question progression, configurable limits and cancellation/recovery.
 
 After a pacing lease is granted, persisted execution now re-observes the browser
 session without authenticating and then re-reads the verification baseline
@@ -102,6 +103,19 @@ Never bypass the challenge, use solving services, forge validation, transfer
 challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
+
+On 2026-10-14, two red-to-green Add Question regressions reproduced premature
+stops after one Save: an unknown transitional Edit shell and a verification
+reload that still exposed the old document or no document origin. The host
+now waits within its existing post-submit/read budget, without resubmitting
+or accepting the old document as fresh proof.
+
+The verification reload carries its prior native origin into the private
+waiter, and only its new document can authorize saved read-back. Unknown
+post-save state is bounded; explicit security/organization stops remain prompt,
+and pre-mutation admission is unchanged. All 61 Add Question host tests passed,
+including persistence, one-submit counts, fresh read-back and human-stop cases.
+Live automatic multi-question confirmation remains pending.
 
 On 2026-10-14, the actual CLI/UI publication path created and verified a
 private one-question quiz through the shared server-owned pacer. Create Set

@@ -255,6 +255,100 @@ test("host confirms Add Question only after exact read-back", async () => {
   assert.equal(fake.readBackReads(), 4);
 });
 
+test("Add Question waits through a transient unknown shell after one Save",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let pending = true;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPage" && pending &&
+        fake.calls.includes("runBlooketAddQuestionPageAction:submit")) {
+      pending = false;
+      return [{ result: { ok: true, value: "unexpected-page" } }];
+    }
+    return await original(request);
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.addQuestion(input), { ok: true });
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  },
+);
+
+test("Add Question awaits the new document after its verification reload",
+  async () => {
+  for (const transitionalOrigin of [null, 2_000]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let pending = true;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketDocumentOrigin" && pending &&
+          fake.calls.includes("reload")) {
+        pending = false;
+        return [{ result: transitionalOrigin }];
+      }
+      return await original(request);
+    };
+    const host = createExtensionAddQuestionHost(fake.chrome, 7,
+      async () => undefined);
+    assert.deepEqual(await host.addQuestion(input), { ok: true });
+    assert.equal(fake.calls.filter(call =>
+      call === "runBlooketAddQuestionPageAction:submit").length, 1);
+    assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  }
+  },
+);
+
+test("Add Question waits for its reloaded Edit shell before saved read-back",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let pending = true;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPage" && pending &&
+        fake.calls.includes("reload")) {
+      pending = false;
+      return [{ result: { ok: true, value: "unexpected-page" } }];
+    }
+    return await original(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input), { ok: true });
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.filter(call => call === "reload").length, 1);
+  },
+);
+
+test("unknown post-save shells are bounded and explicit human stops are prompt",
+  async () => {
+  for (const state of ["unexpected-page", "security-challenge",
+    "organization-prompt"]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let observations = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketPage" &&
+          fake.calls.includes("runBlooketAddQuestionPageAction:submit")) {
+        observations++;
+        return [{ result: { ok: true, value: state } }];
+      }
+      return await original(request);
+    };
+    const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+      async () => undefined).addQuestion(input);
+    assert.deepEqual(result, { ok: false, kind: "navigation", state });
+    assert.ok(observations > 0 && observations <= 50);
+    if (state !== "unexpected-page") assert.equal(observations, 1);
+    assert.equal(fake.calls.filter(call =>
+      call === "runBlooketAddQuestionPageAction:submit").length, 1);
+    assert.equal(fake.calls.includes("reload"), false);
+  }
+  },
+);
+
 test("image write requires a matching persisted byte digest", async () => {
   const fake = fakeChrome({});
   const result = await createExtensionAddQuestionHost(
