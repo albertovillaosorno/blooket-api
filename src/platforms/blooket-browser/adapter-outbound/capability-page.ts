@@ -57,6 +57,7 @@ export function canLeaveBlooketPageForRead(): boolean {
     if ([
       "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
       "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+      "__blooketDetailEditWatch",
     ].some(key => Object.hasOwn(globalThis, key))) return false;
     if (path !== "/my-sets" && path !== "/edit" &&
         !path.startsWith("/set/")) return false;

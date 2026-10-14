@@ -774,7 +774,11 @@ export function openBlooketDetailPanel(setId: string): boolean {
       dispose: () => void;
     };
   };
-  world.__blooketDetailEditWatch?.dispose();
+  const previous = world.__blooketDetailEditWatch;
+  // The previous click might have opened an editor before its reply was lost.
+  // Keep the single-use claim until that document is actually replaced.
+  if (previous?.document === document) return false;
+  previous?.dispose();
   const watch = {
     document,
     setId,
@@ -798,7 +802,8 @@ export function openBlooketDetailPanel(setId: string): boolean {
     opener.click();
     return true;
   } catch {
-    watch.dispose();
+    // The browser may have processed this read-only opener before the click
+    // reply failed; retain the ownership watch to prohibit duplicate opens.
     return false;
   }
 }
