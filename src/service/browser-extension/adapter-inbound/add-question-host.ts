@@ -364,7 +364,9 @@ export function createExtensionAddQuestionHost(
         if (safeToReload !== true || !await sameEditDocument())
           return browserFailure();
         await chrome.tabs.reload(tabId, { bypassCache: true });
-        const fresh = await waitForEdit(script, chrome, tabId, editUrl, pause);
+        const fresh = await waitForEdit(
+          script, chrome, tabId, editUrl, pause, ownedOrigin,
+        );
         if (!fresh.ok) return fresh;
         if (fresh.origin === undefined || fresh.origin === ownedOrigin)
           return browserFailure();
@@ -386,7 +388,9 @@ async function waitForEdit(
   tabId: number,
   editUrl: string,
   pause: (ms: number) => Promise<void>,
+  previousOrigin?: number,
 ): Promise<ExtensionAddQuestionResult & { readonly origin?: number }> {
+  let pendingUnknown = false;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.status === "complete") {
@@ -395,6 +399,13 @@ async function waitForEdit(
         inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
         [editUrl],
       );
+      if (previousOrigin !== undefined &&
+          (origin === null || origin === previousOrigin)) {
+        // A requested reload can leave the old complete document visible.
+        // Do not bind it as fresh verification or open a question in it.
+        await pause(POLL_MS);
+        continue;
+      }
       if (typeof origin !== "number" || !Number.isFinite(origin) ||
           origin <= 0) return browserFailure();
       const observed = await observe(script);
@@ -409,12 +420,18 @@ async function waitForEdit(
       if (confirmedOrigin !== origin || stillThere.status !== "complete" ||
           stillThere.url !== editUrl) return browserFailure();
       if (observed === "edit") return { ok: true, origin };
+      if (previousOrigin !== undefined && observed === "unexpected-page") {
+        pendingUnknown = true;
+        await pause(POLL_MS);
+        continue;
+      }
       if (observed !== undefined)
         return navigationFailure(normalizeUnexpected(observed));
     }
     await pause(POLL_MS);
   }
-  return browserFailure();
+  return pendingUnknown ? navigationFailure("unexpected-page")
+    : browserFailure();
 }
 
 async function observeQuestion(
@@ -427,6 +444,7 @@ async function observeQuestion(
 ): Promise<ExtensionAddQuestionResult> {
   const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
     encodeURIComponent(input.setId);
+  let pendingUnknown = false;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.url !== editUrl) return browserFailure();
@@ -436,11 +454,20 @@ async function observeQuestion(
     }
     const observed = await observe(script);
     if (observed !== "edit") {
+      // Saving can briefly unmount the authenticated Edit shell. Only read
+      // within this same post-submit budget; never submit again or interpret
+      // an unknown page as saved state. Explicit human stops remain immediate.
+      if (observed === "unexpected-page") {
+        pendingUnknown = true;
+        await pause(POLL_MS);
+        continue;
+      }
       if (observed !== undefined)
         return navigationFailure(normalizeUnexpected(observed));
       await pause(POLL_MS);
       continue;
     }
+    pendingUnknown = false;
 
     const panel = await script(
       runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
@@ -557,7 +584,8 @@ async function observeQuestion(
     }
     return browserFailure();
   }
-  return browserFailure();
+  return pendingUnknown ? navigationFailure("unexpected-page")
+    : browserFailure();
 }
 
 type Script = (
