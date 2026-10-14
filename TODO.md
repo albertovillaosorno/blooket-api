@@ -12,13 +12,6 @@ The final ongoing maintenance task is intentionally never auto-completed.
 
 ## P2 - Blooket publication
 
-### TODO - Working Blooket writes and browser fallback
-
-Make real Create Set and question writes work and verify them after reload.
-Browser-first is enough; unverified HTTP is optional, not a launch blocker.
-
-[Record](docs/todo/open/blooket/transports.mdc)
-
 ### TODO - Mutation pacing and human checkpoints
 
 Make real publication paced, cancellable, and recoverable without duplicate

@@ -17,6 +17,8 @@ scope:
   - "src/api/blooket-write-execution/"
   - "src/projects/blooket-write-plans/"
   - "src/ir/blooket-navigation/"
+  - "src/service/browser-extension/"
+  - "src/platforms/blooket-browser/"
 validation:
   - "npm run check"
   - "npm run roadmap:check"
@@ -100,6 +102,18 @@ Never bypass the challenge, use solving services, forge validation, transfer
 challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
+
+On 2026-10-14, the actual CLI/UI publication path created and verified a
+private one-question quiz through the shared server-owned pacer. Create Set
+confirmed automatically, while an uncertain Add Question result was recovered
+by read-only reconciliation without resubmission; final fresh verification
+and a subsequent question read both succeeded.
+
+Ordinary Add Question confirmation still needs its post-save readiness issue
+resolved. Its visible saved question and recoverable journal do not establish
+reliable automatic progression through several questions. This record owns
+that bounded confirmation timing alongside queue, cancellation and budget
+acceptance; publication media/editing keep their separate ownership.
 
 On 2026-10-14, the local Quizzes UI began using the existing server-owned
 shared publication pacer and journaled command boundary. It dispatches a

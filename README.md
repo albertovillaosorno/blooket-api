@@ -457,11 +457,16 @@ started or confirmed creation, even when its planned questions differ.
 Inspect the original publication instead of retrying a timed-out create.
 
 This path has portable integration coverage across MCP, CLI, and local
-service boundaries with a simulated provider. A private development quiz with
-one typing question was also created and freshly verified on Blooket through
-the canonical CLI, after an explicitly witnessed journal reconciliation.
-Ordinary automatic Create Set confirmation without that developer recovery,
-media upload, and existing-quiz editing still require live acceptance.
+service boundaries with a simulated provider.
+
+An actual private quiz was also published and freshly verified through the
+product UI and canonical CLI in Chrome. Create Set confirmed automatically
+after reload and saved metadata/privacy checks. Its typing question was
+confirmed through ordinary read-only journal reconciliation without
+resubmission, and fresh reads verified its answer, exact matching and time.
+
+Ordinary Add Question confirmation timing is still being improved; canonical
+media upload and existing-quiz editing remain unfinished.
 MCP runs the bundled runtime in the background without opening Terminal.
 
 Authenticated private details, saved question/image reads, and account
