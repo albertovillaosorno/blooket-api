@@ -32,7 +32,7 @@
 //
 import assert from "node:assert/strict";
 import { fork, type ChildProcess } from "node:child_process";
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -58,7 +58,8 @@ async function finished(result: OwnedServiceStopObservation) {
 }
 type ManagerOptions =
   NonNullable<Parameters<typeof createInstallerServiceManager>[2]>;
-async function fixture(timeoutMs = 5_000) {
+async function fixture(timeoutMs = 5_000,
+  onStopped?: NonNullable<ManagerOptions["onStopped"]>) {
   const root = await mkdtemp(join(tmpdir(), "installer-service-"));
   const data = join(root, "teacher-data");
   const bundlePath = join(root, "Blooket API.app");
@@ -94,7 +95,7 @@ async function fixture(timeoutMs = 5_000) {
     return child;
   };
   const manager = createInstallerServiceManager(data, boundary,
-    { timeoutMs, launch });
+    { timeoutMs, launch, ...(onStopped ? { onStopped } : {}) });
   return { root, data, boundary, target, children, manager, launch,
     async preserved() {
       assert.equal(await readFile(join(data, "teacher-marker"), "utf8"),
@@ -146,6 +147,45 @@ test("manager starts a real fenced service and reuses its owned child",
     } finally { await f.cleanup(); }
   });
 
+test("local UI shutdown closes the installer-owned service and reports once",
+  { timeout: 20_000 }, async () => {
+    const observer = new EventEmitter();
+    const reports: unknown[] = [];
+    const f = await fixture(5_000, proof => {
+      reports.push(proof); observer.emit("stopped", proof);
+    });
+    try {
+      const nonce = randomUUID();
+      assert.deepEqual(await f.manager.startAndCheck(f.target, nonce), {
+        status: "healthy", nonce, version: PRODUCT_VERSION,
+      });
+      await f.boundary.release();
+      const runtime = JSON.parse(await readFile(join(f.data,
+        "service-runtime.json"), "utf8"));
+      const bootstrap = await (await fetch(runtime.origin + "/api/bootstrap"))
+        .json();
+      const reported = once(observer, "stopped",
+        { signal: AbortSignal.timeout(5_000) });
+      void reported.catch(() => {});
+      const closed = once(f.children[0]!, "close",
+        { signal: AbortSignal.timeout(2_000) });
+      const response = await fetch(runtime.origin + "/api/service-stop", {
+        method: "POST", headers: { Origin: runtime.origin,
+          "Content-Type": "application/json", "X-CSRF-Token": bootstrap.csrf },
+        body: "{}",
+      });
+      assert.equal(response.status, 202);
+      await response.body?.cancel();
+      assert.deepEqual(await closed, [0, null]);
+      assert.deepEqual(await reported, [{ status: "stopped" }]);
+      assert.deepEqual(await f.manager.stop(), { status: "stopped" });
+      assert.deepEqual(reports, [{ status: "stopped" }]);
+      await assert.rejects(readFile(join(f.data, ".service.lock")),
+        { code: "ENOENT" });
+      await f.preserved();
+    } finally { await f.cleanup(); }
+  });
+
 test("concurrent fresh health requests never spawn duplicate services",
   { timeout: 20_000 }, async () => {
     const f = await fixture();
@@ -156,6 +196,30 @@ test("concurrent fresh health requests never spawn duplicate services",
       assert.deepEqual(replies, nonces.map(nonce => ({ status: "healthy",
         version: PRODUCT_VERSION, nonce })));
       assert.equal(f.children.length, 1);
+      await f.preserved();
+    } finally { await f.cleanup(); }
+  });
+
+test("unexpected real child death reports uncertainty without another spawn",
+  { timeout: 20_000 }, async () => {
+    const observer = new EventEmitter();
+    const f = await fixture(5_000, proof => observer.emit("stopped", proof));
+    try {
+      const nonce = randomUUID();
+      assert.deepEqual(await f.manager.startAndCheck(f.target, nonce), {
+        status: "healthy", nonce, version: PRODUCT_VERSION,
+      });
+      const reported = once(observer, "stopped",
+        { signal: AbortSignal.timeout(5_000) });
+      const closed = once(f.children[0]!, "close");
+      f.children[0]!.kill("SIGKILL"); // Intentional disposable-child crash.
+      await closed;
+      assert.deepEqual(await reported, [{ status: "unavailable" }]);
+      assert.deepEqual(await f.manager.startAndCheck(f.target, randomUUID()),
+        { status: "unavailable" });
+      assert.equal(f.children.length, 1);
+      assert.equal(await canonicalDataUpdateBoundaryOwned(f.boundary, f.data),
+        true);
       await f.preserved();
     } finally { await f.cleanup(); }
   });

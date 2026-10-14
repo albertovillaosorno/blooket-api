@@ -41,6 +41,8 @@ import { decodeUpdateHealthRequest, decodeUpdateHealthResponse } from
   "../../../ir/application-updates/contract/health.ts";
 import { decodeUpdateStartupReady } from
   "../../../ir/application-updates/contract/startup.ts";
+import { decodeServiceDrainNotice } from
+  "../../../ir/application-updates/contract/supervision.ts";
 import { BUNDLE_NAME, directoryIdentity, identityAdmitted, pathAdmitted,
   sameIdentity, type DirectoryIdentity } from
   "../../bundle-exchange/adapter-outbound/identity.ts";
@@ -49,7 +51,8 @@ import { authorizeCanonicalServiceStartup, canonicalDataUpdateBoundaryOwned,
   "../../user-storage/adapter-outbound/writer-boundary.ts";
 import { decodeServiceRuntime, type LocalServiceRuntime } from "./runtime.ts";
 import { probeOwnedServiceHealth, type OwnedServiceHealth } from "./health.ts";
-import { requestOwnedServiceStop, type OwnedServiceStopObservation } from
+import { requestOwnedServiceStop, type OwnedServiceStop,
+  type OwnedServiceStopObservation } from
   "./stop.ts";
 
 export interface InstallerServiceTarget {
@@ -59,6 +62,7 @@ export interface InstallerServiceTarget {
 }
 interface Options {
   readonly timeoutMs?: number;
+  readonly onStopped?: (proof: OwnedServiceStop) => void;
   // Trusted composition/test substitution only; never an HTTP/MCP payload.
   readonly launch?: (file: string, args: readonly string[],
     options: SpawnOptions) => ChildProcess;
@@ -71,6 +75,7 @@ interface OwnedChild {
   runtime?: LocalServiceRuntime;
   runtimeVersion?: string;
   stop?: Promise<OwnedServiceStopObservation>;
+  reported?: boolean;
 }
 
 export function createInstallerServiceManager(root: string,
@@ -85,7 +90,13 @@ export function createInstallerServiceManager(root: string,
     pending = next.then(() => {}, () => {});
     return next;
   }
-  return {
+  const report = (captured: OwnedChild, proof: OwnedServiceStop) => {
+    if (captured.reported) return;
+    captured.reported = true;
+    try { options.onStopped?.(proof); }
+    catch { /* Notification failures cannot alter lifecycle ownership. */ }
+  };
+  const manager = {
     startAndCheck(value: InstallerServiceTarget, nonce: string,
       signal?: AbortSignal): Promise<OwnedServiceHealth> {
       const unavailable: OwnedServiceHealth = { status: "unavailable" };
@@ -143,6 +154,22 @@ export function createInstallerServiceManager(root: string,
             void captured.startup.then(runtime => {
               if (runtime) captured.runtime = runtime;
             });
+            const notice = (value: unknown) => {
+              const drained = decodeServiceDrainNotice(value);
+              if (drained && drained.pid === child.pid &&
+                  drained.instance === captured.runtime?.instance)
+                // A UI notice triggers the private stop challenge. It never
+                // replaces the matching drained receipt and actual closure.
+                void manager.stop().catch(() => {});
+            };
+            child.on("message", notice);
+            child.once("close", () => {
+              child.removeListener("message", notice);
+              const completed = captured.stop?.then(result =>
+                result.status === "pending" ? result.completion : result)
+                ?? Promise.resolve({ status: "unavailable" as const });
+              void completed.then(proof => report(captured, proof));
+            });
           }
           const captured = owned;
           const runtime = captured.runtime ?? await observeDeadline(
@@ -180,11 +207,13 @@ export function createInstallerServiceManager(root: string,
         void completed.then(proof => {
           if (proof.status === "stopped" && owned === captured)
             owned = undefined;
+          report(captured, proof);
         });
         return result;
       });
     },
   };
+  return manager;
 }
 
 async function finishStop(captured: OwnedChild, runtime: LocalServiceRuntime) {
