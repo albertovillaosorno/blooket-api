@@ -180,6 +180,28 @@ test("multiple choice answer-slot IDs cannot silently be renumbered", () => {
   }, "mc");
 });
 
+test("changed question semantics are provider drift, not success", () => {
+  for (const variant of ["no-correct", "unknown-correct", "wrong-mode",
+    "wrong-time", "wrong-number", "wrong-random", "wrong-answer-type",
+    "wrong-audio"] as const)
+    withEditor(page => {
+      const value = JSON.parse(page.hidden.value);
+      if (variant === "no-correct") value.correctAnswers = [];
+      if (variant === "unknown-correct")
+        value.correctAnswers = ["not an answer"];
+      if (variant === "wrong-mode") value.answerTypes = ["approximate"];
+      if (variant === "wrong-time") value.timeLimit = 0;
+      if (variant === "wrong-number") value.number = -1;
+      if (variant === "wrong-random") value.random = false;
+      if (variant === "wrong-answer-type") value.answers = [7];
+      if (variant === "wrong-audio") value.audio = { token: "unexpected" };
+      page.hidden.value = JSON.stringify(value);
+      assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+        "shape-drift", variant);
+      assert.equal(page.hidden.clicked, 0, variant);
+    });
+});
+
 test("provider security frames and organization prompts are human stops",
   () => {
   for (const kind of ["challenge", "organization"] as const)

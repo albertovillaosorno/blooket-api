@@ -128,10 +128,43 @@ export function inspectBlooketQuestionEditorCompatibility():
     } catch { /* A partial hydration is not evidence of compatibility. */ }
     const keys = ["number", "question", "answers", "correctAnswers",
       "image", "audio", "qType", "random", "answerTypes", "timeLimit"];
+    const expected = data?.["answers"];
+    const correct = data?.["correctAnswers"];
+    const mode = data?.["qType"];
+    const matchModes = data?.["answerTypes"];
+    const validAnswers = Array.isArray(expected) &&
+      expected.length >= (mode === "mc" ? 2 : 1) &&
+      expected.length <= (mode === "mc" ? 4 : 100) &&
+      expected.every(answer => typeof answer === "string" &&
+        answer.length >= 1 && answer.length <= 10_000) &&
+      new Set(expected).size === expected.length;
+    const validCorrect = validAnswers && Array.isArray(correct) &&
+      correct.length >= 1 && correct.length <= expected.length &&
+      correct.every(answer => expected.includes(answer)) &&
+      new Set(correct).size === correct.length;
+    const validModes = mode === "typing"
+      ? data?.["random"] === true && validAnswers && validCorrect &&
+        correct.length === expected.length &&
+        Array.isArray(matchModes) && matchModes.length === expected.length &&
+        matchModes.every(value => value === "exactly" ||
+          value === "contains")
+      : mode === "mc" && matchModes === null;
+    const validSemanticShape = Boolean(data && validModes &&
+      Number.isSafeInteger(data["number"]) &&
+      (data["number"] as number) >= 1 &&
+      (data["number"] as number) <= 10_000 &&
+      typeof data["question"] === "string" &&
+      data["question"].length >= 1 && data["question"].length <= 20_000 &&
+      Number.isSafeInteger(data["timeLimit"]) &&
+      (data["timeLimit"] as number) >= 1 &&
+      (data["timeLimit"] as number) <= 86_400 &&
+      typeof data["random"] === "boolean" &&
+      typeof data["image"] === "string" &&
+      typeof data["audio"] === "string" && validCorrect);
     const serialized = Boolean(data && hidden.value.length <= 100_000 &&
       Object.keys(data).length === keys.length &&
       keys.every(key => Object.hasOwn(data!, key)) &&
-      JSON.stringify(data) === hidden.value);
+      JSON.stringify(data) === hidden.value && validSemanticShape);
     const typing = data?.["qType"] === "typing";
     const mc = data?.["qType"] === "mc";
     const answers = Array.from(form.querySelectorAll(
