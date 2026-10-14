@@ -188,7 +188,8 @@ function value(result: Awaited<ReturnType<
 }
 
 function browserHost(fixtureState: Awaited<ReturnType<typeof state>>,
-  loseCreationReceipt = false): BlooketPublicationDependencies {
+  loseCreationReceipt = false,
+  confirmationSupported = true): BlooketPublicationDependencies {
   const built = buildBlooketWritePlan(JSON.stringify(document), "",
     capabilities);
   assert.ok(built.ok);
@@ -204,6 +205,7 @@ function browserHost(fixtureState: Awaited<ReturnType<typeof state>>,
       ] };
     },
   } }, writes: blooketBrowserWriteExecutionPort({
+    inspectCreateSetConfirmation: async () => confirmationSupported,
     createSet: async (submission, media) => {
       const operation = built.value.operations[0]!;
       assert.equal(operation.kind, "set");
@@ -231,6 +233,20 @@ function browserHost(fixtureState: Awaited<ReturnType<typeof state>>,
     },
   }) };
 }
+
+test("old browser confirmation stops before a new attempt or budget",
+  async () => { await fixture(async state => {
+    const host = browserHost(state, false, false);
+    const result = await executeBlooketPublicationCommand(
+      command("step", state.revision), host);
+    assert.ok(!result.ok);
+    assert.equal(result.issues[0]?.code,
+      "blooket-browser-companion-update-required");
+    assert.equal(state.writes(), 0);
+    const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.attempt));
+    await assert.rejects(readFile(files.budget));
+  }); });
 
 test("confirmed browser creation uses an explicitly partial observation",
   async () => { await fixture(async state => {

@@ -32,7 +32,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { blooketBrowserWriteExecutionPort, isBrowserWriteExecutionPort } from
+import { blooketBrowserWriteExecutionPort, isBrowserWriteExecutionPort,
+  browserCreateSetConfirmationSupported } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/api/blooket-write-execution/application/browser-write-adapter.ts";
 import type { BlooketBrowserWriteSurfacePort } from
@@ -60,6 +61,37 @@ test("browser transport identity cannot be copied into another writer", () => {
   assert.equal(isBrowserWriteExecutionPort(port), true);
   assert.equal(isBrowserWriteExecutionPort({ ...port }), false);
   assert.equal(Object.isFrozen(port), true);
+});
+
+test("browser confirmation support needs an owned fresh probe", async () => {
+  const base: BlooketBrowserWriteSurfacePort = {
+    createSet: async () => ({ ok: false, kind: "browser",
+      code: "blooket-browser-failed" }),
+    addQuestion: async () => ({ ok: false, kind: "browser",
+      code: "blooket-browser-failed" }),
+  };
+  assert.equal(await browserCreateSetConfirmationSupported(
+    blooketBrowserWriteExecutionPort(base)), false);
+  let supported = true;
+  const port = blooketBrowserWriteExecutionPort({ ...base,
+    inspectCreateSetConfirmation: async () => supported });
+  assert.equal(await browserCreateSetConfirmationSupported(port), true);
+  assert.equal(await browserCreateSetConfirmationSupported({ ...port }),
+    false);
+  supported = false;
+  assert.equal(await browserCreateSetConfirmationSupported(port), false);
+  const throwing = blooketBrowserWriteExecutionPort({ ...base,
+    inspectCreateSetConfirmation: async () => { throw new Error("offline"); }
+  });
+  assert.equal(await browserCreateSetConfirmationSupported(throwing), false);
+  let getterCalls = 0;
+  const accessor = { ...base };
+  Object.defineProperty(accessor, "inspectCreateSetConfirmation", {
+    enumerable: true, get: () => { getterCalls++; return async () => true; },
+  });
+  assert.equal(await browserCreateSetConfirmationSupported(
+    blooketBrowserWriteExecutionPort(accessor)), false);
+  assert.equal(getterCalls, 0);
 });
 
 const questionOperation: BlooketWriteOperation = {

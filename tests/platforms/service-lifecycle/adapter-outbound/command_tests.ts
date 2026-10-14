@@ -292,6 +292,7 @@ test("MCP publication crosses CLI service and journaled browser transport",
     let remote: Record<string, unknown> | undefined;
     const questions: Record<string, unknown>[] = [];
     const mutations: string[] = [];
+    let confirmationInspections = 0;
     const poll = setInterval(() => {
       const job = bridge.next(bridge.pairingToken());
       if (!job) return;
@@ -300,6 +301,9 @@ test("MCP publication crosses CLI service and journaled browser transport",
       switch (request.kind) {
         case "session.observe": value = "my-sets"; break;
         case "capabilities.inspect": value = capabilities; break;
+        case "writes.inspect":
+          confirmationInspections++;
+          value = { createSetConfirmation: "reload-and-privacy-v1" }; break;
         case "sets.list": value = {
           items: remote ? [{ schemaVersion: 1, id: remote["id"],
             title: remote["title"] }] : [],
@@ -376,6 +380,7 @@ test("MCP publication crosses CLI service and journaled browser transport",
         assert.equal((envelope.value.value as { published: boolean }).published,
           true);
       assert.deepEqual(mutations, ["sets.create", "questions.create"]);
+      assert.equal(confirmationInspections, 1);
       assert.equal(JSON.stringify(verified).includes(bridge.pairingToken()),
         false);
       assert.equal(JSON.stringify(verified).includes(root), false);

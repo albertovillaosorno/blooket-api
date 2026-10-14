@@ -145,6 +145,13 @@ export function createBlooketBrowserBridgeAdapters(
     },
 
     writes: {
+      inspectCreateSetConfirmation: async () => {
+        const result = await safeRequest(transport, { kind: "writes.inspect" });
+        return result.ok &&
+          exactKeys(result.value, "createSetConfirmation") &&
+          (result.value as { createSetConfirmation: unknown })
+            .createSetConfirmation === "reload-and-privacy-v1";
+      },
       createSet: async (submission, media) => {
         if (submission.coverImage !== null || media.length !== 0)
           return browserFailureWithKind();

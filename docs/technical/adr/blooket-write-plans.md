@@ -159,6 +159,16 @@ for the precondition comparison; it never claims global absence or upgrades
 the collection's completeness. Only the actual browser adapter's in-process
 identity enables that policy; an unknown writer retains complete-list admission.
 
+Before a new browser creation, the connected worker must declare its current
+`reload-and-privacy-v1` confirmation contract through the read-only internal
+`writes.inspect` job. An absent, legacy, malformed or unavailable declaration
+stops before pacing, budget reservation and journaling.
+
+This is loaded-code compatibility evidence, not Blooket acceptance or account
+capability evidence. The probe neither runs page scripts nor navigates,
+authenticates or mutates the account; actual confirmation remains mandatory.
+Existing ambiguous journals retain their recovery path without this probe.
+
 A new browser creation advances only on its confirmed receipt, obtained from
 an owned fresh Create Set form, edit redirect and exact saved metadata after
 reload. Question operations still require their full question baseline.

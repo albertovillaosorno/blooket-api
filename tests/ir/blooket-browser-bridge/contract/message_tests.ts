@@ -66,7 +66,8 @@ test("browser client labels admit only canonical extension roots", () => {
 });
 
 test("browser requests admit only bounded exact commands", () => {
-  for (const kind of ["session.observe", "sets.list", "capabilities.inspect"])
+  for (const kind of ["session.observe", "sets.list", "capabilities.inspect",
+    "writes.inspect"])
     assert.equal(decodeBlooketBrowserBridgeRequest(request({ kind })).ok, true);
   assert.equal(
     decodeBlooketBrowserBridgeRequest(

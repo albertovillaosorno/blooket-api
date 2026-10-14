@@ -62,6 +62,30 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, clean committed revision bb6767e passed 1,670 portable tests,
+strict TypeScript, roadmap integrity and zero Jig validation diagnostics.
+Its Linux package passed extracted checks and replaced the prior acceptance
+service through confirmed graceful shutdown, without opening a terminal.
+All 18 existing draft/publication records stayed byte-identical after restart.
+
+A real canonical CLI draft and Create Set step reached a newly created empty
+development quiz but returned `reconciliation-required` with no receipt.
+An independent canonical set read confirmed its exact fictional title and
+private visibility after refresh; this is partial evidence, not a verified
+publication. No question was added, no creation was replayed, and the attempt
+remains preserved with its explicitly partial observed baseline.
+
+The installed extension directory contains an older confirmation host, while
+the actually loaded revision remains unverified. A fresh existing-browser
+controller attempt still timed out on extension inventory; the session-owned
+controller was stopped and its stopped state verified, preserving Chrome.
+
+New browser creations now require a read-only declaration of the loaded
+worker's reload/privacy confirmation contract before pacing or journaling.
+Legacy, absent, malformed and unavailable replies produce an explicit companion
+update diagnostic with no new mutation. Portable checks cover these refusals,
+accessor rejection, fresh support changes and retained ambiguous recovery.
+
 On 2026-10-14, known browser publication began capturing an explicitly partial
 `set-observation` precondition instead of requiring global My Sets completeness
 for a fresh receipt-confirmed creation. The visible count/digest is captured
@@ -1569,6 +1593,10 @@ Browser input commands still timed out without changing the selected panel.
 Account-mutation authorization is present. Current loaded-extension control
 and real receipt-confirmed browser publication remain acceptance blockers;
 neither missing account permission nor absence of a Mac is the blocker.
+
+The 2026-10-14 canonical acceptance created one empty private quiz but did not
+obtain a durable receipt. Keep that attempt and the older ambiguous journal;
+neither may be replayed or adopted from a matching visible title alone.
 
 [input-activation]: https://html.spec.whatwg.org/multipage/input.html
 <!-- jig-ignore-next-line: Exact upstream documentation URL is indivisible. -->

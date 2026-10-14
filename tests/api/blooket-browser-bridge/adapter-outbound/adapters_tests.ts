@@ -58,6 +58,34 @@ function transport(
   };
 }
 
+test("loaded confirmation inspection admits only the exact current contract",
+  async () => {
+    let getters = 0;
+    const accessor = Object.defineProperty({}, "createSetConfirmation", {
+      enumerable: true,
+      get: () => { getters++; return "reload-and-privacy-v1"; },
+    });
+    for (const value of [null, {}, { createSetConfirmation: true },
+      { createSetConfirmation: "callback-v0" }, accessor,
+      { createSetConfirmation: "reload-and-privacy-v1", extra: true }]) {
+      const commands: BlooketBrowserBridgeCommand[] = [];
+      const adapters = createBlooketBrowserBridgeAdapters(transport([
+        { ok: true, value },
+      ], commands));
+      assert.equal(await adapters.writes.inspectCreateSetConfirmation!(),
+        false);
+      assert.deepEqual(commands, [{ kind: "writes.inspect" }]);
+    }
+    assert.equal(getters, 0);
+    const commands: BlooketBrowserBridgeCommand[] = [];
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      { ok: true, value: { createSetConfirmation: "reload-and-privacy-v1" } },
+      { ok: false, code: "blooket-browser-unavailable" },
+    ], commands));
+    assert.equal(await adapters.writes.inspectCreateSetConfirmation!(), true);
+    assert.equal(await adapters.writes.inspectCreateSetConfirmation!(), false);
+  });
+
 test("bridge adapters map session and opaque read calls exactly", async () => {
   const commands: BlooketBrowserBridgeCommand[] = [];
   const adapters = createBlooketBrowserBridgeAdapters(transport([
