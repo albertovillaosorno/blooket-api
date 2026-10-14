@@ -77,6 +77,9 @@ test("local reads and MCP traverse the real CLI and service bridge",
     const value =
       job.command.kind === "session.observe"
         ? "my-sets"
+        : job.command.kind === "writes.inspect"
+          ? { createSetConfirmation: "reload-and-privacy-v1",
+              textCapabilityScope: "stable-my-sets-v1" }
         : job.command.kind === "capabilities.inspect" ||
             job.command.kind === "capabilities.inspect-text"
           ? {
@@ -317,7 +320,8 @@ test("MCP publication crosses CLI service and journaled browser transport",
         case "capabilities.inspect-text": value = capabilities; break;
         case "writes.inspect":
           confirmationInspections++;
-          value = { createSetConfirmation: "reload-and-privacy-v1" }; break;
+          value = { createSetConfirmation: "reload-and-privacy-v1",
+            textCapabilityScope: "stable-my-sets-v1" }; break;
         case "sets.list": value = {
           items: remote ? [{ schemaVersion: 1, id: remote["id"],
             title: remote["title"] }] : [],
@@ -394,7 +398,7 @@ test("MCP publication crosses CLI service and journaled browser transport",
         assert.equal((envelope.value.value as { published: boolean }).published,
           true);
       assert.deepEqual(mutations, ["sets.create", "questions.create"]);
-      assert.equal(confirmationInspections, 1);
+      assert.equal(confirmationInspections, 3);
       assert.equal(JSON.stringify(verified).includes(bridge.pairingToken()),
         false);
       assert.equal(JSON.stringify(verified).includes(root), false);

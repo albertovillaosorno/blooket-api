@@ -252,7 +252,8 @@ export function createBlooketBrowserBridgeBroker(
         const kind = job.request.command.kind;
         const minimumMs = kind === "session.authenticate"
           ? MIN_AUTH_DISPATCH_MS
-          : kind === "capabilities.inspect"
+          : kind === "capabilities.inspect" ||
+            kind === "capabilities.inspect-text"
             ? MIN_CAPABILITY_DISPATCH_MS
             : kind === "sets.create" || kind === "questions.create"
               ? Math.max(MIN_WRITE_DISPATCH_MS, writeTimeoutMs - 500)

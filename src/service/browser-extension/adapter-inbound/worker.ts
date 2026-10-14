@@ -851,6 +851,7 @@ async function relay(current: Connection, activeGeneration: number) {
             // exact saved metadata after reload through its actual host.
             result = { ok: true, value: {
               createSetConfirmation: "reload-and-privacy-v1",
+              textCapabilityScope: "stable-my-sets-v1",
             } };
           } else if (job.command.kind === "browser.activate") {
             const visible = await showHumanBlooketTab(current.tabId,

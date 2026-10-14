@@ -325,6 +325,23 @@ test(
   },
 );
 
+test("incompatible text-only worker stops at inspection without retry",
+  async () => {
+  const purposes: unknown[] = [];
+  const result = await inspectBlooketCapabilities(
+    browser([{ ok: true, state: "my-sets" }], []),
+    secretStore([]),
+    { inspect: async purpose => {
+      purposes.push(purpose);
+      return { ok: false, code: "blooket-browser-incompatible" };
+    } },
+    { readOnly: true, textOnly: true },
+  );
+  assert.deepEqual(result, { ok: false, stage: "inspection",
+    code: "blooket-browser-incompatible" });
+  assert.deepEqual(purposes, ["text-publication"]);
+});
+
 test("malformed capability probe envelopes never expose data", async () => {
   for (const invalid of [
     { ok: false, code: "private-code", raw: "private-data" },
