@@ -113,8 +113,9 @@ identified the enabled Blooket API companion, and the supported reload command
 returned `Extension reloaded.` without restarting Chrome or creating a profile.
 The canonical scoped capability probe then succeeded. Computer Use observed
 a newly created fictional set after one canonical publication step, but that
-step remained reconciliation-required without a confirmed receipt. Existing
-pending attempts were preserved, and the new attempt was not replayed.
+step remained reconciliation-required without a confirmed receipt.
+
+Existing pending attempts were preserved, and the new attempt was not replayed.
 
 Computer Use can still inspect the authenticated pages. Enter on the local
 workspace's Quizzes control opened that panel, while Enter on Blooket's My
