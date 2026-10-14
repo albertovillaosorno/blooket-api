@@ -104,6 +104,17 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, a separate read-only extension-world diagnostic was added
+for unresolved Add Question stages. It reports only a fixed enum for modal
+ownership, form detachment, React control preparation, finalization,
+interruption or a latched submit attempt. It does not return IDs, questions,
+answers, URLs or captured provider data and cannot authorize a fresh Save.
+
+Synthetic tests distinguish a possible clicked Save from a detached form,
+prevent getter evaluation, and verify that the diagnostic is self-contained
+for Chrome's isolated scripting world. The existing unresolved form was not
+reloaded, dismissed or mutated to test it.
+
 On 2026-10-14, red-to-green tests found that a wall-clock rollback during
 mutation pacing could create a much longer wait than the configured 2-second
 interval. Nonfinite timestamps could also enter the wait loop instead of
