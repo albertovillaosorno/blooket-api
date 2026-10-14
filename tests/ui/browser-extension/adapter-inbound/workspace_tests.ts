@@ -119,6 +119,43 @@ test("workspace recovers after localhost refused the first connection",
   }]);
 });
 
+test("workspace advertises a new service token after restart", async () => {
+  let poll: (() => void) | undefined;
+  const messages: unknown[] = [];
+  let requests = 0;
+  const globals = {
+    location: { protocol: "http:", pathname: "/", hostname: "127.0.0.1",
+      origin: "http://127.0.0.1:2607" },
+    chrome: { runtime: { sendMessage: async (value: unknown) => {
+      messages.push(value); return { ok: true };
+    } } },
+    fetch: async () => {
+      requests++;
+      if (requests === 2) return new Response(null, { status: 503 });
+      return Response.json({ browserBridge: {
+        application: "blooket-api", schemaVersion: 1,
+        token: requests === 1 ? "a".repeat(43) : "b".repeat(43),
+      } });
+    },
+    AbortSignal, TextDecoder,
+    setInterval: (callback: () => void) => { poll = callback; return 1; },
+  };
+  runInNewContext(source, globals);
+  await pause(0);
+  assert.ok(poll);
+  poll();
+  await pause(0);
+  poll();
+  await pause(0);
+  assert.equal(requests, 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [
+    { kind: "workspace-ready", origin: "http://127.0.0.1:2607",
+      token: "a".repeat(43) },
+    { kind: "workspace-ready", origin: "http://127.0.0.1:2607",
+      token: "b".repeat(43) },
+  ]);
+});
+
 test("workspace retries never overlap an unfinished bridge bootstrap",
   async () => {
   let tick: (() => void) | undefined;
