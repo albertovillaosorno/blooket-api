@@ -326,14 +326,26 @@ A release tag starts a strictly ordered pipeline:
 2. only after that passes, the ARM64 macOS job builds/verifies the Mac app,
    compiles the Safari WebExtension host, exercises Safari WebDriver, and
    embeds the Safari companion inside the Mac app and rezips the final archive;
+   for release tags, it verifies that final archive with the release gate and
+   generates its publisher-signed update manifest;
 3. only after the complete CI workflow passes, the release gate requires valid
    quarterly CalVer and repository variable RELEASE_ENABLED=true;
 4. publish downloads those CI artifacts and creates the GitHub Release.
 
 Release itself does not compile, run tests, build packages, or rerun package
-verification. It publishes exactly darwin-arm64.zip; the Safari containing app
+verification. It publishes darwin-arm64.zip and update-manifest.json; the app
 and extension live inside Blooket API.app in that archive. Linux x64 remains
 useful for portable development/validation and is never a release asset.
+
+Release signing requires the repository secret `BLOOKET_UPDATE_SIGNING_KEY`
+(an Ed25519 private PEM) and variable `BLOOKET_UPDATE_PUBLISHER_KEYS` (a JSON
+array of canonical public PEMs). Only the manifest step receives the private
+key; ordinary CI tags do not sign metadata. The receiving app must independently
+pin the admitted public roots. A CI variable alone never grants client trust.
+
+Missing signing inputs, failed final package assessment or missing manifest
+stop publication. Native signing/notarization and production publisher
+provisioning remain required; these workflow definitions do not establish them.
 
 There is no automated changelog and no repository release-notes file is
 required. The workflow creates the release with empty notes; write the human

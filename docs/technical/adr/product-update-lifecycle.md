@@ -63,7 +63,9 @@ key by its SPKI DER SHA-256 fingerprint; it cannot introduce a trust root.
 
 `src/ir/update-manifests/` owns decoding/canonicalization and
 `src/platforms/update-signatures/` owns cryptographic verification. Production
-publisher-key provisioning/rotation and CI manifest publication remain pending.
+publisher-key provisioning/rotation remains pending. CI now requires signed
+manifest generation and transfers that public document with the exact archive.
+
 Verified metadata must match the selected release; actual archive bytes must
 match its signed size/hash. Apple trust and transactional installation remain
 independent mandatory checks.
@@ -85,8 +87,12 @@ cancellation and a bounded deadline refuse creation. Real-file portable
 fixtures verify the produced signature and archive bytes through the actual
 receiver; their ephemeral keys do not establish a production publisher.
 
-This operation still needs production key provisioning and post-signing CI
-composition. It does not run Apple signing/notarization, publish a release,
+This operation still needs production key provisioning. Release CI runs it
+only after final package assessment, with the private key confined to that
+step. Artifact transfer carries both the ZIP and manifest; publication checks
+both files and does not rebuild or re-sign. Ordinary CI tags do not sign.
+
+This operation does not run Apple signing/notarization, publish a release,
 or enable application installation. Node's [Ed25519 signing contract][node-sign]
 was checked on 2026-10-14; the existing canonical signing context is preserved.
 
@@ -100,6 +106,15 @@ The command loads no `.env` file, accepts no key/path argument and observes
 only clean committed Git source before producing public metadata. Git children
 receive no publisher key environment, and errors expose only stable codes.
 This is a producer entrypoint, not release authorization or an installer tool.
+
+The release caller explicitly forwards only `BLOOKET_UPDATE_SIGNING_KEY` as
+the reusable workflow's optional `update-signing-key` secret. Public roots come
+from `BLOOKET_UPDATE_PUBLISHER_KEYS`; the receiving app still needs independent
+root admission. Missing keys or failed final native assessment stop release.
+
+GitHub's [reusable workflow secret contract][workflow-secrets] was checked on
+2026-10-14. No production keys, Apple signing or hosted execution are implied
+by the configured workflow path.
 
 `src/platforms/update-downloads/` streams publisher-authenticated archives into
 private owned staging directories, with bounded anonymous HTTPS, exact signed
@@ -266,6 +281,8 @@ not establish Safari, Keychain, signing, notarization, or recipient acceptance.
 <!-- jig-ignore-next-line: Canonical Apple documentation URL is indivisible. -->
 [apple]:   https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 [releases]: https://github.com/albertovillaosorno/blooket-api/releases
+[workflow-secrets]:
+  https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
 [api]: https://docs.github.com/en/rest/releases/releases
 
 <!-- jig-ignore-next-line: Exact upstream URL is indivisible. -->

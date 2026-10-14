@@ -16,6 +16,8 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
+    secrets:
+      update-signing-key: ${{ secrets.BLOOKET_UPDATE_SIGNING_KEY }}
 
   gate:
     needs: ci
@@ -60,6 +62,8 @@ jobs:
         run: |
           set -euo pipefail
           app=.temp/release-assets/darwin-arm64.zip
+          manifest=.temp/release-assets/update-manifest.json
           test -s "$app"
-          gh release create "$RELEASE_TAG" "$app" \
+          test -s "$manifest"
+          gh release create "$RELEASE_TAG" "$app" "$manifest" \
             --verify-tag --title "$RELEASE_TAG" --notes ""
