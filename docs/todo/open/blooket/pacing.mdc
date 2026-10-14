@@ -104,6 +104,23 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A fresh owner-authorized, private synthetic one-question publication on
+2026-10-14 automatically confirmed Create Set after the newly compiled
+companion was reloaded into the existing Chrome for Testing profile.
+The question write then returned `write-not-confirmed` with checkpoint 1/2.
+No second Save or manual receipt adoption was attempted.
+
+A read-only browser check found the owned question form still open with the
+expected Typing prompt, answer, match mode and 15-second limit in both visible
+controls and the provider-generated hidden JSON. The exact fresh question read
+failed, so no automatic question receipt or final publication verification
+was claimed. The original unrelated ambiguous attempt remained unreplayed.
+
+Additional red-to-green fixtures show the hidden provider state may hydrate
+before the visible picker and text fields. Bounded readiness polling now waits
+for uniquely owned controls without submitting, adopting another document, or
+relaxing human-stop checks. Real multi-question progression remains open.
+
 On 2026-10-14, a read-only Chrome inspection identified why a canonical
 Add Question attempt could save empty data: changing the hidden serialized
 question bypassed React's visible editor state, which replaced it on Save.

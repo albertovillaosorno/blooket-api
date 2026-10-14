@@ -140,6 +140,10 @@ export async function prepareBlooketQuestionControls(
         input.answers.length > (input.qType === "mc" ? 4 : 100)) return false;
     watch!.controlsStarted = true;
     if (!await wait(() => raw() !== null)) return false;
+    // React may publish the hidden state before the visible picker mounts.
+    // Waiting only for unique provider controls cannot cause another write.
+    if (!await wait(() => unique('[role="combobox"]') !== null))
+      return false;
     const picker = unique('[role="combobox"]');
     if (!picker) return false;
     if (raw()?.["qType"] !== input.qType) {
@@ -157,7 +161,9 @@ export async function prepareBlooketQuestionControls(
       if (options.length !== 1 || !click(options[0] as HTMLElement) ||
           !await wait(() => raw()?.["qType"] === input.qType)) return false;
     }
-    if (!setText(unique("textarea#question"), input.question) ||
+    if (!await wait(() => unique("textarea#question") !== null &&
+        unique("input#time-limit") !== null) ||
+        !setText(unique("textarea#question"), input.question) ||
         !setText(unique("input#time-limit"), String(input.timeLimit)))
       return false;
     if (input.qType === "typing") {
