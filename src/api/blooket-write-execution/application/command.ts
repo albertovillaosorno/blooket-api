@@ -82,7 +82,8 @@ import { verifyPersistedBlooketWrite } from "./verify-reconciliation.ts";
 import { blooketSetReadWriteVerifier, questionMatches } from
   "./set-read-verifier.ts";
 import { lowerBlooketWriteSubmission } from "./lower-submission.ts";
-import { isBrowserWriteExecutionPort } from "./browser-write-adapter.ts";
+import { isBrowserWriteExecutionPort,
+  browserCreateSetConfirmationSupported } from "./browser-write-adapter.ts";
 
 export interface BlooketPublicationDependencies {
   readonly root: string;
@@ -98,7 +99,11 @@ export async function executeBlooketPublicationCommand(
 ) {
   const fail = (code: string) => commandFailure(command.operationId, [{
     path: "$.publication", code,
-    message: code === "blooket-publication-remote-conflict"
+    message: code === "blooket-browser-companion-update-required"
+      ? "The connected browser companion does not declare the required " +
+        "saved-state confirmation support. Update the installed companion " +
+        "before starting this quiz. Your saved draft is retained."
+      : code === "blooket-publication-remote-conflict"
       ? "Publication stopped: an existing set or previously started " +
         "identical plan may conflict. Inspect the original publication " +
         "and remote quiz before any new Create Set attempt."
@@ -274,6 +279,10 @@ export async function executeBlooketPublicationCommand(
     // Durable identity verification never consults current library bytes.
     if (hasMedia(prepared.document))
       return fail("blooket-publication-media-unsupported");
+    if (attempt.kind === "missing" && checkpoint.nextOperationIndex === 0 &&
+        isBrowserWriteExecutionPort(writes) &&
+        !await browserCreateSetConfirmationSupported(writes))
+      return fail("blooket-browser-companion-update-required");
     // Admission is fresh for each new mutation. Already journaled attempts
     // need local recovery first and cannot create another remote write.
     if (attempt.kind === "missing" &&

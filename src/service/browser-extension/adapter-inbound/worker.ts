@@ -844,7 +844,14 @@ async function relay(current: Connection, activeGeneration: number) {
         );
         let result: unknown = { ok: false, code: "blooket-browser-failed" };
         try {
-          if (job.command.kind === "browser.activate") {
+          if (job.command.kind === "writes.inspect") {
+            // Local protocol declaration only: no page script, navigation,
+            // authentication, or provider mutation. Create Set still owes
+            // exact saved metadata after reload through its actual host.
+            result = { ok: true, value: {
+              createSetConfirmation: "reload-and-privacy-v1",
+            } };
+          } else if (job.command.kind === "browser.activate") {
             const visible = await showHumanBlooketTab(current.tabId,
               isOwner);
             result = visible

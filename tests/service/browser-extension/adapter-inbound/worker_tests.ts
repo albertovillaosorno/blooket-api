@@ -799,6 +799,14 @@ test(
     assert.equal(requests.length, beforeForeignWorkspace);
     assert.equal(creates, 1);
     assert.equal(persistentProfile["blooket-owned-tab-id"], 7);
+    const scriptsBeforeConfirmation = scripts.length;
+    const contract = await expectReply({ kind: "writes.inspect" });
+    assert.deepEqual(contract, {
+      schemaVersion: 1, id: contract.id, ok: true,
+      value: { createSetConfirmation: "reload-and-privacy-v1" },
+    });
+    assert.equal(scripts.length, scriptsBeforeConfirmation);
+    assert.equal(foregroundedTabs.length, 0);
     const focused = await expectReply({ kind: "browser.activate" });
     assert.deepEqual(focused, {
       schemaVersion: 1, id: focused.id,

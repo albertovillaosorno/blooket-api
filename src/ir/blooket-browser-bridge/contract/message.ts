@@ -75,6 +75,7 @@ export type BlooketBrowserBridgeOperation =
   | "session.observe"
   | "session.authenticate"
   | "capabilities.inspect"
+  | "writes.inspect"
   | "sets.list"
   | "sets.get"
   | "questions.list"
@@ -90,6 +91,7 @@ export type BlooketBrowserBridgeCommand =
       readonly password: string;
     }
   | { readonly kind: "capabilities.inspect" }
+  | { readonly kind: "writes.inspect" }
   | { readonly kind: "sets.list" }
   | { readonly kind: "sets.get"; readonly setId: string }
   | { readonly kind: "questions.list"; readonly setId: string }
@@ -177,6 +179,7 @@ export function decodeBlooketBrowserBridgeRequest(
     kind === "browser.activate" ||
     kind === "session.observe" ||
     kind === "capabilities.inspect" ||
+    kind === "writes.inspect" ||
     kind === "sets.list"
   )
     command = { kind };

@@ -52,9 +52,18 @@ import { lowerBlooketWriteSubmission } from "./lower-submission.ts";
 // This identifies a trusted composition route, never provider evidence or a
 // remote command permission. The surface still owes fresh saved-state proof.
 const browserPorts = new WeakSet<BlooketWriteExecutionPort>();
+const confirmationProbes = new WeakMap<BlooketWriteExecutionPort,
+  () => Promise<boolean>>();
 export function isBrowserWriteExecutionPort(port: BlooketWriteExecutionPort):
   boolean {
   return browserPorts.has(port);
+}
+
+export async function browserCreateSetConfirmationSupported(
+  port: BlooketWriteExecutionPort,
+): Promise<boolean> {
+  try { return await confirmationProbes.get(port)?.() === true; }
+  catch { return false; }
 }
 
 export function blooketBrowserWriteExecutionPort(
@@ -95,6 +104,11 @@ export function blooketBrowserWriteExecutionPort(
     },
   };
   browserPorts.add(port);
+  const probe = Object.getOwnPropertyDescriptor(surface,
+    "inspectCreateSetConfirmation");
+  if (probe?.enumerable && Object.hasOwn(probe, "value") &&
+      typeof probe.value === "function")
+    confirmationProbes.set(port, () => probe.value.call(surface));
   return Object.freeze(port);
 }
 
