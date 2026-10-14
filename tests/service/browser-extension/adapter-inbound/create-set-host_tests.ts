@@ -1004,6 +1004,27 @@ test("missing native edit-document origin cannot confirm Create Set",
   },
 );
 
+test("Create Set waits for the first edit document before reading a receipt",
+  async () => {
+  const fake = fakeChrome({ scripts: [observed, observed] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  let nativeReads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin" &&
+        ++nativeReads === 1) return [{ result: null }];
+    return await original(request);
+  };
+  const host = createExtensionCreateSetHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.observeCreateSet(), observed);
+  assert.equal(fake.calls.filter(call => call === "script").length, 2);
+  assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  assert.equal(fake.calls.includes("create-ownership:claim"), false);
+  },
+);
+
 test("Create Set refuses an identically routed replacement before navigation",
   async () => {
   for (const replacement of [null, 2_000]) {

@@ -51,6 +51,11 @@ chrome-devtools list_pages --output-format=json
 chrome-devtools list_extensions --output-format=json
 ```
 
+The installed CLI 1.10.1 can serialize extension entries as empty objects in
+JSON. When that happens, use `list_extensions --output-format=md` to inspect
+the actual installed ID, name, version and enabled state; an empty serialized
+object does not establish that the extension is absent.
+
 If existing-browser attachment is authorized and remote debugging is already
 enabled, the installed CLI supports this attachment form:
 
@@ -101,6 +106,21 @@ restriction. A supported extension reload is separate from opening its popup.
 Never report that the current worker loaded merely because disk files changed.
 
 ## Acceptance and continuation
+
+On 2026-10-14, the existing auto-connect controller enumerated pages in the
+owner's original Chrome for Testing profile. Its Markdown extension inventory
+identified the enabled Blooket API companion, and the supported reload command
+returned `Extension reloaded.` without restarting Chrome or creating a profile.
+The canonical scoped capability probe then succeeded. Computer Use observed
+a newly created fictional set after one canonical publication step, but that
+step remained reconciliation-required without a confirmed receipt. Existing
+pending attempts were preserved, and the new attempt was not replayed.
+
+Computer Use can still inspect the authenticated pages. Enter on the local
+workspace's Quizzes control opened that panel, while Enter on Blooket's My
+Sets link and Edit Info button changed focus without activating the controls.
+Native clicks and captures previously timed out. Do not generalize one
+working keyboard control into restored provider interaction or acceptance.
 
 On 2026-10-14, the selected integrated Chrome controller explicitly required
 an update of the ChatGPT Chrome extension before further operations. Earlier
