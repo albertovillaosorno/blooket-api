@@ -69,6 +69,20 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-14, the Quizzes orchestrator was hardened for interrupted
+publication across local draft edits. A resumed journal uses the immutable
+snapshot revision reported by canonical status, not the latest saved draft
+revision, so the service can enforce the original plan without authorizing a
+new create. A malformed frozen revision or changed plan stops before the next
+write; red-to-green tests cover both boundaries.
+
+The UI also accepts zero-operation human and rate-limit stops before the first
+snapshot, checks that progress belongs to the requested logical draft, and
+refuses premature success. Safe application-owned failures are translated into
+EN/ES instructions for sign-in, companion updates, remote conflicts, media,
+lock contention and inaccessible journals; arbitrary error text is not shown.
+These remain portable tests, not newly verified live Blooket publication.
+
 On 2026-10-14, the local Quizzes view began exposing explicit publication
 controls for saved text-only drafts through existing canonical commands.
 One user intent checks durable status, advances only confirmed operations,
