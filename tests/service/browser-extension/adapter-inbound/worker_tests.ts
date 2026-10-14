@@ -389,6 +389,10 @@ test(
           assert.deepEqual(args, ["set-fixture"]);
           return [{ result: questionPanelCloses }];
         }
+        if (func.name === "prepareBlooketQuestionControls") {
+          assert.equal(args?.[0]?.setId, "set-fixture");
+          return [{ result: true }];
+        }
         if (func.name === "runBlooketAddQuestionPageAction") {
           if (args[0] === "open") {
             assert.equal(args[1], "set-fixture");
@@ -1345,6 +1349,7 @@ test(
       true,
     );
     assert.ok(scripts.includes("runBlooketAddQuestionPageAction"));
+    assert.ok(scripts.includes("prepareBlooketQuestionControls"));
     assert.ok(scripts.includes("inspectOpenedBlooketQuestion"));
 
     // A slow, but still leased, browser write must be able to finish its

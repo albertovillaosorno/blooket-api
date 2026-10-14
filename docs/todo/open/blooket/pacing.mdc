@@ -104,6 +104,20 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, a read-only Chrome inspection identified why a canonical
+Add Question attempt could save empty data: changing the hidden serialized
+question bypassed React's visible editor state, which replaced it on Save.
+The browser question adapter now fills only the provider's visible controls,
+checks the resulting native serialization, and never overwrites the hidden
+field. Single-shot form ownership, human-interaction invalidation, and fresh
+remote post-Save verification remain required.
+
+Portable serialized Chrome and DOM fixtures cover Typing match modes, four
+Multiple Choice answers, shuffle, disabled or ambiguous controls, and late
+initial React hydration. The preparation gate checks exact semantic fields,
+rejects unknown fields and noncanonical JSON, and never treats hidden state as
+a remote receipt. These tests are not a new live multi-question confirmation.
+
 On 2026-10-14, two red-to-green Add Question regressions reproduced premature
 stops after one Save: an unknown transitional Edit shell and a verification
 reload that still exposed the old document or no document origin. The host

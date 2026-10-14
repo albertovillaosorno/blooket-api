@@ -176,6 +176,7 @@ function withPage(
         configurable: true,
         value: { document, form, question: field, setId: "set-fixture",
           dirty: false, submitted: false, prepared: false, finalized: false,
+          controlsPrepared: true,
           dispose: () => {} },
       });
     }
@@ -195,7 +196,7 @@ function withPage(
   }
 }
 
-function fixture() {
+function fixture(number = 1) {
   const document = node("DOCUMENT");
   document.selectors["main"] = [node("MAIN")];
   const heading = node("H1", "Synthetic set");
@@ -226,6 +227,12 @@ function fixture() {
     type: "hidden",
   });
   setId.value = "set-fixture";
+  // These admission tests begin after the separate visible-controls stage.
+  hidden.value = JSON.stringify({
+    number, question: "Type sun.", answers: ["sun"],
+    correctAnswers: ["sun"], image: "", audio: "", qType: "typing",
+    random: true, answerTypes: ["exactly"], timeLimit: 15,
+  });
   setId.parent = form;
   const submit = node("BUTTON", "\u00a0 Save Question ", {
     type: "submit",
@@ -248,6 +255,11 @@ function closedQuestionEditor(
   opener.click = () => {
     clicked();
     page.document.selectors[selector] = [page.hidden];
+    const world = globalThis as typeof globalThis & {
+      __blooketAddQuestionFormWatch?: { controlsPrepared: boolean };
+    };
+    if (world.__blooketAddQuestionFormWatch)
+      world.__blooketAddQuestionFormWatch.controlsPrepared = true;
   };
 }
 
@@ -262,6 +274,11 @@ function withImagePage(
   page.add.click = () => {
     nativeClick();
     page.document.selectors['input#question[name="question"]'] = [page.hidden];
+    const world = globalThis as typeof globalThis & {
+      __blooketAddQuestionFormWatch?: { controlsPrepared: boolean };
+    };
+    if (world.__blooketAddQuestionFormWatch)
+      world.__blooketAddQuestionFormWatch.controlsPrepared = true;
   };
   const listeners = new Set<(event: { isTrusted: boolean }) => void>();
   const document = page.document as FixtureNode & {
@@ -301,7 +318,7 @@ function withImagePage(
     form.selectors['input[type="file"]'] = [hidden];
     form.selectors['input[name="coverImageFile"]'] = [hidden];
     form.selectors["button"] = [node("BUTTON", "Remove Image")];
-    page.hidden.value = JSON.stringify({ number: 1, audio: "",
+    page.hidden.value = JSON.stringify({ ...JSON.parse(page.hidden.value),
       image: "blob:https://dashboard.blooket.com/provider-owned" });
   };
   picker.dispatchEvent = event => {
@@ -758,6 +775,12 @@ test(
     page.document,
     "https://dashboard.blooket.com/edit?id=set-fixture",
     () => {
+      page.hidden.value = JSON.stringify({
+        number: 2, question: input.question,
+        answers: ["Sun", "Moon", "Mars"], correctAnswers: ["Sun"],
+        image: "", audio: "", qType: "mc", random: false,
+        answerTypes: null, timeLimit: 20,
+      });
       assert.deepEqual(prepareBlooketAddQuestionForm(input), { ok: true });
       assert.deepEqual(JSON.parse(page.hidden.value), {
         number: 2,
@@ -776,8 +799,45 @@ test(
   },
 );
 
+test("provider JSON key order does not replace genuine editor state", () => {
+  const page = fixture();
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      const value = JSON.parse(page.hidden.value);
+      page.hidden.value = JSON.stringify({
+        timeLimit: value.timeLimit,
+        answerTypes: value.answerTypes,
+        random: value.random,
+        qType: value.qType,
+        audio: value.audio,
+        image: value.image,
+        correctAnswers: value.correctAnswers,
+        answers: value.answers,
+        question: value.question,
+        number: value.number,
+      });
+      assert.deepEqual(prepareBlooketAddQuestionForm(typing), { ok: true });
+      assert.deepEqual(submitBlooketAddQuestionForm(typing), { ok: true });
+      assert.equal(page.submit.clicked, 1);
+    });
+});
+
+test("provider-generated unknown question fields never authorize Save", () => {
+  const page = fixture();
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      page.hidden.value = JSON.stringify({
+        ...JSON.parse(page.hidden.value), unexpectedlyPresent: true,
+      });
+      assert.equal(prepareBlooketAddQuestionForm(typing).ok, false);
+      assert.equal(submitBlooketAddQuestionForm(typing).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+});
+
 test("provider marker text never reaches the hidden question field", () => {
   const page = fixture();
+  const before = page.hidden.value;
   withPage(
     page.document,
     "https://dashboard.blooket.com/edit?id=set-fixture",
@@ -794,7 +854,7 @@ test("provider marker text never reaches the hidden question field", () => {
         },
       ]) {
         assert.equal(prepareBlooketAddQuestionForm(input).ok, false);
-        assert.equal(page.hidden.value, "");
+        assert.equal(page.hidden.value, before);
         assert.equal(page.submit.clicked, 0);
       }
     },
@@ -1124,7 +1184,7 @@ test("page opener's observed next slot binds the prepared question number",
     assert.deepEqual(runBlooketAddQuestionPageAction("prepare", {
       ...typing, number: 2,
     }), { ok: false, code: "blooket-browser-failed" });
-    assert.equal(page.hidden.value, "");
+    assert.equal(JSON.parse(page.hidden.value).question, "Type sun.");
     assert.equal(page.submit.clicked, 0);
   });
   },
@@ -1157,7 +1217,7 @@ test("new question cards after Prepare block the single Save click", () => {
 test("a hidden or missing prior card blocks a prepared next-slot Save",
   () => {
   const selector = '[role="button"][aria-label^="Edit question "]';
-  const page = fixture();
+  const page = fixture(2);
   closedQuestionEditor(page);
   const first = node("DIV", "", { "aria-label": "Edit question 1" });
   page.document.selectors[selector] = [first];
@@ -1245,7 +1305,7 @@ test("ambiguous or hidden question counters cannot authorize a mutation",
 test("a CSS-hidden prior card cannot authorize a later Save",
   () => {
   const selector = '[role="button"][aria-label^="Edit question "]';
-  const page = fixture();
+  const page = fixture(2);
   closedQuestionEditor(page);
   const prior = node("DIV", "", { "aria-label": "Edit question 1" });
   page.counter.textContent = "1 Question";
@@ -1355,13 +1415,12 @@ test("hidden image-envelope fields cannot reach provider File controls",
 );
 
 
-test("Add Question preparation rejects changes inside provider events",
+test("Add Question admission rejects drift after visible preparation",
   () => {
   const variants = ["form", "raw", "challenge", "security", "sidebar"] as const;
   for (const kind of variants) {
     const page = fixture();
-    page.hidden.dispatchEvent = event => {
-      if (event.type !== "input") return true;
+    const changeProvider = () => {
       if (kind === "form")
         page.document.selectors['input#question[name="question"]'] =
           [node("INPUT", "", { type: "hidden" })];
@@ -1378,6 +1437,7 @@ test("Add Question preparation rejects changes inside provider events",
     };
     withPage(page.document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+        changeProvider();
         assert.equal(prepareBlooketAddQuestionForm(typing).ok, false, kind);
         assert.equal(submitBlooketAddQuestionForm(typing).ok, false, kind);
         assert.equal(page.submit.clicked, 0, kind);
@@ -1438,7 +1498,7 @@ test("final Add Question page rejects sparse and decorated match modes",
         assert.equal(prepareBlooketAddQuestionForm({
           ...typing, answerTypes: modes as never,
         }).ok, false);
-        assert.equal(page.hidden.value, "");
+        assert.equal(JSON.parse(page.hidden.value).question, "Type sun.");
         assert.equal(page.submit.clicked, 0);
       });
   }
@@ -1457,7 +1517,7 @@ test("final Add Question page never executes answer field getters", () => {
       assert.equal(prepareBlooketAddQuestionForm({ ...typing,
         answers: [answer] }).ok, false);
       assert.equal(invoked, 0);
-      assert.equal(page.hidden.value, "");
+      assert.equal(JSON.parse(page.hidden.value).question, "Type sun.");
       assert.equal(page.submit.clicked, 0);
     });
 });

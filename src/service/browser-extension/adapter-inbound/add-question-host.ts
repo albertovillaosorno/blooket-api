@@ -48,6 +48,9 @@ import {
   "../../../platforms/blooket-browser/adapter-outbound/add-question-page.ts";
 import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
+import { prepareBlooketQuestionControls } from
+  // jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../platforms/blooket-browser/adapter-outbound/question-controls-page.ts";
 import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import { inspectBlooketDocumentOrigin } from
@@ -302,6 +305,12 @@ export function createExtensionAddQuestionHost(
           await pause(POLL_MS);
         }
         if (!panelReady) return browserFailure();
+
+        const controlsPrepared = await ownedScript(
+          prepareBlooketQuestionControls as (...args: never[]) => unknown,
+          [input],
+        );
+        if (controlsPrepared !== true) return browserFailure();
 
         const prepared = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
