@@ -343,8 +343,13 @@ export function createExtensionCreateSetHost(
             // to a page independently reloaded after our navigation. Bind
             // the page observation and Claim to one newly loaded epoch.
             const targetOrigin = await editDocumentOrigin(CREATE_URL);
-            if (targetOrigin === null || targetOrigin === sourceOrigin)
-              return browserFailure();
+            if (targetOrigin === null || targetOrigin === sourceOrigin) {
+              // Chrome can report the destination URL as complete while its
+              // source document is still being replaced. Wait within this
+              // navigation budget; never claim or populate that old document.
+              await pause(POLL_MS);
+              continue;
+            }
             const observed = await observe(script);
             if (!await createTabReady() ||
                 await editDocumentOrigin(CREATE_URL) !== targetOrigin)
