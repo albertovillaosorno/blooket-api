@@ -287,6 +287,21 @@ test("a late initial provider serialization can hydrate before editing",
     assert.equal(page.hiddenWrites(), 0);
   }));
 
+test("visible React controls may mount after hidden state is ready",
+  async () => withEditor(async page => {
+    const savedPicker = page.form.selectors['[role="combobox"]']!;
+    const savedPrompt = page.form.selectors["textarea#question"]!;
+    page.form.selectors['[role="combobox"]'] = [];
+    page.form.selectors["textarea#question"] = [];
+    setTimeout(() => {
+      page.form.selectors['[role="combobox"]'] = savedPicker;
+      page.form.selectors["textarea#question"] = savedPrompt;
+    }, 75);
+    assert.equal(await prepareBlooketQuestionControls(input), true);
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(JSON.parse(page.hidden.value).question, input.question);
+  }));
+
 test("ignored provider events cannot admit fabricated hidden typing state",
   async () => withEditor(async page => {
     page.ignoreChanges();
