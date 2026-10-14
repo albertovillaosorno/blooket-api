@@ -12,6 +12,27 @@ Playwright MCP, Chrome DevTools MCP, and an installed CLI are alternatives;
 their presence does not establish a working connection. Read the controller's
 current documentation and inspect its actual tabs before account operations.
 
+## Safe question write-stage diagnostics
+
+The isolated Blooket API extension owns the per-document Add Question watch.
+A content-free read-only diagnostic is exported from
+`src/platforms/blooket-browser/adapter-outbound/question-write-stage-page.ts`.
+It returns only one fixed stage enum: no owner in the **current execution
+world**, pending opener, visible-control preparation, pre-submit finalization,
+submit attempted, interruption, detach, replacement, or unavailable.
+
+It must execute in the **same Chrome extension isolated scripting world** as
+the admitted Add Question host. A normal page-world DevTools probe that returns
+`no-owner` does **not** prove the extension's owner was absent. Likewise,
+`ready-for-save` is never authority to click Save, and `submit-attempted` is
+never proof of server persistence. Only canonical journal recovery and fresh
+remote verification can decide whether to resume or close an uncertain write.
+
+Do not reload the extension or navigate away from a pending teacher form just
+to obtain a stage diagnostic. If the authorized controller cannot inspect its
+isolated world without crossing a security or ownership boundary, leave the
+journal uncertain and report the diagnostic as unavailable.
+
 ## Playwright MCP
 
 Microsoft's [extension documentation][playwright-extension], checked on
