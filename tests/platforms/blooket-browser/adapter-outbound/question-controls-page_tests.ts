@@ -31,7 +31,9 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { prepareBlooketQuestionControls } from
+import {
+  prepareBlooketQuestionControls, inspectBlooketPreparedQuestionEcho,
+} from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/blooket-browser/adapter-outbound/question-controls-page.ts";
 import type { BlooketQuestionPageInput } from
@@ -45,6 +47,7 @@ const input: BlooketQuestionPageInput = {
 };
 
 class Control {
+  id = "";
   value = "";
   tagName = "INPUT";
   type = "text";
@@ -193,6 +196,7 @@ function editor(kind: "typing" | "mc" = "typing") {
       addAnswer();
       const answer = answers[index]!;
       answer.tagName = "TEXTAREA";
+      answer.id = "answer-" + index;
       form.selectors["textarea#answer-" + index] = [answer];
       selected.push(false);
       const button = new Control();
@@ -201,6 +205,7 @@ function editor(kind: "typing" | "mc" = "typing") {
       form.selectors['button[aria-label="Mark Answer ' +
         (index + 1) + ' as Correct"]'] = [button];
     }
+    form.selectors['textarea[id^="answer-"]'] = answers;
     const shuffle = new Control();
     shuffle.type = "checkbox";
     shuffle.checked = true;
@@ -400,3 +405,73 @@ test("ambiguous type options never choose the first provider control",
     assert.equal(page.prompt.value, "");
     assert.equal(page.hiddenWrites(), 0);
   }));
+
+
+test("read-only typing echo validates native controls just before Save",
+  async () => withEditor(async page => {
+  assert.equal(await prepareBlooketQuestionControls(input), true);
+  page.watch.prepared = true;
+  page.watch.finalized = true;
+  const injected = Function("return (" +
+    inspectBlooketPreparedQuestionEcho.toString() + ")")() as
+      typeof inspectBlooketPreparedQuestionEcho;
+  assert.equal(injected(input), true);
+  const before = page.hidden.value;
+  page.prompt.value = "provider-altered-question";
+  assert.equal(injected(input), false);
+  assert.equal(page.hidden.value, before);
+  assert.equal(page.hiddenWrites(), 0);
+}));
+
+test("read-only typing echo rejects changed matches and answers",
+  async () => withEditor(async page => {
+  assert.equal(await prepareBlooketQuestionControls(input), true);
+  page.watch.prepared = true;
+  page.watch.finalized = true;
+  const answer = page.form.selectors['input[name="accepted-answers"]']![0]!;
+  answer.value = "provider-altered-answer";
+  assert.equal(inspectBlooketPreparedQuestionEcho(input), false);
+  answer.value = input.answers[0]!.text;
+  const mode = answer.parentElement!.selectors["button"]![0]!;
+  mode.textContent = "Some Other Match";
+  assert.equal(inspectBlooketPreparedQuestionEcho(input), false);
+  assert.equal(page.hiddenWrites(), 0);
+}));
+
+test("read-only multiple-choice echo rejects late shuffle and answer changes",
+  async () => withEditor(async page => {
+  const mc: BlooketQuestionPageInput = {
+    ...input, qType: "mc", random: false, answerTypes: null,
+    answers: [{ text: "Sun", correct: true },
+      { text: "Moon", correct: false },
+      { text: "Star", correct: true },
+      { text: "Earth", correct: false }],
+  };
+  assert.equal(await prepareBlooketQuestionControls(mc), true);
+  page.watch.prepared = true;
+  page.watch.finalized = true;
+  assert.equal(inspectBlooketPreparedQuestionEcho(mc), true);
+  const shuffle = page.form.selectors["input#shuffle-toggle"]![0]!;
+  shuffle.checked = true;
+  assert.equal(inspectBlooketPreparedQuestionEcho(mc), false);
+  shuffle.checked = false;
+  const choice = page.form.selectors["textarea#answer-0"]![0]!;
+  choice.value = "provider-altered-option";
+  assert.equal(inspectBlooketPreparedQuestionEcho(mc), false);
+  assert.equal(page.hiddenWrites(), 0);
+}, "mc"));
+
+test("pre-submit echo cannot re-admit detached, dirty or submitted forms",
+  async () => {
+  for (const condition of ["dirty", "submitted", "form"] as const)
+    await withEditor(async page => {
+      assert.equal(await prepareBlooketQuestionControls(input), true);
+      page.watch.prepared = true;
+      page.watch.finalized = true;
+      if (condition === "dirty") page.watch.dirty = true;
+      if (condition === "submitted") page.watch.submitted = true;
+      if (condition === "form") page.form.isConnected = false;
+      assert.equal(inspectBlooketPreparedQuestionEcho(input), false);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+});

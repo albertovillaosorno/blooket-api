@@ -242,3 +242,102 @@ export async function prepareBlooketQuestionControls(
     return true;
   } catch { return false; }
 }
+
+// One last content echo is required after React finishes preparing the form.
+// The hidden provider JSON alone cannot prove that the visible editor stayed
+// unchanged until the one permitted Save Question click. This read-only probe
+// is serialized into the same isolated world as the owned modal watch.
+export function inspectBlooketPreparedQuestionEcho(
+  input: BlooketQuestionPageInput,
+): boolean {
+  try {
+    const watch = (globalThis as typeof globalThis & {
+      __blooketAddQuestionFormWatch?: {
+        document: Document; setId: string; dirty: boolean;
+        submitted: boolean; prepared: boolean; finalized: boolean;
+        controlsPrepared?: boolean; form?: HTMLFormElement;
+        question?: HTMLInputElement;
+      };
+    }).__blooketAddQuestionFormWatch;
+    const form = watch?.form;
+    const hidden = watch?.question;
+    const url = new URL(location.href);
+    if (!watch || !form || !hidden || watch.document !== document ||
+        watch.setId !== input.setId || watch.dirty || watch.submitted ||
+        !watch.prepared || !watch.finalized || !watch.controlsPrepared ||
+        !form.isConnected || !hidden.isConnected ||
+        hidden.closest("form") !== form ||
+        url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || url.hash ||
+        url.searchParams.size !== 1 ||
+        url.searchParams.get("id") !== input.setId ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]') ||
+        !Array.isArray(input.answers) || input.answers.length < 1)
+      return false;
+    const visible = (element: Element): boolean => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible" &&
+        element.getAttribute("aria-disabled") !== "true";
+    };
+    if (Array.from(document.querySelectorAll(
+      'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
+    )).some(visible) || Array.from(document.querySelectorAll(
+      '[role="dialog"][aria-modal="true"] h3',
+    )).some(node => visible(node) &&
+      node.textContent?.trim() === "Select your organization"))
+      return false;
+    const unique = (selector: string): HTMLElement | null => {
+      const elements = Array.from(form.querySelectorAll(selector));
+      return elements.length === 1 && visible(elements[0]!)
+        ? elements[0] as HTMLElement : null;
+    };
+    const prompt = unique("textarea#question") as
+      HTMLTextAreaElement | null;
+    const time = unique("input#time-limit") as HTMLInputElement | null;
+    if (!unique('[role="combobox"]') || !prompt || !time ||
+        prompt.disabled || prompt.readOnly || time.disabled || time.readOnly ||
+        prompt.value !== input.question ||
+        time.value !== String(input.timeLimit)) return false;
+    if (input.qType === "typing") {
+      const controls = Array.from(form.querySelectorAll(
+        'input[name="accepted-answers"]',
+      )) as HTMLInputElement[];
+      if (!Array.isArray(input.answerTypes) ||
+          controls.length !== input.answers.length ||
+          input.answerTypes.length !== controls.length) return false;
+      return controls.every((control, index) => {
+        const parent = control.parentElement;
+        const buttons = Array.from(parent?.querySelectorAll("button") ?? [])
+          .filter(button => ["Is Exactly", "Contains"]
+            .includes(button.textContent?.trim() ?? ""));
+        const expectedMode = input.answerTypes![index] === "exactly"
+          ? "Is Exactly" : "Contains";
+        return control.tagName === "INPUT" && visible(control) &&
+          !control.disabled && !control.readOnly &&
+          control.value === input.answers[index]?.text &&
+          buttons.length === 1 && visible(buttons[0]!) &&
+          !buttons[0]!.disabled &&
+          buttons[0]!.textContent?.trim() === expectedMode;
+      });
+    }
+    if (input.qType !== "mc" || input.answerTypes !== null ||
+        input.answers.length < 2 || input.answers.length > 4)
+      return false;
+    const choices = Array.from(form.querySelectorAll(
+      'textarea[id^="answer-"]',
+    )) as HTMLTextAreaElement[];
+    const shuffle = unique("input#shuffle-toggle") as
+      HTMLInputElement | null;
+    return choices.length === 4 && shuffle?.type === "checkbox" &&
+      shuffle.checked === input.random && choices.every((choice, index) =>
+        choice.tagName === "TEXTAREA" &&
+        choice.id === "answer-" + index && visible(choice) &&
+        !choice.disabled && !choice.readOnly &&
+        choice.value === (input.answers[index]?.text ?? ""));
+  } catch {
+    return false;
+  }
+}

@@ -104,6 +104,17 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, the Add Question host gained a separate read-only
+pre-submit echo check after React-control preparation and before the one
+latched Save. Typing and Multiple Choice fixtures reproduce a late provider
+rewrite of visible prompt, answers, match mode or shuffle that leaves the
+hidden JSON unchanged. The host now refuses a mismatched echo and never clicks
+Save or reloads in that case; malformed Chrome acknowledgements fail closed.
+
+This is a portable regression, not an automatic receipt for the already
+ambiguous live Add Question attempts. The connected extension was not
+reloaded over their unsaved editor; those journals remain unreplayed.
+
 On 2026-10-14, a separate read-only extension-world diagnostic was added
 for unresolved Add Question stages. It reports only a fixed enum for modal
 ownership, form detachment, React control preparation, finalization,

@@ -48,7 +48,9 @@ import {
   "../../../platforms/blooket-browser/adapter-outbound/add-question-page.ts";
 import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
-import { prepareBlooketQuestionControls } from
+import {
+  prepareBlooketQuestionControls, inspectBlooketPreparedQuestionEcho,
+} from
   // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../platforms/blooket-browser/adapter-outbound/question-controls-page.ts";
 import { canLeaveBlooketPageForRead } from
@@ -349,6 +351,14 @@ export function createExtensionAddQuestionHost(
           }
         }
 
+        // React can replace a visible field after it generated the hidden
+        // JSON. Verify that the native controls still echo the frozen plan
+        // immediately before the single latched Save Question action.
+        const echoed = await ownedScript(
+          inspectBlooketPreparedQuestionEcho as (...args: never[]) => unknown,
+          [input],
+        );
+        if (echoed !== true) return browserFailure();
         try {
           const submittedResult = await ownedScript(
             runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
