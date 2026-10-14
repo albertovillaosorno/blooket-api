@@ -69,6 +69,14 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-14, a red-to-green UI regression demonstrated that a 133-step
+admitted text quiz previously paused solely because the presentation layer
+imposed a fixed 128-write limit. The orchestration loop now uses the same
+10,000-operation structural limit as its validated progress envelope; the
+canonical durable pacing and mutation budget still enforce account safety.
+The corresponding reject-over-limit test performs no remote write. These are
+synthetic progress tests, not provider acceptance of large question counts.
+
 A restarted localhost service on 2026-10-14 served the new publication
 module with HTTP 200 and JavaScript content type. In the owner's existing
 Chrome for Testing profile, a newly opened background localhost test tab

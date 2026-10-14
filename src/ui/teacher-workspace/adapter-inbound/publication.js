@@ -29,7 +29,9 @@
 // - Defaults:
 //   - Unknown phases, cancellation, and uncertain attempts stop immediately.
 //
-const MAX_UI_STEPS = 128;
+// The canonical write plan and durable mutation budget bound publication.
+// A smaller UI-only limit would interrupt valid long quizzes every 128 writes.
+const MAX_UI_STEPS = 10_000;
 
 function progress(value, draftId) {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
@@ -48,7 +50,7 @@ function progress(value, draftId) {
   if (!Number.isSafeInteger(value.completedOperations) ||
       !Number.isSafeInteger(value.totalOperations) ||
       value.completedOperations < 0 || value.totalOperations < 1 ||
-      value.totalOperations > 10_000 ||
+      value.totalOperations > MAX_UI_STEPS ||
       value.completedOperations > value.totalOperations)
     throw Error("publication-progress-invalid");
   return value;

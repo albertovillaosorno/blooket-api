@@ -71,6 +71,36 @@ test("a malformed frozen revision stops before another mutation", async () => {
   assert.deepEqual(names, ["blooket.publication.status"]);
 });
 
+test("a long admitted text quiz does not stop at 128 writes",
+  async () => {
+  let started = 0, verified = 0, status = 0;
+  const result = await publishTextDraft(ID, REV, async name => {
+    if (name === "blooket.publication.status") {
+      status++;
+      return { draftId: ID, phase: "not-started", published: false };
+    }
+    if (name === "blooket.publication.step")
+      return state("advanced", ++started, 133);
+    verified++;
+    return state("verified", started, 133);
+  });
+  assert.equal(result.phase, "verified");
+  assert.equal(result.published, true);
+  assert.equal(started, 133);
+  assert.equal(verified, 1);
+  assert.equal(status, 1);
+});
+
+test("oversized remote plan cannot start a second UI write",
+  async () => {
+  const calls: string[] = [];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return state("ready", 0, 10_001);
+  }), /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status"]);
+});
+
 test("one UI publish intent advances and verifies each durable operation",
   async () => {
   const calls: string[] = [];
