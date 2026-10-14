@@ -211,6 +211,25 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
 
+On 2026-10-14, real signed preparation followed by native exchange reproduced
+a functional failure: the frozen candidate's root prevented cross-parent
+directory replacement. The native helper now temporarily admits owner write
+only on held application directory descriptors, restores each original mode
+at either orientation, and syncs the held directories after restoration.
+It still performs one atomic exchange with no destructive rename fallback.
+
+The regression runs actual signature/ZIP verification, extraction, preparation,
+forward Linux exchange and inverse exchange with preserved identities,
+permissions and teacher data. A real denied exchange also preserves both
+frozen roots and contents; root-run tests skip this permission-only case since
+root bypasses the denial. Fifty-one focused tests passed on the unprivileged
+development host, alongside strict TypeScript and zero Jig diagnostics.
+
+Apple assessment remains an explicit double and these tests do not start the
+product after installation. Independent installer/runtime composition,
+production publisher trust and opt-in recovery controls remain required.
+Native Mac/Safari execution continues under blooket-15.
+
 On 2026-10-14, signed update preparation gained a portable owned sibling
 candidate path, an exclusive native no-replace promotion, fresh candidate
 publisher assessment and a durable prepared installation journal. The

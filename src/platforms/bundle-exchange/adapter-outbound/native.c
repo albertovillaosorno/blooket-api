@@ -152,17 +152,49 @@ int main(int argc, char **argv) {
     identity(&candidate, expected[2], expected[3]);
   int result = 73;
   if (admitted) {
+    int oldApp = openat(left, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    int newApp = openat(right, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    struct stat oldHeld, newHeld;
+    if (oldApp < 0 || newApp < 0 || fstat(oldApp, &oldHeld) != 0 ||
+        fstat(newApp, &newHeld) != 0 ||
+        !identity(&oldHeld, expected[0], expected[1]) ||
+        !identity(&newHeld, expected[2], expected[3])) {
+      if (oldApp >= 0) close(oldApp);
+      if (newApp >= 0) close(newApp);
+      close(right);
+      close(left);
+      return 73;
+    }
+    mode_t oldMode = oldHeld.st_mode & 07777;
+    mode_t newMode = newHeld.st_mode & 07777;
+    /* Both directories change parent during a swap. A frozen candidate needs
+       temporary owner write for its .. entry, just as during preparation. */
+    int oldWritable = (oldMode & S_IWUSR) ||
+      fchmod(oldApp, oldMode | S_IWUSR) == 0;
+    int newWritable = (newMode & S_IWUSR) ||
+      fchmod(newApp, newMode | S_IWUSR) == 0;
     int exchanged = -1;
+    if (oldWritable && newWritable) {
 #if defined(__APPLE__)
-    exchanged = renameatx_np(left, name, right, name, RENAME_SWAP);
+      exchanged = renameatx_np(left, name, right, name, RENAME_SWAP);
 #elif defined(__linux__) && defined(SYS_renameat2)
-    exchanged = (int)syscall(SYS_renameat2, left, name, right, name,
-      RENAME_EXCHANGE);
+      exchanged = (int)syscall(SYS_renameat2, left, name, right, name,
+        RENAME_EXCHANGE);
 #else
-    errno = ENOTSUP;
+      errno = ENOTSUP;
 #endif
+    }
+    /* Restore held inodes at either orientation, including syscall failure.
+       Do not chmod a path that may now name the other application. */
+    int oldRestored = (oldMode & S_IWUSR) || fchmod(oldApp, oldMode) == 0;
+    int newRestored = (newMode & S_IWUSR) || fchmod(newApp, newMode) == 0;
+    int oldSynced = fsync(oldApp) == 0;
+    int newSynced = fsync(newApp) == 0;
     if (exchanged == 0)
-      result = fsync(left) == 0 && fsync(right) == 0 ? 0 : 74;
+      result = oldRestored && newRestored && oldSynced && newSynced &&
+        fsync(left) == 0 && fsync(right) == 0 ? 0 : 74;
+    close(newApp);
+    close(oldApp);
   }
   close(right);
   close(left);

@@ -39,6 +39,8 @@ import { openUpdateInstallationStore } from
   "../../../../src/platforms/update-journals/adapter-outbound/store.ts";
 import { directoryIdentity } from
   "../../../../src/platforms/bundle-exchange/adapter-outbound/identity.ts";
+import { exchangeBundles } from
+  "../../../../src/platforms/bundle-exchange/adapter-outbound/exchange.ts";
 import { removeCreatedStage } from
   "../../../../src/platforms/update-extraction/adapter-outbound/files.ts";
 import { fixture as archiveFixture, baseEntries } from
@@ -126,6 +128,47 @@ test("real preparation freezes a sibling and journals captured identities",
       } finally { await result.store.close(); }
     } finally { await f.cleanup(); }
   });
+test("a frozen prepared bundle exchanges and restores the retained old app",
+  async () => {
+    const f = await fixture();
+    try {
+      const result = await prepareSignedUpdateInstallation(f.options);
+      assert.equal(result.status, "prepared");
+      if (result.status !== "prepared") return;
+      try {
+        const oldMode = (await lstat(f.options.installedPath)).mode & 0o777;
+        const { authority } = result;
+        const options = { installedPath: authority.installedPath,
+          candidatePath: authority.candidatePath,
+          installedIdentity: authority.installedIdentity,
+          candidateIdentity: authority.candidateIdentity,
+          helperPath: f.files.options.helperPath,
+          host: f.files.options.host };
+        assert.deepEqual(await exchangeBundles(options), {
+          status: "exchanged", orientation: "exchanged", durable: true,
+        });
+        assert.deepEqual(await directoryIdentity(authority.installedPath),
+          authority.candidateIdentity);
+        assert.equal((await lstat(authority.installedPath)).mode & 0o777,
+          0o555);
+        assert.equal((await lstat(authority.candidatePath)).mode & 0o777,
+          oldMode);
+        assert.deepEqual(await exchangeBundles({ ...options,
+          installedIdentity: authority.candidateIdentity,
+          candidateIdentity: authority.installedIdentity }), {
+          status: "exchanged", orientation: "exchanged", durable: true,
+        });
+        assert.deepEqual(await directoryIdentity(authority.installedPath),
+          authority.installedIdentity);
+        assert.equal((await lstat(authority.installedPath)).mode & 0o777,
+          oldMode);
+        assert.equal((await lstat(authority.candidatePath)).mode & 0o777,
+          0o555);
+        await f.preserved();
+      } finally { await result.store.close(); }
+    } finally { await f.cleanup(); }
+  });
+
 test("untrusted and non-new releases stop before filesystem preparation",
   async () => {
     const f = await fixture();
