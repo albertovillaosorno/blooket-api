@@ -104,6 +104,13 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, an additional red-to-green pacing regression found that
+mutating a caller-owned configuration object after queue construction could
+accelerate the already admitted start interval or rolling-minute allowance.
+The queue now captures and freezes its validated policy using exact own data
+properties, rejects getters and unknown shapes, and freezes the exported
+default. These checks are independent of the separately durable task budget.
+
 On 2026-10-14, the Add Question host gained a separate read-only
 pre-submit echo check after React-control preparation and before the one
 latched Save. Typing and Multiple Choice fixtures reproduce a late provider
