@@ -258,6 +258,61 @@ connection reaches the authorized Chrome/Chrome for Testing session. Read
 `docs/technical/browser-acceptance-tools.md` before selecting or attaching a
 controller; discover its current tools and help instead of inventing commands.
 
+### Reuse Chrome for Testing with the development controllers
+
+On Fedora, use the system zsh and the existing authenticated Chrome for Testing
+profile, not a newly launched browser. Confirm the local server is reachable
+at `http://127.0.0.1:2607/`, and identify the actual selected Blooket tab.
+The currently installed `chrome-devtools` CLI is a separate entrypoint even
+when the integrated browser/Computer Use tool cannot click or capture.
+Inspect its built-in help and the controller status **without exposing raw
+connection arguments or debugging endpoints**:
+
+```sh
+chrome-devtools --version
+chrome-devtools list_pages --output-format=md
+chrome-devtools list_extensions --output-format=md
+chrome-devtools evaluate_script --help
+```
+
+If a controller is already attached to the authorized Chrome for Testing
+profile, reuse it. The CLI may expose page IDs and `sw-*` service-worker IDs.
+For a *read-only* diagnostic, use the documented `evaluate_script` syntax with
+an observed `--pageId` or `--serviceWorkerId`; emit sanitized conclusions, not
+cookies, local storage, headers, tokens, lesson content, or raw browser dumps.
+Never guess an extension ID, navigate away from an unsaved editor, or install
+a second copy of the companion. After rebuilding the observed unpacked
+extension path, a supported reload is:
+
+```sh
+chrome-devtools reload_extension '<observed-extension-id>' \
+  --output-format=md
+```
+
+Check that the reload reports completion and independently prove the loaded
+worker contract through canonical CLI reads. Do not retry an ambiguous reload
+blindly. If the CLI connects to a fresh isolated profile rather than the
+owner's original Chrome, its tabs are **not** evidence of the owner session.
+
+Playwright MCP is another supported *controller*, distinct from the Blooket API
+extension and from integrated Computer Use. If the MCP tool is connected,
+discover the exposed `browser_tabs`/`browser_snapshot` tools and select the
+owner-authorized existing tab before interacting. Microsoft's supported
+`--extension` connection uses a Playwright controller extension and reuses the
+existing logged-in Chrome session; it does not imply that the extension, MCP
+server, or CLI is installed in every agent runtime.
+
+Never run `npx` to fetch a missing server, launch a new profile, or grant extra
+permissions silently. For official Playwright links and attachment details,
+read `docs/technical/browser-acceptance-tools.md`.
+
+For all controllers, first run a read-only session/capability preflight through
+the canonical product CLI and use the same authenticated account for final
+Create Set, Add Question, and fresh read-back. Preserve attempting journals and
+require confirmed receipts before replaying or switching transports. Native
+macOS/Safari and ARM64 packaging acceptance belongs to final release hardening;
+never block portable browser functionality solely on unavailable Apple hardware.
+
 Reuse existing account-mutation authorization within its stated test scope.
 Prefer a supported reload operation for the already installed extension and
 verify the loaded result; a compiled directory is not loaded-worker evidence.
