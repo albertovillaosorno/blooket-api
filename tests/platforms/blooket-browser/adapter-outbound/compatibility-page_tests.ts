@@ -180,6 +180,38 @@ test("multiple choice answer-slot IDs cannot silently be renumbered", () => {
   }, "mc");
 });
 
+test("foreign routes and unexpected edit parameters report incompatibility",
+  () => {
+  for (const route of ["/create", "/my-sets", "/edit/extra"])
+    withEditor(() => {
+      (globalThis.location as URL).pathname = route;
+      assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+        "other-page", route);
+    });
+  for (const change of ["query", "duplicate", "fragment"] as const)
+    withEditor(() => {
+      const url = globalThis.location as URL;
+      if (change === "query") url.searchParams.set("other", "yes");
+      if (change === "duplicate")
+        url.searchParams.append("id", "set-fixture");
+      if (change === "fragment") url.hash = "#unrecognized";
+      assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+        "shape-drift", change);
+    });
+});
+
+test("unexpected DOM exceptions cannot reveal account content", () => {
+  withEditor(page => {
+    page.document.querySelectorAll = () => {
+      throw Error("synthetic private fixture data");
+    };
+    const report = inspectBlooketQuestionEditorCompatibility();
+    assert.equal(report.state, "shape-drift");
+    assert.equal(JSON.stringify(report).includes("private fixture"), false);
+    assert.equal(page.hidden.clicked, 0);
+  });
+});
+
 test("changed question semantics are provider drift, not success", () => {
   for (const variant of ["no-correct", "unknown-correct", "wrong-mode",
     "wrong-time", "wrong-number", "wrong-random", "wrong-answer-type",
