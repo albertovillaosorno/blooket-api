@@ -211,6 +211,19 @@ acceptance belongs to task blooket-15; this task authorizes no release/tag.
 
 ## Evidence
 
+On 2026-10-14, a real local UI shutdown exposed a lifecycle gap: the installer
+manager left its private child alive after accepting HTTP 202. It now treats
+only the owned PID/instance drainage notice as a trigger for the existing
+private stop challenge, requiring its exact receipt and final child closure.
+The manager reports each child's completed stop or uncertainty once.
+
+Twenty-six focused tests passed with strict TypeScript and zero Jig
+diagnostics. Actual HTTP/IPC tests prove completed UI shutdown, released
+service storage and preserved teacher data; an intentionally crashed real
+child reports uncertainty without releasing update admission or spawning
+a replacement. This connects manager lifetime observation for future
+independent installation integration; it does not complete that integration.
+
 On 2026-10-14, an installer-owned service manager gained concrete silent
 bundle startup, private admission, fresh health and drained shutdown.
 It requires the actual held data capability and captures the real child;
