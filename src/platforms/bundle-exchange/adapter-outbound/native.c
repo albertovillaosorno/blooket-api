@@ -9,13 +9,13 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Guarded silent atomic exchange of two admitted application directories.
+//   - Guarded atomic application exchange and exclusive candidate placement.
 // - Must-Not:
 //   - Choose update policy, verify publishers, remove apps, or open Terminal.
 // - Allows:
 //   - Inputs: Trusted local paths and exact expected filesystem identities.
 //   - Outputs: Observed exchange orientation or bounded failure reasons.
-//   - Side effects: Native atomic directory exchange and directory syncs.
+//   - Side effects: Atomic swap or no-replace rename and directory syncs.
 // - Split-When:
 //   - Update orchestration needs semantic journal/restart authority.
 // - Merge-When:
@@ -68,7 +68,67 @@ static int path(const char *text) {
     if (*p < 32 || *p == 127) return 0;
   return 1;
 }
+static int prepare(int argc, char **argv) {
+  if (argc != 10 || !path(argv[2]) || !path(argv[3])) return 64;
+  uintmax_t expected[6];
+  for (int index = 0; index < 6; index++)
+    if (!number(argv[index + 4], &expected[index])) return 64;
+  if (expected[0] != expected[2] || expected[0] != expected[4]) return 64;
+  int left = open(argv[2], O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+  if (left < 0) return 73;
+  int right = open(argv[3], O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+  if (right < 0) { close(left); return 73; }
+  struct stat leftParent, rightParent, candidate;
+  const char *name = "Blooket API.app";
+  int admitted = fstat(left, &leftParent) == 0 &&
+    fstat(right, &rightParent) == 0 &&
+    identity(&leftParent, expected[2], expected[3]) &&
+    identity(&rightParent, expected[4], expected[5]) &&
+    leftParent.st_uid == geteuid() && (leftParent.st_mode & 077) == 0 &&
+    rightParent.st_uid == geteuid() && (rightParent.st_mode & 077) == 0 &&
+    fstatat(left, name, &candidate, AT_SYMLINK_NOFOLLOW) == 0 &&
+    identity(&candidate, expected[0], expected[1]);
+  int result = 73;
+  if (admitted) {
+    int app = openat(left, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    struct stat held;
+    if (app < 0 || fstat(app, &held) != 0 ||
+        !identity(&held, expected[0], expected[1]) ||
+        held.st_uid != geteuid()) {
+      if (app >= 0) close(app);
+      close(right);
+      close(left);
+      return 73;
+    }
+    mode_t originalMode = held.st_mode & 0777;
+    /* Reparenting a frozen directory needs owner write for its .. entry. */
+    if (fchmod(app, originalMode | S_IWUSR) != 0) {
+      close(app);
+      close(right);
+      close(left);
+      return 73;
+    }
+    int placed = -1;
+#if defined(__APPLE__)
+    placed = renameatx_np(left, name, right, name, RENAME_EXCL);
+#elif defined(__linux__) && defined(SYS_renameat2)
+    placed = (int)syscall(SYS_renameat2, left, name, right, name,
+      RENAME_NOREPLACE);
+#else
+    errno = ENOTSUP;
+#endif
+    int restored = fchmod(app, originalMode) == 0 && fsync(app) == 0;
+    if (placed == 0)
+      result = restored && fsync(left) == 0 && fsync(right) == 0 ? 0 : 74;
+    close(app);
+  }
+  close(right);
+  close(left);
+  return result;
+}
 int main(int argc, char **argv) {
+  if (argc > 1 && strcmp(argv[1], "--prepare") == 0)
+    return prepare(argc, argv);
   if (argc != 11 || !path(argv[1]) || !path(argv[2])) return 64;
   uintmax_t expected[8];
   for (int index = 0; index < 8; index++)
