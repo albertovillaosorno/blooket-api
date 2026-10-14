@@ -1064,6 +1064,29 @@ test("Create Set only claims a freshly navigated target document",
   },
 );
 
+test("Create Set waits for its destination document before claiming",
+  async () => {
+  const fake = fakeChrome({ afterUpdate: [{
+    url: "https://dashboard.blooket.com/create", status: "complete",
+  }], scripts: [createState] });
+  const execute = fake.chrome.scripting.executeScript;
+  const pending: unknown[] = [null, 1_000];
+  let pauses = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] === "https://dashboard.blooket.com/create" &&
+        pending.length) return [{ result: pending.shift() }];
+    if (request.func.name === "runBlooketCreateSetOwnership")
+      assert.equal(pauses, 2);
+    return await execute(request);
+  };
+  const result = await createExtensionCreateSetHost(fake.chrome, 7,
+    async () => { pauses++; }).openCreateSet();
+  assert.deepEqual(result, { ok: true });
+  assert.equal(fake.calls.filter(call =>
+    call === "create-ownership:claim").length, 1);
+});
+
 test("Create Set cannot claim a reloaded target during page observation",
   async () => {
   const fake = fakeChrome({

@@ -81,6 +81,18 @@ stays disabled; the latter never submits.
 The Create page/host suites passed 93 tests. This correction still requires
 loaded-worker and live acceptance.
 
+Create navigation also rejected a transitional document immediately when
+Chrome reported the target route complete before replacing the source page.
+The host now waits within its existing bounded poll budget for a new target
+document before claiming the form. A red-to-green regression reproduces both
+pending and old document evidence, then proves exactly one fresh form claim.
+The existing permanently stale and replacement-after-claim cases still stop.
+
+This is a reproducible host bug, not proof of which failed phase caused the
+live unconfirmed attempt. The combined Create page/host suites passed 94
+tests after the navigation correction; receipt-backed live acceptance remains
+pending.
+
 The official [creation guide][create-required-title], checked on 2026-10-14,
 places title entry before Create; the disabled state comes from the actual
 Chrome DOM observation, not from that guide.
