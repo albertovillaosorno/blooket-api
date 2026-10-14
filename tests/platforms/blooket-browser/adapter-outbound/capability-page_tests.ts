@@ -216,6 +216,42 @@ function withPage(document: FixtureNode, run: () => void): void {
   }
 }
 
+test("navigation refuses pending owned forms before React hydration", () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  withPage(page.document, () => {
+    assert.equal(injected(), true);
+    for (const key of [
+      "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
+      "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+    ]) {
+      const previous = Object.getOwnPropertyDescriptor(globalThis, key);
+      try {
+        Object.defineProperty(globalThis, key, { configurable: true,
+          value: { document: page.document, dirty: false } });
+        assert.equal(injected(), false, key);
+      } finally {
+        if (previous) Object.defineProperty(globalThis, key, previous);
+        else Reflect.deleteProperty(globalThis, key);
+      }
+    }
+    // A supplied getter is not consulted to decide whether an opener exists.
+    let reads = 0;
+    Object.defineProperty(globalThis, "__blooketQuestionEditWatch", {
+      configurable: true, get: () => { reads++; throw Error("getter"); },
+    });
+    try {
+      assert.equal(injected(), false);
+      assert.equal(reads, 0);
+    } finally {
+      Reflect.deleteProperty(globalThis, "__blooketQuestionEditWatch");
+    }
+    assert.equal(injected(), true);
+  });
+});
+
 test("capability navigation leaves all teacher-owned editors untouched", () => {
   const page = fixture();
   const injected = Function(

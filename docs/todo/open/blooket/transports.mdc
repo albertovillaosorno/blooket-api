@@ -62,6 +62,15 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the read-only safe-to-leave guard began refusing
+navigation while an isolated-world Create Set, Add Question, existing
+question, or capability opener retains a pending ownership watch. React
+can mount a modal after the original click, so an absent form before
+hydration is not permission to navigate away. The guard inspects own
+property presence without running an accessor, even after a lost opener
+acknowledgment. Portable page and browser-host tests passed without
+provider login, remote mutation or extension reload evidence.
+
 On 2026-10-14, the integrated Chrome controller explicitly required updating
 its ChatGPT extension before further browser operations. The product service
 remained available and connected with no pending bridge jobs; the unused
