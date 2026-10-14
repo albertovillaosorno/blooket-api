@@ -9,11 +9,12 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Read-only native Apple assessment of a staged update bundle.
+//   - Native Apple assessment of staged and retained application bundles.
 // - Must-Not:
 //   - Extract, install, launch, alter quarantine, or accept unsigned code.
 // - Allows:
-//   - Inputs: Local staging path, publisher trust, and signed release context.
+//   - Inputs: Local bundle path, publisher trust, and signed new-release
+//     context or the captured previously installed version.
 //   - Outputs: Bounded verification results requiring safe installation.
 //   - Side effects: Bounded native read-only verification processes.
 // - Split-When:
@@ -25,7 +26,7 @@
 // - Description:
 //   - Signature validity alone cannot admit a different Apple publisher.
 // - Usage:
-//   - Assess immutable private staging before transactional installation.
+//   - Assess immutable new staging or retained old code during installation.
 // - Defaults:
 //   - Unsupported hosts, absent trust, and unavailable tools fail closed.
 //
@@ -34,8 +35,10 @@ import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { appleBuildVersion } from
+import { appleBuildVersion, decodeProductVersion } from
   "../../../ir/product-version/contract/version.ts";
+import { UPDATE_BUNDLE_ID, isAdmittedMinimumMacos } from
+  "../../../ir/update-manifests/contract/manifest.ts";
 import { verifySignedUpdateManifest } from "./verify.ts";
 
 const executeFile = promisify(execFile);
@@ -53,6 +56,10 @@ export interface AppleBundleVerificationOptions {
   readonly host?: { readonly platform: string; readonly architecture: string };
   readonly execute?: AppleAssessmentCommand;
   readonly timeoutMs?: number;
+}
+export interface AppleInstalledBundleVerificationOptions extends
+  Omit<AppleBundleVerificationOptions, "verification"> {
+  readonly version: string;
 }
 type VerificationReason =
   | "manifest" | "publisher" | "unsupported-host" | "bundle"
@@ -78,6 +85,34 @@ export async function verifyAppleUpdateBundle(
     ({ status: "verification-failed", reason });
   const verified = verifySignedUpdateManifest(options.verification);
   if (!verified.ok) return fail("manifest");
+  return await assessAppleBundle(options, {
+    version: verified.manifest.version,
+    bundleId: verified.manifest.bundleId,
+    minimumMacos: verified.manifest.minimumMacos,
+  });
+}
+
+// A retained, previously installed bundle may predate update manifests. Only
+// trusted local installation composition supplies its captured old version.
+// Reassess Apple identity and notarization directly; never use this entrypoint
+// to admit a downloaded candidate instead of its signed release context.
+export async function verifyAppleInstalledBundle(
+  options: AppleInstalledBundleVerificationOptions,
+): Promise<AppleBundleVerificationResult> {
+  try { decodeProductVersion(options.version); }
+  catch { return { status: "verification-failed", reason: "metadata" }; }
+  return await assessAppleBundle(options, {
+    version: options.version, bundleId: UPDATE_BUNDLE_ID,
+  });
+}
+
+async function assessAppleBundle(
+  options: Omit<AppleBundleVerificationOptions, "verification">,
+  identity: { readonly version: string; readonly bundleId: string;
+    readonly minimumMacos?: string },
+): Promise<AppleBundleVerificationResult> {
+  const fail = (reason: VerificationReason): AppleBundleVerificationResult =>
+    ({ status: "verification-failed", reason });
   if (typeof options.publisherTeamId !== "string" ||
       !/^[A-Z0-9]{10}$/u.test(options.publisherTeamId))
     return fail("publisher");
@@ -135,13 +170,16 @@ export async function verifyAppleUpdateBundle(
     if (await realpath(plist) !== plist || !(await lstat(plist)).isFile())
       return fail("bundle");
     phase = "metadata";
+    let minimumMacos = identity.minimumMacos;
     const expected = {
-      CFBundleIdentifier: verified.manifest.bundleId,
+      CFBundleIdentifier: identity.bundleId,
       CFBundlePackageType: "APPL",
       CFBundleExecutable: "Blooket API",
-      CFBundleShortVersionString: verified.manifest.version,
-      CFBundleVersion: appleBuildVersion(verified.manifest.version),
-      LSMinimumSystemVersion: verified.manifest.minimumMacos,
+      CFBundleShortVersionString: identity.version,
+      CFBundleVersion: appleBuildVersion(identity.version),
+      ...(minimumMacos === undefined ? {} : {
+        LSMinimumSystemVersion: minimumMacos,
+      }),
     };
     for (const [key, value] of Object.entries(expected)) {
       const observed = await run("/usr/bin/plutil", [
@@ -149,6 +187,15 @@ export async function verifyAppleUpdateBundle(
       ]);
       if (observed.stdout !== value && observed.stdout !== value + "\n")
         return fail("metadata");
+    }
+    if (minimumMacos === undefined) {
+      const observed = await run("/usr/bin/plutil", [
+        "-extract", "LSMinimumSystemVersion", "raw", "-o", "-", plist,
+      ]);
+      const value = observed.stdout.endsWith("\n")
+        ? observed.stdout.slice(0, -1) : observed.stdout;
+      if (!isAdmittedMinimumMacos(value)) return fail("metadata");
+      minimumMacos = value;
     }
     phase = "incompatible-os";
     const system = (await run("/usr/bin/sw_vers", ["-productVersion"]))
@@ -159,7 +206,7 @@ export async function verifyAppleUpdateBundle(
     );
     if (!systemPattern.test(system))
       return fail("incompatible-os");
-    const minimum = verified.manifest.minimumMacos.split(".").map(Number);
+    const minimum = minimumMacos.split(".").map(Number);
     const actual = system.split(".").map(Number);
     let compatible = true;
     for (let index = 0; index < 3; index++) {
@@ -189,7 +236,7 @@ export async function verifyAppleUpdateBundle(
     } finally { await binary.close(); }
     phase = "signature";
     const requirement = 'anchor apple generic and identifier "' +
-      verified.manifest.bundleId + '" and certificate leaf[subject.OU] = "' +
+      identity.bundleId + '" and certificate leaf[subject.OU] = "' +
       options.publisherTeamId + '" and certificate leaf[' +
       'field.1.2.840.113635.100.6.1.13] exists';
     await run("/usr/bin/codesign", [
@@ -206,7 +253,7 @@ export async function verifyAppleUpdateBundle(
     if (sources.length !== 1 || sources[0] !== "source=Notarized Developer ID")
       return fail("gatekeeper");
     return {
-      status: "verified", version: verified.manifest.version,
+      status: "verified", version: identity.version,
       requiresTransactionalInstallation: true,
     };
   } catch {

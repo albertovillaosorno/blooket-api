@@ -39,6 +39,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   verifyAppleUpdateBundle,
+  verifyAppleInstalledBundle,
   type AppleAssessmentCommand,
   type AppleBundleVerificationOptions,
 } from "../../../../src/platforms/update-signatures/adapter-outbound/apple.ts";
@@ -152,6 +153,69 @@ test("native assessment binds signed metadata, Apple identity, and OS trust",
     assert.equal(f.calls.at(-1)?.executable, "/usr/sbin/spctl");
   } finally { await f.cleanup(); }
 });
+
+test("retained installed app is reassessed without inventing an old manifest",
+  async () => {
+    const f = await fixture();
+    try {
+      const { verification: _unused, ...native } = f.options;
+      const version = "26.4.0";
+      f.values["CFBundleShortVersionString"] = version;
+      f.values["CFBundleVersion"] = appleBuildVersion(version);
+      const result = await verifyAppleInstalledBundle({ ...native, version });
+      assert.deepEqual(result, {
+        status: "verified", version, requiresTransactionalInstallation: true,
+      });
+      assert.equal(f.calls.length, 9);
+      assert.equal(f.calls.at(-1)?.executable, "/usr/sbin/spctl");
+    } finally { await f.cleanup(); }
+  });
+
+test("old app requires captured version and valid minimum OS metadata",
+  async () => {
+    const f = await fixture();
+    try {
+      const { verification: _unused, ...native } = f.options;
+      assert.deepEqual(await verifyAppleInstalledBundle({
+        ...native, version: "26.4.0",
+      }), { status: "verification-failed", reason: "metadata" });
+      for (const minimum of ["13.4", "13.05", "", "13.5\n"]) {
+        f.values["LSMinimumSystemVersion"] = minimum;
+        f.calls.length = 0;
+        assert.deepEqual(await verifyAppleInstalledBundle({
+          ...native, version: "26.4.1",
+        }), { status: "verification-failed", reason: "metadata" });
+        assert.ok(f.calls.every(c => c.executable === "/usr/bin/plutil"));
+      }
+      f.calls.length = 0;
+      assert.deepEqual(await verifyAppleInstalledBundle({
+        ...native, version: "invalid",
+      }), { status: "verification-failed", reason: "metadata" });
+      assert.equal(f.calls.length, 0);
+    } finally { await f.cleanup(); }
+  });
+
+test("old app retains publisher, native signature and notarization gates",
+  async () => {
+    const f = await fixture();
+    try {
+      const { verification: _unused, ...native } = f.options;
+      assert.deepEqual(await verifyAppleInstalledBundle({
+        ...native, version: "26.4.1", publisherTeamId: "",
+      }), { status: "verification-failed", reason: "publisher" });
+      assert.equal(f.calls.length, 0);
+      assert.deepEqual(await verifyAppleInstalledBundle({
+        ...native, version: "26.4.1", execute: async (file, args, signal) => {
+          if (file === "/usr/bin/codesign") throw Error("unsigned fixture");
+          return await native.execute!(file, args, signal);
+        },
+      }), { status: "verification-failed", reason: "signature" });
+      f.values["assessment"] = "source=Developer ID";
+      assert.deepEqual(await verifyAppleInstalledBundle({
+        ...native, version: "26.4.1",
+      }), { status: "verification-failed", reason: "gatekeeper" });
+    } finally { await f.cleanup(); }
+  });
 
 test("missing publisher trust and unsupported hosts run no native command",
   async () => {

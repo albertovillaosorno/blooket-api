@@ -30,7 +30,7 @@
 //   - Unproven ownership, trust, writer completion, or health fail closed.
 //
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { createUpdateInstallationController } from
@@ -40,6 +40,12 @@ import { acquireUpdatePublicationBoundary } from
 import { openUpdateInstallationStore } from
   "../../../../src/platforms/update-journals/adapter-outbound/store.ts";
 import { withFixture } from "./installation-fixtures.ts";
+import { verifyAppleInstalledBundle } from
+  "../../../../src/platforms/update-signatures/adapter-outbound/apple.ts";
+import { appleBuildVersion } from
+  "../../../../src/ir/product-version/contract/version.ts";
+import { UPDATE_BUNDLE_ID } from
+  "../../../../src/ir/update-manifests/contract/manifest.ts";
 
 function stopped(reason: string, phase = "prepared") {
   return { status: "installation-stopped", reason, phase };
@@ -81,6 +87,63 @@ test("failed candidate health performs one inverse and preserves both apps",
     assert.equal((await f.controller().run()).status, "old-running");
     assert.deepEqual(f.events.filter(event => event.startsWith("exchange:")),
       before.filter(event => event.startsWith("exchange:")));
+  }, true); });
+
+test("native rollback reassesses retained old app without an old manifest",
+  async () => { await withFixture(async f => {
+    const runtime = join(f.options.installedPath, "Contents/Resources/runtime");
+    await mkdir(runtime, { recursive: true });
+    await writeFile(join(f.options.installedPath, "Contents/Info.plist"),
+      "synthetic old plist; Apple command responses are test doubles");
+    const header = Buffer.alloc(32);
+    header.writeUInt32LE(0xfeedfacf, 0);
+    header.writeUInt32LE(0x0100000c, 4);
+    header.writeUInt32LE(2, 12);
+    await writeFile(join(runtime, "node"), header);
+    const values: Record<string, string> = {
+      CFBundleIdentifier: UPDATE_BUNDLE_ID, CFBundlePackageType: "APPL",
+      CFBundleExecutable: "Blooket API",
+      CFBundleShortVersionString: f.authority.installedVersion,
+      CFBundleVersion: appleBuildVersion(f.authority.installedVersion),
+      LSMinimumSystemVersion: "13.5",
+    };
+    const assess = f.ports.assess, healthy = f.ports.startAndCheck;
+    let signatureChecks = 0, gatekeeperChecks = 0;
+    f.ports.assess = async (target, record) => {
+      if (target.kind === "new") return await assess(target, record);
+      const result = await verifyAppleInstalledBundle({
+        bundlePath: target.path, version: target.version,
+        publisherTeamId: "ABCDEF1234",
+        host: { platform: "darwin", architecture: "arm64" },
+        execute: async (file, args) => {
+          if (file === "/usr/bin/plutil")
+            return { stdout: values[args[1]!]! + "\n", stderr: "" };
+          if (file === "/usr/bin/sw_vers")
+            return { stdout: "26.0\n", stderr: "" };
+          if (file === "/usr/bin/codesign") {
+            signatureChecks++;
+            assert.ok(args[4]!.includes('subject.OU] = "ABCDEF1234"'));
+            assert.equal(args.at(-1), target.path);
+            return { stdout: "", stderr: "" };
+          }
+          assert.equal(file, "/usr/sbin/spctl");
+          gatekeeperChecks++;
+          return { stdout: "", stderr: "source=Notarized Developer ID\n" };
+        },
+      });
+      return result.status === "verified"
+        ? { status: "verified", version: result.version } : result;
+    };
+    f.ports.startAndCheck = async (target, nonce) => target.kind === "new"
+      ? { status: "unhealthy" } : await healthy(target, nonce);
+    assert.equal((await f.controller().run()).status, "old-running");
+    assert.equal(signatureChecks, 2);
+    assert.equal(gatekeeperChecks, 2);
+    assert.deepEqual(f.events.filter(e => e.startsWith("exchange:")),
+      ["exchange:forward", "exchange:rollback"]);
+    assert.equal(await readFile(join(f.options.installedPath, "marker"),
+      "utf8"), "old version");
+    assert.equal((await f.store.read())!.phase, "old-healthy");
   }, true); });
 
 test("lost forward acknowledgement is independently observed without replay",
