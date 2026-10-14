@@ -123,7 +123,9 @@ TypeScript lint profiles became committed, reviewed repository assets.
 Jig 26.3.0 refused enabling executable ClangFormat/ClangTidy without
 native validation capabilities and root configs; its reviewed TypeScript
 linter expected a tooling-only root tsconfig incompatible with the
-currently authoritative application tsconfig. These executors remain
+currently authoritative application tsconfig.
+
+These executors remain
 explicitly disabled in `linters.toml`, not silently reported active.
 Strict `npm run check`, native C compiler checks, and zero-diagnostic
 Jig validation remain in force. Activation awaits a pinned executable
