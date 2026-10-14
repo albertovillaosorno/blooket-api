@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-09"
-status: "active"
+status: "completed"
 priority: "p1"
 horizon: "publication"
 order: 90
@@ -25,6 +25,39 @@ validation:
 ---
 
 # TODO - Working Blooket writes and browser fallback
+
+## Functional completion (2026-10-14)
+
+The authorized Chrome for Testing session ran the actual localhost product
+with the compiled companion from `b2d455f`. A canonical CLI Create Set step
+returned an automatic receipt only after native redirect, reload and matching
+title, description and private visibility, advancing its durable checkpoint
+to one of two operations.
+
+Computer Use invoked the product's publication control to add one typing
+question. Its uncertain post-submit result was recovered through the ordinary
+read-only reconciliation command, advancing the same journal to two of two
+operations without resubmission or manual receipt adoption. The UI then
+reported remote verification, and a fresh canonical CLI verify returned
+`published: true`, `phase: verified` at 2026-10-14T16:16:54.346Z.
+
+A subsequent fresh canonical question read returned exactly one typing
+question, its requested answer marked correct with exact matching, a
+15-second limit, and no image or audio. Existing ambiguous Create Set journals
+were preserved without title-based adoption, and the original owner-selected
+photo was not modified.
+
+The browser create/add transport and conservative ambiguity recovery satisfy
+this record's functional acceptance. Improving ordinary Add Question
+confirmation timing remains in the readiness/pacing work of `blooket-10`;
+editing and canonical media admission remain in `blooket-11` and `blooket-12`.
+HTTP writes stay optional and disabled; this completion does not declare the
+remaining publication milestones complete.
+
+The committed `b2d455f` passed TypeScript, roadmap validation, all 1,763
+portable tests and `jig validate` with zero diagnostics. `jig doctor` remains
+degraded and `jig check` reports the external non-authoritative repository
+graph rule as not evaluated; neither is represented as a clean result.
 
 ## Objective
 
