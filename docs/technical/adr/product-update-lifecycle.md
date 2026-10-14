@@ -236,6 +236,25 @@ lease then excludes another installation until actual drained shutdown.
 Independent supervisor/recovery composition and production publisher trust
 remain required; this private startup capability is not a shipping updater.
 
+The installer service manager now composes that startup exception with one
+actual retained ChildProcess, private runtime/health observation and drained
+shutdown. It checks the held data capability before launching the assessed
+bundle's fixed runtime/entrypoint, ignores standard streams and uses no shell.
+It does not choose publisher trust, exchange applications or release fences.
+
+Startup observation survives cancellation/deadlines so a late service cannot
+be replaced by a duplicate. Every health challenge still requires the selected
+version and fresh nonce; an exact wrong-version reply identifies only the same
+owned child's shutdown version. Successful stop requires that child's drained
+receipt and final closure before another service can be started.
+
+On 2026-10-14, signed ZIP fixtures exercised preparation, real journaled Linux
+exchange and actual service startup through this manager. The successful path
+retained the previous app and reached fresh new-service health; wrong-version
+candidate health caused drained shutdown, inverse exchange and fresh old-service
+health. Apple commands and bundle launch locations remain test substitutions,
+not native Mac acceptance or enabled production installation.
+
 The ordinary installed launcher now starts a silent independent service
 supervisor, which keeps the actual service child and private IPC after the
 launcher disconnects. It admits readiness only after an owned fresh health
