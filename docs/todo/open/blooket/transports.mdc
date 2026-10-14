@@ -62,6 +62,24 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, committed revision 5c2422d passed a fresh 1,673-test suite
+with no failures, skips or cancellations, plus strict TypeScript, roadmap
+integrity and zero Jig validation diagnostics. Its clean Linux package passed
+extracted checks and restarted the acceptance workspace silently.
+
+A second canonical draft stopped with
+`blooket-browser-companion-update-required` before any new attempt or budget
+file. Canonical reconciliation of the first new ambiguous creation remained
+inconclusive and preserved the attempt bytes
+exactly. A fresh canonical read of the original fixture still returned four
+questions with an image on the owner's second question.
+
+Verified companion files from that package now occupy the existing unpacked
+extension path; all prior files are retained in an owned small backup.
+This filesystem preparation does not prove a loaded-worker reload. A fresh
+local workspace click and a capture of the created set still timed out in the
+integrated controller, so neither UI completion nor screenshot proof is claimed.
+
 On 2026-10-14, clean committed revision bb6767e passed 1,670 portable tests,
 strict TypeScript, roadmap integrity and zero Jig validation diagnostics.
 Its Linux package passed extracted checks and replaced the prior acceptance
