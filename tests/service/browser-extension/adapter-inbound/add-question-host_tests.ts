@@ -136,6 +136,8 @@ function fakeChrome(options: {
                 value: options.navigationState ?? "edit",
               },
             }];
+          case "prepareBlooketQuestionControls":
+            return [{ result: true }];
           case "runBlooketAddQuestionPageAction":
             if (args?.[0] === "open" || args?.[0] === "open-image") {
               modalOpen = args?.[1] === "set-fixture";

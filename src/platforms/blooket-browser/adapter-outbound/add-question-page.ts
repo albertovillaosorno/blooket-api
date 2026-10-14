@@ -15,7 +15,7 @@
 // - Allows:
 //   - Inputs: Exact question semantics and optional bounded prepared bytes.
 //   - Outputs: Panel readiness and exact prepare/submit acknowledgements.
-//   - Side effects: Open the Add Question modal, set one hidden form value,
+//   - Side effects: Open the Add Question modal, validate provider form state,
 //     attach one owned File, and click one Save Question submit control.
 // - Split-When:
 //   - Another question media family needs different verified controls.
@@ -91,6 +91,9 @@ export function runBlooketAddQuestionPageAction(
       expectedNumber?: number;
       image?: BlooketPreparedImage;
       url?: string;
+      controlChangeTarget?: Element;
+      controlsStarted?: boolean;
+      controlsPrepared?: boolean;
       dispose: () => void;
     };
   };
@@ -253,6 +256,33 @@ export function runBlooketAddQuestionPageAction(
     };
   };
 
+  const matchesProviderQuestion = (
+    text: string,
+    expected: NonNullable<ReturnType<typeof serializedQuestion>>,
+  ): boolean => {
+    // React emits compact JSON. Whitespace drift is not a provider-generated
+    // rewrite and must not weaken the pre-submit guard.
+    if (text.length > 100_000 || text.trim() !== text) return false;
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+        return false;
+      const actual = parsed as Record<string, unknown>;
+      // Only a compact native JSON.stringify envelope from the provider may
+      // authorize a Save; noncanonical spacing/duplicate keys are drift.
+      if (JSON.stringify(actual) !== text) return false;
+      const prepared = expected as Record<string, unknown>;
+      const keys = Object.keys(prepared);
+      if (Object.keys(actual).length !== keys.length) return false;
+      return keys.every(key => {
+        if (!Object.hasOwn(actual, key)) return false;
+        const left = actual[key], right = prepared[key];
+        if (Array.isArray(right)) return Array.isArray(left) &&
+          JSON.stringify(left) === JSON.stringify(right);
+        return left === right;
+      });
+    } catch { return false; }
+  };
   try {
     // Browser scripts are serialized separately. A prior edit-page read
     // cannot establish that this injected action still owns a valid session.
@@ -369,7 +399,10 @@ export function runBlooketAddQuestionPageAction(
         };
         const types = ["pointerdown", "keydown", "input", "change"];
         const onInteraction = (event: Event) => {
-          if (event.isTrusted) watch.dirty = true;
+          if (event.isTrusted && !(
+            (event.type === "input" || event.type === "change") &&
+            watch.controlChangeTarget === event.target
+          )) watch.dirty = true;
         };
         let observer: MutationObserver | undefined;
         watch.dispose = () => {
@@ -494,6 +527,7 @@ export function runBlooketAddQuestionPageAction(
     const watch = world.__blooketAddQuestionFormWatch;
     if (!watch || watch.document !== document ||
         watch.setId !== input.setId || watch.dirty || watch.submitted ||
+        !watch.controlsPrepared ||
         (watch.expectedNumber !== undefined &&
           watch.expectedNumber !== input.number) ||
         (watch.form && watch.form !== resolved.form) ||
@@ -515,6 +549,8 @@ export function runBlooketAddQuestionPageAction(
           watch.setId !== input.setId || watch.dirty || watch.submitted)
         return failed();
       if (action === "prepare") {
+        if (!matchesProviderQuestion(resolved.question.value, expected))
+          return failed();
         if (!emptyFileInputs(resolved.form) || watch.fileInput ||
             (watch.form && watch.form !== resolved.form) ||
             resolved.form.querySelector('input[name="coverImageFile"]'))
@@ -629,23 +665,15 @@ export function runBlooketAddQuestionPageAction(
     if (action === "prepare" || action === "finalize-image") {
       watch.form = resolved.form;
       watch.question = resolved.question;
-      const descriptor = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      );
-      if (descriptor?.set === undefined) return failed();
-      descriptor.set.call(resolved.question, JSON.stringify(expected));
-      resolved.question.dispatchEvent(new Event("input", { bubbles: true }));
-      resolved.question.dispatchEvent(new Event("change", { bubbles: true }));
-      // Provider input handlers may synchronously remount the modal, change
-      // a hidden value, or raise a human stop. A lost prepare ack must not
-      // be considered usable or handed forward to the one-click Save path.
+      // The visible controls own React state. A hidden-value override is
+      // overwritten by the provider's next render and can save a blank MC
+      // question. Admit only the provider-generated serialization.
       const current = questionForm(input.setId);
       if (!current || current.form !== resolved.form ||
           current.question !== resolved.question ||
           world.__blooketAddQuestionFormWatch !== watch ||
           watch.document !== document || watch.dirty || watch.submitted ||
-          resolved.question.value !== JSON.stringify(expected) ||
+          !matchesProviderQuestion(resolved.question.value, expected) ||
           (watch.expectedNumber !== undefined &&
             !exactPriorCards(watch.expectedNumber)) ||
           document.title === "Just a moment..." ||
@@ -676,7 +704,7 @@ export function runBlooketAddQuestionPageAction(
       watch.finalized = !hasImage || action === "finalize-image";
       return { ok: true };
     }
-    if (resolved.question.value !== JSON.stringify(expected) ||
+    if (!matchesProviderQuestion(resolved.question.value, expected) ||
         !exactPriorCards(watch.expectedNumber ?? input.number))
       return failed();
     const submits = Array.from(
