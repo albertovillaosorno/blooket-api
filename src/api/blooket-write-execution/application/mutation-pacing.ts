@@ -68,6 +68,20 @@ export function createBlooketMutationPacer(
   validatePolicy(policy);
   let tail: Promise<void> = Promise.resolve();
   let starts: number[] = [];
+  // The in-process queue uses one nondecreasing timeline, independent of the
+  // durable task budget's wall-clock timestamps. Refuse invalid injected clocks
+  // rather than waiting hours after rollback or silently skipping intervals.
+  let observedAtMs = 0;
+  const clock: BlooketMutationPacingRuntime = {
+    now: () => {
+      const value = runtime.now();
+      if (!Number.isFinite(value) || value < observedAtMs || value < 0)
+        throw Error("mutation-pacing-clock-invalid");
+      observedAtMs = value;
+      return value;
+    },
+    sleep: runtime.sleep,
+  };
 
   return {
     async acquire(signal?: AbortSignal): Promise<BlooketMutationLeaseResult> {
@@ -86,7 +100,7 @@ export function createBlooketMutationPacer(
         return cancelled();
       }
       try {
-        await waitForStart(policy, runtime, starts, signal);
+        await waitForStart(policy, clock, starts, signal);
       } catch (error) {
         releaseSlot();
         if (signal?.aborted || isAbort(error)) return cancelled();
@@ -96,7 +110,13 @@ export function createBlooketMutationPacer(
         releaseSlot();
         return cancelled();
       }
-      const startedAtMs = runtime.now();
+      let startedAtMs: number;
+      try {
+        startedAtMs = clock.now();
+      } catch (error) {
+        releaseSlot();
+        throw error;
+      }
       starts = pruneStarts(starts, startedAtMs);
       starts.push(startedAtMs);
       let released = false;
@@ -186,7 +206,9 @@ function isAbort(error: unknown): boolean {
 }
 
 const systemRuntime: BlooketMutationPacingRuntime = {
-  now: () => Date.now(),
+  // Wall-clock jumps are handled by the durable task-budget policy. Only
+  // elapsed in-process time is relevant to this separate pacing window.
+  now: () => performance.now(),
   sleep: async (milliseconds, signal) => {
     await new Promise<void>((resolve, reject) => {
       if (signal?.aborted) {

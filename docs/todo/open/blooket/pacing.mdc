@@ -104,6 +104,19 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, red-to-green tests found that a wall-clock rollback during
+mutation pacing could create a much longer wait than the configured 2-second
+interval. Nonfinite timestamps could also enter the wait loop instead of
+failing. The in-process service queue now uses a monotonic elapsed-time clock,
+while the separately persisted task-duration budget retains its strict
+wall-clock rollback admission checks.
+
+The pacer also validates every injected clock read, including after a wait and
+at final lease grant. Invalid timestamps fail before mutation admission;
+exclusive queue slots are released and a later valid acquisition can proceed.
+Ten deterministic tests cover serialization, the rolling limit, cancellation,
+clock rollback and recovery. No provider mutation or user journal was used.
+
 A fresh owner-authorized, private synthetic one-question publication on
 2026-10-14 automatically confirmed Create Set after the newly compiled
 companion was reloaded into the existing Chrome for Testing profile.
