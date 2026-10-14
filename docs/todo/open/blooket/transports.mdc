@@ -62,6 +62,19 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the restarted service ran the scoped CLI probe against
+the authenticated Chrome session. `session inspect` reported an owned Edit
+page, but `capabilities inspect --text-only --json` returned the explicit
+`blooket-browser-incompatible` stop after the read-only declaration check.
+The loaded worker does not advertise the new text capability protocol.
+No Create Set/Add Question was submitted, and the eighteen existing
+publication journal files were not modified during that diagnosis.
+
+A separate isolated-workspace regression now proves that a server restart
+rotating its local bridge token causes a fresh capability announcement after
+a temporary HTTP 503, without retaining or replaying the stale token.
+This is portable evidence only; it does not prove Chrome reloaded the addon.
+
 On 2026-10-14, the read-only `writes.inspect` declaration added an exact
 `textCapabilityScope` field. Text-only inspection first validates this
 loaded-worker declaration, so a legacy extension returns
