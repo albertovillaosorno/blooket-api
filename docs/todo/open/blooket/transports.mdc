@@ -75,6 +75,7 @@ document immediately, unlike the corrected Create navigation. A red-to-green
 regression now proves bounded waiting before the first Edit lifetime is bound,
 with exactly two receipt reads and no claim, navigation or resubmission.
 Later document replacements and permanently missing origins still fail closed.
+
 The combined Create page/host suites passed 95 tests. This portable correction
 does not establish which phase caused the observed live confirmation failure.
 
