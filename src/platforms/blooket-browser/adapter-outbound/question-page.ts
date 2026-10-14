@@ -293,7 +293,8 @@ export function openBlooketQuestionPanel(
       (buttons[0] as HTMLButtonElement).click();
       return true;
     } catch {
-      watch.dispose();
+      // The click might have opened the modal before its acknowledgement was
+      // lost. Keep the watch so no later read or navigation can replay it.
       return false;
     }
   } catch {

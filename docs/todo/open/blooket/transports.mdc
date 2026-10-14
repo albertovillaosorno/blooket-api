@@ -62,6 +62,13 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, an existing-question read opener retained its original
+single-use document watch when the Edit click threw after it might have
+executed. Previously the catch disposed ownership, allowing a second
+read-only request to click again before the modal hydrated. A synthetic
+lost-acknowledgment regression failed under the previous behavior and
+passed after preserving the watch; no provider edit or Save occurred.
+
 On 2026-10-14, the read-only safe-to-leave guard began refusing
 navigation while an isolated-world Create Set, Add Question, existing
 question, or capability opener retains a pending ownership watch. React

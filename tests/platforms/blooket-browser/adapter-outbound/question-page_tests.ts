@@ -194,6 +194,27 @@ test("pending question reader cannot open a second editor before hydration",
     });
   });
 
+test("lost read opener click keeps its single-use ownership", () => {
+  const document = node("DOCUMENT");
+  const card = node("DIV", "", {
+    role: "button", "aria-label": "Edit question 1",
+  });
+  const edit = node("BUTTON", "Edit");
+  let clicks = 0;
+  edit.click = () => { clicks++; throw Error("lost-click-ack"); };
+  card.selectors["button"] = [edit];
+  document.selectors[
+    '[role="button"][aria-label="Edit question 1"]'
+  ] = [card];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    assert.equal(Object.hasOwn(globalThis, "__blooketQuestionEditWatch"),
+      true);
+    assert.equal(openBlooketQuestionPanel("fixture", 1), false);
+    assert.equal(clicks, 1);
+  });
+});
+
 test("question panels expose normalized read facts without saving", () => {
   const document = node("DOCUMENT");
   const group = node("DIV", "", {
