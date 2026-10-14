@@ -62,6 +62,26 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, Computer Use recovered the existing authenticated development
+account after its browser session changed and the local service stopped.
+The service reused the same data root and preserved every prior journal.
+A canonical set-detail read confirmed the separately created fictional set's
+title, description and private visibility; its lost creation receipt was not
+adopted from that read.
+
+A bounded temporary worker diagnostic showed a later canonical attempt
+claiming, preparing and submitting successfully, then stopping at its first
+post-submit session observation. The visible provider tab had reached Edit,
+but no durable receipt was confirmed. No additional question write was issued.
+
+The observer incorrectly treated an Edit DOM state as an unexpected page when
+Chrome's tab metadata still advertised Create. It now waits for the native
+redirect within the existing observation budget, without submitting again or
+accepting a DOM state as saved-state proof. Red-to-green and negative
+regressions verify the transition and immediate security/foreign-route stops.
+The combined Create page/host suites passed 97 tests; automatic live creation
+confirmation remains pending.
+
 On 2026-10-14, the authorized Chrome DevTools CLI confirmed the existing
 My Sets tab is loaded and the selected Edit page contains an open dialog.
 The canonical session and list reads returned `blooket-browser-failed`.
