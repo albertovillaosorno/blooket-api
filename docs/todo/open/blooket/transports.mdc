@@ -62,6 +62,14 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, Add Question form opening acquired a distinct
+pre-click versus possible-click boundary. If the browser opener throws
+after its click may have executed, the isolated-world form watch remains
+owned and a second opener is refused before hydration. A failure while
+installing the observer still releases its unclicked claim. Synthetic
+red-to-green page regressions exercise both outcomes and no Save click;
+authenticated publication acceptance remains pending.
+
 On 2026-10-14, an existing-question read opener retained its original
 single-use document watch when the Edit click threw after it might have
 executed. Previously the catch disposed ownership, allowing a second

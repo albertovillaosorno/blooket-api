@@ -592,6 +592,50 @@ const typing: BlooketTextQuestionPageInput = {
   timeLimit: 15,
 };
 
+test("throwing Add Question opener cannot be clicked again", () => {
+  const page = fixture();
+  const clicked = page.add.click.bind(page.add);
+  page.document.selectors['input#question[name="question"]'] = [];
+  page.add.click = () => { clicked(); throw Error("lost-open-ack"); };
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(runBlooketAddQuestionPageAction("open", "set-fixture"),
+        false);
+      assert.equal(Object.hasOwn(globalThis,
+        "__blooketAddQuestionFormWatch"), true);
+      assert.equal(runBlooketAddQuestionPageAction("open", "set-fixture"),
+        false);
+      assert.equal(page.add.clicked, 1);
+      assert.equal(page.submit.clicked, 0);
+    });
+});
+
+test("failed Add Question watch setup releases its unclicked claim", () => {
+  const page = fixture();
+  page.document.selectors['input#question[name="question"]'] = [];
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      const previous = Object.getOwnPropertyDescriptor(globalThis,
+        "MutationObserver");
+      Object.defineProperty(globalThis, "MutationObserver", {
+        configurable: true,
+        value: class { observe() { throw Error("watch-unavailable"); }
+          disconnect() {} },
+      });
+      try {
+        assert.equal(runBlooketAddQuestionPageAction("open", "set-fixture"),
+          false);
+        assert.equal(Object.hasOwn(globalThis,
+          "__blooketAddQuestionFormWatch"), false);
+        assert.equal(page.add.clicked, 0);
+      } finally {
+        if (previous) Object.defineProperty(globalThis,
+          "MutationObserver", previous);
+        else Reflect.deleteProperty(globalThis, "MutationObserver");
+      }
+    });
+});
+
 test("serialized Add Question runner preserves browser semantics", () => {
   const page = fixture();
   closedQuestionEditor(page);
