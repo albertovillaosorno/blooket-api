@@ -103,8 +103,9 @@ export function createBlooketBrowserBridgeAdapters(
     },
 
     capabilities: {
-      inspect: async () =>
-        await safeRequest(transport, { kind: "capabilities.inspect" }),
+      inspect: async (purpose) =>
+        await safeRequest(transport, { kind: purpose === "text-publication"
+          ? "capabilities.inspect-text" : "capabilities.inspect" }),
     },
 
     sets: {

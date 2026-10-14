@@ -159,7 +159,7 @@ export async function executeBlooketPublicationCommand(
         return fail("blooket-publication-media-unsupported");
       const capabilities = await inspectBlooketCapabilities(
         blooket.session, blooket.secrets, blooket.capabilities,
-        { readOnly: true },
+        { readOnly: true, textOnly: true },
       );
       if (!capabilities.ok) return fail(capabilities.code);
       if (capabilities.kind !== "capabilities")
@@ -290,7 +290,7 @@ export async function executeBlooketPublicationCommand(
       if (currentCapabilities === undefined) {
         const capabilities = await inspectBlooketCapabilities(
           blooket.session, blooket.secrets, blooket.capabilities,
-          { readOnly: true },
+          { readOnly: true, textOnly: true },
         );
         if (!capabilities.ok) return fail(capabilities.code);
         if (capabilities.kind !== "capabilities")

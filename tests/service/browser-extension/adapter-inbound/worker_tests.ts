@@ -1331,6 +1331,17 @@ test(
     assert.ok(scripts.includes("closeBlooketAudioCapabilityDrawer"));
     assert.ok(scripts.includes("closeBlooketCapabilityQuestionPanel"));
 
+    const beforeText = scripts.length;
+    const textCapability = await expectReply({
+      kind: "capabilities.inspect-text",
+    });
+    assert.equal(textCapability.ok, true);
+    assert.equal(textCapability.value.schemaVersion, 3);
+    assert.equal(textCapability.value.features.audio, "account-dependent");
+    assert.deepEqual(scripts.slice(beforeText).filter(name =>
+      name === "openBlooketCapabilityQuestionPanel" ||
+      name === "openBlooketAudioCapabilityDrawer"), []);
+
     questionPanelCloses = false;
     assert.equal(
       (

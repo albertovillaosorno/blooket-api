@@ -102,6 +102,7 @@ async function state(root: string) {
   let remote: BlooketSetDetail | undefined;
   const questions: BlooketQuestionRead[] = [];
   let writes = 0, capabilityReads = 0, sessionState = "my-sets";
+  const capabilityPurposes: ("text-publication" | undefined)[] = [];
   let ambiguous = false;
   let clock = 0;
   const secret = async (): Promise<never> => {
@@ -119,8 +120,9 @@ async function state(root: string) {
           state: sessionState as "my-sets" | "security-challenge" }),
         authenticate: secret,
       },
-      capabilities: { inspect: async () => {
+      capabilities: { inspect: async purpose => {
         capabilityReads++;
+        capabilityPurposes.push(purpose);
         return { ok: true, value: capabilities };
       } },
       sets: {
@@ -177,6 +179,7 @@ async function state(root: string) {
   const revision = (saved.value as { revision: string }).revision;
   return { root, host, revision, questions,
     writes: () => writes, capabilities: () => capabilityReads,
+    capabilityPurposes: () => capabilityPurposes,
     ambiguous: (value: boolean) => { ambiguous = value; },
     session: (value: string) => { sessionState = value; },
   };
@@ -340,6 +343,9 @@ test("each draft step writes once and requires separate fresh verification",
     assert.equal(second["completedOperations"], 2);
     assert.equal(second["published"], false);
     assert.equal(state.writes(), 2);
+    assert.deepEqual(state.capabilityPurposes(), [
+      "text-publication", "text-publication",
+    ]);
     const status = value(await executeBlooketPublicationCommand(
       command("status"), state.host,
     ));

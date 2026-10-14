@@ -86,6 +86,25 @@ test("loaded confirmation inspection admits only the exact current contract",
     assert.equal(await adapters.writes.inspectCreateSetConfirmation!(), false);
   });
 
+test("text publication requests only the conservative capability scope",
+  async () => {
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const ports = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: { scope: "synthetic-text" } },
+    { ok: true, value: { scope: "synthetic-full" } },
+  ], commands));
+  assert.deepEqual(await ports.capabilities.inspect("text-publication"), {
+    ok: true, value: { scope: "synthetic-text" },
+  });
+  assert.deepEqual(await ports.capabilities.inspect(), {
+    ok: true, value: { scope: "synthetic-full" },
+  });
+  assert.deepEqual(commands, [
+    { kind: "capabilities.inspect-text" },
+    { kind: "capabilities.inspect" },
+  ]);
+});
+
 test("bridge adapters map session and opaque read calls exactly", async () => {
   const commands: BlooketBrowserBridgeCommand[] = [];
   const adapters = createBlooketBrowserBridgeAdapters(transport([
