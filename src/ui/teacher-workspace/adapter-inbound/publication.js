@@ -109,17 +109,23 @@ export async function publishTextDraft(
     }), draftId);
     // One publication step cannot prove final remote verification.
     if (next.published !== false) throw Error("publication-progress-invalid");
-    onProgress(next);
-    if (next.phase === "reconciliation-required") return next;
-    // A new command can only follow an exact advancement of the frozen plan.
-    // Never replay a write merely because its result was pending or ambiguous.
-    if (next.phase !== "advanced" ||
+    if (next.phase !== "advanced") {
+      onProgress(next);
+      return next;
+    }
+    // The first Create Set receipt must bind a real set; later steps cannot
+    // quietly change it, the frozen revision, or the operation count.
+    if (typeof next.remoteSetId !== "string" ||
+        !next.remoteSetId ||
+        (current.remoteSetId != null &&
+          current.remoteSetId !== next.remoteSetId) ||
         next.revision !== frozenRevision ||
         next.completedOperations !== current.completedOperations + 1 ||
         (current.totalOperations !== 0 &&
           next.totalOperations !== current.totalOperations))
-      return next;
+      throw Error("publication-progress-invalid");
     current = next;
+    onProgress(current);
     if (current.completedOperations === current.totalOperations)
       return await verify();
   }
