@@ -47,9 +47,11 @@ the recipient; safe rollback/recovery is a functional requirement.
 
 ### TODO - Ongoing compatibility assurance and product hardening
 
-Keep finding and fixing bugs, adding regressions, improving behavior, UI/UX,
-Linux stubs, and theoretical macOS/Safari/ChatGPT assurance. **Never close or
-remove this last TODO until Alberto explicitly requests its completion.**
+Keep finding and fixing bugs, adding regressions, and dedicating recurring
+commits to aggressive Blooket platform-change detection and compatibility tests.
+Also improve UX, Linux stubs and theoretical macOS/Safari/ChatGPT assurance.
+**Never close or remove this last TODO until Alberto explicitly requests its
+completion.**
 Its perpetual status must not block delivery of working features or updates.
 
 [Record](docs/todo/open/acceptance/teacher.mdc)

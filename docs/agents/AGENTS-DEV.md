@@ -64,12 +64,18 @@ diary back in `TODO.md`. Follow `docs/todo/README.md` and run
 `npm run roadmap:check`.
 
 **Evergreen exception:** task `blooket-15` is a continuous maintenance loop
-for bug fixes, regression tests, UX, Linux stubs, and theoretical
-macOS/Safari/ChatGPT assurance. Never complete, move, or remove it unless
-Alberto explicitly asks to close **that exact task**, even when other TODOs
-are finished or all tests pass. Its open status never blocks working features,
-safe updates, or shipping. It does not authorize unattended background work,
-commits, releases, or automatic changes to a user's Blooket account.
+for bug fixes, regression tests, dedicated recurring commits that detect
+Blooket platform drift, UX, Linux stubs, and theoretical macOS/Safari/ChatGPT
+assurance. For provider-facing changes, test both compatibility and fail-closed
+behavior with sanitized fixtures and read-only checks before claiming live
+acceptance; old green fixtures do not establish compatibility with a changed
+provider build.
+
+Never complete, move, or remove it unless Alberto explicitly asks to close
+**that exact task**, even when other TODOs are finished or all tests pass. Its
+open status never blocks working features, safe updates, or shipping. It does
+not authorize unattended background work, commits, releases, or automatic
+changes to a user's Blooket account.
 
 Developer and product-user instruction profiles are already separate. Preserve
 that authority boundary: personal skills cannot expose developer contracts,
