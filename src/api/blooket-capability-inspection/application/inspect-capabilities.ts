@@ -94,7 +94,7 @@ export async function inspectBlooketCapabilities(
   browser: BlooketBrowserSessionPort,
   secrets: HostSecretStore,
   inspection: BlooketCapabilityInspectionPort,
-  options: { readonly readOnly?: boolean } = {},
+  options: { readonly readOnly?: boolean; readonly textOnly?: boolean } = {},
 ): Promise<InspectBlooketCapabilitiesResult> {
   const session = options.readOnly
     ? await inspectReadyBlooketSession(browser)
@@ -110,7 +110,7 @@ export async function inspectBlooketCapabilities(
     return session;
   }
 
-  const probed = await safeInspect(inspection);
+  const probed = await safeInspect(inspection, options.textOnly === true);
   if (!probed.ok) {
     // An authenticated tab may become challenged while the probe is running.
     // Only re-observe; never replay the failed probe or initiate login here.
@@ -154,9 +154,12 @@ export async function inspectBlooketCapabilities(
 
 async function safeInspect(
   inspection: BlooketCapabilityInspectionPort,
+  textOnly: boolean,
 ): Promise<BlooketCapabilityProbeResult> {
   try {
-    const result = await inspection.inspect();
+    const result = await inspection.inspect(
+      textOnly ? "text-publication" : undefined,
+    );
     if (!result || typeof result !== "object" || Array.isArray(result))
       return capabilityFailure();
     const exact = (fields: readonly string[]): boolean => {

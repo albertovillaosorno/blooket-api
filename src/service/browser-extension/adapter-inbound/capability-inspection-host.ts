@@ -146,7 +146,8 @@ export function createExtensionCapabilityInspectionHost(
   };
 
   return {
-    inspect: async (): Promise<ExtensionCapabilityInspectionResult> => {
+    inspect: async (options: { readonly textOnly?: boolean } = {}):
+      Promise<ExtensionCapabilityInspectionResult> => {
       const startedAt = now();
       const probeDeadline = startedAt + PROBE_BUDGET_MS;
       const finishDeadline = startedAt + TOTAL_BUDGET_MS;
@@ -286,8 +287,10 @@ export function createExtensionCapabilityInspectionHost(
           afterListConfirmation.url !== MY_SETS_URL
         ) return browserFailure();
 
+        // Text-only publication never claims account media entitlements.
+        // The stable authenticated list is conservative account evidence.
         let accountMedia: BlooketAccountMediaAvailability = "account-dependent";
-        if (selected !== null) {
+        if (selected !== null && options.textOnly !== true) {
           setId = selected;
           const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
             encodeURIComponent(setId);

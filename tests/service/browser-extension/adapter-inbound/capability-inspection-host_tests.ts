@@ -318,6 +318,59 @@ test(
   },
 );
 
+test("text publication inspects stable My Sets without opening Audio UI",
+  async () => {
+  // The nonempty list is real account evidence, but not evidence for Audio.
+  const page = fixture({ questionOpenRejected: true,
+    drawerOpenRejected: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect({ textOnly: true });
+  assert.equal(result.ok, true);
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    false);
+  assert.equal(page.scripts.includes("openBlooketAudioCapabilityDrawer"),
+    false);
+  if (!result.ok) return;
+  const decoded = decodeBlooketCapabilitySnapshot(result.value);
+  assert.equal(decoded.ok, true);
+  if (decoded.ok) {
+    assert.equal(decoded.value.features.answerImages, "account-dependent");
+    assert.equal(decoded.value.features.audio, "account-dependent");
+  }
+});
+
+test("text publication rejects conflicting list evidence without a modal",
+  async () => {
+  const list = (id: string) => ({ ok: true, value: {
+    completeness: "unknown", items: [{ schemaVersion: 1, id,
+      title: "Synthetic fixture" }],
+  } });
+  const page = fixture({ setListReplies: [
+    list("set-fixture"), list("different-fixture"),
+  ] });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect({ textOnly: true });
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.currentUrl(), page.originalUrl);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    false);
+});
+
+test("text publication still refuses an unsafe teacher editor",
+  async () => {
+  const page = fixture({ unsafeOriginalEditor: true });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect({ textOnly: true });
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.navigations.length, 0);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    false);
+});
+
 test(
   "cleanup failure invalidates an otherwise observed capability",
   async () => {

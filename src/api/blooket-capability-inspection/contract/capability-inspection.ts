@@ -43,5 +43,5 @@ export type BlooketCapabilityProbeResult =
     };
 
 export interface BlooketCapabilityInspectionPort {
-  inspect(): Promise<BlooketCapabilityProbeResult>;
+  inspect(purpose?: "text-publication"): Promise<BlooketCapabilityProbeResult>;
 }

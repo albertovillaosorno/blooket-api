@@ -837,7 +837,8 @@ async function relay(current: Connection, activeGeneration: number) {
           : job.command.kind === "sets.create" ||
               job.command.kind === "questions.create"
             ? 57_000
-            : job.command.kind === "capabilities.inspect"
+            : job.command.kind === "capabilities.inspect" ||
+                job.command.kind === "capabilities.inspect-text"
               ? 9_000 : 8_000;
         const jobBrowser = ownedBrowser(
           current, activeGeneration, Date.now() + budgetMs,
@@ -874,13 +875,16 @@ async function relay(current: Connection, activeGeneration: number) {
               loginIdentifier: job.command.loginIdentifier,
               password: job.command.password,
             });
-          } else if (job.command.kind === "capabilities.inspect") {
+          } else if (job.command.kind === "capabilities.inspect" ||
+              job.command.kind === "capabilities.inspect-text") {
             const host = createExtensionCapabilityInspectionHost(
               jobBrowser,
               current.tabId,
               pause,
             );
-            result = await host.inspect();
+            result = await host.inspect({
+              textOnly: job.command.kind === "capabilities.inspect-text",
+            });
           } else if (job.command.kind === "sets.create") {
             const host = createExtensionCreateSetHost(
               jobBrowser,
