@@ -102,6 +102,18 @@ Never report that the current worker loaded merely because disk files changed.
 
 ## Acceptance and continuation
 
+On 2026-10-14, the selected integrated Chrome controller explicitly required
+an update of the ChatGPT Chrome extension before further operations. Earlier
+page observations worked, while native actions and captures timed out.
+This is a controller dependency update; the product companion has its own
+separate reload and loaded-contract verification.
+
+Preserve the existing profile, authenticated session and pending journals while
+recovering the controller. The installed Chrome DevTools MCP configuration had
+no existing-browser attachment configured, so invoking it would not establish
+access to this session. A previous existing-browser CLI attachment also failed.
+No alternative profile was created to replace that acceptance environment.
+
 Account-mutation authorization persists for the specific development account
 and authorized test scope. Preserve teacher-owned media and existing journals;
 an ambiguous Save is reconciled rather than replayed. CAPTCHA, organization
