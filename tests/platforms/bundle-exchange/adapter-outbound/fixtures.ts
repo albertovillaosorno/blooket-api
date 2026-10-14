@@ -31,12 +31,14 @@
 //
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from
+import { chmod, mkdir, mkdtemp, realpath, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { removeCreatedStage } from
+  "../../../../src/platforms/update-extraction/adapter-outbound/files.ts";
 import { directoryIdentity } from
   "../../../../src/platforms/bundle-exchange/adapter-outbound/identity.ts";
 
@@ -72,8 +74,8 @@ export async function fixture(compile = true) {
       installedIdentity: await directoryIdentity(installedPath),
       candidateIdentity: await directoryIdentity(candidatePath),
       host: { platform: "darwin", architecture: "arm64" } },
-    cleanup: () => rm(root, { recursive: true }) };
+    cleanup: () => removeCreatedStage(root) };
   } catch (error) {
-    await rm(root, { recursive: true }); throw error;
+    await removeCreatedStage(root); throw error;
   }
 }

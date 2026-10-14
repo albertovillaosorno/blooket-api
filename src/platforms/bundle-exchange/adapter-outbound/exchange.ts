@@ -139,7 +139,7 @@ export async function exchangeBundles(options: BundleExchangeOptions):
 
 // Promise settlement confirms that the owned writer has actually closed.
 // Caller-held installation ownership must last until this promise settles.
-function executeNative(file: string, args: readonly string[],
+export function executeNative(file: string, args: readonly string[],
   signal: AbortSignal): Promise<void> {
   return new Promise((resolveResult, reject) => {
     if (signal.aborted) { reject(new Error("cancelled")); return; }
