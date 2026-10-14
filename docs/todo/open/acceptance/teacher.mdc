@@ -58,6 +58,40 @@ the implementation, and verify that existing behavior still works. Repeat this
 cycle whenever development agents are authorized to work; the existence of this
 TODO does not itself start a background agent or grant deployment authority.
 
+Give provider-change detection unusually high and recurring maintenance
+priority. Blooket is an external platform that can change between product
+releases, silently invalidating previously working browser selectors, React
+controls, routes, authentication states, transport payloads, timing assumptions,
+and success/read-back signals. Allocate dedicated, reviewable commits to
+compatibility probes, fixture drift detection, regressions and fixes, not just
+new features.
+
+Continuously evolve the test matrix even when the existing tests are green;
+green fixtures from an older provider build are not proof the live integration
+still works.
+
+For every observed provider UI/API change or unexplained write/read failure:
+record the observed browser/product build and affected contract, add a minimal
+sanitized failing fixture or read-only smoke test, distinguish a real provider
+change from an application regression, update the adapter only after review,
+and validate ordinary, interrupted and ambiguous outcomes. Keep both positive
+and fail-closed negative tests: changed or missing controls, hydration/order,
+identity/session/navigation, overlays, question types/timing/media, and remote
+persistence after reload. No credentials, captured private content, cookies,
+or volatile provider action tokens belong in tracked fixtures.
+
+Re-run deterministic drift suites for relevant source changes, and periodically
+perform owner-authorized read-only browser compatibility checks against the
+actual connected provider session. Keep opt-in and human stops for account
+mutations, challenges, browser permissions and unfamiliar access states. A drift
+signal must prevent unsafe writes or honestly mark verification inconclusive;
+it must never trigger automatic selector guessing, security bypass, or replay
+of ambiguous mutations.
+
+Document evidence, failures and unresolved risks with each
+compatibility-focused commit. This is ongoing intensive maintenance, not a
+finite box to check or a requirement to block safe feature delivery.
+
 Focus on bugs, missing tests, correctness, recovery, edge cases, performance,
 behavior, EN/ES UX, accessibility, UI polish, Safari/ChatGPT compatibility,
 **theoretical macOS ARM64 compatibility assurance** from official docs,
