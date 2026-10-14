@@ -136,6 +136,7 @@ function editor(kind: "typing" | "mc" = "typing") {
   let qType = "mc";
   let random = true;
   let ignored = false;
+  let extraProviderField = false;
   let hiddenWrites = 0;
   let serialized = "";
   const render = () => {
@@ -148,6 +149,7 @@ function editor(kind: "typing" | "mc" = "typing") {
       image: "", audio: "", qType, random,
       answerTypes: qType === "typing" ? [...modes] : null,
       timeLimit: Number(time.value),
+      ...(extraProviderField ? { providerExtra: true } : {}),
     });
   };
   Object.defineProperty(hidden, "value", {
@@ -217,6 +219,7 @@ function editor(kind: "typing" | "mc" = "typing") {
   return { document, form, hidden, watch, prompt, time, picker, list,
     render, hiddenWrites: () => hiddenWrites,
     ignoreChanges: () => { ignored = true; },
+    driftProviderShape: () => { extraProviderField = true; render(); },
     clearGenerated: () => { serialized = ""; } };
 }
 
@@ -302,6 +305,14 @@ test("visible React controls may mount after hidden state is ready",
     assert.equal(JSON.parse(page.hidden.value).question, input.question);
   }));
 
+test("a provider-added hidden question property is detectable drift",
+  async () => withEditor(async page => {
+    page.driftProviderShape();
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.watch.controlsPrepared, false);
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
 test("ignored provider events cannot admit fabricated hidden typing state",
   async () => withEditor(async page => {
     page.ignoreChanges();
@@ -326,6 +337,59 @@ test("human interaction or form detachment during input prevents admission",
         assert.equal(page.hiddenWrites(), 0);
       });
   });
+
+test("changed provider type labels stop before editing the question",
+  async () => withEditor(async page => {
+    const options = page.list.selectors['[role="option"]']!;
+    options[1]!.textContent = "Typing Prompt";
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.watch.controlsPrepared, false);
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("changed picker control identity stops before type selection",
+  async () => withEditor(async page => {
+    page.picker.attributes["aria-controls"] = "replacement-list";
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("provider cannot silently add a second type picker",
+  async () => withEditor(async page => {
+    page.form.selectors['[role="combobox"]']!.push(new Control());
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }));
+
+test("changed typing match controls stop before marking preparation",
+  async () => withEditor(async page => {
+    page.list.selectors['[role="option"]']![1]!.onClick = () => {
+      // A changed provider keeps its controls unavailable after selection.
+      page.form.selectors['input[name="accepted-answers"]'] = [];
+      page.render();
+    };
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.watch.controlsPrepared, false);
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("changed multiple-choice correctness selector stops before Save",
+  async () => withEditor(async page => {
+    page.form.selectors[
+      'button[aria-label="Mark Answer 1 as Correct"]'
+    ] = [];
+    const mc: BlooketQuestionPageInput = {
+      ...input, qType: "mc", random: false, answerTypes: null,
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+    };
+    assert.equal(await prepareBlooketQuestionControls(mc), false);
+    assert.equal(page.watch.controlsPrepared, false);
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc"));
 
 test("ambiguous type options never choose the first provider control",
   async () => withEditor(async page => {

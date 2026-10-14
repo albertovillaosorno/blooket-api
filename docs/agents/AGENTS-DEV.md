@@ -69,7 +69,9 @@ Blooket platform drift, UX, Linux stubs, and theoretical macOS/Safari/ChatGPT
 assurance. For provider-facing changes, test both compatibility and fail-closed
 behavior with sanitized fixtures and read-only checks before claiming live
 acceptance; old green fixtures do not establish compatibility with a changed
-provider build.
+provider build. Run `npm run provider:drift:check` for changes to Blooket
+browser adapters, extension behavior and observed provider contracts; this
+is deterministic regression coverage, not current provider acceptance.
 
 Never complete, move, or remove it unless Alberto explicitly asks to close
 **that exact task**, even when other TODOs are finished or all tests pass. Its

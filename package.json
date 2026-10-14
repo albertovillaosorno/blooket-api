@@ -6,6 +6,12 @@
   "scripts": {
     "check": ".dependencies/pnpm/node_modules/.bin/tsc -p tsconfig.json",
     "test": "node --test --test-concurrency=4 $(find tests -name '*_tests.ts')",
+    "provider:drift:check":
+      "npm run provider:drift:pages && npm run provider:drift:worker",
+    "provider:drift:pages":
+      "node --test tests/platforms/blooket-browser/adapter-outbound/*_tests.ts",
+    "provider:drift:worker":
+      "node --test tests/service/browser-extension/adapter-inbound/*_tests.ts",
     "validate":
       "npm run check && npm run roadmap:check && npm run validate:tests",
     "start": "node src/service/background-service/adapter-inbound/main.ts",

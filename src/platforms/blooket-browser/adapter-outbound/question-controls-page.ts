@@ -129,8 +129,15 @@ export async function prepareBlooketQuestionControls(
     // hidden state. A malformed transient value never authorizes preparation.
     try {
       const value: unknown = JSON.parse(hidden!.value);
-      return value && typeof value === "object" && !Array.isArray(value)
-        ? value as Record<string, unknown> : null;
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        return null;
+      const record = value as Record<string, unknown>;
+      const keys = ["number", "question", "answers", "correctAnswers",
+        "image", "audio", "qType", "random", "answerTypes", "timeLimit"];
+      if (Object.keys(record).length !== keys.length ||
+          keys.some(key => !Object.hasOwn(record, key)) ||
+          JSON.stringify(record) !== hidden!.value) return null;
+      return record;
     } catch { return null; }
   };
   try {
