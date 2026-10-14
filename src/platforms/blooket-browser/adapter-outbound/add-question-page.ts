@@ -380,6 +380,7 @@ export function runBlooketAddQuestionPageAction(
           if (world.__blooketAddQuestionFormWatch === watch)
             delete world.__blooketAddQuestionFormWatch;
         };
+        let mayHaveClicked = false;
         try {
           for (const type of types)
             document.addEventListener(type, onInteraction, true);
@@ -388,8 +389,14 @@ export function runBlooketAddQuestionPageAction(
           });
           observer.observe(document, { childList: true, subtree: true });
           world.__blooketAddQuestionFormWatch = watch;
+          mayHaveClicked = true;
           opener.click();
-        } catch { watch.dispose(); return false; }
+        } catch {
+          // The opener may have executed before its script reply was lost.
+          // Only pre-click failures may release this document's watch.
+          if (!mayHaveClicked) watch.dispose();
+          return false;
+        }
       }
       return true;
     }
