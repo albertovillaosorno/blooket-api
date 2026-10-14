@@ -42,3 +42,10 @@ paths = ["docs/technical/browser-acceptance-tools.md"]
 decision_id = "none"
 section_mode = "required"
 sections = []
+
+[profile.provider-change-detection]
+kind = "adr"
+paths = ["docs/technical/provider-change-detection.md"]
+decision_id = "none"
+section_mode = "required"
+sections = []

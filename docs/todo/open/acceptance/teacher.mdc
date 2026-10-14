@@ -33,6 +33,8 @@ scope:
   - "src/platforms/service-lifecycle/"
   - "src/ui/teacher-workspace/"
   - "src/mcp/"
+  - "src/platforms/blooket-browser/"
+  - "tests/platforms/blooket-browser/"
 validation:
   - "npm run check"
   - "npm run roadmap:check"
@@ -152,6 +154,21 @@ ChatGPT-specific OAuth registration/reauthorization behavior also live only in
 this final record.
 
 ## Evidence
+
+On 2026-10-14, an explicit `provider:drift:check` command grouped the native
+Blooket page and extension-host regressions. It passed 290 synthetic tests
+before adding a separate read-only shape inspector for the question editor.
+The inspector's fixture cases distinguish a valid Typing/Multiple Choice form
+from renamed answer slots, missing selectors, changed time controls, malformed
+JSON, wrong set identity and missing or duplicated fields. No fixture uses
+personal account content or claims a confirmed remote Save.
+
+An authorized read-only Chrome DevTools observation of an existing unsaved
+Typing editor reported compatible structural controls and matching visible and
+provider-serialized text. It did not reload, click, create, adopt a journal
+receipt or prove server persistence. The final inspector's native read-only
+contract and incident workflow are documented in
+`docs/technical/provider-change-detection.md`.
 
 On 2026-10-14, the installed ClangFormat 23.1.2 rejected a read-only
 `--dry-run --Werror` of the existing native C exchange helper against its
