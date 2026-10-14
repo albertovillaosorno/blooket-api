@@ -613,17 +613,20 @@ test(
 test(
   "a queued capability inspection requires its cleanup time budget",
   async () => {
-    let tick = 10_000;
-    const broker = createBlooketBrowserBridgeBroker({
-      token: TOKEN, now: () => tick,
-    });
-    const pending = broker.request({ kind: "capabilities.inspect" });
-    tick += 501;
-    assert.equal(broker.next(TOKEN), null);
-    assert.deepEqual(await pending, {
-      ok: false, code: "blooket-browser-unavailable",
-    });
-    broker.close();
+    for (const kind of ["capabilities.inspect",
+      "capabilities.inspect-text"] as const) {
+      let tick = 10_000;
+      const broker = createBlooketBrowserBridgeBroker({
+        token: TOKEN, now: () => tick,
+      });
+      const pending = broker.request({ kind });
+      tick += 501;
+      assert.equal(broker.next(TOKEN), null);
+      assert.deepEqual(await pending, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+      broker.close();
+    }
   },
 );
 
@@ -633,6 +636,7 @@ test(
     for (const [kind, delay] of [
       ["sets.list", 1_500],
       ["capabilities.inspect", 500],
+      ["capabilities.inspect-text", 500],
     ] as const) {
       let tick = 10_000;
       const broker = createBlooketBrowserBridgeBroker({

@@ -103,9 +103,22 @@ export function createBlooketBrowserBridgeAdapters(
     },
 
     capabilities: {
-      inspect: async (purpose) =>
-        await safeRequest(transport, { kind: purpose === "text-publication"
-          ? "capabilities.inspect-text" : "capabilities.inspect" }),
+      inspect: async (purpose) => {
+        if (purpose === "text-publication") {
+          // Older workers cannot decode this command and would strand its
+          // broker lease. Require a read-only feature declaration first.
+          const declared = await safeRequest(transport, {
+            kind: "writes.inspect",
+          });
+          if (!declared.ok) return declared;
+          if (!currentWriteDeclaration(declared.value))
+            return { ok: false, code: "blooket-browser-incompatible" };
+        }
+        return await safeRequest(transport, {
+          kind: purpose === "text-publication"
+            ? "capabilities.inspect-text" : "capabilities.inspect",
+        });
+      },
     },
 
     sets: {
@@ -148,10 +161,7 @@ export function createBlooketBrowserBridgeAdapters(
     writes: {
       inspectCreateSetConfirmation: async () => {
         const result = await safeRequest(transport, { kind: "writes.inspect" });
-        return result.ok &&
-          exactKeys(result.value, "createSetConfirmation") &&
-          (result.value as { createSetConfirmation: unknown })
-            .createSetConfirmation === "reload-and-privacy-v1";
+        return result.ok && currentWriteDeclaration(result.value);
       },
       createSet: async (submission, media) => {
         if (submission.coverImage !== null || media.length !== 0)
@@ -223,6 +233,19 @@ async function safeRequest(
   } catch {
     return browserFailure();
   }
+}
+
+function currentWriteDeclaration(value: unknown): boolean {
+  if (!exactKeys(value, "createSetConfirmation,textCapabilityScope") ||
+      !value || typeof value !== "object") return false;
+  try {
+    const create = Object.getOwnPropertyDescriptor(
+      value, "createSetConfirmation",
+    );
+    const text = Object.getOwnPropertyDescriptor(value, "textCapabilityScope");
+    return create?.value === "reload-and-privacy-v1" &&
+      text?.value === "stable-my-sets-v1";
+  } catch { return false; }
 }
 
 function exactKeys(value: unknown, names: string): boolean {

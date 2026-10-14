@@ -62,6 +62,20 @@ fallback or retry that can duplicate a quiz/question.
 
 ## Evidence
 
+On 2026-10-14, the read-only `writes.inspect` declaration added an exact
+`textCapabilityScope` field. Text-only inspection first validates this
+loaded-worker declaration, so a legacy extension returns
+`blooket-browser-incompatible` without dispatching an unknown command or
+opening Blooket editor UI. The canonical Create Set gate requires the same
+current declaration; invalid fields and property getters never grant support.
+
+The broker now reserves the full nine-second capability cleanup window for
+`capabilities.inspect-text`, rejecting near-expired queued commands before
+browser navigation. Red-to-green tests cover both safety boundaries and
+MCP/CLI/service simulation. The live Chrome extension still requires a
+confirmed reload and actual receipt-backed writes; the new declaration is
+not evidence of a loaded worker by itself.
+
 On 2026-10-14, the canonical CLI read gained
 `capabilities inspect --text-only --json`, using an exact versioned read scope.
 Focused validation and a simulated MCP/CLI/service integration passed; the

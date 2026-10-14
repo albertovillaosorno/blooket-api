@@ -175,6 +175,7 @@ async function safeInspect(
       return { ok: true, value: result.value };
     if (exact(["code", "ok"]) && result.ok === false &&
         (result.code === "blooket-browser-unavailable" ||
+          result.code === "blooket-browser-incompatible" ||
           result.code === "blooket-browser-failed"))
       return { ok: false, code: result.code };
     return capabilityFailure();

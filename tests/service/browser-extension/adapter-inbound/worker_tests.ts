@@ -803,7 +803,8 @@ test(
     const contract = await expectReply({ kind: "writes.inspect" });
     assert.deepEqual(contract, {
       schemaVersion: 1, id: contract.id, ok: true,
-      value: { createSetConfirmation: "reload-and-privacy-v1" },
+      value: { createSetConfirmation: "reload-and-privacy-v1",
+        textCapabilityScope: "stable-my-sets-v1" },
     });
     assert.equal(scripts.length, scriptsBeforeConfirmation);
     assert.equal(foregroundedTabs.length, 0);

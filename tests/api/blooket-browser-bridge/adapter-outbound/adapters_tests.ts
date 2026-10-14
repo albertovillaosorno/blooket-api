@@ -67,7 +67,8 @@ test("loaded confirmation inspection admits only the exact current contract",
     });
     for (const value of [null, {}, { createSetConfirmation: true },
       { createSetConfirmation: "callback-v0" }, accessor,
-      { createSetConfirmation: "reload-and-privacy-v1", extra: true }]) {
+      { createSetConfirmation: "reload-and-privacy-v1", extra: true },
+      { createSetConfirmation: "reload-and-privacy-v1" }]) {
       const commands: BlooketBrowserBridgeCommand[] = [];
       const adapters = createBlooketBrowserBridgeAdapters(transport([
         { ok: true, value },
@@ -79,17 +80,39 @@ test("loaded confirmation inspection admits only the exact current contract",
     assert.equal(getters, 0);
     const commands: BlooketBrowserBridgeCommand[] = [];
     const adapters = createBlooketBrowserBridgeAdapters(transport([
-      { ok: true, value: { createSetConfirmation: "reload-and-privacy-v1" } },
+      { ok: true, value: { createSetConfirmation: "reload-and-privacy-v1",
+        textCapabilityScope: "stable-my-sets-v1" } },
       { ok: false, code: "blooket-browser-unavailable" },
     ], commands));
     assert.equal(await adapters.writes.inspectCreateSetConfirmation!(), true);
     assert.equal(await adapters.writes.inspectCreateSetConfirmation!(), false);
   });
 
+test("write declarations never invoke attacker-owned property getters",
+  async () => {
+  let calls = 0;
+  const declaration = new Proxy({
+    createSetConfirmation: "reload-and-privacy-v1",
+    textCapabilityScope: "stable-my-sets-v1",
+  }, { get() { calls++; throw new Error("getter called"); } });
+  const ports = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: declaration },
+    { ok: true, value: declaration },
+    { ok: true, value: { kind: "synthetic" } },
+  ], []));
+  assert.equal(await ports.writes.inspectCreateSetConfirmation!(), true);
+  assert.deepEqual(await ports.capabilities.inspect("text-publication"), {
+    ok: true, value: { kind: "synthetic" },
+  });
+  assert.equal(calls, 0);
+});
+
 test("text publication requests only the conservative capability scope",
   async () => {
   const commands: BlooketBrowserBridgeCommand[] = [];
   const ports = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: { createSetConfirmation: "reload-and-privacy-v1",
+      textCapabilityScope: "stable-my-sets-v1" } },
     { ok: true, value: { scope: "synthetic-text" } },
     { ok: true, value: { scope: "synthetic-full" } },
   ], commands));
@@ -100,9 +123,22 @@ test("text publication requests only the conservative capability scope",
     ok: true, value: { scope: "synthetic-full" },
   });
   assert.deepEqual(commands, [
+    { kind: "writes.inspect" },
     { kind: "capabilities.inspect-text" },
     { kind: "capabilities.inspect" },
   ]);
+});
+
+test("text capability preflight rejects an old worker before editor probes",
+  async () => {
+  const commands: BlooketBrowserBridgeCommand[] = [];
+  const ports = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: { createSetConfirmation: "reload-and-privacy-v1" } },
+  ], commands));
+  assert.deepEqual(await ports.capabilities.inspect("text-publication"), {
+    ok: false, code: "blooket-browser-incompatible",
+  });
+  assert.deepEqual(commands, [{ kind: "writes.inspect" }]);
 });
 
 test("bridge adapters map session and opaque read calls exactly", async () => {
