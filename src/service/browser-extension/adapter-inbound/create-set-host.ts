@@ -581,7 +581,13 @@ export function createExtensionCreateSetHost(
               return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
-            if (observed !== undefined && observed !== "create")
+            // The provider can render Edit before tabs.get advertises its
+            // redirect. Await native route evidence within this same budget;
+            // the page state alone never authorizes a receipt or resubmit.
+            const awaitingRedirect = tab.url === CREATE_URL &&
+              observed === "edit";
+            if (observed !== undefined && observed !== "create" &&
+                !awaitingRedirect)
               return navigationFailure(normalizeUnexpected(observed));
           }
           await pause(POLL_MS);
