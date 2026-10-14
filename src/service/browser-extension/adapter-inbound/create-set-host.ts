@@ -446,6 +446,7 @@ export function createExtensionCreateSetHost(
       try {
         if (expected !== undefined && typeof expected.private !== "boolean")
           return browserFailure();
+        let pendingUnknown = false;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
           if (tab.status === "complete" && tab.url) {
@@ -581,18 +582,22 @@ export function createExtensionCreateSetHost(
               return { ok: true, remoteSetId: ids[0] };
             }
             const observed = await observe(script);
-            // The provider can render Edit before tabs.get advertises its
-            // redirect. Await native route evidence within this same budget;
+            // The provider can render an unknown transitional shell or Edit
+            // before tabs.get advertises its redirect. Await native route
+            // evidence within this same budget;
             // the page state alone never authorizes a receipt or resubmit.
             const awaitingRedirect = tab.url === CREATE_URL &&
-              observed === "edit";
+              (observed === "edit" || observed === "unexpected-page");
+            pendingUnknown = tab.url === CREATE_URL &&
+              observed === "unexpected-page";
             if (observed !== undefined && observed !== "create" &&
                 !awaitingRedirect)
               return navigationFailure(normalizeUnexpected(observed));
           }
           await pause(POLL_MS);
         }
-        return browserFailure();
+        return pendingUnknown ? navigationFailure("unexpected-page")
+          : browserFailure();
       } catch {
         return browserFailure();
       }
