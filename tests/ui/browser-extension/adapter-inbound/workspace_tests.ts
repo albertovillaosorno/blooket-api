@@ -80,6 +80,79 @@ test("automatic workspace relay forwards only its private capability",
   assert.equal(JSON.stringify(message).includes("email"), false);
   assert.equal(JSON.stringify(message).includes("csrf"), false);
 });
+test("workspace recovers after localhost refused the first connection",
+  async () => {
+  let tick: (() => void) | undefined;
+  let attempts = 0;
+  const messages: unknown[] = [];
+  const freshToken = "b".repeat(43);
+  const globals = {
+    location: { protocol: "http:", pathname: "/", hostname: "127.0.0.1",
+      origin: "http://127.0.0.1:2607" },
+    chrome: { runtime: { sendMessage: async (message: unknown) => {
+      messages.push(message);
+      return { ok: true };
+    } } },
+    fetch: async (route: string, options: RequestInit) => {
+      assert.equal(route, "/api/bootstrap");
+      assert.equal(options.credentials, "omit");
+      attempts++;
+      if (attempts === 1) throw Error("ECONNREFUSED");
+      return Response.json({ browserBridge: {
+        application: "blooket-api", schemaVersion: 1, token: freshToken,
+      } });
+    },
+    AbortSignal, TextDecoder,
+    setInterval: (callback: () => void) => { tick = callback; return 1; },
+  };
+  runInNewContext(source, globals);
+  await pause(0);
+  assert.equal(attempts, 1);
+  assert.equal(messages.length, 0);
+  assert.ok(tick);
+  tick();
+  await pause(0);
+  assert.equal(attempts, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{
+    kind: "workspace-ready", origin: "http://127.0.0.1:2607",
+    token: freshToken,
+  }]);
+});
+
+test("workspace retries never overlap an unfinished bridge bootstrap",
+  async () => {
+  let tick: (() => void) | undefined;
+  let release!: (response: Response) => void;
+  const pending = new Promise<Response>(resolve => { release = resolve; });
+  let attempts = 0;
+  const messages: unknown[] = [];
+  const globals = {
+    location: { protocol: "http:", pathname: "/", hostname: "127.0.0.1",
+      origin: "http://127.0.0.1:2607" },
+    chrome: { runtime: { sendMessage: async (value: unknown) => {
+      messages.push(value);
+      return { ok: true };
+    } } },
+    fetch: async () => { attempts++; return await pending; },
+    AbortSignal, TextDecoder,
+    setInterval: (callback: () => void) => { tick = callback; return 1; },
+  };
+  runInNewContext(source, globals);
+  assert.ok(tick);
+  tick();
+  tick();
+  assert.equal(attempts, 1);
+  release(Response.json({ browserBridge: {
+    application: "blooket-api", schemaVersion: 1,
+    token: "c".repeat(43),
+  } }));
+  await pause(0);
+  assert.equal(messages.length, 1);
+  tick();
+  await pause(0);
+  assert.equal(attempts, 2);
+});
+
 test("automatic workspace relay ignores unrelated origins and bootstraps",
   async () => {
   for (const page of [
