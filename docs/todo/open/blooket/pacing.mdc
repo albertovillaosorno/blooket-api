@@ -104,6 +104,14 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A follow-up red-to-green guard restricts the transient missing native
+Edit-document lifetime wait to a host-owned navigation or reload. An existing
+teacher-selected Edit route with absent lifetime evidence now stops after one
+observation instead of polling for 50 attempts. Newly navigated targets also
+reject wrong-type, nonfinite and negative lifetimes immediately; none of these
+cases opens the question editor or attempts Save. Portable tests verify the
+one-shot stop without changing any live browser document.
+
 Two read-only question confirmation stages now account for React card
 remounts after Cancel. The canonical saved-question reader retries only the
 exact `blooket-browser-failed` hydration reply for at most fifteen bounded

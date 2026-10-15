@@ -155,6 +155,11 @@ this final record.
 
 ## Evidence
 
+The browser mutation host now separates temporarily missing document-origin
+evidence after its own navigation from absent or malformed identity on a
+teacher-selected existing tab. These cases cannot be polled into authority;
+synthetic tests assert zero modal opens and zero Save attempts.
+
 Dedicated read/navigation drift tests now cover a same-route document
 replacement during Chrome's final `tabs.get`, temporary loss of question-card
 controls after an owned Cancel, and persistent or malformed post-Cancel
