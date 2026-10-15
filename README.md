@@ -503,6 +503,12 @@ Keep the local workspace open for automatic discovery and restart recovery.
 The normal launcher opens it. If the service runs without a browser page, the
 popup's **Open workspace** shortcut uses the default local port 2607.
 
+For development, `npm run launch -- --no-open` starts or reuses the normal
+background service without opening another browser. If working with an
+explicit test data root, pass that same `BLOOKET_DATA_HOME` environment
+variable to the launcher. Restarting the service does not clear publication
+journals, the per-plan mutation budget or recent account pacing history.
+
 The portable tests exercise the compiled worker and synthetic browser APIs.
 The ARM64 CI stage separately converts/compiles the Safari host and exercises
 the packaged workspace through Safari WebDriver. Remaining Apple trust and

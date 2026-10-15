@@ -247,7 +247,8 @@ This small version-one ledger stores only ordered epoch-millisecond timestamps;
 its lock, owner-only atomic replace and no-follow bounded read preserve history
 on service restart without exposing provider or teacher content. Missing files
 begin an empty history; malformed, unsafe, unreadable or clock-regressed files
-block new writes instead of discarding evidence.
+block new writes instead of discarding evidence. Canonical serialization
+also rejects duplicate JSON keys and reordered or incomplete saved facts.
 
 The in-memory pacer still serializes work and uses monotonic elapsed time. When
 restarted, the durable gate may require another cancellable wait under the

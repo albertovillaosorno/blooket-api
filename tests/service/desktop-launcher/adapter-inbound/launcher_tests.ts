@@ -51,6 +51,8 @@ import {
   "../../../../src/platforms/user-storage/adapter-outbound/writer-boundary.ts";
 import { decodeServiceRuntime } from
   "../../../../src/platforms/service-lifecycle/adapter-outbound/runtime.ts";
+import { reserveDurableMutationStart } from
+  "../../../../src/platforms/mutation-pacing-files/adapter-outbound/history.ts";
 
 const launcher = fileURLToPath(new URL(
   "../../../../src/service/desktop-launcher/adapter-inbound/launcher.ts",
@@ -136,6 +138,12 @@ test("real silent launcher starts, reuses and drains the supervised service",
     await savePreferences(root, { ...preferences,
       service: { ...preferences.service, portMode: "automatic", port: 1 } });
     await writeFile(join(root, "teacher-marker"), "teacher-owned-data");
+    const historyPath = join(root, "mutation-pacing.json");
+    assert.deepEqual(await reserveDurableMutationStart(historyPath, {
+      minimumStartIntervalMs: 2_000,
+      maximumStartsPerMinute: 20,
+    }, () => 200_000), { kind: "admitted" });
+    const historyBefore = await readFile(historyPath, "utf8");
     const command = (option: string) => promisify(execFile)(process.execPath,
       [launcher, option], { timeout: 8_000, maxBuffer: 8192,
         env: { PATH: process.env["PATH"], HOME: process.env["HOME"],
@@ -157,6 +165,9 @@ test("real silent launcher starts, reuses and drains the supervised service",
       throw Error("owned-launcher-service-did-not-drain");
     };
     try {
+      assert.equal((await command("--status")).stdout,
+        "Service offline.\n");
+      assert.equal(await readFile(historyPath, "utf8"), historyBefore);
       const first = await command("--no-open");
       assert.equal(first.stderr, "");
       const runtime = decodeServiceRuntime(JSON.parse(await readFile(
@@ -178,6 +189,16 @@ test("real silent launcher starts, reuses and drains the supervised service",
       const boundary = await acquireCanonicalDataUpdateBoundary(root);
       assert.equal(boundary.ok, true);
       if (boundary.ok) await boundary.release();
+      assert.equal(await readFile(historyPath, "utf8"), historyBefore);
+      const restarted = await command("--no-open");
+      assert.equal(restarted.stderr, "");
+      const nextRuntime = decodeServiceRuntime(JSON.parse(await readFile(
+        join(root, "service-runtime.json"), "utf8")));
+      assert.equal(restarted.stdout, nextRuntime.origin + "\n");
+      assert.notEqual(nextRuntime.pid, runtime.pid);
+      assert.equal(await readFile(historyPath, "utf8"), historyBefore);
+      assert.equal(await readFile(join(root, "teacher-marker"), "utf8"),
+        "teacher-owned-data");
     } finally {
       await command("--stop");
       await drained();

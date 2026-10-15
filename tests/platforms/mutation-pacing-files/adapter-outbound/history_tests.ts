@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, rm, symlink, writeFile } from
+import { lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,6 +54,8 @@ test("persistent start history survives a fresh caller and restart",
   async () => {
   await fixture(async file => {
     assert.deepEqual(await reserve(file, 10_000), { kind: "admitted" });
+    assert.equal((await stat(file)).mode & 0o777, 0o600);
+    await assert.rejects(lstat(file + ".lock"), /ENOENT/u);
     const initial = await readFile(file, "utf8");
     assert.deepEqual(await reserve(file, 10_500),
       { kind: "wait", waitMs: 1_500 });
@@ -140,6 +142,19 @@ test("symlinked pacing ledger cannot escape its owned data root", async () => {
   });
 });
 
+test("symbolic lock files block reservations without touching the target",
+  async () => { await fixture(async file => {
+  const outside = file + ".outside";
+  await writeFile(outside, "owner-controlled-external-file");
+  await symlink(outside, file + ".lock");
+  await assert.rejects(reserve(file, 2_000),
+    /mutation-pacing-history-unavailable/u);
+  assert.equal(await readFile(outside, "utf8"),
+    "owner-controlled-external-file");
+  await assert.rejects(readFile(file, "utf8"));
+  }); },
+);
+
 test("a successful reservation counts even without a provider receipt",
   async () => { await fixture(async file => {
     assert.deepEqual(await reserve(file, 0), { kind: "admitted" });
@@ -147,6 +162,23 @@ test("a successful reservation counts even without a provider receipt",
       { kind: "wait", waitMs: 1_000 });
     const saved = JSON.parse(await readFile(file, "utf8"));
     assert.deepEqual(saved.starts, [0]);
+  }); },
+);
+
+test("duplicate JSON keys and noncanonical history cannot reset starts",
+  async () => { await fixture(async file => {
+  const tampered = [
+    '{"schemaVersion":1,"lastStartMs":10,"starts":[10],"starts":[2]}\n',
+    '{"starts":[10],"schemaVersion":1,"lastStartMs":10}\n',
+    '{ "schemaVersion":1,"lastStartMs":10,"starts":[10]}\n',
+    '{"schemaVersion":1,"lastStartMs":10,"starts":[10]}',
+  ];
+  for (const text of tampered) {
+    await writeFile(file, text);
+    await assert.rejects(reserve(file, 100_000),
+      /mutation-pacing-history-unavailable/u);
+    assert.equal(await readFile(file, "utf8"), text);
+  }
   }); },
 );
 
