@@ -302,10 +302,30 @@ export async function executeBlooketPublicationCommand(
         const captured = await baseVerifier.captureBaseline(...args);
         // Session/media preparation may await between preflight and the
         // durable write-ahead journal. Recheck that exact collection here.
-        return captured.ok && (!expectedAppendBaseline ||
-          !sameBlooketWriteVerificationBaseline(captured.baseline,
-            expectedAppendBaseline))
-          ? { ok: true as const, baseline: null } : captured;
+        if (!captured.ok) return captured;
+        if (!expectedAppendBaseline ||
+            !sameBlooketWriteVerificationBaseline(captured.baseline,
+              expectedAppendBaseline))
+          return { ok: true as const, baseline: null };
+        // The question digest alone cannot detect a concurrent change to
+        // set metadata while mutation pacing or media admission awaits.
+        const detail = await getBlooketSet(blooket.session, blooket.secrets,
+          blooket.sets, plan.target.remoteSetId, { readOnly: true });
+        if (!detail.ok) return { ok: false as const,
+          kind: "browser" as const,
+          code: detail.code === "blooket-browser-unavailable" ||
+            detail.code === "blooket-browser-incompatible"
+            ? detail.code : "blooket-browser-failed" as const };
+        if (detail.kind !== "set")
+          return { ok: false as const, kind: "navigation" as const,
+            state: detail.state };
+        const expected = desiredPlan.operations[0];
+        return expected?.kind === "set" &&
+          detail.value.id === plan.target.remoteSetId &&
+          detail.value.title === expected.title &&
+          detail.value.description === expected.description &&
+          detail.value.visibility === expected.visibility
+          ? captured : { ok: true as const, baseline: null };
       },
     };
     if (command.command === "blooket.publication.reconcile") {

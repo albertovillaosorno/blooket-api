@@ -78,6 +78,13 @@ existing set without Create Set. Version-three snapshots bind the full desired
 quiz and original collection digest; version-two plans execute only the new
 question suffix. Existing journals and checkpoints retain their old bindings.
 
+A follow-up red-to-green regression exposed a gap in append preconditions:
+unchanged question digests alone did not detect a concurrent change to remote
+set metadata during pacing. Both baseline captures now include an exact
+read-only title, description, visibility and set-ID check before journaling.
+A synthetic paced privacy change stops without consuming a write or opening
+an attempt journal. This remains portable evidence, not live account proof.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses
