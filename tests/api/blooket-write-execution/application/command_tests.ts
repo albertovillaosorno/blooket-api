@@ -251,6 +251,8 @@ test("append refuses changed prior questions before any new write", () =>
     s.questions[0] = { ...s.questions[0]!, question: "Teacher changed it." };
     const result = await executeBlooketPublicationCommand(request, s.host);
     assert.equal(result.ok, false);
+    assert.match(result.issues[0]?.message ?? "", /existing remote quiz/u);
+    assert.doesNotMatch(result.issues[0]?.message ?? "", /Create Set/u);
     assert.equal(s.writes(), 2);
     const paths = await publicationFiles(s.root, "extension");
     await assert.rejects(readFile(paths.snapshot), { code: "ENOENT" });
@@ -1443,7 +1445,7 @@ test("a second draft cannot replay an already started identical plan",
     assert.equal(copied.issues[0]?.code,
       "blooket-publication-remote-conflict");
     assert.match(copied.issues[0]?.message ?? "",
-      /previously started identical plan/u);
+      /another active publication/u);
     assert.equal(state.writes(), 1);
     const paths = await publicationFiles(state.root, "cloned-fixture");
     await assert.rejects(readFile(paths.attempt));

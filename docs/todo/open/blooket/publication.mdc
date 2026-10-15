@@ -98,6 +98,11 @@ synthetic regression demonstrates retrying the same saved draft after its
 prior active publisher finishes, without duplicating prior questions.
 Historical idle snapshots remain readable and cannot strand a started writer.
 
+A synthetic regression also caught a misleading conflict instruction: an
+append blocked by an edited existing question was advised to retry a Create
+Set flow. The shared diagnostic now explains existing-quiz and concurrent
+publication conflicts without suggesting another set creation or replay.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses

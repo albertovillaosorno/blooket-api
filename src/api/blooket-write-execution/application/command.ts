@@ -121,9 +121,10 @@ export async function executeBlooketPublicationCommand(
         "saved-state confirmation support. Update the installed companion " +
         "before starting this quiz. Your saved draft is retained."
       : code === "blooket-publication-remote-conflict"
-      ? "Publication stopped: an existing set or previously started " +
-        "identical plan may conflict. Inspect the original publication " +
-        "and remote quiz before any new Create Set attempt."
+      ? "Publication stopped: the existing remote quiz, saved question " +
+        "prefix, or another active publication conflicts with this plan. " +
+        "Inspect the remote quiz and retained publication journal " +
+        "before initiating another write."
       : code === "publication-storage-unavailable"
         ? "Publication stopped: local journal evidence could not be " +
           "safely inspected. Preserve it and repair storage before retrying."
