@@ -186,9 +186,12 @@ export async function executeBlooketPublicationCommand(
           question.answers.some(answer => answer.image !== null));
       if (unsupported || (hasMedia(document.value) && !host.preparedMedia))
         return fail("blooket-publication-media-unsupported");
+      // Admitted question images use the base snapshot's explicit image
+      // fact. They do not require probing account-dependent answer images
+      // or audio drawers; the planner still refuses unknown image support.
       const capabilities = await inspectBlooketCapabilities(
         blooket.session, blooket.secrets, blooket.capabilities,
-        { readOnly: true, textOnly: !hasMedia(document.value) },
+        { readOnly: true, textOnly: true },
       );
       if (!capabilities.ok) return fail(capabilities.code);
       if (capabilities.kind !== "capabilities")
@@ -340,7 +343,7 @@ export async function executeBlooketPublicationCommand(
       if (currentCapabilities === undefined) {
         const capabilities = await inspectBlooketCapabilities(
           blooket.session, blooket.secrets, blooket.capabilities,
-          { readOnly: true, textOnly: !hasMedia(prepared.document) },
+          { readOnly: true, textOnly: true },
         );
         if (!capabilities.ok) return fail(capabilities.code);
         if (capabilities.kind !== "capabilities")

@@ -43,5 +43,8 @@ export type BlooketCapabilityProbeResult =
     };
 
 export interface BlooketCapabilityInspectionPort {
+  // This historical scope skips account-dependent audio/answer-image UI.
+  // The snapshot retains its independent question-image availability fact;
+  // callers must still validate every feature they actually request.
   inspect(purpose?: "text-publication"): Promise<BlooketCapabilityProbeResult>;
 }

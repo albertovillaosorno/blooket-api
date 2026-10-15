@@ -1485,7 +1485,15 @@ test("canonical publication freezes prepared question image and verifies it",
     const image = { mediaId: "icon", revision: 1,
       format: "png" as const, bytes: new Uint8Array(PNG_SIGNATURE) };
     let reads = 0;
-    const host = { ...state.host, preparedMedia: {
+    const inspect = state.host.blooket.capabilities.inspect;
+    const host = { ...state.host, blooket: { ...state.host.blooket,
+      capabilities: { inspect: async (purpose?: "text-publication") => {
+        if (purpose !== "text-publication") return {
+          ok: false as const, code: "blooket-browser-failed" as const,
+        };
+        return await inspect(purpose);
+      } },
+    }, preparedMedia: {
       read: async (id: string) => {
         assert.equal(id, "icon");
         reads++;
@@ -1495,7 +1503,7 @@ test("canonical publication freezes prepared question image and verifies it",
     const created = value(await executeBlooketPublicationCommand(
       command("step", revision), host));
     assert.equal(created["completedOperations"], 1);
-    assert.deepEqual(state.capabilityPurposes(), [undefined]);
+    assert.deepEqual(state.capabilityPurposes(), ["text-publication"]);
     const files = await publicationFiles(state.root, "fixture");
     const snapshot = JSON.parse(await readFile(files.snapshot, "utf8"));
     assert.equal(snapshot.expectedMedia.items.length, 1);
@@ -1512,6 +1520,43 @@ test("canonical publication freezes prepared question image and verifies it",
     assert.equal(state.writes(), 2);
     assert.ok(reads >= 3);
   }); });
+
+test("scoped image publication still requires supported image capability",
+  async () => {
+  for (const availability of ["unknown", "unsupported", "account-dependent"])
+    await fixture(async state => {
+      const saved = await executeLibraryCommand({
+        version: 1, operationId: "cli:scoped-image-draft",
+        command: "drafts.put", payload: { id: "fixture",
+          expectedRevision: state.revision,
+          document: { ...document, questions: [{ ...document.questions[0],
+            image: { description: "Synthetic icon", mediaId: "icon" },
+          }] },
+        },
+      }, state.root);
+      assert.ok(saved.ok);
+      const host = { ...state.host, blooket: { ...state.host.blooket,
+        capabilities: { inspect: async (purpose?: "text-publication") => {
+          assert.equal(purpose, "text-publication");
+          return { ok: true as const, value: { ...capabilities,
+            features: { ...capabilities.features,
+              questionImages: availability } } };
+        } },
+      }, preparedMedia: { read: async () => ({ ok: true as const,
+        value: { mediaId: "icon", revision: 1, format: "png" as const,
+          bytes: new Uint8Array(PNG_SIGNATURE) },
+      }) } };
+      const result = await executeBlooketPublicationCommand(command("step",
+        (saved.value as { revision: string }).revision), host);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.issues[0]?.code,
+        "blooket-publication-invalid-draft");
+      assert.equal(state.writes(), 0);
+      const files = await publicationFiles(state.root, "fixture");
+      await assert.rejects(readFile(files.snapshot));
+      await assert.rejects(readFile(files.attempt));
+    });
+});
 
 test("Stop during prepared image lookup leaves no publication snapshot",
   async () => { await fixture(async state => {

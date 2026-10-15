@@ -54,9 +54,16 @@ Version-one snapshots remain text-only and retain their existing checkpoint and
 journal bindings. Final image verification and reconciliation consume the
 version-two frozen expected context without resolving today's media library.
 Cover and answer-image snapshots are refused until their remote identity can
-be verified. This snapshot foundation does not admit new media mutations:
-the live prepared-file transport must still pass acceptance before enabling
-that creation path.
+be verified. Question images use the existing bounded prepared-file transport
+and frozen identities, with live publication acceptance still tracked in
+`blooket-11`.
+
+The historical `text-publication` capability scope supplies the base snapshot
+without inspecting account-dependent audio or answer-image drawers. Text and
+prepared question-image publication use that scope; the planner still requires
+explicit supported question-image availability and validated current media
+identities. A failed unrelated audio probe cannot substitute for an image
+entitlement decision, and unknown image availability remains blocking.
 
 Progress uses a version-two checkpoint containing the exact plan ID, the next
 operation index, and the opaque remote set ID after Create Set succeeds. The

@@ -434,15 +434,17 @@ These commands reuse the confirmed browser session and never load `.env`, read
 credentials, or submit a login. A closed session requires signing in locally;
 security challenges and organization prompts preserve the human-action stop.
 
-The `--text-only` capabilities inspection is read-only preflight for text quiz
-publication, not a Create Set attempt. It does not inspect Audio or claim
-account media entitlements.
+The `--text-only` capabilities inspection is a read-only base preflight,
+not a Create Set attempt. It skips account-dependent Audio and answer-image
+drawers while retaining the snapshot's separate question-image availability.
+Prepared question images still need explicit support and current validated
+bytes.
 
 Listing returns observed summaries, not a non-empty collection completeness
 guarantee. The explicit empty-account state is bounded; pagination and remote
 completeness acceptance remain pending.
 
-Text-only new-quiz publication also has canonical `publication step`, `status`,
+New-quiz publication has canonical `publication step`, `status`,
 `reconcile`, and `verify` CLI commands and matching `blooket_publication_*` MCP
 tools. The local **Quizzes** view now shows the saved drafts' durable status
 and has explicit Publish, Stop, Reconcile, and Verify controls for the same
@@ -465,8 +467,14 @@ after reload and saved metadata/privacy checks. Its typing question was
 confirmed through ordinary read-only journal reconciliation without
 resubmission, and fresh reads verified its answer, exact matching and time.
 
-Ordinary Add Question confirmation timing is still being improved; canonical
-media upload and existing-quiz editing remain unfinished.
+Prepared question images are admitted by stable library ID; covers, answer
+images and audio remain refused. Live prepared-image upload acceptance and
+existing-quiz editing remain unfinished.
+
+An October 15 Chrome test identified omitted null fields in injected MC input;
+JSON text now preserves them and real native preparation passes. The next
+canonical MC Save received HTTP 429 and remains journaled without replay.
+Uninterrupted multi-question publication is still unverified.
 
 The local **Settings → Blooket publication pacing** controls expose four
 bounded, shared limits: seconds between mutation starts (2–60), mutation

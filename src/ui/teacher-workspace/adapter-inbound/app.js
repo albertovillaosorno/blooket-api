@@ -275,9 +275,9 @@ const words = {
       "Prepara quizzes con la IA y revisa tus borradores aquí.",
     connection: "Publicación en Blooket",
     publicationPending:
-      "Publica quizzes de texto desde tus borradores guardados. " +
-      "Cada escritura requiere confirmación remota; imágenes y audio " +
-      "aún no están admitidos.",
+      "Publica tus borradores con texto e imágenes preparadas de la " +
+      "biblioteca. Cada guardado requiere confirmación de Blooket; " +
+      "las portadas, las imágenes en respuestas y el audio siguen pendientes.",
     publishDraft: "Publicar y verificar",
     stopPublication: "Detener publicación",
     reconcileDraft: "Reconciliar sin reenviar",
@@ -609,8 +609,9 @@ const words = {
       "Prepare quizzes with AI and review your drafts here.",
     connection: "Blooket publication",
     publicationPending:
-      "Publish text-only quizzes from saved drafts. Each write needs " +
-      "remote confirmation; image and audio publication is not ready.",
+      "Publish saved drafts with text and prepared library question images. " +
+      "Each save needs Blooket confirmation; covers, answer images and " +
+      "audio remain unavailable.",
     publishDraft: "Publish and verify",
     stopPublication: "Stop publication",
     reconcileDraft: "Reconcile without replay",
