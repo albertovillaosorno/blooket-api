@@ -546,11 +546,13 @@ test(
           return [{ result: questionPanelCloses }];
         }
         if (func.name === "prepareBlooketQuestionControls") {
-          assert.equal(args?.[0]?.setId, "set-fixture");
+          assert.equal(typeof args?.[0], "string");
+          assert.equal(JSON.parse(args[0]).setId, "set-fixture");
           return [{ result: true }];
         }
         if (func.name === "inspectBlooketPreparedQuestionEcho") {
-          assert.equal(args?.[0]?.setId, "set-fixture");
+          assert.equal(typeof args?.[0], "string");
+          assert.equal(JSON.parse(args[0]).setId, "set-fixture");
           return [{ result: true }];
         }
         if (func.name === "runBlooketAddQuestionPageAction") {
@@ -574,8 +576,14 @@ test(
           }
           if (args[0] === "is-ready")
             return [{ result: addQuestionPanelReady }];
-          if (args[0] === "prepare") return [{ result: { ok: true } }];
+          if (args[0] === "prepare") {
+            assert.equal(typeof args[1], "string");
+            assert.equal(JSON.parse(args[1]).setId, "set-fixture");
+            return [{ result: { ok: true } }];
+          }
           if (args[0] === "submit") {
+            assert.equal(typeof args[1], "string");
+            assert.equal(JSON.parse(args[1]).setId, "set-fixture");
             addQuestionPanelReady = false;
             questionSaved = true;
             return [{ result: { ok: true } }];
