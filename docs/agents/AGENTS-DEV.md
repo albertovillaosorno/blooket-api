@@ -301,6 +301,10 @@ and may be closed after the check. If the service needs a source-code restart,
 drain only the verified service owner with zero pending jobs; then recheck the
 same Chrome profile.
 
+A detached Linux Node child can remain a zombie temporarily after its
+listener and locks are gone. The launcher may recognize that terminated
+process state but still requires all other independent drain evidence.
+
 The developer's current local service need not run in the system's default
 data root. Set `BLOOKET_DATA_HOME` explicitly to the already-approved profile,
 not a guessed account directory. The unattended login-item preference remains

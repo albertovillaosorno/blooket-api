@@ -40,6 +40,8 @@ import {
   boundedResponseText,
   decodeServiceRuntime,
   existingService,
+  isTerminatedLinuxProcessStat,
+  serviceProcessExited,
 } from
   "../../../../src/platforms/service-lifecycle/adapter-outbound/runtime.ts";
 test("runtime discovery rejects public URLs and mismatched instances",
@@ -188,3 +190,22 @@ test("bounded response reader refuses forged size and invalid limits",
     Uint8Array.of(0xc3, 0x28)), 2), /encoded/u);
   },
 );
+
+
+test("terminated Linux service process states do not require reaping",
+  async () => {
+  const pid = process.pid;
+  const prefix = `${pid} (node main.ts)`;
+  for (const state of ["Z", "X", "x"])
+    assert.equal(isTerminatedLinuxProcessStat(
+      `${prefix} ${state} 1 0 0 0 0`, pid), true);
+  for (const state of ["S", "R", "D", "T", "I"])
+    assert.equal(isTerminatedLinuxProcessStat(
+      `${prefix} ${state} 1 0 0 0 0`, pid), false);
+  assert.equal(isTerminatedLinuxProcessStat(
+    `${pid + 1} (node main.ts) Z 1 0 0 0 0`, pid), false);
+  assert.equal(isTerminatedLinuxProcessStat(`${prefix} Z`, pid), false);
+  assert.equal(isTerminatedLinuxProcessStat("not a stat file", pid), false);
+  assert.equal(await serviceProcessExited(process.pid), false);
+  assert.equal(await serviceProcessExited(-1), false);
+});

@@ -104,6 +104,18 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+The owner-safe local launcher additionally recognizes a terminated Linux
+process that is temporarily retained as a zombie by the host. The service's
+exact prior PID, removed discovery and lock files, drained writer leases and
+refused loopback listener are still all required before stop can be confirmed.
+A real standalone development-service stop had previously returned
+`service-stop-unconfirmed` despite having drained; the user service was
+immediately restored with the official supervised launcher.
+
+Synthetic state parsing and live-process checks now cover this distinction
+without loosening macOS or other platform rules. This does not certify
+future host shutdowns.
+
 The restart-safe account pacing ledger was hardened further after a
 red-to-green JSON-format regression: duplicate, reordered or noncanonical
 fields now fail closed even when `JSON.parse` alone would admit them. Descriptor
