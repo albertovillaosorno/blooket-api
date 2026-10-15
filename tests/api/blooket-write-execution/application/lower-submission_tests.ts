@@ -256,6 +256,13 @@ test(
   );
   assert.deepEqual(
     lowerBlooketWriteSubmission(
+      { ...questionOperation, questionNumber: 10_001 },
+      { remoteSetId: "remote-set-1" },
+    ),
+    { ok: false, code: "invalid-question-number" },
+  );
+  assert.deepEqual(
+    lowerBlooketWriteSubmission(
       questionOperation,
       { remoteSetId: null },
     ),

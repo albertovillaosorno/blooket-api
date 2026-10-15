@@ -109,6 +109,11 @@ Canonical publication now preflights exact native text lowering before a
 snapshot or journal is opened, including stored plans on resume. Invalid
 literal markers retain the draft without spending a mutation start.
 
+A second native-contract mismatch allowed question number 10,001 through
+shared lowering even though the Chrome writer caps it at 10,000. The
+submission now rejects that number before browser execution, and canonical
+preflight applies the same cap before opening a new journal.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses
