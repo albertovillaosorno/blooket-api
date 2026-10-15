@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import {
+  link,
   mkdtemp,
   readFile,
   rm,
@@ -273,6 +274,27 @@ test("noncanonical budget bytes cannot reset attempted starts", async () => {
     assert.deepEqual(await loadMutationBudgetFile(path, planId), {
       ok: true, state: saved.state,
     });
+  });
+});
+
+test("hard-linked budget aliases cannot admit a later mutation", async () => {
+  await temporary(async directory => {
+    const path = join(directory, "budget.json");
+    const alias = join(directory, "unexpected-alias.json");
+    const planId = "plan:synthetic";
+    assert.equal((await reserveMutationBudgetStart(
+      path, planId, POLICY, 10_000,
+    )).ok, true);
+    const before = await readFile(path, "utf8");
+    await link(path, alias);
+    assert.deepEqual(await loadMutationBudgetFile(path, planId), {
+      ok: false, kind: "io", code: "mutation-budget-file-unsafe",
+    });
+    assert.deepEqual(await reserveMutationBudgetStart(
+      path, planId, POLICY, 12_000,
+    ), { ok: false, kind: "io", code: "mutation-budget-file-unsafe" });
+    assert.equal(await readFile(path, "utf8"), before);
+    assert.equal(await readFile(alias, "utf8"), before);
   });
 });
 

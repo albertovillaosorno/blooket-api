@@ -129,7 +129,8 @@ async function readHistory(path: string): Promise<StoredHistory | null> {
   let data = "";
   try {
     const stat = await handle.stat();
-    if (!stat.isFile() || stat.size < 2 || stat.size > MAX_FILE_BYTES)
+    if (!stat.isFile() || stat.nlink !== 1 ||
+        stat.size < 2 || stat.size > MAX_FILE_BYTES)
       throw Error("mutation-pacing-history-invalid");
     const buffer = Buffer.alloc(MAX_FILE_BYTES + 1);
     let length = 0;
@@ -141,6 +142,8 @@ async function readHistory(path: string): Promise<StoredHistory | null> {
     }
     const after = await handle.stat();
     if (length > MAX_FILE_BYTES || length !== stat.size ||
+        !after.isFile() || after.nlink !== 1 ||
+        after.dev !== stat.dev || after.ino !== stat.ino ||
         after.size !== stat.size || after.mtimeMs !== stat.mtimeMs ||
         after.ctimeMs !== stat.ctimeMs)
       throw Error("mutation-pacing-history-invalid");
