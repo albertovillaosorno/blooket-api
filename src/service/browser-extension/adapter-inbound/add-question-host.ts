@@ -429,6 +429,8 @@ async function waitForEdit(
         continue;
       }
       if (origin === null) {
+        if (previousOrigin === undefined && !justNavigated)
+          return browserFailure();
         // Chrome may report a completed target navigation before the
         // document's native lifetime becomes observable. Wait only within
         // the existing bounded edit-read window; do not open a modal yet.

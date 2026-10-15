@@ -1177,6 +1177,59 @@ test("transient missing post-reload document proof cannot reuse old page",
   },
 );
 
+test("unexpected target origin shapes stop without waiting after navigation",
+  async () => {
+  for (const malformed of ["unknown", -1, Number.NaN, {}, false]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let reads = 0;
+    let pauses = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "inspectBlooketDocumentOrigin" &&
+          request.args?.[0] ===
+            "https://dashboard.blooket.com/edit?id=set-fixture") {
+        reads++;
+        return [{ result: malformed }];
+      }
+      return await original(request);
+    };
+    assert.deepEqual(await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => { pauses++; },
+    ).addQuestion(input), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(reads, 1);
+    assert.equal(pauses, 0);
+    assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+      false);
+  }
+  },
+);
+
+test("an existing Edit without native proof never waits to take ownership",
+  async () => {
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/edit?id=set-fixture" });
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  let pauses = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin") {
+      reads++;
+      return [{ result: null }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => { pauses++; }).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(reads, 1);
+  assert.equal(pauses, 0);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
+  },
+);
+
 test("Add Question refuses a target without native edit document proof",
   async () => {
   const fake = fakeChrome({});
