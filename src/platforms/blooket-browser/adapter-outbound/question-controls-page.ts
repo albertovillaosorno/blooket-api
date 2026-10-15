@@ -32,8 +32,13 @@
 import type { BlooketQuestionPageInput } from "./add-question-page.ts";
 
 export async function prepareBlooketQuestionControls(
-  input: BlooketQuestionPageInput,
+  candidate: BlooketQuestionPageInput | string,
 ): Promise<boolean> {
+  let input: BlooketQuestionPageInput;
+  try {
+    input = typeof candidate === "string" ? JSON.parse(candidate) : candidate;
+    if (!input || typeof input !== "object") return false;
+  } catch { return false; }
   // This function is serialized by Chrome. Keep runtime helpers inside it.
   const world = globalThis as typeof globalThis & {
     __blooketAddQuestionFormWatch?: {
@@ -148,6 +153,7 @@ export async function prepareBlooketQuestionControls(
   try {
     if (!owned() || watch!.controlsStarted ||
         (input.qType !== "typing" && input.qType !== "mc") ||
+        (input.qType === "mc" && input.answerTypes !== null) ||
         !Array.isArray(input.answers) || input.answers.length < 1 ||
         input.answers.length > (input.qType === "mc" ? 4 : 100)) return false;
     watch!.controlsStarted = true;
@@ -352,9 +358,12 @@ export async function prepareBlooketQuestionControls(
 // unchanged until the one permitted Save Question click. This read-only probe
 // is serialized into the same isolated world as the owned modal watch.
 export function inspectBlooketPreparedQuestionEcho(
-  input: BlooketQuestionPageInput,
+  candidate: BlooketQuestionPageInput | string,
 ): boolean {
   try {
+    const input: BlooketQuestionPageInput = typeof candidate === "string"
+      ? JSON.parse(candidate) : candidate;
+    if (!input || typeof input !== "object") return false;
     const watch = (globalThis as typeof globalThis & {
       __blooketAddQuestionFormWatch?: {
         document: Document; setId: string; dirty: boolean;

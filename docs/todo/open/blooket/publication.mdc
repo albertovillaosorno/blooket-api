@@ -73,6 +73,24 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, an isolated-world preparation diagnostic identified the live
+MC stop precisely: Blooket generated `answerTypes: null`, while the object
+received by the injected function had no own `answerTypes` field. All other
+semantic fields matched, form ownership remained valid, and Save was never
+invoked by that diagnostic.
+
+The host now sends admitted question input as JSON text through Chrome
+injection, preserving nullable fields through preparation, finalization,
+visible echo and the single submit boundary. The page functions parse that
+text and retain their existing ownership and exact semantics checks.
+Portable regressions cover MC null preservation and the one-Save latch.
+
+The corrected preparation function was then exercised in the same authorized
+Chrome editor and returned true. Its owned form was cancelled successfully
+without calling Save, and the temporary diagnostic fields were removed.
+This proves real native preparation, not remote persistence or resolution of
+the older uncertain journal.
+
 On 2026-10-15, the updated installed companion and restarted local service
 created another private fictional set through the canonical CLI with a
 confirmed durable Create Set receipt. The following MC operation stopped

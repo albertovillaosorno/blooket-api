@@ -390,6 +390,23 @@ test("two or three multiple-choice answers do not fill blank React slots",
   }
 });
 
+test("JSON text preserves nullable MC fields across Chrome injection",
+  async () => withEditor(async page => {
+    const candidate: BlooketQuestionPageInput = {
+      ...input, qType: "mc", question: "Choose a star.",
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+      answerTypes: null, random: false, timeLimit: 15,
+    };
+    const injected = Function("return (" +
+      prepareBlooketQuestionControls.toString() + ")")() as
+      (input: unknown) => Promise<boolean>;
+    assert.equal(await injected(JSON.stringify(candidate)), true);
+    assert.equal(JSON.parse(page.hidden.value).answerTypes, null);
+    assert.equal(page.watch.controlsPrepared, true);
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc"));
+
 test("delayed typing answer and match changes settle before admission",
   async () => withEditor(async page => {
     page.delayTypingEvents();
