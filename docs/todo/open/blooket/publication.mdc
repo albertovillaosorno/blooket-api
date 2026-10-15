@@ -73,6 +73,264 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, the combined current publication changes passed TypeScript,
+roadmap validation, all 1,964 repository tests, and `jig validate` with zero
+diagnostics. Reviewed native-control, prepared-media and detached-read changes
+were committed separately with DCO signoff and their targeted tests rerun.
+
+The authorized live canonical CLI observed My Sets and returned a text
+capability snapshot. Its full capability inspection still returned
+`blooket-browser-failed`; neither a real image publication nor an existing
+quiz edit is established by the portable checks. Computer Use independently
+failed to initialize its request-header policy before accessing the website.
+That controller failure does not prove a Blooket challenge or signed-out
+session. Existing uncertain journals remain unchanged and are not replayed.
+
+On 2026-10-15, a red-to-green stable-ID media regression found that the
+shared Blooket publication admission accepted arbitrary prepared bytes when
+the port supplied a valid `png`, `jpeg` or `gif` format label. The admission
+now compares the copied bounded bytes against the existing image-format
+signature detector before freezing identities or admitting a remote write.
+The production prepared-library reader still performs the stronger isolated
+image decode, frame/canvas and recipe checks; signature admission is an
+additional common guard, not a substitute for decoding.
+
+Synthetic tests cover cross-format signatures, unknown bytes, unchanged
+SHA-256 identities, mutating payload bytes, and normal valid signatures.
+No real prepared image, remote upload or customer library was changed.
+
+On 2026-10-15, a red-to-green extension-worker regression found that a
+background question-read tab could be activated by the teacher without
+changing its URL. The previous cleanup treated its tab ID as disposable and
+could close an adopted, foregrounded tab. The worker now rejects a temporary
+tab once Chrome reports `active: true` and refuses to remove it, including
+after an interrupted read.
+
+The original submitted editor and all recovery journals are unaffected. This
+is a portable browser fixture, not a newly confirmed remote publication.
+
+On 2026-10-15, an authorized read-only canonical `questions.list` for the
+existing private fictional recovery set returned `blooket-browser-failed`.
+The attached Chrome extension still had one exact, submitted form owner on
+the same target set, with no saved question cards in the original editor.
+A subsequent inspection confirmed that the original unsaved modal, service
+bridge, and twelve ambiguous journals remained untouched; no Save was replayed.
+
+Prepared image snapshots now honor publication cancellation at every media
+lookup, including when the library read returns after Stop. A new bounded
+abort race releases an in-flight command promptly even if a local prepared
+read does not settle; the unfinished read has no remote mutation authority.
+Red-to-green tests cover no snapshot before Create Set, retained checkpoint
+and no second journal after Create Set, and prompt Stop during stalled media.
+These are portable local tests, not a fresh remote publication receipt.
+
+On 2026-10-15, a slower saved-card hydration fixture reproduced an
+incorrect empty question list: Blooket's initial zero-counter shell could
+still reveal an existing question after 350 milliseconds. The question
+reader now spaces its independent zero-card observations by 250 milliseconds
+instead of 100, while preserving the same fixed read deadline. Two new
+regressions prove delayed cards and an expired short deadline fail closed;
+all 56 targeted question-scan tests passed.
+
+A separate prepared-media fixture found that the Blooket publication adapter
+accepted a canonical JPEG rendition ending in `.jpg` but refused `.jpeg`.
+Both extensions now map to the existing `jpeg` media format without changing
+source bytes or admitting unrelated image extensions. The read port remains
+strictly stable-ID bound, and the existing subsequent byte and image identity
+admission still applies.
+
+The detached capability reader previously permitted up to three seconds for
+its private tab to load followed by a fresh nine-second inspection budget.
+A red-to-green latency fixture exceeded the surrounding browser bridge
+window. The caller now shares a single absolute eight-second deadline with
+its nested inspector and reserves time for cleanup; invalid upstream
+deadlines fail before browser access. Seventy targeted capability host tests
+passed, including deadline, challenges and temporary-tab restoration.
+
+The existing Chrome session was checked read-only. An independent background
+My Sets page exposed the expected authenticated shell and thirteen valid
+visible Edit cards before its temporary tab was closed. The original owned
+submitted question form remained untouched, and canonical capability reads
+still reported an unavailable browser result with the older loaded worker.
+No live question submission, reload, journal replay or media upload was made.
+
+On 2026-10-15, the canonical `blooket.publication.step` composition now
+accepts prepared **question** images with stable media IDs when the account's
+full capability snapshot explicitly admits them. The service-owned media
+reader is consulted before the immutable publication snapshot is created;
+current byte count, recipe revision, format, SHA-256 and ID are frozen as
+identities, never paths or image bytes. Each subsequent write step rechecks
+the current bytes against those identities before any new attempt journal or
+remote mutation. Distinct media files are hashed one at a time with an
+application cap of 200 image IDs rather than retaining all binary payloads.
+
+The synthetic canonical command fixture confirms a two-operation publication
+with an image-bearing saved question and exact remote image digest verification.
+A changed media buffer after Create Set now blocks Add Question without a new
+journal or remote write; frozen verification does not consult today's library.
+An uncertain image attempt remains journaled and can be inspected using
+read-only reconciliation without re-reading changed or unavailable media.
+
+The portable fixtures do not prove a live Blooket image upload or macOS media
+transport. Cover and Multiple Choice answer images remain refused because
+remote read-back cannot yet establish their byte identities.
+
+A third 2026-10-15 red-to-green preflight regression found that the
+native time-limit input could carry a teacher edit that had not reached the
+provider's hidden React JSON. Selecting the type or continuing preparation
+previously overwrote that limit. The writer now requires the visible seconds
+to agree with the provider-generated initial value both before and after
+type selection, leaving any unsynchronized custom value untouched.
+
+These two additional synthetic tests cover a changed time before the picker
+and during its transition. No real form was changed or submitted, and the
+pending live question remains an uncertain journaled attempt.
+
+Two more red-to-green editor regressions caught unowned answer text arriving
+after the first guard: a newly created Typing alternative could already hold
+native text, or a Multiple Choice slot could change while the prior slot was
+being entered. Both previously overwrote the late answer. The writer now
+checks that each target answer control remains empty immediately before its
+native input event, and refuses to continue otherwise.
+
+The tests cover both question types and preserve the late text. They do not
+click Save or use the authenticated Blooket editor. The owner's previously
+submitted, uncertain form is still not replayed or closed.
+
+A second 2026-10-15 native editor regression covered an unsynchronized
+visible prompt whose hidden React serialization still reported empty text.
+Previously the writer clicked the provider type picker and overwrote that
+prompt. The writer now waits for the real visible prompt before the type
+transition and refuses nonempty native text ahead of any first click.
+
+Another regression reproduced a teacher changing the visible prompt or typing
+answer while the type picker was transitioning. The writer now repeats the
+prompt and native-answer preflight after the type switch, before setting the
+new question or timer. Both tests were red before the guards and green
+without submitting or accessing the owner's unsaved question.
+
+A new red-to-green React preflight regression found that a question modal
+may contain a human-written prompt or answer before its hidden serialized
+answer array reflects that text. Earlier automation could select another
+question type over the nonempty visible field even when the hidden JSON still
+contained only empty answers. The writer now refuses preexisting text in the
+native question, serialized answer/correctness arrays, or any currently
+visible MC/typing answer control before the first picker click or text edit.
+The two synthetic fixtures prove that prior content and the unsaved prompt
+remain untouched; no real Blooket form was modified or submitted.
+
+A later detached question-read regression exposed a session challenge that
+could replace the authenticated Edit shell after the saved-card scan but
+before the read was returned. A stable route and native document origin alone
+previously admitted this stale observation.
+
+The detached host now observes the session again after enumeration and
+refuses the scan unless the exact Edit state is still present. A separate
+fixture rejects a nonenumerable final `ok` in a plausible browser reply.
+Both retain temporary tab cleanup and leave the submitted editor untouched.
+
+A second red-to-green React editor regression rejected a native question
+form with a provider-reported number different from the frozen operation. The
+writer previously selected the type and changed visible fields before its
+final number check failed.
+
+It now checks the exact number and an empty native image/audio state before
+the first picker click, prompt edit or timer change. Synthetic fixtures
+prove both wrong-slot and preexisting-media refusal without altering text.
+The active real editor was not modified or resubmitted.
+
+On 2026-10-15, an empty saved-question enumeration was found to be
+confirmed from three near-simultaneous React snapshots. A synthetic delayed
+hydration fixture returned no cards initially and then one server-rendered
+card after 150 ms: the former reader incorrectly reported an empty set.
+The question host now spaces independent empty-list checks by 100 ms each,
+refusing late card appearance and retaining its original read deadline.
+
+These checks reduce false empty reads but do not turn provider absence into
+proof that a prior attempted Save can be replayed. The owner editor and its
+ambiguous attempt are left untouched. Read-only `capabilities inspect` through
+the currently loaded local extension still returned
+`blooket-browser-failed`, not a live capability receipt.
+
+On 2026-10-15, a red-to-green worker reconnection fixture found a
+background question-read tab left open when its original browser connection
+retired mid-script. The old connection correctly lost script and write
+authority, but also lost its tab cleanup permission. Temporary Chrome tabs
+are now tracked by the creating connection and can be removed after retirement
+only if their tab ID, original exact route and observed window still agree.
+
+A user-navigated temporary tab is not removed. No retired worker regains read,
+submit, navigation or publication authority; the pending teacher form is
+untouched. Both timing cases pass through the actual synthetic worker relay.
+
+A separate Multiple Choice regression found that detecting unrelated text in
+an unused answer slot occurred after the editor had already overwritten the
+visible prompt. The new preflight rejects extra serialized or visible answer
+text before modifying the prompt and timer. The previous single-Save latch and
+remote verification requirements remain unchanged. All checks used synthetic
+fixtures, not the owner's active Blooket editor.
+
+A separate red-to-green question-document regression now refuses duplicate
+Multiple Choice answer text during canonical document decoding. The captured
+Edit client stores `correctAnswers` as exact text strings rather than stable
+answer-slot identities.
+
+Two identical labels with contradictory correctness
+cannot be represented unambiguously on the provider. The decoder returns a
+specific `duplicate-answer-text` issue before any write plan is produced.
+Valid image-only choices still retain their independent media references.
+A full planner regression confirms that no executable operation is lowered
+from a duplicate-text document; no existing teacher quiz was modified.
+
+On 2026-10-15, a red-to-green native React editor fixture reproduced a
+publication failure for ordinary Multiple Choice questions with two or three
+answers. The Blooket captured Edit module `89770.tsx`, functions `er` and
+`eF` (captured build `86784c3d4c38fcd559c92f38fbadd7a160947de2`),
+shows four visible answer controls while only touched indexes are assigned
+to the serialized answer array. Sending empty input/change events to unused
+controls can create extra trailing blank answers. The adapter now leaves
+those controls untouched if already empty and refuses nonempty unowned text
+rather than silently clearing teacher work.
+
+Fixtures verify two-, three-,
+and four-choice semantics and that the hidden provider field is never edited.
+The captured build is older than the authenticated page, so these are portable
+compatibility regressions, not a new live submission receipt.
+
+A separate red-to-green fixture reproduced React's delayed state commits:
+rapid prompt, timer, answer and correctness changes could replace earlier
+provider state while the visible fields looked right. The writer now waits
+for each exact provider-generated value before the next native control event,
+for both Multiple Choice and Typing Answer match modes. The single Save
+latch and existing confirmation/human-stop requirements remain unchanged.
+
+A worker regression also rejects a fresh detached question read if the
+original editor enters a security challenge while the background tab scans;
+the same document origin and prior submit latch are insufficient after a
+human-stop transition. All changes were validated synthetically, without
+reloading the user's pending form or attempting another remote mutation.
+
+On 2026-10-15, red-to-green synthetic regressions reproduced false
+browser-read failures when Chrome marked an isolated Edit or My Sets tab
+complete before Blooket finished mounting its React session UI. The existing
+detached `questions.list` reader now waits for an exact transitional Edit
+state in the same native document, subject to its original fixed deadline.
+The detached text/full capability reader now likewise waits for My Sets and
+Edit to hydrate, including narrowly unavailable initial observations.
+The first saved-list response can also arrive after session hydration; the
+capability reader now waits only for an exact initial unavailable result.
+
+Malformed lists and the independent second snapshot are never retried.
+
+Both paths still reject account challenges, redirects, inconsistent frames,
+accessor-backed provider status, replaced native documents, unbounded delays,
+and failed temporary-tab cleanup.
+Focused fixtures and the 1,919-test repository suite passed. A separate
+read-only browser visit confirmed that a fresh My Sets tab could load with
+HTTP 200 and no HTTP 429 resource entries; the original submitted editor was
+not changed. The installed extension was not reloaded, so these source fixes
+do not yet establish live companion acceptance or a remote write receipt.
+
 On 2026-10-15, the canonical authenticated CLI could observe the Edit
 session, while its text capability inspection returned a browser failure with
 an unresolved submitted Add Question editor still present. This is a source
