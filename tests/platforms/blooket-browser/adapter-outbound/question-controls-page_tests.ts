@@ -421,6 +421,29 @@ test("React-batched MC edits must settle before the next native event",
     assert.equal(page.hiddenWrites(), 0);
   }, "mc"));
 
+test("a controlled field may restore its value before React commits it",
+  async () => withEditor(async page => {
+    page.delayMcEvents();
+    const onPromptInput = page.prompt.onEvent;
+    page.prompt.onEvent = event => {
+      if (event.type !== "input") return;
+      const requested = page.prompt.value;
+      onPromptInput(event);
+      page.prompt.value = "";
+      setTimeout(() => { page.prompt.value = requested; }, 40);
+    };
+    const candidate: BlooketQuestionPageInput = {
+      ...input, qType: "mc", question: "Pick the light sources.",
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+      answerTypes: null, random: true, timeLimit: 15,
+    };
+    assert.equal(await prepareBlooketQuestionControls(candidate), true);
+    assert.equal(page.prompt.value, candidate.question);
+    assert.equal(JSON.parse(page.hidden.value).question, candidate.question);
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc"));
+
 test("an unsynchronized human prompt blocks picker activation",
   async () => withEditor(async page => {
     // A native text input may have changed without a React onChange event.
