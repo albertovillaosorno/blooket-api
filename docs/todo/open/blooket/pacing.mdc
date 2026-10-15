@@ -104,6 +104,14 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A deterministic stalled-clock regression found that the in-process start
+pacer could busy-loop if its sleep port resolved without advancing a monotonic
+clock. The durable rolling-history wait had a related repeated-reservation
+case. Both now refuse a nonadvancing clock after one unproductive sleep; local
+interval waits also have a bounded retry count. The queue slot is released,
+no new lease is granted, and an ordinary advancing clock still follows the
+configured minimum interval and rolling-minute limit.
+
 Another red-to-green cancellation regression keeps persisted recovery as the
 first operation, then stops an already cancelled *ready* publication without
 contacting the browser, reading a remote baseline or acquiring the pacing

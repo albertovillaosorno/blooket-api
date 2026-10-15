@@ -246,6 +246,27 @@ test("wall-clock rollback fails closed without sleeping until the old future",
   }
 });
 
+test("a stalled pacing clock refuses instead of busy-waiting forever",
+  async () => {
+  let sleeps = 0;
+  const pacer = createBlooketMutationPacer(undefined, {
+    now: () => 1_000,
+    sleep: async () => {
+      sleeps++;
+      if (sleeps >= 3) throw Error("fixture-unbounded-waits");
+    },
+  });
+  const first = await pacer.acquire();
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  first.lease.release();
+  await assert.rejects(pacer.acquire(), /mutation-pacing-clock-invalid/u);
+  assert.equal(sleeps, 1);
+  // Failure releases the exclusive queue slot for a later observation.
+  await assert.rejects(pacer.acquire(), /mutation-pacing-clock-invalid/u);
+  assert.equal(sleeps, 2);
+});
+
 test("nonfinite pacing clock never grants a mutation lease", async () => {
   let now = Number.NaN;
   const pacer = createBlooketMutationPacer(undefined, {
@@ -424,6 +445,22 @@ test("failed durable start never grants a lease or blocks a later caller",
   const admitted = await pacer.acquire();
   assert.equal(admitted.ok, true);
   if (admitted.ok) admitted.lease.release();
+});
+
+test("a stalled durable gate wait fails closed before repeated reservations",
+  async () => {
+  let reservations = 0;
+  let sleeps = 0;
+  const pacer = createBlooketMutationPacer(undefined, {
+    now: () => 10_000,
+    sleep: async () => { sleeps++; },
+  }, { reserve: async () => {
+    reservations++;
+    return { kind: "wait" as const, waitMs: 2_000 };
+  } });
+  await assert.rejects(pacer.acquire(), /mutation-pacing-clock-invalid/u);
+  assert.equal(reservations, 1);
+  assert.equal(sleeps, 1);
 });
 
 test("a cancelled durable history wait cannot consume an extra start",
