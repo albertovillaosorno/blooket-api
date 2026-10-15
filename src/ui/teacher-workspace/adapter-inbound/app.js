@@ -1996,6 +1996,8 @@ document
 // UI requests reuse one service-owned pacer and journaled operation boundary.
 // Reopening Quizzes cannot create a second in-flight caller for the same draft.
 let activePublication = null;
+let publicationViewEpoch = 0;
+let quizzesLoadGeneration = 0;
 function publicationLabel(value) {
   const phase = value?.phase;
   if (phase === "verified" && value.published === true)
@@ -2037,7 +2039,13 @@ function publicationFailureText(error) {
 }
 async function loadQuizzes() {
   if (activePublication) return;
+  const epoch = publicationViewEpoch;
+  const generation = ++quizzesLoadGeneration;
+  const current = () => !activePublication &&
+    publicationViewEpoch === epoch &&
+    quizzesLoadGeneration === generation;
   const ids = await command("drafts.list", {});
+  if (!current()) return;
   const container = $("#drafts");
   container.replaceChildren();
   if (!ids.length) {
@@ -2047,6 +2055,7 @@ async function loadQuizzes() {
   }
   for (const id of ids) {
     const record = await command("drafts.get", { id });
+    if (!current()) return;
     const article = document.createElement("article");
     const title = document.createElement("h2");
     const preview = document.createElement("pre");
@@ -2060,7 +2069,12 @@ async function loadQuizzes() {
     container.append(article);
     let latest;
     const refreshState = async () => {
-      latest = await command("blooket.publication.status", { draftId: id });
+      const observedEpoch = publicationViewEpoch;
+      const observed = await command("blooket.publication.status",
+        { draftId: id });
+      if (activePublication || quizzesLoadGeneration !== generation ||
+          observedEpoch !== publicationViewEpoch) return;
+      latest = observed;
       state.textContent = publicationLabel(latest);
       actions.replaceChildren();
       const add = (label, name, callback) => {
@@ -2076,6 +2090,7 @@ async function loadQuizzes() {
         if (activePublication) return;
         const controller = new AbortController();
         activePublication = { id, controller };
+        publicationViewEpoch++;
         const buttons = Array.from(document.querySelectorAll(
           "[data-publication-action]",
         ));

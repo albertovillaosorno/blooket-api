@@ -104,6 +104,14 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A synthetic-DOM regression exposed a teacher-facing cancel-button race in
+the Quizzes tab: a delayed Refresh or list response could replace the active
+publication controls and hide Stop. Quizzes now discards obsolete asynchronous
+view responses by publication epoch and load generation. Tests run the actual
+UI closure with delayed responses and verify Stop remains visible while a
+publication is active, late responses stay inert, and Refresh works again
+after the operation completes. No browser account or real quiz is used.
+
 A deterministic stalled-clock regression found that the in-process start
 pacer could busy-loop if its sleep port resolved without advancing a monotonic
 clock. The durable rolling-history wait had a related repeated-reservation
