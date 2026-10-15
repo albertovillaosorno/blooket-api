@@ -91,6 +91,7 @@ next step. The shared-set collision gate now distinguishes an actually
 started competing checkpoint or uncertain journal from an idle snapshot.
 The original can resume its remaining suffix; a started competing publisher
 continues to block overlap. No original snapshot or journal is deleted.
+
 The collision check now also runs before freezing a new append draft, so a
 refused competing request does not leave an unusable snapshot. A second
 synthetic regression demonstrates retrying the same saved draft after its
