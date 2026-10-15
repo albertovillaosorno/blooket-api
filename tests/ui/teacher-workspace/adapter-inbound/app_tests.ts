@@ -67,8 +67,12 @@ class Element {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
 }
 
 async function quizFixture(options: {
@@ -94,6 +98,7 @@ async function quizFixture(options: {
   let listReads = 0, statusReads = 0;
   let cancelled: (() => boolean) | undefined;
   const calls: string[] = [];
+  const reported: unknown[] = [];
   const document = {
     createElement: (tag: string) => new Element(tag),
     querySelectorAll: () => root.findAllActions(),
@@ -104,7 +109,7 @@ async function quizFixture(options: {
     t: (value: string) => value,
     AbortController,
     JSON,
-    report: (error: unknown) => { throw error; },
+    report: (error: unknown) => { reported.push(error); },
     publicationStopReason: () => "unknown",
     publishTextDraft: async (_id: unknown, _rev: unknown,
       _send: unknown, _progress: unknown, isCancelled: () => boolean) => {
@@ -141,7 +146,7 @@ async function quizFixture(options: {
       loadQuizzes: () => Promise<void>;
     };
   await api.loadQuizzes();
-  return { root, calls, statusRefresh, thirdStatus, finished,
+  return { root, calls, reported, statusRefresh, thirdStatus, finished,
     secondList, thirdList, loadQuizzes: api.loadQuizzes,
     isCancelled: () => cancelled?.() };
 }
@@ -254,4 +259,19 @@ test("Stop signals cancellation and is disabled until task settles",
   await flush();
   assert.equal(ui.root.findAction("stop"), undefined);
   assert.ok(ui.root.findAction("refresh"));
+});
+
+
+test("stale failing Refresh does not interrupt an active publication",
+  async () => {
+  const ui = await quizFixture();
+  ui.root.findAction("refresh")?.handlers.get("click")?.();
+  ui.root.findAction("publish")?.handlers.get("click")?.();
+  assert.ok(ui.root.findAction("stop"));
+  ui.statusRefresh.reject(Error("simulated-stale-status-failure"));
+  await flush();
+  assert.deepEqual(ui.reported, []);
+  assert.ok(ui.root.findAction("stop"));
+  ui.finished.resolve({ phase: "paused", published: false });
+  await flush();
 });

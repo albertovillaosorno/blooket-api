@@ -2072,11 +2072,19 @@ async function loadQuizzes() {
     const refreshState = async () => {
       const observedEpoch = publicationViewEpoch;
       const requestGeneration = ++refreshGeneration;
-      const observed = await command("blooket.publication.status",
-        { draftId: id });
-      if (activePublication || quizzesLoadGeneration !== generation ||
-          observedEpoch !== publicationViewEpoch ||
-          requestGeneration !== refreshGeneration) return;
+      const obsolete = () => activePublication ||
+        quizzesLoadGeneration !== generation ||
+        observedEpoch !== publicationViewEpoch ||
+        requestGeneration !== refreshGeneration;
+      let observed;
+      try {
+        observed = await command("blooket.publication.status",
+          { draftId: id });
+      } catch (error) {
+        if (obsolete()) return;
+        throw error;
+      }
+      if (obsolete()) return;
       latest = observed;
       state.textContent = publicationLabel(latest);
       actions.replaceChildren();
