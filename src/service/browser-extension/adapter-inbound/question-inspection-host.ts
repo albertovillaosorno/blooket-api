@@ -334,7 +334,10 @@ export function createExtensionQuestionInspectionHost(
           questions.push(decoded);
         }
         if (numbers.length === 0) await pause(0);
-        const after = await enumerate(setId, url, deadline);
+        // Cancel can remount the saved cards after closing the read-owned
+        // panel. Wait only for an exact not-ready shape; a readable drift or
+        // malformed success cannot be polled until it happens to match.
+        const after = await enumerate(setId, url, deadline, true);
         if (!after || after.length !== numbers.length ||
             after.some((number, index) => number !== numbers[index]))
           return browserFailure();

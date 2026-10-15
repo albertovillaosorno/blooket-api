@@ -804,6 +804,63 @@ test("hidden saved-image envelopes never become question evidence",
   },
 );
 
+test("saved-question scans await only transient post-Cancel hydration",
+  async () => {
+  const fixture = synthetic({ listReplies: [
+    { ok: true, value: [1] },
+    failed,
+    { ok: true, value: [1] },
+    { ok: true, value: [1] },
+  ] });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), {
+    ok: true, value: [validQuestion],
+  });
+  assert.equal(fixture.enumerations(), 4);
+  assert.equal(fixture.calls.filter(name =>
+    name === "openBlooketQuestionPanel").length, 1);
+  assert.equal(fixture.calls.filter(name =>
+    name === "closeBlooketQuestionPanel").length, 1);
+  },
+);
+
+test("post-Cancel cards never hydrate beyond the fixed read allowance",
+  async () => {
+  const fixture = synthetic({ listReplies: [
+    { ok: true, value: [1] },
+    ...Array.from({ length: 20 }, () => failed),
+  ] });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 10_000), failed);
+  assert.equal(fixture.enumerations(), 16);
+  assert.equal(fixture.calls.filter(name =>
+    name === "closeBlooketQuestionPanel").length, 1);
+  },
+);
+
+test("independent final post-Cancel card proof cannot hydrate later",
+  async () => {
+  const fixture = synthetic({ listReplies: [
+    { ok: true, value: [1] },
+    { ok: true, value: [1] },
+    failed,
+    { ok: true, value: [1] },
+  ] });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.enumerations(), 3);
+  },
+);
+
+test("malformed post-Cancel evidence is never retried into success",
+  async () => {
+  const fixture = synthetic({ listReplies: [
+    { ok: true, value: [1] },
+    { ok: true, value: [1], unexpected: true },
+    { ok: true, value: [1] },
+  ] });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.enumerations(), 2);
+  },
+);
+
 test("late question-card drift after Cancel cannot confirm read results",
   async () => {
   for (const lists of [

@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+The canonical `questions.list` read-back path now tolerates transient
+post-Cancel card remounting with a bounded exact-unavailable retry, while
+preserving the non-retriable second saved-list confirmation. The common
+read-navigation worker also reconfirms its newly loaded native document
+identity after Chrome returns the final complete tab, rejecting same-URL
+document replacement before transferring read authority. These portable
+regressions help later interruption/reconciliation flows but do not authorize
+replaying existing ambiguous attempts or establish new live acceptance.
+
 On 2026-10-14, a real canonical CLI publication with the validated Linux package
 created a private empty fictional quiz but stopped with a retained attempting
 journal and no receipt. A separate canonical fresh set read confirmed the title

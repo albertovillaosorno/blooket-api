@@ -104,6 +104,23 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+Two read-only question confirmation stages now account for React card
+remounts after Cancel. The canonical saved-question reader retries only the
+exact `blooket-browser-failed` hydration reply for at most fifteen bounded
+observations; a valid but drifted collection, malformed envelope, expired
+read deadline or changed native document stops immediately. Its independent
+second list check is never retried into agreement.
+
+The Add Question post-Save receipt path follows the same one-way rule after
+closing its read-owned modal, without submitting a second Save. Its first
+final saved-card enumeration may wait up to fifteen polls for a transient
+unavailable UI, but a readable missing, extra or malformed card list stops.
+The separately verified fresh-document read remains required to report
+success. Red-to-green synthetic regressions cover remount, permanent
+unavailability, malformed replies and non-retriable conflicting rows.
+
+This is not proof of a newly saved live question.
+
 A red-to-green Add Question continuation regression covers two more
 provider/Chrome hydration races. A newly navigated target may return no native
 document origin for several bounded observations, or the native Edit document
