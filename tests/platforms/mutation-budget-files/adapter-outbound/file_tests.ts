@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import {
+  chmod,
   link,
   mkdtemp,
   readFile,
@@ -274,6 +275,26 @@ test("noncanonical budget bytes cannot reset attempted starts", async () => {
     assert.deepEqual(await loadMutationBudgetFile(path, planId), {
       ok: true, state: saved.state,
     });
+  });
+});
+
+test("group-writable mutation budget cannot authorize a new start",
+  async () => {
+  await temporary(async directory => {
+    const path = join(directory, "budget.json");
+    const planId = "plan:synthetic";
+    assert.equal((await reserveMutationBudgetStart(
+      path, planId, POLICY, 10_000,
+    )).ok, true);
+    const before = await readFile(path, "utf8");
+    await chmod(path, 0o660);
+    assert.deepEqual(await loadMutationBudgetFile(path, planId), {
+      ok: false, kind: "io", code: "mutation-budget-file-unsafe",
+    });
+    assert.deepEqual(await reserveMutationBudgetStart(
+      path, planId, POLICY, 12_000,
+    ), { ok: false, kind: "io", code: "mutation-budget-file-unsafe" });
+    assert.equal(await readFile(path, "utf8"), before);
   });
 });
 

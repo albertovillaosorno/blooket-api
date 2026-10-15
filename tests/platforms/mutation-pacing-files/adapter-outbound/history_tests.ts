@@ -31,8 +31,9 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { link, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from
-  "node:fs/promises";
+import {
+  chmod, link, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { reserveDurableMutationStart } from
@@ -129,6 +130,17 @@ test("malformed, rollback and future histories remain unchanged", async () => {
     }
   });
 });
+
+test("world-writable start history cannot authorize an account mutation",
+  async () => { await fixture(async file => {
+  assert.deepEqual(await reserve(file, 10_000), { kind: "admitted" });
+  const before = await readFile(file, "utf8");
+  await chmod(file, 0o606);
+  await assert.rejects(reserve(file, 12_000),
+    /mutation-pacing-history-unavailable/u);
+  assert.equal(await readFile(file, "utf8"), before);
+  }); },
+);
 
 test("hard-linked pacing history aliases cannot reset the rolling window",
   async () => { await fixture(async file => {

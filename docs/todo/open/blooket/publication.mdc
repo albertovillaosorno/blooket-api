@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+Red-to-green permission regressions likewise reject a write-attempt journal
+or checkpoint made group- or world-writable after its initial private atomic
+save. Such files cannot be used to confirm an ambiguous attempt, clear its
+journal or advance a quiz, and are preserved byte-for-byte for human recovery.
+Normal single-link owner-controlled files continue to work without migration.
+
 The canonical persisted executor also has two synthetic integration checks
 for aliased recovery files. A hard-linked attempting journal stops at
 `attempt-load`; a hard-linked question checkpoint stops at `checkpoint-load`.

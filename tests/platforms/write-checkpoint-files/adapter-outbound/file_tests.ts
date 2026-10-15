@@ -121,6 +121,24 @@ test("missing checkpoint files load initial progress", async () => {
   });
 });
 
+test("group-writable checkpoints cannot authorize question progress",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "checkpoint.json");
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(1)), { ok: true });
+    const before = await readFile(path, "utf8");
+    await chmod(path, 0o660);
+    assert.deepEqual(await loadWriteCheckpointFile(path, plan), {
+      ok: false, kind: "io", code: "checkpoint-file-unsafe",
+    });
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(2)), { ok: false, kind: "io",
+      code: "checkpoint-file-unsafe" });
+    assert.equal(await readFile(path, "utf8"), before);
+  });
+});
+
 test("hard-linked checkpoint cannot authorize further publication progress",
   async () => {
   await withTemporaryDirectory(async directory => {

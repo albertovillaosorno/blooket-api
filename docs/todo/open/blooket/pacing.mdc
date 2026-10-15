@@ -104,6 +104,13 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A further fail-closed filesystem regression covers account pacing and
+plan-bound task budgets made writable by other POSIX users (`mode & 0o022`).
+Both adapters now inspect permissions before and after reading the same opened
+descriptor, refusing altered mode bits without reserving another mutation.
+The real local recovery tree was inspected read-only: none of its 47 files has
+multiple hard links, group/other-write permission, or noncanonical JSON.
+
 A red-to-green local persistence regression shows that a mutation task
 budget or account-wide pacing history with an unexpected hard-link alias could
 previously be read as valid while the same inode remained writable under a
