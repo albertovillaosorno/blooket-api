@@ -100,11 +100,7 @@ export async function loadWriteCheckpointFile(
     return loadIoFailure("checkpoint-file-unreadable");
   }
 
-  const parsed = parseCheckpointJson(read.value);
-  if (!parsed.ok) {
-    return parsed;
-  }
-  const decoded = decodeBlooketWriteCheckpoint(parsed.value, plan);
+  const decoded = decodeStoredCheckpoint(read.value, plan);
   if (!decoded.ok) {
     return {
       ok: false,
@@ -181,12 +177,9 @@ async function saveWriteCheckpointFileLocked(
   }
 
   let previousIndex = 0;
+  let previousRemoteSetId: string | null = null;
   if (existing.kind === "text") {
-    const parsed = parseCheckpointJson(existing.value);
-    if (!parsed.ok) {
-      return parsed;
-    }
-    const decoded = decodeBlooketWriteCheckpoint(parsed.value, plan);
+    const decoded = decodeStoredCheckpoint(existing.value, plan);
     if (!decoded.ok) {
       return {
         ok: false,
@@ -195,9 +188,7 @@ async function saveWriteCheckpointFileLocked(
       };
     }
     previousIndex = decoded.value.nextOperationIndex;
-    if (checkpoint.nextOperationIndex === previousIndex) {
-      return { ok: true };
-    }
+    previousRemoteSetId = decoded.value.remoteSetId;
   }
 
   if (checkpoint.nextOperationIndex < previousIndex) {
@@ -215,6 +206,17 @@ async function saveWriteCheckpointFileLocked(
     );
   }
 
+  // A saved Create Set identity must survive both idempotent saves and
+  // subsequent question progress; a different remote set needs reconciliation.
+  if (existing.kind === "text" && previousIndex > 0 &&
+      previousRemoteSetId !== checkpoint.remoteSetId)
+    return progressFailure("$.remoteSetId",
+      "checkpoint-remote-identity-mismatch",
+      "Checkpoint may not switch a previously confirmed remote set.");
+  if (existing.kind === "text" &&
+      checkpoint.nextOperationIndex === previousIndex)
+    return { ok: true };
+
   const contents = JSON.stringify(checkpoint, null, 2) + "\n";
   try {
     await writeAtomicFile(
@@ -228,6 +230,33 @@ async function saveWriteCheckpointFileLocked(
   } catch {
     return saveIoFailure("checkpoint-write-failed");
   }
+}
+
+function decodeStoredCheckpoint(
+  source: string, plan: BlooketWritePlan,
+):
+  | { readonly ok: true; readonly value: BlooketWriteCheckpoint }
+  | { readonly ok: false; readonly kind: "invalid";
+      readonly issues: readonly ValidationIssue[] } {
+  const parsed = parseCheckpointJson(source);
+  if (!parsed.ok) return parsed;
+  const decoded = decodeBlooketWriteCheckpoint(parsed.value, plan);
+  if (!decoded.ok) return { ok: false, kind: "invalid",
+    issues: decoded.issues };
+  const raw = parsed.value as Record<string, unknown>;
+  // Current checkpoints are always atomically written in one exact order.
+  // Historical v1 files may use compact or indented JSON with/without LF.
+  // Never turn duplicate indexes or set IDs into trusted progress.
+  const compact = JSON.stringify(parsed.value);
+  const pretty = JSON.stringify(parsed.value, null, 2);
+  const canonical = JSON.stringify(decoded.value, null, 2) + "\n";
+  const valid = raw["schemaVersion"] === 2
+    ? source === canonical
+    : [compact, compact + "\n", pretty, pretty + "\n"]
+      .includes(source);
+  if (!valid) return progressFailure("$", "checkpoint-noncanonical",
+    "Checkpoint bytes differ from the admitted record.");
+  return { ok: true, value: decoded.value };
 }
 
 function parseCheckpointJson(
