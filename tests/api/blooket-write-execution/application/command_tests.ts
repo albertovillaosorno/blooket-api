@@ -194,6 +194,169 @@ function value(result: Awaited<ReturnType<
   return result.value as Record<string, unknown>;
 }
 
+async function appendFixture(s: Awaited<ReturnType<typeof state>>,
+  additions = 1) {
+  value(await executeBlooketPublicationCommand(command("step", s.revision),
+    s.host));
+  value(await executeBlooketPublicationCommand(command("step", s.revision),
+    s.host));
+  const documentWithNewQuestion = { ...document, questions: [
+    ...document.questions, ...Array.from({ length: additions }, (_, index) =>
+      ({ ...document.questions[0]!, id: "q" + String(index + 2),
+        prompt: index === 0 ? "Type moon." : "Type star.",
+        answer: index === 0 ? "moon" : "star", timeLimitSeconds: 25 })),
+  ] };
+  const saved = await executeLibraryCommand({ version: 1,
+    operationId: "cli:append-fixture", command: "drafts.put",
+    payload: { id: "extension", expectedRevision: null,
+      document: documentWithNewQuestion },
+  }, s.root);
+  assert.ok(saved.ok);
+  const revision = (saved.value as { revision: string }).revision;
+  return { version: 1 as const, operationId: "cli:append-fixture",
+    command: "blooket.publication.append", payload: {
+      draftId: "extension", expectedRevision: revision,
+      remoteSetId: "synthetic-remote",
+    } };
+}
+
+test("canonical append preserves existing questions and creates no set", () =>
+  fixture(async s => {
+    const request = await appendFixture(s);
+    const before = structuredClone(s.questions);
+    const result = value(await executeBlooketPublicationCommand(request,
+      s.host));
+    assert.equal(result["phase"], "advanced");
+    assert.equal(result["completedOperations"], 1);
+    assert.equal(result["totalOperations"], 1);
+    assert.equal(result["remoteSetId"], "synthetic-remote");
+    assert.equal(s.writes(), 3);
+    assert.deepEqual(s.questions.slice(0, 1), before);
+    assert.equal(s.questions[1]?.question, "Type moon.");
+    assert.equal(s.questions[1]?.timeLimit, 25);
+    const verified = value(await executeBlooketPublicationCommand({
+      ...request, command: "blooket.publication.verify",
+      payload: { draftId: "extension" },
+    }, s.host));
+    assert.equal(verified["published"], true);
+    const replay = value(await executeBlooketPublicationCommand(request,
+      s.host));
+    assert.equal(replay["phase"], "complete");
+    assert.equal(s.writes(), 3);
+  }));
+
+test("append refuses changed prior questions before any new write", () =>
+  fixture(async s => {
+    const request = await appendFixture(s);
+    s.questions[0] = { ...s.questions[0]!, question: "Teacher changed it." };
+    const result = await executeBlooketPublicationCommand(request, s.host);
+    assert.equal(result.ok, false);
+    assert.equal(s.writes(), 2);
+    const paths = await publicationFiles(s.root, "extension");
+    await assert.rejects(readFile(paths.snapshot), { code: "ENOENT" });
+  }));
+
+test("uncertain append retains its target and cannot resend", () =>
+  fixture(async s => {
+    const request = await appendFixture(s);
+    s.ambiguous(true);
+    const first = value(await executeBlooketPublicationCommand(request,
+      s.host));
+    assert.equal(first["phase"], "reconciliation-required");
+    assert.equal(first["completedOperations"], 0);
+    assert.equal(first["remoteSetId"], "synthetic-remote");
+    const paths = await publicationFiles(s.root, "extension");
+    const before = await readFile(paths.attempt, "utf8");
+    value(await executeBlooketPublicationCommand(request, s.host));
+    assert.equal(s.writes(), 3);
+    assert.equal(await readFile(paths.attempt, "utf8"), before);
+    const retarget = await executeBlooketPublicationCommand({ ...request,
+      payload: { ...request.payload, remoteSetId: "another-set" },
+    }, s.host);
+    assert.equal(retarget.ok, false);
+    assert.equal(s.writes(), 3);
+    assert.equal(await readFile(paths.attempt, "utf8"), before);
+  }));
+
+test("append resumes its suffix with the ordinary journaled step", () =>
+  fixture(async s => {
+    const request = await appendFixture(s, 2);
+    const first = value(await executeBlooketPublicationCommand(request,
+      s.host));
+    assert.equal(first["completedOperations"], 1);
+    assert.equal(first["totalOperations"], 2);
+    assert.equal(s.writes(), 3);
+    const { remoteSetId: _target, ...payload } = request.payload;
+    const next = value(await executeBlooketPublicationCommand({ ...request,
+      command: "blooket.publication.step", payload }, s.host));
+    assert.equal(next["completedOperations"], 2);
+    assert.equal(s.writes(), 4);
+    assert.deepEqual(s.questions.map(question => question.number), [1, 2, 3]);
+    assert.equal(value(await executeBlooketPublicationCommand({ ...request,
+      command: "blooket.publication.verify",
+      payload: { draftId: "extension" },
+    }, s.host))["published"], true);
+  }));
+
+test("a lost append receipt reconciles fresh reads without another Save", () =>
+  fixture(async s => {
+    const request = await appendFixture(s);
+    const host: BlooketPublicationDependencies = { ...s.host, writes: {
+      execute: async (...args) => {
+        await s.host.writes.execute(...args);
+        return { ok: false, kind: "browser", code: "blooket-browser-failed" };
+      },
+    } };
+    const result = value(await executeBlooketPublicationCommand(request, host));
+    assert.equal(result["phase"], "reconciliation-required");
+    assert.equal(s.questions.length, 2);
+    const repeated = value(await executeBlooketPublicationCommand(request,
+      host));
+    assert.equal(repeated["phase"], "reconciliation-required");
+    assert.equal(s.writes(), 3);
+    const reconciled = value(await executeBlooketPublicationCommand({
+      ...request, command: "blooket.publication.reconcile",
+      payload: { draftId: "extension" },
+    }, host));
+    assert.equal(reconciled["phase"], "recovered");
+    assert.equal(reconciled["completedOperations"], 1);
+    assert.equal(s.writes(), 3);
+  }));
+
+test("append detects a teacher edit between preflight and journal capture",
+  () => fixture(async s => {
+    const request = await appendFixture(s);
+    let observations = 0;
+    const host: BlooketPublicationDependencies = { ...s.host, blooket: {
+      ...s.host.blooket, questions: { list: async (...args) => {
+        if (++observations === 3)
+          s.questions[0] = { ...s.questions[0]!, timeLimit: 40 };
+        return s.host.blooket.questions!.list(...args);
+      } },
+    } };
+    const result = await executeBlooketPublicationCommand(request, host);
+    assert.equal(result.ok, false);
+    assert.equal(s.writes(), 2);
+    const files = await publicationFiles(s.root, "extension");
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+    assert.equal(s.questions[0]?.timeLimit, 40);
+  }));
+
+test("append freezes the prior collection across an interrupted suffix", () =>
+  fixture(async s => {
+    const request = await appendFixture(s, 2);
+    value(await executeBlooketPublicationCommand(request, s.host));
+    const paths = await publicationFiles(s.root, "extension");
+    const frozen = await readFile(paths.snapshot, "utf8");
+    const checkpoint = await readFile(paths.checkpoint, "utf8");
+    s.questions[0] = { ...s.questions[0]!, timeLimit: 40 };
+    const result = await executeBlooketPublicationCommand(request, s.host);
+    assert.equal(result.ok, false);
+    assert.equal(s.writes(), 3);
+    assert.equal(await readFile(paths.snapshot, "utf8"), frozen);
+    assert.equal(await readFile(paths.checkpoint, "utf8"), checkpoint);
+  }));
+
 function browserHost(fixtureState: Awaited<ReturnType<typeof state>>,
   loseCreationReceipt = false,
   confirmationSupported = true): BlooketPublicationDependencies {

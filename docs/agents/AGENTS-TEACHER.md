@@ -25,9 +25,9 @@ Use the validated quiz contracts exposed by the admitted tools. Keep recoverable
 local drafts distinct from published Blooket state. Fresh, verified remote state
 wins when editing an existing online quiz.
 
-## Text-only publication
+## Quiz publication
 
-For an authorized new text-only quiz, save the validated draft with
+For an authorized new quiz, save the validated draft with
 `drafts_put` and retain its returned revision. Call
 `blooket_publication_step` with that draft ID and exact revision, observing each
 result before continuing. Each step performs at most one remote mutation; a
@@ -41,9 +41,22 @@ legitimate local action before continuation.
 
 After all writes complete, call `blooket_publication_verify`. Report publication
 only when that fresh check returns `published: true`; retain the returned remote
-set ID for the teacher. Media and editing an existing quiz are unsupported by
-these tools at present; do not silently remove requested images or replace an
-existing quiz with a new one.
+set ID for the teacher. Prepared question images use stable library IDs;
+unprepared assets, cover images, answer images and audio remain unsupported.
+Do not silently remove requested media.
+
+To extend an existing quiz, first read its exact set ID, current metadata and
+questions. Save a new draft containing the full desired quiz: preserve all
+existing metadata and the exact ordered question prefix, then add new questions.
+
+Call `blooket_publication_append` with that draft ID, saved revision and exact
+`remoteSetId`. It sends at most one new question, without creating a set.
+Continue its remaining steps with `blooket_publication_step`, then verify.
+
+Replacement, deletion, reordering and changes to existing question content or
+metadata are still unsupported. Explain that stop; do not create a replacement
+quiz or omit a requested edit. An uncertain append uses the same status and
+read-only reconciliation workflow as new publication.
 
 ## Media
 

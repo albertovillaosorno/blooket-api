@@ -46,6 +46,7 @@ import type { BlooketCapabilitySnapshot } from
 import {
   buildBlooketWritePlan, buildPreparedBlooketWritePlan,
   sameRemoteCreateSetMetadata,
+  type BlooketWriteOperation,
 } from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import { decodeBlooketPublicationSnapshot as decodeSnapshot,
   publicationHasMedia as hasMedia } from
@@ -83,8 +84,15 @@ import {
 } from "../../../settings/teacher-preferences/domain/preferences.ts";
 import { executePersistedBlooketWrite } from "./execute-persisted.ts";
 import { verifyPersistedBlooketWrite } from "./verify-reconciliation.ts";
-import { blooketSetReadWriteVerifier, questionMatches } from
+import {
+  blooketSetReadWriteVerifier, questionMatches, questionBaselineFor,
+} from
   "./set-read-verifier.ts";
+import type { BlooketQuestionRead } from
+  "../../../ir/blooket-question-reads/contract/question-read.ts";
+import { sameBlooketWriteVerificationBaseline,
+  type BlooketWriteVerificationBaseline } from
+  "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
 import { lowerBlooketWriteSubmission } from "./lower-submission.ts";
 import { admitPreparedPublicationIdentities } from
   "./admit-prepared-media.ts";
@@ -148,7 +156,8 @@ export async function executeBlooketPublicationCommand(
       ? defaultPublicationPreferences()
       : decodePublicationPreferences(descriptor.value);
   } catch { return fail("invalid-publication-policy"); }
-  const { draftId, expectedRevision } = decoded.value;
+  const { draftId, expectedRevision, remoteSetId: requestedSetId } =
+    decoded.value;
   const { root, blooket, writes, pacer, signal } = host;
   const success = (value: unknown) =>
     commandSuccess(command.operationId, value);
@@ -166,7 +175,8 @@ export async function executeBlooketPublicationCommand(
     let snapshot = await readPublicationSnapshot(files.snapshot);
     let currentCapabilities: BlooketCapabilitySnapshot | undefined;
     if (snapshot === undefined) {
-      if (command.command !== "blooket.publication.step")
+      if (command.command !== "blooket.publication.step" &&
+          command.command !== "blooket.publication.append")
         return success({ draftId, phase: "not-started", published: false });
       const draft = await executeLibraryCommand({
         ...command, command: "drafts.get", payload: { id: draftId },
@@ -208,20 +218,56 @@ export async function executeBlooketPublicationCommand(
         if (!admitted.ok) return fail(admitted.code);
         expectedMedia = admitted.identities;
       }
-      const candidate = {
+      let candidate: unknown = {
         schemaVersion: 2, draftId, revision: expectedRevision,
         expectedMedia,
         document: document.value, capabilities: capabilities.value,
       };
       const admitted = decodeSnapshot(candidate, draftId);
       if (!admitted) return fail("blooket-publication-invalid-draft");
+      if (requestedSetId !== undefined) {
+        const detail = await getBlooketSet(blooket.session, blooket.secrets,
+          blooket.sets, requestedSetId, { readOnly: true });
+        if (!detail.ok) return fail(detail.code);
+        if (detail.kind !== "set")
+          return success({ draftId, phase: detail.kind,
+            state: detail.state, published: false });
+        const existing = await listBlooketQuestions(blooket.session,
+          blooket.secrets, blooket.questions, requestedSetId,
+          { readOnly: true });
+        if (!existing.ok) return fail(existing.code);
+        if (existing.kind !== "questions")
+          return success({ draftId, phase: existing.kind,
+            state: existing.state, published: false });
+        if (detail.value.id !== requestedSetId ||
+            detail.value.title !== document.value.title ||
+            detail.value.description !== document.value.description ||
+            detail.value.visibility !== document.value.visibility ||
+            existing.value.length >= document.value.questions.length ||
+            !matchesQuestions(existing.value,
+              admitted.plan.operations.slice(1, existing.value.length + 1),
+              requestedSetId, expectedMedia))
+          return fail("blooket-publication-remote-conflict");
+        const baseline = questionBaselineFor(existing.value);
+        if (baseline === null)
+          return fail("blooket-write-baseline-not-captured");
+        candidate = { schemaVersion: 3, draftId, revision: expectedRevision,
+          expectedMedia, document: document.value,
+          capabilities: capabilities.value,
+          target: { remoteSetId: requestedSetId, baseline } };
+        if (!decodeSnapshot(candidate, draftId))
+          return fail("blooket-publication-invalid-draft");
+      }
       if (signal?.aborted) return fail("blooket-publication-cancelled");
       await createPublicationSnapshot(files.snapshot, candidate);
       snapshot = candidate;
     }
     const prepared = decodeSnapshot(snapshot, draftId);
     if (!prepared) return fail("publication-snapshot-invalid");
-    const { plan, revision, expectedMedia } = prepared;
+    const { plan, desiredPlan, revision, expectedMedia } = prepared;
+    if (requestedSetId !== undefined && (plan.schemaVersion !== 2 ||
+        requestedSetId !== plan.target.remoteSetId))
+      return fail("blooket-publication-remote-conflict");
     if (expectedRevision !== undefined && expectedRevision !== revision)
       return fail("blooket-publication-draft-conflict");
     const loaded = await loadWriteCheckpointFile(files.checkpoint, plan);
@@ -244,10 +290,24 @@ export async function executeBlooketPublicationCommand(
             ? "baseline-unavailable" : "ambiguous-attempt",
         } : {}),
       });
-    const verifier = blooketSetReadWriteVerifier(
+    let expectedAppendBaseline: BlooketWriteVerificationBaseline | null = null;
+    const baseVerifier = blooketSetReadWriteVerifier(
       blooket.sets, blooket.questions, expectedMedia,
       isBrowserWriteExecutionPort(writes) ? "observed" : "complete",
     );
+    const verifier = plan.schemaVersion === 1 ? baseVerifier : {
+      ...baseVerifier,
+      captureBaseline: async (...args: Parameters<
+        typeof baseVerifier.captureBaseline>) => {
+        const captured = await baseVerifier.captureBaseline(...args);
+        // Session/media preparation may await between preflight and the
+        // durable write-ahead journal. Recheck that exact collection here.
+        return captured.ok && (!expectedAppendBaseline ||
+          !sameBlooketWriteVerificationBaseline(captured.baseline,
+            expectedAppendBaseline))
+          ? { ok: true as const, baseline: null } : captured;
+      },
+    };
     if (command.command === "blooket.publication.reconcile") {
       const result = await verifyPersistedBlooketWrite(
         files, plan, blooket.session, blooket.secrets, verifier,
@@ -286,25 +346,17 @@ export async function executeBlooketPublicationCommand(
         if (questions.kind !== "questions")
           return success({ ...progress, phase: questions.kind,
             state: questions.state });
-        const set = plan.operations[0];
+        const set = desiredPlan.operations[0];
         if (!set || set.kind !== "set" ||
             detail.value.title !== set.title ||
             detail.value.description !== set.description ||
             detail.value.visibility !== set.visibility ||
-            questions.value.length !== plan.operations.length - 1 ||
-            !plan.operations.slice(1).every((operation, index) => {
-              const lowered = lowerBlooketWriteSubmission(operation, {
-                remoteSetId: checkpoint.remoteSetId,
-              });
-              const imageId = lowered.ok &&
-                lowered.value.kind === "add-question"
-                ? lowered.value.image?.mediaId : undefined;
-              return lowered.ok && questions.value[index] !== undefined &&
-                questionMatches(questions.value[index]!, lowered.value,
-                  imageId === undefined ? undefined
-                    : expectedMedia?.items.find(item =>
-                        item.mediaId === imageId));
-            }))
+            !matchesQuestions(questions.value,
+              desiredPlan.operations.slice(1), checkpoint.remoteSetId,
+              expectedMedia) || (plan.schemaVersion === 2 &&
+              !sameBlooketWriteVerificationBaseline(plan.target.baseline,
+                questionBaselineFor(questions.value.slice(0,
+                  plan.target.baseline.itemCount)))))
           return fail("blooket-publication-remote-conflict");
         const current = JSON.stringify([detail.value, questions.value]);
         if (previous !== undefined && previous !== current)
@@ -332,7 +384,8 @@ export async function executeBlooketPublicationCommand(
             candidate => samePreparedMediaIdentity(item, candidate))))
         return fail("blooket-media-stale");
     }
-    if (attempt.kind === "missing" && checkpoint.nextOperationIndex === 0 &&
+    if (plan.schemaVersion === 1 && attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex === 0 &&
         isBrowserWriteExecutionPort(writes) &&
         !await browserCreateSetConfirmationSupported(writes))
       return fail("blooket-browser-companion-update-required");
@@ -363,7 +416,7 @@ export async function executeBlooketPublicationCommand(
     // questions. Match the remote Create Set payload, not a whole-plan hash.
     // The lock prevents two local publications from starting simultaneously;
     // the potentially partial My Sets list cannot prove global absence.
-    if (attempt.kind === "missing" &&
+    if (plan.schemaVersion === 1 && attempt.kind === "missing" &&
         checkpoint.nextOperationIndex === 0) {
       let others;
       try { others = await readOtherPublicationSnapshots(root, draftId); }
@@ -372,6 +425,7 @@ export async function executeBlooketPublicationCommand(
         const candidate = decodeSnapshot(other.data, other.draftId);
         if (!candidate)
           return fail("publication-storage-unavailable");
+        if (candidate.plan.schemaVersion === 2) continue;
         const ownSet = plan.operations[0];
         const otherSet = candidate.plan.operations[0];
         if (!ownSet || !otherSet || ownSet.kind !== "set" ||
@@ -397,7 +451,7 @@ export async function executeBlooketPublicationCommand(
     // Even an incomplete My Sets list can prove a positive collision.
     // This prevents another draft from reproducing a matching private quiz
     // after a prior uncertain Create Set; absence is never taken as proof.
-    if (attempt.kind === "missing" &&
+    if (plan.schemaVersion === 1 && attempt.kind === "missing" &&
         checkpoint.nextOperationIndex === 0) {
       const planned = plan.operations[0];
       if (!planned || planned.kind !== "set")
@@ -434,9 +488,10 @@ export async function executeBlooketPublicationCommand(
     // unrelated existing quiz if the user or provider switched edit routes.
     // Read the exact remote metadata again before any subsequent question
     // mutation; a human stop or unknown route cannot authorize a write.
-    if (checkpoint.nextOperationIndex > 0 &&
+    if (attempt.kind === "missing" &&
+        (checkpoint.nextOperationIndex > 0 || plan.schemaVersion === 2) &&
         checkpoint.nextOperationIndex < plan.operations.length) {
-      const expected = plan.operations[0];
+      const expected = desiredPlan.operations[0];
       if (!expected || expected.kind !== "set" ||
           checkpoint.remoteSetId === null)
         return fail("blooket-publication-remote-conflict");
@@ -462,22 +517,37 @@ export async function executeBlooketPublicationCommand(
         if (existing.kind !== "questions")
           return success({ ...progress, phase: existing.kind,
             state: existing.state });
-        const prior = plan.operations.slice(1,
-          checkpoint.nextOperationIndex);
-        if (existing.value.length !== prior.length ||
-            !prior.every((operation, index) => {
-              const lowered = lowerBlooketWriteSubmission(operation, {
-                remoteSetId: checkpoint.remoteSetId,
-              });
-              const mediaId = lowered.ok &&
-                lowered.value.kind === "add-question"
-                ? lowered.value.image?.mediaId : undefined;
-              return lowered.ok && existing.value[index] !== undefined &&
-                questionMatches(existing.value[index]!, lowered.value,
-                  mediaId === undefined ? undefined
-                    : expectedMedia?.items.find(item =>
-                        item.mediaId === mediaId));
-            }))
+        const completed = plan.schemaVersion === 2
+          ? plan.target.baseline.itemCount + checkpoint.nextOperationIndex
+          : checkpoint.nextOperationIndex - 1;
+        const prior = desiredPlan.operations.slice(1, completed + 1);
+        if (!matchesQuestions(existing.value, prior, checkpoint.remoteSetId,
+              expectedMedia) || (plan.schemaVersion === 2 &&
+              !sameBlooketWriteVerificationBaseline(plan.target.baseline,
+                questionBaselineFor(existing.value.slice(0,
+                  plan.target.baseline.itemCount)))))
+          return fail("blooket-publication-remote-conflict");
+        if (plan.schemaVersion === 2)
+          expectedAppendBaseline = questionBaselineFor(existing.value);
+      }
+    }
+    if (plan.schemaVersion === 2 && attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex < plan.operations.length) {
+      const others = await readOtherPublicationSnapshots(root, draftId);
+      for (const other of others) {
+        const candidate = decodeSnapshot(other.data, other.draftId);
+        if (!candidate) return fail("publication-storage-unavailable");
+        const paths = await publicationFiles(root, other.draftId);
+        const prior = await loadWriteCheckpointFile(paths.checkpoint,
+          candidate.plan);
+        const inFlight = await loadWriteAttemptFile(paths.attempt,
+          candidate.plan);
+        if (!prior.ok || !inFlight.ok)
+          return fail("publication-storage-unavailable");
+        if (prior.checkpoint.remoteSetId === plan.target.remoteSetId &&
+            (inFlight.kind === "record" ||
+              prior.checkpoint.nextOperationIndex <
+                candidate.plan.operations.length))
           return fail("blooket-publication-remote-conflict");
       }
     }
@@ -522,4 +592,21 @@ export async function executeBlooketPublicationCommand(
     catch { releaseFailed = true; }
     if (releaseFailed) return fail("publication-lock-release-failed");
   }
+}
+
+function matchesQuestions(
+  actual: readonly BlooketQuestionRead[],
+  operations: readonly BlooketWriteOperation[], remoteSetId: string,
+  media?: PreparedMediaIdentities,
+): boolean {
+  return actual.length === operations.length && operations.every(
+    (operation, index) => {
+      const lowered = lowerBlooketWriteSubmission(operation, { remoteSetId });
+      if (!lowered.ok || lowered.value.kind !== "add-question") return false;
+      const imageId = lowered.value.image?.mediaId;
+      return questionMatches(actual[index]!, lowered.value,
+        imageId === undefined ? undefined : media?.items.find(item =>
+          item.mediaId === imageId));
+    },
+  );
 }

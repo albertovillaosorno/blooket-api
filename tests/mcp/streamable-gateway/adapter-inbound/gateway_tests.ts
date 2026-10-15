@@ -197,6 +197,11 @@ test(
         listed.result.tools.some((tool) => tool.name === "instructions_get"),
       );
       assert.ok(listed.result.tools.some((tool) => tool.name === "skills_put"));
+      const append = listed.result.tools.find(tool =>
+        tool.name === "blooket_publication_append");
+      assert.ok(append);
+      assert.deepEqual(append.inputSchema.required,
+        ["draftId", "expectedRevision", "remoteSetId"]);
       const enrichment = listed.result.tools.find(
         (tool) => tool.name === "library_enrich",
       );

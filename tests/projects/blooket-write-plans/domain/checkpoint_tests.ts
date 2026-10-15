@@ -80,6 +80,7 @@ import {
   "../../../../src/projects/blooket-write-plans/domain/checkpoint.ts";
 import {
   buildBlooketWritePlan,
+  buildBlooketAppendPlan,
   type BlooketWritePlan,
 } from
   "../../../../src/projects/blooket-write-plans/domain/write-plan.ts";
@@ -113,6 +114,37 @@ function plan(): BlooketWritePlan {
   }
   return result.value;
 }
+
+test("append checkpoints bind index zero without a fabricated set receipt",
+  () => {
+    const desired = plan();
+    const target = { remoteSetId: "existing-set", baseline: {
+      schemaVersion: 1 as const, kind: "question-list" as const,
+      itemCount: 0, sha256: "a".repeat(64),
+    } };
+    const append = buildBlooketAppendPlan(desired, target);
+    assert.ok(append);
+    assert.equal(append.operations.length, 1);
+    assert.equal(append.operations[0]?.kind, "question");
+    const checkpoint = initialBlooketWriteCheckpoint(append);
+    assert.equal(checkpoint.nextOperationIndex, 0);
+    assert.equal(checkpoint.remoteSetId, "existing-set");
+    assert.equal(decodeBlooketWriteCheckpoint(checkpoint, append).ok, true);
+    for (const remoteSetId of [null, "another-set"])
+      assert.equal(decodeBlooketWriteCheckpoint({ ...checkpoint, remoteSetId },
+        append).ok, false);
+    assert.equal(advanceBlooketWriteCheckpoint(append, checkpoint,
+      append.operations[0]!.operationId, null).ok, true);
+    assert.notEqual(buildBlooketAppendPlan(desired, { ...target,
+      remoteSetId: "another-set" })?.planId, append.planId);
+    assert.notEqual(buildBlooketAppendPlan(desired, { ...target,
+      baseline: { ...target.baseline, sha256: "b".repeat(64) },
+    })?.planId, append.planId);
+    assert.equal(buildBlooketAppendPlan(desired, { ...target,
+      baseline: { ...target.baseline, itemCount: 1 },
+    }), undefined);
+    assert.equal(buildBlooketAppendPlan(append, target), undefined);
+  });
 
 test("fresh checkpoints resume at the first operation", () => {
   const value = plan();

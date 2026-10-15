@@ -36,8 +36,9 @@ import { BLOOKET_PUBLICATION_COMMANDS, decodeBlooketPublicationCommand } from
 
 test("publication payloads admit logical IDs and exact saved revisions", () => {
   for (const name of BLOOKET_PUBLICATION_COMMANDS) {
-    const request = name.endsWith(".step")
-      ? { draftId: "fixture.quiz", expectedRevision: "a".repeat(64) }
+    const request = (name.endsWith(".step") || name.endsWith(".append"))
+      ? { draftId: "fixture.quiz", expectedRevision: "a".repeat(64),
+          ...(name.endsWith(".append") ? { remoteSetId: "remote-set" } : {}) }
       : { draftId: "fixture.quiz" };
     assert.equal(decodeBlooketPublicationCommand(name, request).ok, true);
     for (const invalid of [null, [], {},
@@ -45,7 +46,7 @@ test("publication payloads admit logical IDs and exact saved revisions", () => {
       { ...request, draftId: "../fixture" },
       { ...request, draftId: "a".repeat(129) },
       { ...request, overrideRetry: true },
-      { ...request, remoteSetId: "model-controlled" },
+      { ...request, remoteSetId: "" },
     ]) assert.equal(decodeBlooketPublicationCommand(name, invalid).ok, false);
   }
   for (const expectedRevision of [null, undefined, "", "A".repeat(64), 1])
@@ -57,9 +58,11 @@ test("publication payloads admit logical IDs and exact saved revisions", () => {
 test("publication admission never evaluates or tolerates extra own fields",
   () => {
   for (const name of BLOOKET_PUBLICATION_COMMANDS) {
-    const step = name.endsWith(".step");
+    const step = (name.endsWith(".step") || name.endsWith(".append"));
     const input = step ? { draftId: "fixture",
-      expectedRevision: "a".repeat(64) } : { draftId: "fixture" };
+      expectedRevision: "a".repeat(64),
+      ...(name.endsWith(".append") ? { remoteSetId: "remote-set" } : {})
+    } : { draftId: "fixture" };
     let getterCalls = 0;
     const accessor = Object.defineProperty({ ...input }, "draftId", {
       enumerable: true, get() { getterCalls++; return "fixture"; },

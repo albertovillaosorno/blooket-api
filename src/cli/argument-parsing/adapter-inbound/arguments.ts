@@ -104,17 +104,20 @@ export function parseCliArguments(args: readonly string[]): CliParseResult {
     const command = "blooket.publication." + args[1];
     const json = args.at(-1) === "--json";
     const values = args.slice(2, json ? -1 : undefined);
-    const step = command === "blooket.publication.step";
+    const append = command === "blooket.publication.append";
+    const step = command === "blooket.publication.step" || append;
     const payload = {
       draftId: values[0]!,
       ...(step ? { expectedRevision: values[1]! } : {}),
+      ...(append ? { remoteSetId: values[2]! } : {}),
     };
     if (!isBlooketPublicationCommand(command) ||
-        values.length !== (step ? 2 : 1) ||
+        values.length !== (append ? 3 : step ? 2 : 1) ||
         !decodeBlooketPublicationCommand(command, payload).ok)
       return { ok: false,
         message: "Usage: blooket publication " +
           "step <draft-id> <revision> [--json], or " +
+          "append <draft-id> <revision> <set-id> [--json], or " +
           "status|verify|reconcile <draft-id> [--json]",
       };
     return { ok: true, invocation: {

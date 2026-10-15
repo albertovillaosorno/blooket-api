@@ -80,7 +80,7 @@ export function initialBlooketWriteCheckpoint(
     schemaVersion: BLOOKET_WRITE_CHECKPOINT_VERSION,
     planId: plan.planId,
     nextOperationIndex: 0,
-    remoteSetId: null,
+    remoteSetId: plan.schemaVersion === 2 ? plan.target.remoteSetId : null,
   };
 }
 
@@ -156,6 +156,7 @@ export function decodeBlooketWriteCheckpoint(
     typeof nextOperationIndex === "number"
     && Number.isSafeInteger(nextOperationIndex)
     && nextOperationIndex === 0
+    && plan.schemaVersion === 1
     && remoteSetId !== null
     && remoteSetId !== undefined
   ) {
@@ -164,6 +165,10 @@ export function decodeBlooketWriteCheckpoint(
       code: "unexpected-remote-set-binding",
       message: "A fresh checkpoint cannot already target a remote set.",
     });
+  }
+  if (plan.schemaVersion === 2 && remoteSetId !== plan.target.remoteSetId) {
+    issues.push({ path: "$.remoteSetId", code: "remote-set-binding-mismatch",
+      message: "Append progress must retain its immutable target set ID." });
   }
   if (
     typeof nextOperationIndex === "number"

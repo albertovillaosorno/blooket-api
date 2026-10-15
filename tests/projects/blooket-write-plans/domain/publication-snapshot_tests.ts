@@ -53,6 +53,33 @@ const legacy = { schemaVersion: 1, draftId: "fixture",
   revision: "a".repeat(64), document, capabilities };
 const identity = { mediaId: "icon", revision: 1, format: "png",
   byteLength: 30, sha256: "b".repeat(64) };
+
+test("version three append snapshots keep exact target and suffix identities",
+  () => {
+    const snapshot = { ...legacy, schemaVersion: 3,
+      expectedMedia: { schemaVersion: 1, items: [] },
+      target: { remoteSetId: "existing-set", baseline: {
+        schemaVersion: 1, kind: "question-list", itemCount: 0,
+        sha256: "a".repeat(64),
+      } },
+    };
+    const decoded = decodeBlooketPublicationSnapshot(snapshot, "fixture");
+    assert.ok(decoded && decoded.plan.schemaVersion === 2);
+    assert.equal(decoded.desiredPlan.operations[0]?.kind, "set");
+    assert.equal(decoded.plan.operations[0]?.kind, "question");
+    assert.deepEqual(decoded.plan.target, snapshot.target);
+    snapshot.target.baseline.sha256 = "b".repeat(64);
+    assert.equal(decoded.plan.target.baseline.sha256, "a".repeat(64));
+    for (const candidate of [
+      { ...snapshot, schemaVersion: 2 },
+      { ...snapshot, target: { ...snapshot.target, path: "/private/set" } },
+      { ...snapshot, target: { ...snapshot.target, baseline: {
+        ...snapshot.target.baseline, kind: "set-list" } } },
+      { ...snapshot, target: { ...snapshot.target, baseline: {
+        ...snapshot.target.baseline, itemCount: 1 } } },
+    ]) assert.equal(decodeBlooketPublicationSnapshot(candidate, "fixture"),
+      undefined);
+  });
 function mediaSnapshot() {
   return { ...legacy, schemaVersion: 2,
     document: { ...document, questions: [{ ...document.questions[0],

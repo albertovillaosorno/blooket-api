@@ -73,6 +73,25 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, canonical CLI/MCP append publication began extending an explicit
+existing set without Create Set. Version-three snapshots bind the full desired
+quiz and original collection digest; version-two plans execute only the new
+question suffix. Existing journals and checkpoints retain their old bindings.
+
+Portable tests cover preserved questions, per-question time, sequential resume,
+retarget refusal, edits during preflight, edits between steps and reconciliation
+of a lost successful receipt without another Save. An integration fixture uses
+the actual MCP tool, CLI subprocess, localhost service, browser bridge and
+durable journal with a simulated provider. Live append and replacing existing
+question content remain pending; this record stays active.
+
+Blooket's official [question-set guide][question-set-guide], checked on
+2026-10-15, documents adding and saving questions in the set editor. It does not
+establish a private server contract or prove this product's remote writes.
+
+<!-- jig-ignore-next-line: Preserve the exact official provider URL. -->
+[question-set-guide]: https://help.blooket.com/hc/en-us/articles/16289513807383-Creating-a-Question-Set
+
 On 2026-10-15, publication stopped depending on unrelated account-dependent
 Audio inspection for prepared question images. The existing scoped base
 snapshot already reports question-image availability separately; the
@@ -614,10 +633,12 @@ rule evaluation limitation remains explicit in the development handoff.
 
 ## Blockers
 
-Text-only Add Question browser mechanics now submit once and require exact
-post-submit read-back. Media upload, existing-quiz editing, and live canonical
-publication acceptance remain pending. The connected legacy extension must be
-replaced before the current bounded read contracts can verify a real result.
+Canonical Create Set and one typing question have real fresh verification.
+Uninterrupted multi-question publication, prepared-media upload, live append
+and replacement of existing questions remain pending. The latest native MC Save
+received HTTP 429 and retains its uncertain journal without replay. Computer Use
+currently fails its own request-header-policy initialization before page access;
+that controller failure does not establish a Blooket challenge or session loss.
 
 Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
 and does not block this functional record.

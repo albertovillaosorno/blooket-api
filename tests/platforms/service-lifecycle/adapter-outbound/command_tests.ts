@@ -230,7 +230,7 @@ test("local reads and MCP traverse the real CLI and service bridge",
     assert.equal(
       listTeacherTools().filter((tool) => tool.name.startsWith("blooket_"))
         .length,
-      9,
+      10,
     );
     assert.equal(JSON.stringify(mcp).includes(bridge.pairingToken()), false);
     legacyList = true;
@@ -402,6 +402,55 @@ test("MCP publication crosses CLI service and journaled browser transport",
       assert.equal(JSON.stringify(verified).includes(bridge.pairingToken()),
         false);
       assert.equal(JSON.stringify(verified).includes(root), false);
+      const extension = await executeJsonCommand("drafts.put", {
+        id: "append-fixture", expectedRevision: null,
+        document: { schemaVersion: 1, title: "Synthetic publication",
+          description: "Fixture", quizLanguage: "English",
+          visibility: "private", mediaIndex: "media.jsonl", coverImage: null,
+          questions: [
+            { id: "q1", type: "typing-answer", prompt: "Type sun.",
+              timeLimitSeconds: 10, image: null, matchMode: "contains",
+              answer: "sun" },
+            { id: "q2", type: "typing-answer", prompt: "Type moon.",
+              timeLimitSeconds: 25, image: null, matchMode: "exact",
+              answer: "moon" },
+          ],
+        },
+      }, "cli:append-draft", root);
+      assert.ok(extension.ok);
+      const appended = await callTeacherTool("blooket_publication_append", {
+        draftId: "append-fixture", remoteSetId: "synthetic-created",
+        expectedRevision: (extension.value as { revision: string }).revision,
+      }, root);
+      assert.equal(appended.isError, false, appended.content[0]?.text);
+      const appendEnvelope = decodeResultEnvelope(
+        JSON.parse(appended.content[0]!.text),
+      );
+      assert.ok(appendEnvelope.ok && appendEnvelope.value.ok);
+      if (appendEnvelope.ok && appendEnvelope.value.ok)
+        assert.deepEqual(appendEnvelope.value.value, {
+          draftId: "append-fixture",
+          revision: (extension.value as { revision: string }).revision,
+          remoteSetId: "synthetic-created", completedOperations: 1,
+          totalOperations: 1, published: false, phase: "advanced",
+        });
+      const checkedAppend = await callTeacherTool("blooket_publication_verify",
+        { draftId: "append-fixture" }, root);
+      assert.equal(checkedAppend.isError, false,
+        checkedAppend.content[0]?.text);
+      const checked = decodeResultEnvelope(
+        JSON.parse(checkedAppend.content[0]!.text),
+      );
+      assert.ok(checked.ok && checked.value.ok);
+      if (checked.ok && checked.value.ok)
+        assert.equal((checked.value.value as { published: boolean }).published,
+          true);
+      assert.deepEqual(mutations,
+        ["sets.create", "questions.create", "questions.create"]);
+      assert.equal(questions.length, 2);
+      assert.equal(questions[0]?.["question"], "Type sun.");
+      assert.equal(questions[1]?.["question"], "Type moon.");
+      assert.equal(confirmationInspections, 4);
     } finally {
       clearInterval(poll);
       bridge.close();
