@@ -225,7 +225,8 @@ export async function executeBlooketPublicationCommand(
         document: document.value, capabilities: capabilities.value,
       };
       const admitted = decodeSnapshot(candidate, draftId);
-      if (!admitted) return fail("blooket-publication-invalid-draft");
+      if (!admitted || !providerTextCanBeSubmitted(admitted.plan.operations))
+        return fail("blooket-publication-invalid-draft");
       if (requestedSetId !== undefined) {
         const detail = await getBlooketSet(blooket.session, blooket.secrets,
           blooket.sets, requestedSetId, { readOnly: true });
@@ -273,6 +274,8 @@ export async function executeBlooketPublicationCommand(
     const prepared = decodeSnapshot(snapshot, draftId);
     if (!prepared) return fail("publication-snapshot-invalid");
     const { plan, desiredPlan, revision, expectedMedia } = prepared;
+    if (!providerTextCanBeSubmitted(plan.operations))
+      return fail("blooket-publication-invalid-draft");
     if (requestedSetId !== undefined && (plan.schemaVersion !== 2 ||
         requestedSetId !== plan.target.remoteSetId))
       return fail("blooket-publication-remote-conflict");
@@ -655,4 +658,15 @@ async function competingAppendState(
   } catch {
     return "storage-unavailable";
   }
+}
+
+// Check the actual provider lowering contract before opening a snapshot or
+// write-ahead journal. The temporary target is never sent to a browser.
+function providerTextCanBeSubmitted(
+  operations: readonly BlooketWriteOperation[],
+): boolean {
+  return operations.every(operation => lowerBlooketWriteSubmission(
+    operation, { remoteSetId: operation.kind === "set" ? null
+      : "publication-preflight" },
+  ).ok);
 }
