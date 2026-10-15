@@ -75,6 +75,7 @@ function fakeChrome(options: {
   readonly imageProbeReply?: unknown;
   readonly canLeave?: unknown;
   readonly savePersists?: boolean;
+  readonly postSubmit429?: boolean;
 }) {
   let tab = {
     url: options.initialUrl ??
@@ -142,6 +143,8 @@ function fakeChrome(options: {
           case "inspectBlooketPreparedQuestionEcho":
             return [{ result: options.echoValid === undefined
               ? true : options.echoValid }];
+          case "inspectBlooketPostSubmitRateLimit":
+            return [{ result: options.postSubmit429 === true }];
           case "runBlooketAddQuestionPageAction":
             if (args?.[0] === "open" || args?.[0] === "open-image") {
               modalOpen = args?.[1] === "set-fixture";
@@ -241,6 +244,35 @@ function fakeChrome(options: {
     navigated = false;
   } };
 }
+
+test("a post-Save 429 stops as rate-limited without a second Save",
+  async () => {
+  const fake = fakeChrome({ mismatchReadBack: true,
+    postSubmit429: true });
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "navigation",
+    state: "rate-limited" });
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.includes("reload"), false);
+  assert.equal(fake.calls.includes(
+    "inspectBlooketPostSubmitRateLimit"), true);
+  },
+);
+
+test("a failed Save without linked 429 remains uncertain, not a replay",
+  async () => {
+  const fake = fakeChrome({ mismatchReadBack: true,
+    postSubmit429: false });
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
 
 test("host confirms Add Question only after exact read-back", async () => {
   const fake = fakeChrome({});

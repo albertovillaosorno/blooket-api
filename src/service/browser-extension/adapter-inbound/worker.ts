@@ -46,7 +46,9 @@ import { createExtensionQuestionInspectionHost } from
   "./question-inspection-host.ts";
 import { inspectDetachedBlooketQuestions } from
   "./detached-question-read-host.ts";
-import { inspectBlooketQuestionWriteStage } from
+import {
+  inspectBlooketQuestionWriteStage, inspectBlooketSubmittedQuestionOwner,
+} from
   // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../platforms/blooket-browser/adapter-outbound/question-write-stage-page.ts";
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
@@ -372,10 +374,13 @@ async function read(
         Date.now() < readDeadline) {
       const stage = await script(current, browser,
         inspectBlooketQuestionWriteStage as (...args: never[]) => unknown);
+      const bound = await script(current, browser,
+        inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
+        [operation.setId]);
       const state = await script(current, browser,
         inspectBlooketPage as (...args: never[]) => unknown,
         [{ kind: "session.observe" }]);
-      if (!exactWorkerKeys(stage, "kind,stage") ||
+      if (bound !== true || !exactWorkerKeys(stage, "kind,stage") ||
           (stage as { kind?: unknown }).kind !==
             "blooket-question-write-stage" ||
           (stage as { stage?: unknown }).stage !== "submit-attempted" ||
@@ -396,8 +401,12 @@ async function read(
       const finalOrigin = await script(current, browser,
         inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
         [tab.url]);
+      const finalBinding = await script(current, browser,
+        inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
+        [operation.setId]);
       if (finalTab.status !== "complete" || finalTab.url !== tab.url ||
-          finalOrigin !== sourceOrigin || Date.now() >= readDeadline)
+          finalOrigin !== sourceOrigin || finalBinding !== true ||
+          Date.now() >= readDeadline)
         throw new Error("browser-navigation-unsafe");
       return detached;
     }
