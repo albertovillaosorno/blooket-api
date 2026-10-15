@@ -312,15 +312,20 @@ export function createExtensionAddQuestionHost(
         }
         if (!panelReady) return browserFailure();
 
+        // Preserve nullable fields across Chrome's injected argument bridge.
+        // Admission above already decoded these semantics; each page entry
+        // still validates its owned form and exact provider state.
+        const serializedInput = JSON.stringify(input);
+
         const controlsPrepared = await ownedScript(
           prepareBlooketQuestionControls as (...args: never[]) => unknown,
-          [input],
+          [serializedInput],
         );
         if (controlsPrepared !== true) return browserFailure();
 
         const prepared = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-          ["prepare", input],
+          ["prepare", serializedInput],
         );
         if (!exactOk(prepared)) {
           if (input.image) await ownedScript(
@@ -344,7 +349,7 @@ export function createExtensionAddQuestionHost(
           }
           const finalized = imageReady ? await ownedScript(
             runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-            ["finalize-image", input],
+            ["finalize-image", serializedInput],
           ) : undefined;
           if (!exactOk(finalized)) {
             await ownedScript(
@@ -360,13 +365,13 @@ export function createExtensionAddQuestionHost(
         // immediately before the single latched Save Question action.
         const echoed = await ownedScript(
           inspectBlooketPreparedQuestionEcho as (...args: never[]) => unknown,
-          [input],
+          [serializedInput],
         );
         if (echoed !== true) return browserFailure();
         try {
           const submittedResult = await ownedScript(
             runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-            ["submit", input],
+            ["submit", serializedInput],
           );
           if (!exactOk(submittedResult)) return browserFailure();
         } catch {

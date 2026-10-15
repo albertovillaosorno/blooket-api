@@ -861,6 +861,35 @@ test("provider marker text never reaches the hidden question field", () => {
   );
 });
 
+test("injected JSON text retains MC nulls through prepare and one Save", () => {
+  const page = fixture();
+  const input: BlooketTextQuestionPageInput = {
+    ...typing, qType: "mc", question: "Choose a star.",
+    answers: [{ text: "Sun", correct: true },
+      { text: "Moon", correct: false }],
+    answerTypes: null, random: false,
+  };
+  page.hidden.value = JSON.stringify({
+    number: 1, question: input.question, answers: ["Sun", "Moon"],
+    correctAnswers: ["Sun"], image: "", audio: "", qType: "mc",
+    random: false, answerTypes: null, timeLimit: 15,
+  });
+  const injected = Function("return (" +
+    runBlooketAddQuestionPageAction.toString() + ")")() as
+    typeof runBlooketAddQuestionPageAction;
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      const json = JSON.stringify(input);
+      assert.deepEqual(injected("prepare", json), { ok: true });
+      assert.deepEqual(injected("submit", json), { ok: true });
+      assert.equal(page.submit.clicked, 1);
+      assert.deepEqual(injected("submit", json), {
+        ok: false, code: "blooket-browser-failed",
+      });
+      assert.equal(page.submit.clicked, 1);
+    });
+});
+
 test("stale hidden state and file data prevent submission", () => {
   for (const change of ["raw", "file"] as const) {
     const page = fixture();

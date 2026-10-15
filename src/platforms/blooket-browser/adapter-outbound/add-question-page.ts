@@ -518,8 +518,11 @@ export function runBlooketAddQuestionPageAction(
       watch.dispose();
       return { ok: true };
     }
-    if (typeof value === "string") return failed();
-    const input = value;
+    // Chrome's injected object argument conversion can omit null fields.
+    // JSON text preserves MC answerTypes:null without weakening validation.
+    const input: BlooketTextQuestionPageInput = typeof value === "string"
+      ? JSON.parse(value) : value;
+    if (!input || typeof input !== "object") return failed();
     const expected = serializedQuestion(input);
     if (expected === null) return failed();
     const resolved = questionForm(input.setId);

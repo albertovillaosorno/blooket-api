@@ -139,8 +139,10 @@ function fakeChrome(options: {
               },
             }];
           case "prepareBlooketQuestionControls":
+            assert.equal(typeof args?.[0], "string");
             return [{ result: true }];
           case "inspectBlooketPreparedQuestionEcho":
+            assert.equal(typeof args?.[0], "string");
             return [{ result: options.echoValid === undefined
               ? true : options.echoValid }];
           case "inspectBlooketPostSubmitRateLimit":
@@ -170,7 +172,8 @@ function fakeChrome(options: {
             if (args?.[0] === "submit") {
               modalOpen = false;
               questionAdded = true;
-              submittedImage = !!(args[1] as { image?: unknown })?.image;
+              assert.equal(typeof args[1], "string");
+              submittedImage = !!JSON.parse(args[1] as string).image;
               return [{ result: { ok: true } }];
             }
             throw new Error("unexpected-add-question-action");
@@ -310,6 +313,35 @@ test("changed visible editor echo prevents the single Save click",
   }
   },
 );
+
+test("MC injection carries null semantics as JSON before any Save",
+  async () => {
+  const fake = fakeChrome({ prepareFails: true });
+  const original = fake.chrome.scripting.executeScript;
+  const payloads: unknown[] = [];
+  fake.chrome.scripting.executeScript = async request => {
+    const argument = request.func.name === "prepareBlooketQuestionControls"
+      ? request.args?.[0]
+      : request.func.name === "runBlooketAddQuestionPageAction" &&
+          request.args?.[0] === "prepare" ? request.args[1] : undefined;
+    if (argument !== undefined) {
+      assert.equal(typeof argument, "string");
+      payloads.push(JSON.parse(argument as string).answerTypes);
+    }
+    return await original(request);
+  };
+  const candidate = { ...input, qType: "mc" as const,
+    answers: [{ text: "Sun", correct: true },
+      { text: "Moon", correct: false }], answerTypes: null };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined);
+  assert.deepEqual(await host.addQuestion(candidate), {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.deepEqual(payloads, [null, null]);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+});
 
 test("a replaced editor during echo cannot reach Save or reuse tab proof",
   async () => {
