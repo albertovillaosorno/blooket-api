@@ -94,6 +94,7 @@ export function runBlooketAddQuestionPageAction(
       controlChangeTarget?: Element;
       controlsStarted?: boolean;
       controlsPrepared?: boolean;
+      submitStartMs?: number;
       dispose: () => void;
     };
   };
@@ -720,6 +721,12 @@ export function runBlooketAddQuestionPageAction(
         submit.disabled ||
         submit.getAttribute("aria-disabled") === "true")
       return failed();
+    // This time origin is only for a later read-only HTTP 429 diagnostic.
+    // Recording it before the one click never authorizes another Save.
+    const submitStartMs = performance.now();
+    if (!Number.isFinite(submitStartMs) || submitStartMs < 0)
+      return failed();
+    watch.submitStartMs = submitStartMs;
     watch.submitted = true;
     submit.click();
     return { ok: true };

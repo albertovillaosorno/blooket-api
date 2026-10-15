@@ -60,6 +60,8 @@ test(
   let incompatiblePoll = false;
   let unsafeReadSource = false;
   let submittedReadOwner = false;
+  let submittedBoundSet = "set-fixture";
+  let detachedSourceOwnerLost = false;
   let detachedSourceReload = false;
   let detachedCreated = 0;
   let detachedClosed = 0;
@@ -254,6 +256,10 @@ test(
               detachedSourceReload = false;
               documentOrigin += 1_000;
             }
+            if (detachedSourceOwnerLost) {
+              detachedSourceOwnerLost = false;
+              submittedReadOwner = false;
+            }
             return [{ result: { ok: true, value: [] } }];
           }
           throw Error("unexpected-detached-question-script");
@@ -263,6 +269,11 @@ test(
         if (func.name === "inspectBlooketQuestionWriteStage")
           return [{ result: { kind: "blooket-question-write-stage",
             stage: submittedReadOwner ? "submit-attempted" : "no-owner" } }];
+        if (func.name === "inspectBlooketSubmittedQuestionOwner") {
+          assert.equal(args.length, 1);
+          return [{ result: submittedReadOwner &&
+            args[0] === submittedBoundSet }];
+        }
         if (func.name === "inspectBlooketSessionDocumentOrigin") {
           assert.deepEqual(args, [tabUrl]);
           return [{ result: documentOrigin }];
@@ -1006,11 +1017,26 @@ test(
     })).ok, false);
     assert.equal(detachedCreated, 2);
     assert.equal(detachedClosed, 2);
-    submittedReadOwner = false;
+    // An old submit latch from another same-document set is not authority
+    // to inspect this route, even if its stage still says submitted.
+    submittedBoundSet = "other-set";
     assert.equal((await expectReply({
       kind: "questions.list", setId: "set-fixture",
     })).ok, false);
     assert.equal(detachedCreated, 2);
+    submittedBoundSet = "set-fixture";
+    // A teacher edit during the detached read invalidates final ownership.
+    detachedSourceOwnerLost = true;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, 3);
+    assert.equal(detachedClosed, 3);
+    submittedReadOwner = false;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, 3);
     questionSaved = true;
     unsafeReadSource = false;
     tabUrl = "https://dashboard.blooket.com/my-sets";

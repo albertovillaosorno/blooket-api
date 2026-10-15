@@ -155,6 +155,19 @@ this final record.
 
 ## Evidence
 
+On 2026-10-15, a content-free authorized Chrome read found one same-origin
+HTTP 429 resource response on the provider Edit route during initial page
+loading. This is not a Save receipt, nor proof that the later Save was
+throttled. A dedicated isolated-world diagnostic now records a monotonic
+timestamp before
+a single Save click and only classifies HTTP 429 fetches to that exact same
+Edit route after the attempt.
+
+Earlier hydration 429s, unrelated set IDs, foreign initiators, replaced
+documents and unowned latches are refused.
+Synthetic provider-drift tests prove the positive and negative shapes; an
+uncertain attempted write remains journaled without auto-retry.
+
 The browser mutation host now separates temporarily missing document-origin
 evidence after its own navigation from absent or malformed identity on a
 teacher-selected existing tab. These cases cannot be polled into authority;

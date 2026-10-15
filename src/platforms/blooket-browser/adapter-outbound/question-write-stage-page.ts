@@ -94,3 +94,81 @@ export function inspectBlooketQuestionWriteStage():
     return result("unavailable");
   }
 }
+
+// A submitted latch can belong to an earlier SPA route in the same native
+// document. Only the exact set that owns that latch may authorize a detached
+// read. No account identifiers are ever returned by this injected probe.
+export function inspectBlooketSubmittedQuestionOwner(
+  setId: string,
+): boolean {
+  try {
+    if (typeof setId !== "string" || !setId || setId.length > 512 ||
+        /[\x00-\x1f\x7f]/u.test(setId)) return false;
+    const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || url.hash ||
+        url.searchParams.size !== 1 ||
+        url.searchParams.getAll("id").length !== 1 ||
+        url.searchParams.get("id") !== setId) return false;
+    const field = Object.getOwnPropertyDescriptor(
+      globalThis, "__blooketAddQuestionFormWatch",
+    );
+    if (!field || !field.enumerable || !field.configurable ||
+        !("value" in field)) return false;
+    const watch = field.value;
+    if (!watch || typeof watch !== "object" || Array.isArray(watch))
+      return false;
+    const own = (key: string): unknown => {
+      const data = Object.getOwnPropertyDescriptor(watch, key);
+      return data?.enumerable && "value" in data ? data.value : undefined;
+    };
+    return own("document") === document && own("setId") === setId &&
+      own("submitted") === true && own("dirty") === false;
+  } catch { return false; }
+}
+
+// The provider can keep an Edit form visible when a Save-triggered fetch was
+// throttled. Observe only a same-origin HTTP 429 *after* the one owned submit
+// latch. A 429 from initial navigation or another set cannot explain Save.
+// This is a conservative wait signal, not proof of remote non-persistence.
+export function inspectBlooketPostSubmitRateLimit(setId: string): boolean {
+  try {
+    if (!setId || setId.length > 512 ||
+        /[\x00-\x1f\x7f]/u.test(setId)) return false;
+    const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || url.hash ||
+        url.searchParams.size !== 1 ||
+        url.searchParams.get("id") !== setId) return false;
+    const owner = Object.getOwnPropertyDescriptor(
+      globalThis, "__blooketAddQuestionFormWatch",
+    );
+    if (!owner || !("value" in owner) || !owner.enumerable ||
+        !owner.configurable || !owner.value ||
+        typeof owner.value !== "object") return false;
+    const own = (key: string): unknown => {
+      const field = Object.getOwnPropertyDescriptor(owner.value, key);
+      return field && "value" in field && field.enumerable
+        ? field.value : undefined;
+    };
+    const started = own("submitStartMs");
+    if (own("document") !== document || own("setId") !== setId ||
+        own("submitted") !== true || own("dirty") !== false ||
+        typeof started !== "number" || !Number.isFinite(started) ||
+        started < 0 || started > performance.now()) return false;
+    const entries = performance.getEntriesByType("resource");
+    // An evicted or huge timing buffer is inconclusive, never permission to
+    // retry. We do not request headers, bodies, parameters or credentials.
+    if (entries.length > 2_000) return false;
+    return entries.some(entry => {
+      if (entry.entryType !== "resource" ||
+          (entry as PerformanceResourceTiming).initiatorType !== "fetch" ||
+          (entry as PerformanceResourceTiming).responseStatus !== 429 ||
+          entry.startTime < started) return false;
+      const requested = new URL(entry.name);
+      return requested.origin === url.origin &&
+        requested.pathname === url.pathname &&
+        requested.search === url.search;
+    });
+  } catch { return false; }
+}

@@ -57,6 +57,9 @@ import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
+import { inspectBlooketPostSubmitRateLimit } from
+  // jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../platforms/blooket-browser/adapter-outbound/question-write-stage-page.ts";
 import {
   closeBlooketQuestionPanel,
   inspectOpenedBlooketQuestion,
@@ -374,7 +377,21 @@ export function createExtensionAddQuestionHost(
         const initialRead = await observeQuestion(
           input, ownedScript, chrome, tabId, pause, imageIdentity,
         );
-        if (!initialRead.ok) return initialRead;
+        if (!initialRead.ok) {
+          if (initialRead.kind === "browser") {
+            // Only a same-set fetch throttled *after* the one Save click
+            // identifies a provider wait. This never clears the attempt or
+            // retries it; earlier page-load 429s remain inconclusive.
+            const throttled = await ownedScript(
+              inspectBlooketPostSubmitRateLimit as
+                (...args: never[]) => unknown,
+              [input.setId],
+            ).catch(() => false);
+            if (throttled === true)
+              return navigationFailure("rate-limited");
+          }
+          return initialRead;
+        }
         // The newly rendered card can be an optimistic UI state. Require a
         // fresh provider document before reporting the question as saved.
         // The read-owned modal was canceled; never reload teacher draft work.

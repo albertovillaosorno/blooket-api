@@ -31,7 +31,11 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inspectBlooketQuestionWriteStage } from
+import {
+  inspectBlooketQuestionWriteStage,
+  inspectBlooketSubmittedQuestionOwner,
+  inspectBlooketPostSubmitRateLimit,
+} from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/blooket-browser/adapter-outbound/question-write-stage-page.ts";
 
@@ -163,4 +167,90 @@ test("unknown watch fields cannot smuggle account content in stage output",
     assert.deepEqual(Object.keys(report), ["kind", "stage"]);
     assert.equal(JSON.stringify(report).includes("synthetic-secret"), false);
   });
+});
+
+test("submitted owner checks exact set binding without leaking the ID", () => {
+  const probe = Function("return (" +
+    inspectBlooketSubmittedQuestionOwner.toString() + ")")() as
+      typeof inspectBlooketSubmittedQuestionOwner;
+  const route = Object.getOwnPropertyDescriptor(globalThis, "location");
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: new URL("https://dashboard.blooket.com/edit?id=set-fixture"),
+  });
+  try {
+    const watch = { ...bound(), setId: "set-fixture", submitted: true };
+    withWatch(watch, () => {
+      assert.equal(probe("set-fixture"), true);
+      assert.equal(probe("another-set"), false);
+      watch.setId = "other-set";
+      assert.equal(probe("set-fixture"), false);
+      watch.setId = "set-fixture";
+      watch.submitted = false;
+      assert.equal(probe("set-fixture"), false);
+      watch.submitted = true;
+      watch.dirty = true;
+      assert.equal(probe("set-fixture"), false);
+    });
+  } finally {
+    if (route) Object.defineProperty(globalThis, "location", route);
+    else Reflect.deleteProperty(globalThis, "location");
+  }
+});
+
+
+test("a post-submit 429 requires exact owner, route and request timing", () => {
+  const originalLocation = Object.getOwnPropertyDescriptor(globalThis,
+    "location");
+  const originalPerformance = Object.getOwnPropertyDescriptor(globalThis,
+    "performance");
+  const address = "https://dashboard.blooket.com/edit?id=set-fixture";
+  const entries: { entryType: string; initiatorType: string;
+    responseStatus: number; startTime: number; name: string }[] = [];
+  Object.defineProperty(globalThis, "location", { configurable: true,
+    value: new URL(address) });
+  Object.defineProperty(globalThis, "performance", { configurable: true,
+    value: { now: () => 10_000,
+      getEntriesByType: () => entries } });
+  try {
+    const watch = { ...bound(), submitted: true, dirty: false,
+      setId: "set-fixture", submitStartMs: 8_000 };
+    withWatch(watch, () => {
+      const probe = Function("return (" +
+        inspectBlooketPostSubmitRateLimit.toString() + ")")() as
+          typeof inspectBlooketPostSubmitRateLimit;
+      assert.equal(probe("set-fixture"), false);
+      entries.push({ entryType: "resource", initiatorType: "fetch",
+        responseStatus: 429, startTime: 2_000, name: address });
+      assert.equal(probe("set-fixture"), false,
+        "an earlier 429 cannot be attributed to the Save click");
+      entries.push({ entryType: "resource", initiatorType: "fetch",
+        responseStatus: 429, startTime: 8_200,
+        name: "https://dashboard.blooket.com/edit?id=another-set" });
+      assert.equal(probe("set-fixture"), false);
+      entries.push({ entryType: "resource", initiatorType: "img",
+        responseStatus: 429, startTime: 8_400, name: address });
+      assert.equal(probe("set-fixture"), false);
+      entries.push({ entryType: "resource", initiatorType: "fetch",
+        responseStatus: 429, startTime: 8_600, name: address });
+      assert.equal(probe("set-fixture"), true);
+      assert.equal(probe("another-set"), false);
+      watch.setId = "different-set";
+      assert.equal(probe("set-fixture"), false);
+      watch.setId = "set-fixture";
+      watch.dirty = true;
+      assert.equal(probe("set-fixture"), false);
+      watch.dirty = false;
+      watch.submitted = false;
+      assert.equal(probe("set-fixture"), false);
+    });
+  } finally {
+    for (const [name, descriptor] of [
+      ["location", originalLocation],
+      ["performance", originalPerformance],
+    ] as const) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  }
 });
