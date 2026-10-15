@@ -12,13 +12,6 @@ The final ongoing maintenance task is intentionally never auto-completed.
 
 ## P2 - Blooket publication
 
-### TODO - Mutation pacing and human checkpoints
-
-Make real publication paced, cancellable, and recoverable without duplicate
-writes; stop clearly when human action is needed.
-
-[Record](docs/todo/open/blooket/pacing.mdc)
-
 ### TODO - Journaled quiz publication
 
 Publish and edit real quizzes from canonical CLI/MCP tools, verify the remote
