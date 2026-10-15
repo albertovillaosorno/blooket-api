@@ -2068,12 +2068,15 @@ async function loadQuizzes() {
     article.append(title, preview, state, actions);
     container.append(article);
     let latest;
+    let refreshGeneration = 0;
     const refreshState = async () => {
       const observedEpoch = publicationViewEpoch;
+      const requestGeneration = ++refreshGeneration;
       const observed = await command("blooket.publication.status",
         { draftId: id });
       if (activePublication || quizzesLoadGeneration !== generation ||
-          observedEpoch !== publicationViewEpoch) return;
+          observedEpoch !== publicationViewEpoch ||
+          requestGeneration !== refreshGeneration) return;
       latest = observed;
       state.textContent = publicationLabel(latest);
       actions.replaceChildren();

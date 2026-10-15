@@ -104,6 +104,13 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A second synthetic-DOM regression showed that overlapping Quizzes status
+reads could complete out of order and restore an obsolete Publish button after
+a newer read had already offered Verify. Each draft's rendered status now has
+its own monotonically increasing request generation, in addition to the view
+and active-publication guard. The tests also prove that Stop aborts the active
+publication signal and stays disabled after the teacher presses it.
+
 A synthetic-DOM regression exposed a teacher-facing cancel-button race in
 the Quizzes tab: a delayed Refresh or list response could replace the active
 publication controls and hide Stop. Quizzes now discards obsolete asynchronous

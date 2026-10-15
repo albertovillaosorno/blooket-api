@@ -75,6 +75,7 @@ async function quizFixture(options: {
   readonly holdSecondList?: boolean;
   readonly holdThirdList?: boolean;
   readonly holdSecondStatus?: boolean;
+  readonly holdThirdStatus?: boolean;
 } = {}) {
   const source = await readFile(new URL(
     "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
@@ -86,10 +87,12 @@ async function quizFixture(options: {
   assert.ok(begin > 0 && end > begin);
   const root = new Element("div");
   const statusRefresh = deferred<unknown>();
+  const thirdStatus = deferred<unknown>();
   const finished = deferred<unknown>();
   const secondList = deferred<string[]>();
   const thirdList = deferred<string[]>();
   let listReads = 0, statusReads = 0;
+  let cancelled: (() => boolean) | undefined;
   const calls: string[] = [];
   const document = {
     createElement: (tag: string) => new Element(tag),
@@ -103,7 +106,11 @@ async function quizFixture(options: {
     JSON,
     report: (error: unknown) => { throw error; },
     publicationStopReason: () => "unknown",
-    publishTextDraft: async () => await finished.promise,
+    publishTextDraft: async (_id: unknown, _rev: unknown,
+      _send: unknown, _progress: unknown, isCancelled: () => boolean) => {
+      cancelled = isCancelled;
+      return await finished.promise;
+    },
     command: async (name: string) => {
       calls.push(name);
       if (name === "drafts.list") {
@@ -121,6 +128,8 @@ async function quizFixture(options: {
         statusReads++;
         if (statusReads === 2 && options.holdSecondStatus !== false)
           return await statusRefresh.promise;
+        if (statusReads === 3 && options.holdThirdStatus)
+          return await thirdStatus.promise;
         return { phase: "ready", completedOperations: 0,
           totalOperations: 2, published: false };
       }
@@ -132,8 +141,9 @@ async function quizFixture(options: {
       loadQuizzes: () => Promise<void>;
     };
   await api.loadQuizzes();
-  return { root, calls, statusRefresh, finished,
-    secondList, thirdList, loadQuizzes: api.loadQuizzes };
+  return { root, calls, statusRefresh, thirdStatus, finished,
+    secondList, thirdList, loadQuizzes: api.loadQuizzes,
+    isCancelled: () => cancelled?.() };
 }
 
 async function flush() {
@@ -207,4 +217,41 @@ test("older Quizzes list responses never overwrite the newest view",
   await older;
   assert.equal(ui.root.children.length, 1);
   assert.equal(ui.root.children[0], newestArticle);
+});
+
+
+test("older status requests cannot re-enable Publish after Verify",
+  async () => {
+  const ui = await quizFixture({ holdThirdStatus: true });
+  const initialRefresh = ui.root.findAction("refresh");
+  initialRefresh?.handlers.get("click")?.();
+  initialRefresh?.handlers.get("click")?.();
+  ui.thirdStatus.resolve({ phase: "writes-complete", published: false,
+    completedOperations: 2, totalOperations: 2,
+    remoteSetId: "synthetic-set" });
+  await flush();
+  assert.ok(ui.root.findAction("verify"));
+  ui.statusRefresh.resolve({ phase: "ready", published: false,
+    completedOperations: 0, totalOperations: 2 });
+  await flush();
+  assert.ok(ui.root.findAction("verify"),
+    "an old status reply restored an obsolete Publish action");
+  assert.equal(ui.root.findAction("publish"), undefined);
+});
+
+
+test("Stop signals cancellation and is disabled until task settles",
+  async () => {
+  const ui = await quizFixture();
+  ui.root.findAction("publish")?.handlers.get("click")?.();
+  const stop = ui.root.findAction("stop");
+  assert.ok(stop);
+  assert.equal(ui.isCancelled(), false);
+  stop.handlers.get("click")?.();
+  assert.equal(stop.disabled, true);
+  assert.equal(ui.isCancelled(), true);
+  ui.finished.resolve({ phase: "paused", published: false });
+  await flush();
+  assert.equal(ui.root.findAction("stop"), undefined);
+  assert.ok(ui.root.findAction("refresh"));
 });
