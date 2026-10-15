@@ -83,6 +83,7 @@ export function lowerBlooketWriteSubmission(
   if (
     !Number.isSafeInteger(operation.questionNumber)
     || operation.questionNumber < 1
+    || operation.questionNumber > 10_000
   ) {
     return { ok: false, code: "invalid-question-number" };
   }
