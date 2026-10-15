@@ -75,6 +75,8 @@ import { blooketSetReadWriteVerifier } from
 import { acquireUpdatePublicationBoundary } from
   "../../../../src/api/application-updates/application/publication-boundary.ts";
 
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+
 const capabilities = JSON.parse(await readFile(new URL(
   "../../../ir/capability-snapshots/contract/" +
     "blooket-official-2026-10-05.json", import.meta.url,
@@ -985,7 +987,7 @@ test("uncertain attempts block updates after inconclusive reconciliation",
 
 async function mediaRecoveryFixture(state: Awaited<ReturnType<typeof state>>) {
   const preparedMedia = { mediaId: "icon", revision: 1,
-    format: "png" as const, bytes: new Uint8Array([137, 80, 78, 71, 13, 10]) };
+    format: "png" as const, bytes: new Uint8Array(PNG_SIGNATURE) };
   const identity = identifyPreparedMedia(preparedMedia)!;
   const snapshot = { schemaVersion: 2, draftId: "fixture",
     revision: state.revision, capabilities,
@@ -1439,3 +1441,238 @@ test("orphan attempt without snapshot blocks a new remote create",
     assert.equal(state.writes(), 1);
   }); },
 );
+
+test("canonical publication freezes prepared question image and verifies it",
+  async () => { await fixture(async state => {
+    const updated = await executeLibraryCommand({
+      version: 1, operationId: "cli:fixture-image-draft", command: "drafts.put",
+      payload: { id: "fixture", expectedRevision: state.revision,
+        document: { ...document, questions: [{ ...document.questions[0],
+          image: { description: "Synthetic prepared icon", mediaId: "icon" },
+        }] } },
+    }, state.root);
+    assert.ok(updated.ok);
+    const revision = (updated.value as { revision: string }).revision;
+    const image = { mediaId: "icon", revision: 1,
+      format: "png" as const, bytes: new Uint8Array(PNG_SIGNATURE) };
+    let reads = 0;
+    const host = { ...state.host, preparedMedia: {
+      read: async (id: string) => {
+        assert.equal(id, "icon");
+        reads++;
+        return { ok: true as const, value: image };
+      },
+    } };
+    const created = value(await executeBlooketPublicationCommand(
+      command("step", revision), host));
+    assert.equal(created["completedOperations"], 1);
+    assert.deepEqual(state.capabilityPurposes(), [undefined]);
+    const files = await publicationFiles(state.root, "fixture");
+    const snapshot = JSON.parse(await readFile(files.snapshot, "utf8"));
+    assert.equal(snapshot.expectedMedia.items.length, 1);
+    assert.equal(snapshot.expectedMedia.items[0].mediaId, "icon");
+    assert.equal(snapshot.expectedMedia.items[0].byteLength, 8);
+    assert.equal(JSON.stringify(snapshot).includes("137,80,78"), false);
+    const added = value(await executeBlooketPublicationCommand(
+      command("step", revision), host));
+    assert.equal(added["completedOperations"], 2);
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("verify"), { ...host, preparedMedia: { read: async () => {
+        throw Error("frozen verification cannot read current media");
+      } } }))["published"], true);
+    assert.equal(state.writes(), 2);
+    assert.ok(reads >= 3);
+  }); });
+
+test("Stop during prepared image lookup leaves no publication snapshot",
+  async () => { await fixture(async state => {
+    const saved = await executeLibraryCommand({
+      version: 1, operationId: "cli:cancel-media-start", command: "drafts.put",
+      payload: { id: "fixture", expectedRevision: state.revision,
+        document: { ...document, questions: [{ ...document.questions[0],
+          image: { description: "Synthetic icon", mediaId: "icon" },
+        }] } },
+    }, state.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const abort = new AbortController();
+    let reads = 0;
+    const result = await executeBlooketPublicationCommand(
+      command("step", revision), { ...state.host, signal: abort.signal,
+        preparedMedia: { read: async () => {
+          reads++;
+          abort.abort();
+          return { ok: true as const, value: {
+            mediaId: "icon", revision: 1, format: "png" as const,
+            bytes: new Uint8Array(PNG_SIGNATURE),
+          } };
+        } },
+      });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues[0]?.code,
+      "blooket-publication-cancelled");
+    assert.equal(reads, 1);
+    assert.equal(state.writes(), 0);
+    const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.snapshot));
+    await assert.rejects(readFile(files.attempt));
+  }); },
+);
+
+test("stalled image read lets Stop release the publication command promptly",
+  async () => { await fixture(async state => {
+    const saved = await executeLibraryCommand({
+      version: 1, operationId: "cli:cancel-stalled-image",
+      command: "drafts.put",
+      payload: { id: "fixture", expectedRevision: state.revision,
+        document: { ...document, questions: [{ ...document.questions[0],
+          image: { description: "Synthetic icon", mediaId: "icon" },
+        }] } },
+    }, state.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const abort = new AbortController();
+    const image = { mediaId: "icon", revision: 1,
+      format: "png" as const, bytes: new Uint8Array(PNG_SIGNATURE) };
+    let entered!: () => void;
+    let release!: (result: { ok: true; value: typeof image }) => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const blocked = new Promise<{ ok: true; value: typeof image }>(
+      resolve => { release = resolve; },
+    );
+    const work = executeBlooketPublicationCommand(
+      command("step", revision), { ...state.host, signal: abort.signal,
+        preparedMedia: { read: async () => {
+          entered();
+          return await blocked;
+        } },
+      });
+    await started;
+    abort.abort();
+    try {
+      const result = await Promise.race([work,
+        new Promise<"hung">(resolve =>
+          setTimeout(() => resolve("hung"), 160)),
+      ]);
+      assert.notEqual(result, "hung");
+      if (result === "hung") return;
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.issues[0]?.code,
+        "blooket-publication-cancelled");
+      assert.equal(state.writes(), 0);
+      const files = await publicationFiles(state.root, "fixture");
+      await assert.rejects(readFile(files.snapshot));
+      await assert.rejects(readFile(files.attempt));
+    } finally {
+      release({ ok: true, value: image });
+      await work;
+    }
+  }); },
+);
+
+test("Stop during resumed image check cannot open another attempt journal",
+  async () => { await fixture(async state => {
+    const saved = await executeLibraryCommand({
+      version: 1, operationId: "cli:cancel-media-resume", command: "drafts.put",
+      payload: { id: "fixture", expectedRevision: state.revision,
+        document: { ...document, questions: [{ ...document.questions[0],
+          image: { description: "Synthetic icon", mediaId: "icon" },
+        }] } },
+    }, state.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const image = { mediaId: "icon", revision: 1,
+      format: "png" as const, bytes: new Uint8Array(PNG_SIGNATURE) };
+    const initial = { ...state.host, preparedMedia: { read: async () =>
+      ({ ok: true as const, value: image }) } };
+    const created = value(await executeBlooketPublicationCommand(
+      command("step", revision), initial));
+    assert.equal(created["completedOperations"], 1);
+    const files = await publicationFiles(state.root, "fixture");
+    const checkpoint = await readFile(files.checkpoint, "utf8");
+    const abort = new AbortController();
+    const stopped = await executeBlooketPublicationCommand(
+      command("step", revision), { ...initial, signal: abort.signal,
+        preparedMedia: { read: async () => {
+          abort.abort();
+          return { ok: true as const, value: image };
+        } },
+      });
+    assert.equal(stopped.ok, false);
+    if (!stopped.ok) assert.equal(stopped.issues[0]?.code,
+      "blooket-publication-cancelled");
+    assert.equal(state.writes(), 1);
+    assert.equal(await readFile(files.checkpoint, "utf8"), checkpoint);
+    await assert.rejects(readFile(files.attempt));
+  }); },
+);
+
+test("changed prepared image after Create Set fails before second mutation",
+  async () => { await fixture(async state => {
+    const updated = await executeLibraryCommand({
+      version: 1, operationId: "cli:fixture-image-changes",
+      command: "drafts.put",
+      payload: { id: "fixture", expectedRevision: state.revision,
+        document: { ...document, questions: [{ ...document.questions[0],
+          image: { description: "Synthetic prepared icon", mediaId: "icon" },
+        }] } },
+    }, state.root);
+    assert.ok(updated.ok);
+    const revision = (updated.value as { revision: string }).revision;
+    const image = { mediaId: "icon", revision: 1,
+      format: "png" as const, bytes: new Uint8Array([...PNG_SIGNATURE, 23]) };
+    const host = { ...state.host, preparedMedia: { read: async () =>
+      ({ ok: true as const, value: image }) } };
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("step", revision), host))["completedOperations"], 1);
+    const files = await publicationFiles(state.root, "fixture");
+    const original = await readFile(files.snapshot, "utf8");
+    image.bytes[8] = 11;
+    const changed = await executeBlooketPublicationCommand(
+      command("step", revision), host);
+    assert.ok(!changed.ok);
+    assert.equal(changed.issues[0]?.code, "blooket-media-stale");
+    assert.equal(state.writes(), 1);
+    assert.equal(await readFile(files.snapshot, "utf8"), original);
+    await assert.rejects(readFile(files.attempt));
+  }); });
+
+test("uncertain image writes remain reconcilable without current media bytes",
+  async () => { await fixture(async state => {
+    const updated = await executeLibraryCommand({
+      version: 1, operationId: "cli:fixture-image-interrupted",
+      command: "drafts.put",
+      payload: { id: "fixture", expectedRevision: state.revision,
+        document: { ...document, questions: [{ ...document.questions[0],
+          image: { description: "Synthetic icon", mediaId: "icon" },
+        }] } },
+    }, state.root);
+    assert.ok(updated.ok);
+    const revision = (updated.value as { revision: string }).revision;
+    const media = { mediaId: "icon", revision: 1,
+      format: "png" as const, bytes: new Uint8Array(PNG_SIGNATURE) };
+    const host = { ...state.host, preparedMedia: { read: async () =>
+      ({ ok: true as const, value: media }) } };
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("step", revision), host))["completedOperations"], 1);
+    state.ambiguous(true);
+    const interrupted = value(await executeBlooketPublicationCommand(
+      command("step", revision), host));
+    assert.equal(interrupted["phase"], "reconciliation-required");
+    assert.equal(state.writes(), 2);
+    const files = await publicationFiles(state.root, "fixture");
+    const journal = await readFile(files.attempt, "utf8");
+    media.bytes.fill(0);
+    const missingPort = { ...host, preparedMedia: { read: async () => {
+      throw Error("Recovery may not require current library image");
+    } } };
+    const resumed = value(await executeBlooketPublicationCommand(
+      command("step", revision), missingPort));
+    assert.equal(resumed["phase"], "reconciliation-required");
+    const result = value(await executeBlooketPublicationCommand(
+      command("reconcile"), missingPort));
+    assert.equal(result["phase"], "reconciliation-required");
+    assert.equal(result["reason"], "verification-inconclusive");
+    assert.equal(await readFile(files.attempt, "utf8"), journal);
+    assert.equal(state.writes(), 2);
+  }); });

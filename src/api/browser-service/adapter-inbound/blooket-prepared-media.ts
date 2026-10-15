@@ -94,7 +94,7 @@ function formatForPreparedFile(
   file: string,
 ): "gif" | "jpeg" | "png" | null {
   if (file.endsWith(".gif")) return "gif";
-  if (file.endsWith(".jpg")) return "jpeg";
+  if (file.endsWith(".jpg") || file.endsWith(".jpeg")) return "jpeg";
   if (file.endsWith(".png")) return "png";
   return null;
 }
