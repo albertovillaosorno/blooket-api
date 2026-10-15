@@ -545,14 +545,16 @@ pending; do not present an unsigned archive as a ready-to-install release.
 ## Develop and verify
 
 ```sh
-npm run check
-npm test
+npm run validate
 node --check src/ui/teacher-workspace/adapter-inbound/app.js
-jig validate --root .
 ```
 
 Jig's `scalability.repository-graph` rule currently records an evidenced
 `not-evaluated` outcome while Jig's own schema/migration contract matures.
+The repository's `npm run validate` runs strict TypeScript checking, roadmap
+integrity, all portable tests, and `jig validate --root .`. `jig check` is a
+separate rule-outcome report and currently retains the external graph gap.
+
 Successful Jig validation has zero policy diagnostics but does not imply this
 particular graph rule has been fully evaluated. The supporting schema source
 files are part of Jig's validator build, not this product checkout.
