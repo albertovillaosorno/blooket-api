@@ -248,7 +248,7 @@ export async function verifyDistribution(
       });
     assert.equal((await request("/")).status, 200);
     for (const path of ["/icon.svg", "/mcp-icon.png", "/library.js",
-      "/publication.js"])
+      "/publication.js", "/pacing-settings.js"])
       assert.equal((await request(path)).status, 200);
     const bootstrap = (await (await request("/api/bootstrap")).json()) as {
       csrf: string;

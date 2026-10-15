@@ -194,7 +194,14 @@ export async function startBrowserService(
     ...createBlooketRuntimePorts(browserBridge, root),
     secrets,
   };
-  const publicationPacer = createBlooketMutationPacer();
+  // One immutable policy snapshot governs every transport's admitted writes.
+  // Changes saved in Settings take effect after a service restart, not in the
+  // middle of an in-flight journaled publication.
+  const publicationPolicy = Object.freeze({ ...preferences.publication });
+  const publicationPacer = createBlooketMutationPacer({
+    minimumStartIntervalMs: publicationPolicy.minimumStartIntervalMs,
+    maximumStartsPerMinute: publicationPolicy.maximumStartsPerMinute,
+  });
   let origin = "";
   let ownedPort: number | undefined;
   const staticRoot = new URL(
@@ -317,6 +324,7 @@ export async function startBrowserService(
         "/app.js": ["app.js", "text/javascript"],
         "/library.js": ["library.js", "text/javascript"],
         "/publication.js": ["publication.js", "text/javascript"],
+        "/pacing-settings.js": ["pacing-settings.js", "text/javascript"],
         "/style.css": ["style.css", "text/css"],
       };
       const asset = files[url.pathname];
@@ -848,7 +856,8 @@ export async function startBrowserService(
           const result = await executeCommand(decoded.value, root, blooket, {
             root, blooket, writes: blooket.writeExecution,
             preparedMedia: blooket.preparedMedia,
-            pacer: publicationPacer, signal: controller.signal,
+            pacer: publicationPacer, publicationPolicy,
+            signal: controller.signal,
           });
           if (!response.destroyed) json(response, 200, result);
         } finally {

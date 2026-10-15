@@ -467,6 +467,23 @@ resubmission, and fresh reads verified its answer, exact matching and time.
 
 Ordinary Add Question confirmation timing is still being improved; canonical
 media upload and existing-quiz editing remain unfinished.
+
+The local **Settings → Blooket publication pacing** controls expose four
+bounded, shared limits: seconds between mutation starts (2–60), mutation
+starts per rolling minute (1–20), attempts per publication (1–10,000), and
+task duration (1–1,440 minutes). Defaults remain 2 seconds, 20 per minute,
+10,000 attempts and 24 hours. Changes take effect after restarting the local
+service; a running journal retains its recovery identity.
+
+Settings v3 are read with conservative defaults and migrated to v4 on the next
+explicit save.
+An old v3 Settings form cannot overwrite a saved v4 publication policy.
+
+These are application safety limits, **not** verified Blooket rate limits.
+Exhaustion stops before a new journal/remote write and never authorizes
+replaying an uncertain attempt. A smaller attempt limit may stop an otherwise
+valid long quiz until the teacher explicitly changes settings and restarts.
+
 MCP runs the bundled runtime in the background without opening Terminal.
 
 Authenticated private details, saved question/image reads, and account

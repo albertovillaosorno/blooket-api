@@ -389,6 +389,33 @@ test("each draft step writes once and requires separate fresh verification",
       "blooket-publication-remote-conflict");
   }); });
 
+test("configured task start limit stops before a second journal or write",
+  async () => { await fixture(async state => {
+    const configured: BlooketPublicationDependencies = {
+      ...state.host,
+      publicationPolicy: {
+        minimumStartIntervalMs: 2_000,
+        maximumStartsPerMinute: 20,
+        maximumTaskStarts: 1,
+        maximumTaskDurationMs: 86_400_000,
+      },
+    };
+    const initial = await executeBlooketPublicationCommand(
+      command("step", state.revision), configured);
+    assert.equal(initial.ok, true);
+    assert.equal(state.writes(), 1);
+    const second = await executeBlooketPublicationCommand(
+      command("step", state.revision), configured);
+    assert.equal(second.ok, false);
+    if (second.ok) return;
+    assert.equal(second.issues[0]?.code,
+      "mutation-task-start-budget-exhausted");
+    assert.equal(state.writes(), 1);
+    const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.attempt));
+  }); },
+);
+
 test("uncertain writes stay journaled even after an empty read-back",
   async () => { await fixture(async state => {
     state.ambiguous(true);

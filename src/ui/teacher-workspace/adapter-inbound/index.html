@@ -252,6 +252,25 @@
             ></label>
             <p class="hint" data-i18n="qualityHelp"></p>
           </article>
+          <article>
+            <h2 data-i18n="publicationPacing"></h2>
+            <p class="hint" data-i18n="publicationPacingHelp"></p>
+            <div class="pair">
+              <label><span data-i18n="publicationInterval"></span>
+                <input name="publicationMinIntervalSeconds" type="number"
+                  min="2" max="60" step="1" required /></label>
+              <label><span data-i18n="publicationPerMinute"></span>
+                <input name="publicationStartsPerMinute" type="number"
+                  min="1" max="20" step="1" required /></label>
+              <label><span data-i18n="publicationTaskStarts"></span>
+                <input name="publicationTaskStarts" type="number"
+                  min="1" max="10000" step="1" required /></label>
+              <label><span data-i18n="publicationTaskDuration"></span>
+                <input name="publicationTaskDurationMinutes" type="number"
+                  min="1" max="1440" step="1" required /></label>
+            </div>
+            <p class="hint" data-i18n="publicationRestartHelp"></p>
+          </article>
           <div class="settings-actions">
             <button
               type="submit"

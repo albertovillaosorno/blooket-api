@@ -34,6 +34,7 @@ import test from "node:test";
 import {
   defaultTeacherPreferences,
   decodeTeacherPreferences,
+  defaultPublicationPreferences,
 } from "../../../../src/settings/teacher-preferences/domain/preferences.ts";
 import { defaultLocalServiceSettings } from
   "../../../../src/settings/local-service/domain/local-service-settings.ts";
@@ -45,7 +46,7 @@ test(
       defaultLocalServiceSettings(),
       "/tmp/media",
     );
-    assert.equal(decoded.schemaVersion, 3);
+    assert.equal(decoded.schemaVersion, 4);
     assert.equal(decoded.defaults.gifFps, 10);
     assert.equal(decoded.service.port, 2607);
     assert.equal("zoom" in decoded.defaults, false);
@@ -127,4 +128,53 @@ test("MCP URLs require an exact credential-free HTTPS resource", () => {
     ).online.enabled,
     true,
   );
+});
+
+
+test("version-three preferences migrate publication limits conservatively",
+  () => {
+  const current = defaultTeacherPreferences("/tmp/media");
+  const { publication: _ignored, ...legacy } = current;
+  const migrated = decodeTeacherPreferences({ ...legacy, schemaVersion: 3 },
+    "/tmp/media");
+  assert.equal(migrated.schemaVersion, 4);
+  assert.deepEqual(migrated.publication, defaultPublicationPreferences());
+  assert.equal(migrated.service.port, current.service.port);
+  assert.equal(migrated.locale, current.locale);
+  assert.throws(() => decodeTeacherPreferences({ ...legacy,
+    schemaVersion: 3, publication: current.publication }, "/tmp/media"));
+});
+
+test("version-four publication settings reject unsafe limits and additions",
+  () => {
+  const defaults = defaultTeacherPreferences("/tmp/media");
+  const base = defaults.publication;
+  const invalid = [
+    { ...base, minimumStartIntervalMs: 1_999 },
+    { ...base, minimumStartIntervalMs: 60_001 },
+    { ...base, minimumStartIntervalMs: 2_001.5 },
+    { ...base, minimumStartIntervalMs: 2_001 },
+    { ...base, maximumStartsPerMinute: 0 },
+    { ...base, maximumStartsPerMinute: 21 },
+    { ...base, maximumTaskStarts: 0 },
+    { ...base, maximumTaskStarts: 10_001 },
+    { ...base, maximumTaskDurationMs: 999 },
+    { ...base, maximumTaskDurationMs: 61_000 },
+    { ...base, maximumTaskDurationMs: 86_400_001 },
+    { ...base, maximumTaskStarts: "20" },
+    { ...base, unexpected: true },
+  ];
+  for (const publication of invalid)
+    assert.throws(() => decodeTeacherPreferences({
+      ...defaults, publication,
+    }, "/tmp/media"));
+  const stricter = {
+    minimumStartIntervalMs: 10_000,
+    maximumStartsPerMinute: 3,
+    maximumTaskStarts: 2,
+    maximumTaskDurationMs: 600_000,
+  };
+  assert.deepEqual(decodeTeacherPreferences({
+    ...defaults, publication: stricter,
+  }, "/tmp/media").publication, stricter);
 });

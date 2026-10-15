@@ -36,6 +36,45 @@ import {
   type LocalServiceSettings,
 } from "../../local-service/domain/local-service-settings.ts";
 
+export interface PublicationPreferences {
+  readonly minimumStartIntervalMs: number;
+  readonly maximumStartsPerMinute: number;
+  readonly maximumTaskStarts: number;
+  readonly maximumTaskDurationMs: number;
+}
+
+export function defaultPublicationPreferences(): PublicationPreferences {
+  return {
+    minimumStartIntervalMs: 2_000,
+    maximumStartsPerMinute: 20,
+    maximumTaskStarts: 10_000,
+    maximumTaskDurationMs: 86_400_000,
+  };
+}
+
+export function decodePublicationPreferences(
+  value: unknown,
+): PublicationPreferences {
+  const record = object(value);
+  exact(record, ["minimumStartIntervalMs", "maximumStartsPerMinute",
+    "maximumTaskStarts", "maximumTaskDurationMs"]);
+  // Settings use whole seconds and whole minutes so values saved by the
+  // local UI remain exactly representable on the next load.
+  if (!integer(record["minimumStartIntervalMs"], 2_000, 60_000) ||
+      (record["minimumStartIntervalMs"] as number) % 1_000 !== 0 ||
+      !integer(record["maximumStartsPerMinute"], 1, 20) ||
+      !integer(record["maximumTaskStarts"], 1, 10_000) ||
+      !integer(record["maximumTaskDurationMs"], 60_000, 86_400_000) ||
+      (record["maximumTaskDurationMs"] as number) % 60_000 !== 0)
+    throw new Error("invalid-publication-policy");
+  return {
+    minimumStartIntervalMs: record["minimumStartIntervalMs"] as number,
+    maximumStartsPerMinute: record["maximumStartsPerMinute"] as number,
+    maximumTaskStarts: record["maximumTaskStarts"] as number,
+    maximumTaskDurationMs: record["maximumTaskDurationMs"] as number,
+  };
+}
+
 export interface ExportDefaults {
   readonly width: number;
   readonly height: number;
@@ -43,7 +82,8 @@ export interface ExportDefaults {
   readonly compression: "lossless" | "compact";
 }
 export interface TeacherPreferences {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
+  readonly publication: PublicationPreferences;
   readonly service: LocalServiceSettings;
   readonly locale: "en" | "es";
   readonly email: string;
@@ -59,7 +99,8 @@ export function defaultTeacherPreferences(
   mediaRoot: string,
 ): TeacherPreferences {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
+    publication: defaultPublicationPreferences(),
     service: defaultLocalServiceSettings(),
     locale: "es",
     email: "",
@@ -78,22 +119,20 @@ export function decodeTeacherPreferences(
     if (!old.ok) throw new Error("invalid-settings");
     return { ...defaultTeacherPreferences(defaultRoot), service: old.value };
   }
+  const legacyThree = record["schemaVersion"] === 3;
   exact(record, [
-    "schemaVersion",
-    "service",
-    "locale",
-    "email",
-    "mediaRoot",
-    "online",
-    "defaults",
+    "schemaVersion", "service", "locale", "email", "mediaRoot",
+    "online", "defaults", ...(!legacyThree ? ["publication"] : []),
   ]);
+  const publication = legacyThree ? defaultPublicationPreferences()
+    : decodePublicationPreferences(record["publication"]);
   const service = decodeLocalServiceSettings(record["service"]);
   const online = object(record["online"]);
   exact(online, ["enabled", "publicUrl", "provider"]);
   const defaults = object(record["defaults"]);
   exact(defaults, ["width", "height", "gifFps", "compression"]);
   if (
-    record["schemaVersion"] !== 3 ||
+    (record["schemaVersion"] !== 4 && !legacyThree) ||
     !service.ok ||
     (record["locale"] !== "en" && record["locale"] !== "es") ||
     typeof record["email"] !== "string" ||
@@ -116,7 +155,9 @@ export function decodeTeacherPreferences(
       defaults["compression"] !== "compact")
   )
     throw new Error("invalid-settings");
-  return value as TeacherPreferences;
+  const old = value as Omit<TeacherPreferences,
+    "schemaVersion" | "publication">;
+  return { ...old, schemaVersion: 4, publication };
 }
 function validMcpUrl(value: string): boolean {
   try {

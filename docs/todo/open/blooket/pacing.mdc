@@ -104,6 +104,19 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, publication pacing gained persisted version-four teacher
+preferences and local Settings controls. Four exact bounded values now govern
+the running service's shared CLI/MCP/UI mutation-start queue and canonical
+task budget. A policy is fixed for the service lifetime; changed settings take
+effect after restart, not mid-journal. Legacy v3 settings load with safe
+defaults and migrate on explicit save without deleting the previous file.
+
+Portable regressions prove invalid and fractional limits are rejected, unit
+conversions are exact, stale v3 writes cannot clear stricter policies, settings
+survive service restart, and a configured one-start task stops before a second
+journal or Blooket call. The live Add Question multi-question acceptance and
+provider pacing limits remain unverified, so this TODO stays open.
+
 On 2026-10-14, an additional red-to-green pacing regression found that
 mutating a caller-owned configuration object after queue construction could
 accelerate the already admitted start interval or rolling-minute allowance.

@@ -54,7 +54,7 @@ test("local icons load and image intake requires origin and CSRF", async () => {
   const service = await startBrowserService({ root, port: 0 });
   try {
     for (const path of ["/icon.svg", "/mcp-icon.png", "/library.js",
-      "/publication.js"]) {
+      "/publication.js", "/pacing-settings.js"]) {
       const response = await fetch(service.origin + path);
       assert.equal(response.status, 200);
       assert.ok((await response.arrayBuffer()).byteLength > 100);
@@ -83,6 +83,42 @@ test("local icons load and image intake requires origin and CSRF", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("publication pacing settings persist through HTTP and service restart",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "publication-pacing-settings-"));
+  let service: Awaited<ReturnType<typeof startBrowserService>> | undefined;
+  try {
+    service = await startBrowserService({ root, port: 0 });
+    const bootstrap = await (await fetch(service.origin +
+      "/api/bootstrap")).json();
+    assert.equal(bootstrap.preferences.schemaVersion, 4);
+    const configured = { ...bootstrap.preferences,
+      publication: { minimumStartIntervalMs: 5_000,
+        maximumStartsPerMinute: 3, maximumTaskStarts: 2,
+        maximumTaskDurationMs: 900_000 } };
+    const response = await fetch(service.origin + "/api/settings", {
+      method: "POST", headers: {
+        Origin: service.origin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": bootstrap.csrf,
+      }, body: JSON.stringify({ preferences: configured, password: "",
+        tunnelToken: "" }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).ok, true);
+    assert.deepEqual((await loadPreferences(root)).publication,
+      configured.publication);
+    await service.quiesce();
+    service = await startBrowserService({ root, port: 0 });
+    const next = await (await fetch(service.origin + "/api/bootstrap")).json();
+    assert.deepEqual(next.preferences.publication, configured.publication);
+  } finally {
+    await service?.quiesce();
+    await rm(root, { recursive: true, force: true });
+  }
+},
+);
 
 test("update ownership excludes direct HTTP data writers and lazy reads",
   { timeout: 10_000 }, async () => {
