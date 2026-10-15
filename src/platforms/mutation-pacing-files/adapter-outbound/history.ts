@@ -139,7 +139,10 @@ async function readHistory(path: string): Promise<StoredHistory | null> {
       if (!part.bytesRead) break;
       length += part.bytesRead;
     }
-    if (length > MAX_FILE_BYTES)
+    const after = await handle.stat();
+    if (length > MAX_FILE_BYTES || length !== stat.size ||
+        after.size !== stat.size || after.mtimeMs !== stat.mtimeMs ||
+        after.ctimeMs !== stat.ctimeMs)
       throw Error("mutation-pacing-history-invalid");
     data = buffer.subarray(0, length).toString("utf8");
   } finally { await handle.close(); }
@@ -161,6 +164,14 @@ async function readHistory(path: string): Promise<StoredHistory | null> {
       (v as number) < (starts[i - 1] as number))) ||
       starts.at(-1) !== record["lastStartMs"])
     throw Error("mutation-pacing-history-invalid");
+  // Exact serializer order matters: a reordered or repeated field cannot
+  // stand in for the adapter's own previous reservation record.
+  const canonical = JSON.stringify({
+    schemaVersion: 1,
+    lastStartMs: record["lastStartMs"],
+    starts,
+  }) + "\n";
+  if (canonical !== data) throw Error("mutation-pacing-history-invalid");
   return {
     lastStartMs: record["lastStartMs"] as number,
     starts: starts as number[],

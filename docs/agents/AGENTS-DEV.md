@@ -266,6 +266,46 @@ connection reaches the authorized Chrome/Chrome for Testing session. Read
 `docs/technical/browser-acceptance-tools.md` before selecting or attaching a
 controller; discover its current tools and help instead of inventing commands.
 
+### Ensure the existing localhost service is running
+
+Before interactive browser acceptance, check the current local service:
+
+```sh
+BLOOKET_DATA_HOME="$PWD/.temp/browser-acceptance-current" \
+  npm run launch -- --status
+```
+
+When this approved development data root is the one already used by the
+connected Chrome profile, **start or reuse the service** if offline:
+
+```sh
+BLOOKET_DATA_HOME="$PWD/.temp/browser-acceptance-current" \
+  npm run launch -- --no-open
+```
+
+This is an explicit, existing product launcher path: it starts a supervised
+background service or reuses the verified live instance, without opening a
+new Chrome profile. Check `http://127.0.0.1:2607/` and a redacted
+`/api/bootstrap` health summary (HTTP, bridge connection, pending-job count)
+before proceeding. Never expose the bootstrap CSRF, bridge bearer token,
+secrets, full browser dumps or private quiz content.
+
+Do not delete or overwrite stale-looking service locks or publication journals,
+kill unknown processes, or retry an ambiguous Blooket write to recover a
+connection. Confirm the exact data root and port, inspect competing processes,
+and use only the approved owner-controlled lifecycle. If the browser has an
+unsaved question editor, leave that tab untouched.
+
+A separate temporary background localhost tab is safer for UI smoke checks
+and may be closed after the check. If the service needs a source-code restart,
+drain only the verified service owner with zero pending jobs; then recheck the
+same Chrome profile.
+
+The developer's current local service need not run in the system's default
+data root. Set `BLOOKET_DATA_HOME` explicitly to the already-approved profile,
+not a guessed account directory. The unattended login-item preference remains
+user-controlled; these checks do not enable hidden autostart.
+
 ### Reuse Chrome for Testing with the development controllers
 
 On Fedora, use the system zsh and the existing authenticated Chrome for Testing

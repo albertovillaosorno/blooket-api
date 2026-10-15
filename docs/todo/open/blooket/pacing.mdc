@@ -104,6 +104,13 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+The restart-safe account pacing ledger was hardened further after a
+red-to-green JSON-format regression: duplicate, reordered or noncanonical
+fields now fail closed even when `JSON.parse` alone would admit them. Descriptor
+reads also compare actual bytes and file timestamps to detect concurrent edits.
+Owner-only `0600` output, released lock files and symbolic lock refusals have
+dedicated portable regressions. No private account write was attempted.
+
 On 2026-10-14, the per-data-root rolling account pacing ledger is now
 durable across service restarts rather than only in memory. The normal
 server-owned pacer commits recent start timestamps in an atomic owner-only
