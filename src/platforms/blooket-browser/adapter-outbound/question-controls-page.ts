@@ -331,8 +331,17 @@ export function inspectBlooketPreparedQuestionEcho(
     )) as HTMLTextAreaElement[];
     const shuffle = unique("input#shuffle-toggle") as
       HTMLInputElement | null;
+    // Provider correctness toggles must remain uniquely present and enabled.
+    // Their checked state is compared through the separately validated native
+    // serialization; do not guess a CSS class as a correctness indicator.
+    const correctnessControls = Array.from({ length: 4 }, (_, index) =>
+      unique('button[aria-label="Mark Answer ' +
+        (index + 1) + ' as Correct"]'));
     return choices.length === 4 && shuffle?.type === "checkbox" &&
-      shuffle.checked === input.random && choices.every((choice, index) =>
+      shuffle.checked === input.random &&
+      correctnessControls.every(button => button?.tagName === "BUTTON" &&
+        !(button as HTMLButtonElement).disabled) &&
+      choices.every((choice, index) =>
         choice.tagName === "TEXTAREA" &&
         choice.id === "answer-" + index && visible(choice) &&
         !choice.disabled && !choice.readOnly &&

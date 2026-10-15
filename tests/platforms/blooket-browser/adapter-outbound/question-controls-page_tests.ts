@@ -461,6 +461,34 @@ test("read-only multiple-choice echo rejects late shuffle and answer changes",
   assert.equal(page.hiddenWrites(), 0);
 }, "mc"));
 
+test("pre-submit MC echo refuses replaced or disabled correctness controls",
+  async () => {
+  const mc: BlooketQuestionPageInput = {
+    ...input, qType: "mc", random: false, answerTypes: null,
+    answers: [{ text: "Sun", correct: true },
+      { text: "Moon", correct: false },
+      { text: "Star", correct: true },
+      { text: "Earth", correct: false }],
+  };
+  for (const variant of ["missing", "duplicate", "disabled", "hidden"])
+    await withEditor(async page => {
+      assert.equal(await prepareBlooketQuestionControls(mc), true);
+      page.watch.prepared = true;
+      page.watch.finalized = true;
+      const selector = 'button[aria-label="Mark Answer 1 as Correct"]';
+      const buttons = page.form.selectors[selector]!;
+      assert.equal(inspectBlooketPreparedQuestionEcho(mc), true);
+      if (variant === "missing") page.form.selectors[selector] = [];
+      if (variant === "duplicate") buttons.push(new Control());
+      if (variant === "disabled") buttons[0]!.disabled = true;
+      if (variant === "hidden") buttons[0]!.attributes["aria-disabled"] =
+        "true";
+      assert.equal(inspectBlooketPreparedQuestionEcho(mc), false);
+      assert.equal(page.hiddenWrites(), 0);
+    }, "mc");
+},
+);
+
 test("pre-submit echo cannot re-admit detached, dirty or submitted forms",
   async () => {
   for (const condition of ["dirty", "submitted", "form"] as const)
