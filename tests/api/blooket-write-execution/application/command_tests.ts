@@ -298,6 +298,41 @@ test("append resumes its suffix with the ordinary journaled step", () =>
     }, s.host))["published"], true);
   }));
 
+test("an unused competing append snapshot cannot strand active progress",
+  () => fixture(async s => {
+    const first = await appendFixture(s, 2);
+    const advanced = value(await executeBlooketPublicationCommand(first,
+      s.host));
+    assert.equal(advanced["completedOperations"], 1);
+    const firstFiles = await publicationFiles(s.root, "extension");
+    const frozen = JSON.parse(await readFile(firstFiles.snapshot, "utf8"));
+    const parsed = decodeBlooketPublicationSnapshot(frozen, "extension");
+    assert.ok(parsed);
+    const second = await executeLibraryCommand({ version: 1,
+      operationId: "cli:competing-append", command: "drafts.put",
+      payload: { id: "extension-other", expectedRevision: null,
+        document: parsed.document },
+    }, s.root);
+    assert.ok(second.ok);
+    const conflicting = await executeBlooketPublicationCommand({ ...first,
+      payload: { draftId: "extension-other",
+        expectedRevision: (second.value as { revision: string }).revision,
+        remoteSetId: "synthetic-remote" },
+    }, s.host);
+    assert.equal(conflicting.ok, false);
+    assert.equal(s.writes(), 3);
+    const otherFiles = await publicationFiles(s.root, "extension-other");
+    assert.ok(await readFile(otherFiles.snapshot, "utf8"));
+    const continued = value(await executeBlooketPublicationCommand({
+      ...first, command: "blooket.publication.step", payload: {
+        draftId: "extension", expectedRevision: first.payload.expectedRevision,
+      },
+    }, s.host));
+    assert.equal(continued["phase"], "advanced");
+    assert.equal(continued["completedOperations"], 2);
+    assert.equal(s.writes(), 4);
+  }));
+
 test("a lost append receipt reconciles fresh reads without another Save", () =>
   fixture(async s => {
     const request = await appendFixture(s);

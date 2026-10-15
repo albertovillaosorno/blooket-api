@@ -85,6 +85,13 @@ read-only title, description, visibility and set-ID check before journaling.
 A synthetic paced privacy change stops without consuming a write or opening
 an attempt journal. This remains portable evidence, not live account proof.
 
+Another red-to-green regression found that a refused competing append draft
+could leave an unused frozen snapshot that blocked the original publisher's
+next step. The shared-set collision gate now distinguishes an actually
+started competing checkpoint or uncertain journal from an idle snapshot.
+The original can resume its remaining suffix; a started competing publisher
+continues to block overlap. No original snapshot or journal is deleted.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses

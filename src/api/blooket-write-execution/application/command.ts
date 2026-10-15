@@ -564,10 +564,14 @@ export async function executeBlooketPublicationCommand(
           candidate.plan);
         if (!prior.ok || !inFlight.ok)
           return fail("publication-storage-unavailable");
+        // A frozen but unused competing snapshot has not started a write.
+        // Blocking on it would strand an already active append if the
+        // competing draft was refused by this same conflict check.
         if (prior.checkpoint.remoteSetId === plan.target.remoteSetId &&
             (inFlight.kind === "record" ||
-              prior.checkpoint.nextOperationIndex <
-                candidate.plan.operations.length))
+              (prior.checkpoint.nextOperationIndex > 0 &&
+                prior.checkpoint.nextOperationIndex <
+                  candidate.plan.operations.length)))
           return fail("blooket-publication-remote-conflict");
       }
     }
