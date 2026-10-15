@@ -104,6 +104,18 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A red-to-green local persistence regression shows that a mutation task
+budget or account-wide pacing history with an unexpected hard-link alias could
+previously be read as valid while the same inode remained writable under a
+second name outside the lock protocol. Both readers now refuse link counts
+other than one before admitting the record. They also re-check the descriptor's
+file identity, byte count and modification/change metadata after the bounded
+read so a concurrent in-place replacement fails closed.
+
+Fixtures use only
+private temporary files, preserve the aliased bytes on refusal and never
+contact Blooket. Canonical atomic writer output still reads and reserves.
+
 An older Quizzes Refresh can also fail after the teacher has started a
 publication. The UI now suppresses failures from obsolete status requests
 instead of surfacing a misleading unrelated error during the active operation.

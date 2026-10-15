@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from
+import { link, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -129,6 +129,18 @@ test("malformed, rollback and future histories remain unchanged", async () => {
     }
   });
 });
+
+test("hard-linked pacing history aliases cannot reset the rolling window",
+  async () => { await fixture(async file => {
+  assert.deepEqual(await reserve(file, 10_000), { kind: "admitted" });
+  const before = await readFile(file, "utf8");
+  await link(file, file + ".alias");
+  await assert.rejects(reserve(file, 12_000),
+    /mutation-pacing-history-unavailable/u);
+  assert.equal(await readFile(file, "utf8"), before);
+  assert.equal(await readFile(file + ".alias", "utf8"), before);
+  }); },
+);
 
 test("symlinked pacing ledger cannot escape its owned data root", async () => {
   await fixture(async file => {
