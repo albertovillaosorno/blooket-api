@@ -322,7 +322,11 @@ test("an unused competing append snapshot cannot strand active progress",
     assert.equal(conflicting.ok, false);
     assert.equal(s.writes(), 3);
     const otherFiles = await publicationFiles(s.root, "extension-other");
-    assert.ok(await readFile(otherFiles.snapshot, "utf8"));
+    await assert.rejects(readFile(otherFiles.snapshot), { code: "ENOENT" });
+    // Also tolerate a historical unused snapshot left by an older refusal.
+    await createPublicationSnapshot(otherFiles.snapshot, { ...frozen,
+      draftId: "extension-other",
+      revision: (second.value as { revision: string }).revision });
     const continued = value(await executeBlooketPublicationCommand({
       ...first, command: "blooket.publication.step", payload: {
         draftId: "extension", expectedRevision: first.payload.expectedRevision,
@@ -331,6 +335,45 @@ test("an unused competing append snapshot cannot strand active progress",
     assert.equal(continued["phase"], "advanced");
     assert.equal(continued["completedOperations"], 2);
     assert.equal(s.writes(), 4);
+  }));
+
+test("a refused competing append can start after the active writer finishes",
+  () => fixture(async s => {
+    const first = await appendFixture(s, 2);
+    value(await executeBlooketPublicationCommand(first, s.host));
+    const paths = await publicationFiles(s.root, "extension");
+    const frozen = JSON.parse(await readFile(paths.snapshot, "utf8"));
+    const parsed = decodeBlooketPublicationSnapshot(frozen, "extension");
+    assert.ok(parsed);
+    const before = parsed.document.questions[0]!;
+    assert.equal(before.type, "typing-answer");
+    const expanded = { ...parsed.document, questions: [
+      ...parsed.document.questions, { ...before, id: "q4",
+        prompt: "Type comet.", answer: "comet" },
+    ] };
+    const saved = await executeLibraryCommand({ version: 1,
+      operationId: "cli:later-append", command: "drafts.put",
+      payload: { id: "extension-later", expectedRevision: null,
+        document: expanded },
+    }, s.root);
+    assert.ok(saved.ok);
+    const next = { ...first, payload: { draftId: "extension-later",
+      expectedRevision: (saved.value as { revision: string }).revision,
+      remoteSetId: "synthetic-remote" } };
+    assert.equal((await executeBlooketPublicationCommand(next, s.host)).ok,
+      false);
+    const other = await publicationFiles(s.root, "extension-later");
+    await assert.rejects(readFile(other.snapshot), { code: "ENOENT" });
+    value(await executeBlooketPublicationCommand({ ...first,
+      command: "blooket.publication.step", payload: { draftId: "extension",
+        expectedRevision: first.payload.expectedRevision },
+    }, s.host));
+    const advanced = value(await executeBlooketPublicationCommand(next,
+      s.host));
+    assert.equal(advanced["phase"], "advanced");
+    assert.equal(advanced["totalOperations"], 1);
+    assert.equal(s.questions[3]?.question, "Type comet.");
+    assert.equal(s.writes(), 5);
   }));
 
 test("a lost append receipt reconciles fresh reads without another Save", () =>

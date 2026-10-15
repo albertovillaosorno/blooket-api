@@ -257,6 +257,13 @@ export async function executeBlooketPublicationCommand(
           target: { remoteSetId: requestedSetId, baseline } };
         if (!decodeSnapshot(candidate, draftId))
           return fail("blooket-publication-invalid-draft");
+        // Refuse a competing active publisher before freezing this new
+        // draft. An unstarted rejected draft must remain retryable.
+        const collision = await competingAppendState(root, draftId,
+          requestedSetId);
+        if (collision !== "none") return fail(collision === "conflict"
+          ? "blooket-publication-remote-conflict"
+          : "publication-storage-unavailable");
       }
       if (signal?.aborted) return fail("blooket-publication-cancelled");
       await createPublicationSnapshot(files.snapshot, candidate);
@@ -553,27 +560,11 @@ export async function executeBlooketPublicationCommand(
     }
     if (plan.schemaVersion === 2 && attempt.kind === "missing" &&
         checkpoint.nextOperationIndex < plan.operations.length) {
-      const others = await readOtherPublicationSnapshots(root, draftId);
-      for (const other of others) {
-        const candidate = decodeSnapshot(other.data, other.draftId);
-        if (!candidate) return fail("publication-storage-unavailable");
-        const paths = await publicationFiles(root, other.draftId);
-        const prior = await loadWriteCheckpointFile(paths.checkpoint,
-          candidate.plan);
-        const inFlight = await loadWriteAttemptFile(paths.attempt,
-          candidate.plan);
-        if (!prior.ok || !inFlight.ok)
-          return fail("publication-storage-unavailable");
-        // A frozen but unused competing snapshot has not started a write.
-        // Blocking on it would strand an already active append if the
-        // competing draft was refused by this same conflict check.
-        if (prior.checkpoint.remoteSetId === plan.target.remoteSetId &&
-            (inFlight.kind === "record" ||
-              (prior.checkpoint.nextOperationIndex > 0 &&
-                prior.checkpoint.nextOperationIndex <
-                  candidate.plan.operations.length)))
-          return fail("blooket-publication-remote-conflict");
-      }
+      const collision = await competingAppendState(root, draftId,
+        plan.target.remoteSetId);
+      if (collision !== "none") return fail(collision === "conflict"
+        ? "blooket-publication-remote-conflict"
+        : "publication-storage-unavailable");
     }
     const result = await executePersistedBlooketWrite(
       files, plan, blooket.session, blooket.secrets, writes, verifier, {
@@ -633,4 +624,34 @@ function matchesQuestions(
           item.mediaId === imageId));
     },
   );
+}
+
+// A refused new append must not freeze an idle snapshot that later strands
+// the active writer. Keep this admission and the resume gate identical.
+async function competingAppendState(
+  root: string, draftId: string, remoteSetId: string,
+): Promise<"none" | "conflict" | "storage-unavailable"> {
+  try {
+    const others = await readOtherPublicationSnapshots(root, draftId);
+    for (const other of others) {
+      const candidate = decodeSnapshot(other.data, other.draftId);
+      if (!candidate) return "storage-unavailable";
+      const paths = await publicationFiles(root, other.draftId);
+      const prior = await loadWriteCheckpointFile(paths.checkpoint,
+        candidate.plan);
+      const inFlight = await loadWriteAttemptFile(paths.attempt,
+        candidate.plan);
+      if (!prior.ok || !inFlight.ok) return "storage-unavailable";
+      // A historical frozen but unused competing snapshot owns no write.
+      if (prior.checkpoint.remoteSetId === remoteSetId &&
+          (inFlight.kind === "record" ||
+            (prior.checkpoint.nextOperationIndex > 0 &&
+              prior.checkpoint.nextOperationIndex <
+                candidate.plan.operations.length)))
+        return "conflict";
+    }
+    return "none";
+  } catch {
+    return "storage-unavailable";
+  }
 }
