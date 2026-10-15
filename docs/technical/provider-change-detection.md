@@ -62,6 +62,24 @@ confirm authentication, server persistence, current account entitlements,
 question correctness after reload, transport support, or a provider version.
 Canonical CLI/MCP commands and fresh remote read-back still own verification.
 
+## October 14, 2026 read-only compatibility observation
+
+An authorized Chrome for Testing 155 read-only inspection of the already-open
+authenticated Edit page found one account My Sets navigation link, a present
+Typing question editor, its expected visible `textarea#question` and numeric
+`input#time-limit`, and one Save Question control. Blooket's provider build
+identity was not verified. No clicks, refresh, extension reload, credential
+reads or saved-content exports were performed.
+
+The canonical CLI session observation still returned `edit`, while fresh
+`sets.list` and text-only capability reads returned `blooket-browser-failed`.
+The existing connected Chrome session also retains an open question editor;
+read navigation is intentionally forbidden when that form could hold unsaved
+work. This result does **not** establish an upstream selector change, a saved
+question receipt, or automatic multi-question acceptance. Leave the pending
+attempts and owned editor untouched; use portable read/hydration regressions
+until safe live reads are possible.
+
 ## Maintenance evidence and incident protocol
 
 For each meaningful platform change or unexplained failure, capture the safe
