@@ -217,7 +217,7 @@ test("durable duration exhaustion preserves the prior state", async () => {
   });
 });
 
-test("the maximum bounded budget file admits only exact owned bytes",
+test("budget reader rejects oversized and noncanonical bytes",
   async () => {
   await temporary(async directory => {
     const path = join(directory, "budget.json");
@@ -228,7 +228,7 @@ test("the maximum bounded budget file admits only exact owned bytes",
     });
     await writeFile(path, body.padEnd(4_096, " "));
     assert.deepEqual(await loadMutationBudgetFile(path, "plan:synthetic"), {
-      ok: true, state: { version: 1, startedAtMs: 10_000, starts: 1 },
+      ok: false, kind: "invalid", code: "mutation-budget-file-invalid",
     });
     await writeFile(path, body.padEnd(4_097, " "));
     assert.deepEqual(await loadMutationBudgetFile(path, "plan:synthetic"), {
@@ -237,6 +237,44 @@ test("the maximum bounded budget file admits only exact owned bytes",
   });
   },
 );
+
+test("noncanonical budget bytes cannot reset attempted starts", async () => {
+  await temporary(async directory => {
+    const path = join(directory, "budget.json");
+    const planId = "plan:synthetic";
+    const saved = {
+      schemaVersion: 1, planId,
+      state: { version: 1, startedAtMs: 10_000, starts: 2 },
+    };
+    const canonical = JSON.stringify(saved, null, 2) + "\n";
+    const altered = [
+      JSON.stringify(saved),
+      canonical + " ",
+      JSON.stringify({ planId, schemaVersion: 1, state: saved.state },
+        null, 2) + "\n",
+      canonical.replace('"starts": 2', '"starts": 1, "starts": 2'),
+      canonical.replace('"starts": 2', '"starts": 2, "starts": 1'),
+      canonical.replace('"schemaVersion": 1',
+        '"schemaVersion": 9, "schemaVersion": 1'),
+    ];
+    for (const bytes of altered) {
+      await writeFile(path, bytes);
+      assert.deepEqual(await loadMutationBudgetFile(path, planId), {
+        ok: false, kind: "invalid", code: "mutation-budget-file-invalid",
+      });
+      assert.deepEqual(await reserveMutationBudgetStart(
+        path, planId, { maximumStarts: 3, maximumDurationMs: 60_000 },
+        11_000,
+      ), { ok: false, kind: "invalid",
+        code: "mutation-budget-file-invalid" });
+      assert.equal(await readFile(path, "utf8"), bytes);
+    }
+    await writeFile(path, canonical);
+    assert.deepEqual(await loadMutationBudgetFile(path, planId), {
+      ok: true, state: saved.state,
+    });
+  });
+});
 
 test("unsafe malformed and oversized budget files fail closed", async () => {
   await temporary(async (directory) => {

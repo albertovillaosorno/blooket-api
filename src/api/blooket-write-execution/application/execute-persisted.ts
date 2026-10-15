@@ -600,6 +600,9 @@ async function executePersistedBlooketWriteLocked(
   if (!recovery.ok || recovery.kind !== "ready") {
     return recovery;
   }
+  if (options.signal?.aborted)
+    return { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled" };
 
   const prepared = await prepareNextBlooketWrite(
     plan,
@@ -610,6 +613,9 @@ async function executePersistedBlooketWriteLocked(
   if (!prepared.ok || prepared.kind !== "ready") {
     return prepared;
   }
+  if (options.signal?.aborted)
+    return { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled" };
 
   const baseline = await captureVerificationBaseline(
     verifier,
@@ -620,6 +626,9 @@ async function executePersistedBlooketWriteLocked(
   if (!baseline.ok) {
     return baseline.result;
   }
+  if (options.signal?.aborted)
+    return { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled" };
 
   let lease: { readonly startedAtMs: number; release(): void } | undefined;
   try {

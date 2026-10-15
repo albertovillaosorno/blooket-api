@@ -370,6 +370,108 @@ function serialPacer(events: string[]): BlooketMutationPacer {
   };
 }
 
+test("pre-cancelled publication skips session, pacing and baseline reads",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const browserCalls: string[] = [], writeCalls: string[] = [];
+    const pacing: string[] = [], verificationCalls: Array<{
+      operationId: string; remoteSetId: string | null;
+    }> = [];
+    const budgetPath = join(directory, "budget.json");
+    const result = await executePersistedBlooketWrite(
+      paths, plan, browser(browserCalls), secrets(),
+      writes(SET_SUCCESS, writeCalls),
+      verification({ ok: true, baseline: SET_BASELINE }, verificationCalls),
+      { signal: AbortSignal.abort(), pacer: immediatePacer(pacing),
+        budget: { path: budgetPath,
+          policy: { maximumStarts: 2, maximumDurationMs: 60_000 } } },
+    );
+    assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled" });
+    assert.deepEqual(browserCalls, []);
+    assert.deepEqual(verificationCalls, []);
+    assert.deepEqual(pacing, []);
+    assert.deepEqual(writeCalls, []);
+    assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId),
+      { ok: true, state: null });
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" });
+  });
+});
+
+test("pre-cancelled restart still prioritizes the ambiguous attempt",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const initial = await executePersistedBlooketWrite(
+      paths, plan, browser([]), secrets(),
+      writes({ ok: false, kind: "navigation", state: "rate-limited" }, []),
+    );
+    assert.equal(initial.ok && initial.kind === "reconciliation-required",
+      true);
+    const journalBefore = await readFile(paths.attempt, "utf8");
+    const browserCalls: string[] = [], writeCalls: string[] = [];
+    const resumed = await executePersistedBlooketWrite(
+      paths, plan, browser(browserCalls), secrets(),
+      writes(SET_SUCCESS, writeCalls), undefined,
+      { signal: AbortSignal.abort() },
+    );
+    assert.equal(resumed.ok && resumed.kind === "reconciliation-required",
+      true);
+    if (resumed.ok && resumed.kind === "reconciliation-required")
+      assert.equal(resumed.reason, "ambiguous-attempt");
+    assert.equal(await readFile(paths.attempt, "utf8"), journalBefore);
+    assert.deepEqual(browserCalls, []);
+    assert.deepEqual(writeCalls, []);
+  });
+});
+
+test("cancel during initial baseline avoids pacing", async () => {
+  await withTemporaryDirectory(async dir => {
+    const paths = persistence(join(dir, "checkpoint.json"));
+    const controller = new AbortController();
+    const calls: string[] = [], pace: string[] = [];
+    const verifier: BlooketWriteVerificationPort = {
+      captureBaseline: async () => {
+        calls.push("baseline"); controller.abort();
+        return { ok: true, baseline: SET_BASELINE };
+      },
+      verify: async () => ({ ok: true, outcome: "inconclusive" }),
+    };
+    const result = await executePersistedBlooketWrite(paths, plan,
+      browser([]), secrets(), writes(SET_SUCCESS, []), verifier,
+      { signal: controller.signal, pacer: immediatePacer(pace) });
+    assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled" });
+    assert.deepEqual(calls, ["baseline"]);
+    assert.deepEqual(pace, []);
+  });
+});
+
+test("cancel after session observation skips baseline and pacing",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const paths = persistence(join(dir, "checkpoint.json"));
+    const controller = new AbortController();
+    const calls: string[] = [], pace: string[] = [];
+    const writesCalled: string[] = [];
+    const original = browser(calls);
+    const result = await executePersistedBlooketWrite(paths, plan, {
+      ...original, observe: async () => {
+        controller.abort();
+        return await original.observe();
+      },
+    }, secrets(), writes(SET_SUCCESS, writesCalled), undefined,
+    { signal: controller.signal, pacer: immediatePacer(pace) });
+    assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+      code: "mutation-pacing-cancelled" });
+    assert.deepEqual(calls, ["observe"]);
+    assert.deepEqual(pace, []);
+    assert.deepEqual(writesCalled, []);
+  });
+});
+
 test("abort after pacing grant still stops before journal", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
