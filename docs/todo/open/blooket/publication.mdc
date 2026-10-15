@@ -81,7 +81,9 @@ were committed separately with DCO signoff and their targeted tests rerun.
 The authorized live canonical CLI observed My Sets and returned a text
 capability snapshot. Its full capability inspection still returned
 `blooket-browser-failed`; neither a real image publication nor an existing
-quiz edit is established by the portable checks. Computer Use independently
+quiz edit is established by the portable checks.
+
+Computer Use independently
 failed to initialize its request-header policy before accessing the website.
 That controller failure does not prove a Blooket challenge or signed-out
 session. Existing uncertain journals remain unchanged and are not replayed.
