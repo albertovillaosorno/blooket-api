@@ -31,6 +31,11 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { reserveDurableMutationStart } from
+  "../../../../src/platforms/mutation-pacing-files/adapter-outbound/history.ts";
 import {
   DEFAULT_BLOOKET_MUTATION_PACING,
   createBlooketMutationPacer,
@@ -351,4 +356,113 @@ test("runtime pacing rejects policy accessors without evaluating them", () => {
     virtualRuntime().runtime,
   ), /invalid-mutation-pacing-policy/u);
   assert.equal(accessed, false);
+});
+
+test("durable pacing gate survives service restarts without speeding writes",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "pacer-restart-test-"));
+  try {
+    const path = join(root, "starts.json");
+    const clock = virtualRuntime();
+    const durable = {
+      reserve: (policy: typeof DEFAULT_BLOOKET_MUTATION_PACING) =>
+        reserveDurableMutationStart(path, policy, clock.now),
+    };
+    const initial = createBlooketMutationPacer(undefined,
+      clock.runtime, durable);
+    const first = await initial.acquire();
+    assert.equal(first.ok, true);
+    if (first.ok) first.lease.release();
+    const before = await readFile(path, "utf8");
+    const restarted = createBlooketMutationPacer(undefined,
+      clock.runtime, durable);
+    const next = await restarted.acquire();
+    assert.equal(next.ok, true);
+    if (next.ok) {
+      assert.equal(next.lease.startedAtMs, 2_000);
+      next.lease.release();
+    }
+    assert.notEqual(await readFile(path, "utf8"), before);
+    assert.deepEqual(clock.sleeps, [2_000]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("durable gate enforces rolling quota across separate pacers",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "pacer-window-test-"));
+  try {
+    let time = 30_000;
+    const sleeps: number[] = [];
+    const runtime = { now: () => time,
+      sleep: async (ms: number) => { sleeps.push(ms); time += ms; } };
+    const policy = { minimumStartIntervalMs: 2_000,
+      maximumStartsPerMinute: 2 };
+    const gate = { reserve: (p: typeof policy) =>
+      reserveDurableMutationStart(join(root, "starts.json"), p, () => time) };
+    for (let index = 0; index < 3; index++) {
+      const pacer = createBlooketMutationPacer(policy, runtime, gate);
+      const result = await pacer.acquire();
+      assert.equal(result.ok, true);
+      if (result.ok) result.lease.release();
+    }
+    assert.equal(time, 90_000);
+    assert.deepEqual(sleeps, [2_000, 58_000]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("failed durable start never grants a lease or blocks a later caller",
+  async () => {
+  const runtime = virtualRuntime();
+  let refuse = true;
+  const gate = { reserve: async () => {
+    if (refuse) throw Error("fixture disk refusal");
+    return { kind: "admitted" as const };
+  } };
+  const pacer = createBlooketMutationPacer(undefined, runtime.runtime, gate);
+  await assert.rejects(pacer.acquire(), /fixture disk refusal/u);
+  refuse = false;
+  const admitted = await pacer.acquire();
+  assert.equal(admitted.ok, true);
+  if (admitted.ok) admitted.lease.release();
+});
+
+test("a cancelled durable history wait cannot consume an extra start",
+  async () => {
+  const controller = new AbortController();
+  let gates = 0;
+  const pacer = createBlooketMutationPacer(undefined, {
+    now: () => 0,
+    sleep: async (_ms, signal) => {
+      controller.abort();
+      if (signal?.aborted) {
+        const error = Error("fixture-cancelled");
+        error.name = "AbortError";
+        throw error;
+      }
+    },
+  }, { reserve: async () => {
+    gates++;
+    return { kind: "wait" as const, waitMs: 3_000 };
+  } });
+  assert.deepEqual(await pacer.acquire(controller.signal),
+    { ok: false, code: "mutation-pacing-cancelled" });
+  assert.equal(gates, 1);
+});
+
+test("malformed durable gate replies cannot skip the account policy",
+  async () => {
+  const invalid: unknown[] = [
+    null, {}, { kind: "admitted", extra: true },
+    { kind: "wait", waitMs: 0 }, { kind: "wait", waitMs: Infinity },
+    { kind: "wait", waitMs: 60_001 },
+    { kind: "ignore" },
+  ];
+  for (const reply of invalid) {
+    const pacer = createBlooketMutationPacer(undefined,
+      virtualRuntime().runtime, {
+        reserve: async () => reply as { readonly kind: "admitted" },
+      });
+    await assert.rejects(pacer.acquire(),
+      /mutation-pacing-history-unavailable/u);
+  }
 });

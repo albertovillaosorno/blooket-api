@@ -480,6 +480,12 @@ explicit save.
 An old v3 Settings form cannot overwrite a saved v4 publication policy.
 
 These are application safety limits, **not** verified Blooket rate limits.
+The shared account-wide start history also persists under the service-owned
+`mutation-pacing.json`; restarting the service cannot clear the recent rolling
+minute or minimum interval. No account, quiz, credentials or other provider
+content is saved in this timestamp-only file. An unreadable or corrupted
+history blocks the next write instead of silently resetting limits.
+
 Exhaustion stops before a new journal/remote write and never authorizes
 replaying an uncertain attempt. A smaller attempt limit may stop an otherwise
 valid long quiz until the teacher explicitly changes settings and restarts.

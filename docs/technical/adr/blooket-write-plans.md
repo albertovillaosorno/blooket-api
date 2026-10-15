@@ -240,3 +240,18 @@ saves are refused to prevent a stale UI from dropping stricter policy fields.
 Application pacing cannot establish Blooket's actual account quota. Exhaustion
 is a recoverable pre-write stop; it does not justify replaying any prior
 uncertain attempt, clearing a journal, or claiming remote success.
+
+The shared pacer also commits each admitted account-wide mutation start to the
+local data-root `mutation-pacing.json` before returning an execution lease.
+This small version-one ledger stores only ordered epoch-millisecond timestamps;
+its lock, owner-only atomic replace and no-follow bounded read preserve history
+on service restart without exposing provider or teacher content. Missing files
+begin an empty history; malformed, unsafe, unreadable or clock-regressed files
+block new writes instead of discarding evidence.
+
+The in-memory pacer still serializes work and uses monotonic elapsed time. When
+restarted, the durable gate may require another cancellable wait under the
+original lease before recording the new start. The gate applies any newly
+stricter validated policy against prior starts. A durable reservation counts
+conservatively even when post-lease revalidation stops before a browser write;
+no uncertain journal is ever reopened to recover that unused allowance.

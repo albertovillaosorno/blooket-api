@@ -46,8 +46,10 @@ import test from "node:test";
 import { executePersistedBlooketWrite } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/api/blooket-write-execution/application/execute-persisted.ts";
-import type { BlooketMutationPacer } from
+import { createBlooketMutationPacer, type BlooketMutationPacer } from
   "../../../../src/api/blooket-write-execution/application/mutation-pacing.ts";
+import { reserveDurableMutationStart } from
+  "../../../../src/platforms/mutation-pacing-files/adapter-outbound/history.ts";
 import type {
   BlooketBrowserObservationResult,
   BlooketBrowserSessionPort,
@@ -1027,6 +1029,37 @@ test(
         assert.equal(attempt.record.phase, "confirmed");
     });
   },
+);
+
+test("unavailable account pacing history stops before budget and journal",
+  async () => { await withTemporaryDirectory(async directory => {
+  const paths = persistence(join(directory, "checkpoint.json"));
+  const file = join(directory, "mutation-pacing.json");
+  const budgetPath = join(directory, "budget.json");
+  await writeFile(file, "corrupted-history-fixture");
+  let now = 10_000;
+  const events: string[] = [];
+  const pacer = createBlooketMutationPacer(undefined, {
+    now: () => now,
+    sleep: async ms => { now += ms; },
+  }, { reserve: policy => reserveDurableMutationStart(
+    file, policy, () => now) });
+  const result = await executePersistedBlooketWrite(
+    paths, plan, browser([]), secrets(), writes(SET_SUCCESS, events),
+    verification({ ok: true, baseline: SET_BASELINE }), {
+      requireVerificationBaseline: true, pacer,
+      budget: { path: budgetPath, now: () => now,
+        policy: { maximumStarts: 10, maximumDurationMs: 60_000 } },
+    });
+  assert.deepEqual(result, { ok: false, stage: "mutation-pacing",
+    code: "mutation-pacing-failed" });
+  assert.deepEqual(events, []);
+  assert.equal(await readFile(file, "utf8"), "corrupted-history-fixture");
+  assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+    { ok: true, kind: "missing" });
+  assert.deepEqual(await loadMutationBudgetFile(budgetPath, plan.planId),
+    { ok: true, state: null });
+  }); },
 );
 
 test("durable budget reservation precedes journaled mutation", async () => {

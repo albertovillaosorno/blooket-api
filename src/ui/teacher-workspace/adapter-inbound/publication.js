@@ -158,6 +158,7 @@ export function publicationStopReason(error) {
     "publication-snapshot-invalid"].includes(code)) return "storage";
   if (["mutation-task-start-budget-exhausted",
     "mutation-task-duration-exhausted"].includes(code)) return "limit";
+  if (code === "mutation-pacing-failed") return "pacing";
   if (code === "blooket-publication-cancelled") return "paused";
   return "unknown";
 }

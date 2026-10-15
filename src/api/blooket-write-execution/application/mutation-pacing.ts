@@ -60,11 +60,20 @@ export interface BlooketMutationPacingRuntime {
   readonly sleep: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
 }
 
+/** Optional durable account-wide admission after in-memory queue pacing. */
+export interface BlooketMutationStartGate {
+  reserve(policy: BlooketMutationPacingPolicy): Promise<
+    | { readonly kind: "admitted" }
+    | { readonly kind: "wait"; readonly waitMs: number }
+  >;
+}
+
 const WINDOW_MS = 60_000;
 
 export function createBlooketMutationPacer(
   policy: BlooketMutationPacingPolicy = DEFAULT_BLOOKET_MUTATION_PACING,
   runtime: BlooketMutationPacingRuntime = systemRuntime,
+  durable?: BlooketMutationStartGate,
 ): BlooketMutationPacer {
   // A later settings change cannot rewrite the policy of an already running
   // queue. Read only exact own data fields; never invoke injected accessors.
@@ -102,8 +111,46 @@ export function createBlooketMutationPacer(
         releaseSlot();
         return cancelled();
       }
+      let startedAtMs: number;
       try {
-        await waitForStart(admittedPolicy, clock, starts, signal);
+        // A new service process loses in-memory timestamps. The optional
+        // durable gate owns the account-wide rolling history across restarts.
+        // Its reservation is committed before any write journal opens.
+        for (let checks = 0;; checks++) {
+          if (checks >= 64) throw Error("mutation-pacing-history-unavailable");
+          await waitForStart(admittedPolicy, clock, starts, signal);
+          if (signal?.aborted) {
+            releaseSlot();
+            return cancelled();
+          }
+          if (durable) {
+            const admitted = await durable.reserve(admittedPolicy);
+            if (!admitted || typeof admitted !== "object" ||
+                Array.isArray(admitted))
+              throw Error("mutation-pacing-history-unavailable");
+            const fields = Reflect.ownKeys(admitted);
+            const descriptor = Object.getOwnPropertyDescriptor(
+              admitted, "kind");
+            if (!descriptor || !descriptor.enumerable ||
+                !Object.hasOwn(descriptor, "value"))
+              throw Error("mutation-pacing-history-unavailable");
+            if (descriptor.value === "wait") {
+              const wait = Object.getOwnPropertyDescriptor(
+                admitted, "waitMs");
+              if (fields.length !== 2 || !wait || !wait.enumerable ||
+                  !Object.hasOwn(wait, "value") ||
+                  !Number.isSafeInteger(wait.value) || wait.value < 1 ||
+                  wait.value > WINDOW_MS)
+                throw Error("mutation-pacing-history-unavailable");
+              await clock.sleep(wait.value, signal);
+              continue;
+            }
+            if (descriptor.value !== "admitted" || fields.length !== 1)
+              throw Error("mutation-pacing-history-unavailable");
+          }
+          startedAtMs = clock.now();
+          break;
+        }
       } catch (error) {
         releaseSlot();
         if (signal?.aborted || isAbort(error)) return cancelled();
@@ -112,13 +159,6 @@ export function createBlooketMutationPacer(
       if (signal?.aborted) {
         releaseSlot();
         return cancelled();
-      }
-      let startedAtMs: number;
-      try {
-        startedAtMs = clock.now();
-      } catch (error) {
-        releaseSlot();
-        throw error;
       }
       starts = pruneStarts(starts, startedAtMs);
       starts.push(startedAtMs);

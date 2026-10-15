@@ -43,6 +43,9 @@ import {
 } from "../../../ir/blooket-browser-bridge/contract/message.ts";
 import { createBlooketMutationPacer } from
   "../../blooket-write-execution/application/mutation-pacing.ts";
+import { reserveDurableMutationStart } from
+  "../../../platforms/mutation-pacing-files/adapter-outbound/history.ts";
+import { join } from "node:path";
 import { isBlooketPublicationCommand } from
   "../../../ir/blooket-publication-commands/contract/commands.ts";
 import {
@@ -201,6 +204,9 @@ export async function startBrowserService(
   const publicationPacer = createBlooketMutationPacer({
     minimumStartIntervalMs: publicationPolicy.minimumStartIntervalMs,
     maximumStartsPerMinute: publicationPolicy.maximumStartsPerMinute,
+  }, undefined, {
+    reserve: policy => reserveDurableMutationStart(
+      join(root, "mutation-pacing.json"), policy),
   });
   let origin = "";
   let ownedPort: number | undefined;
