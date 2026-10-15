@@ -62,6 +62,9 @@ export async function inspectDetachedBlooketCapabilities(
 ): Promise<ExtensionCapabilityInspectionResult> {
   const started = now();
   if (!Number.isFinite(started)) return failed();
+  // Include background-tab loading and capability inspection under the
+  // same deadline; the localhost bridge expects a bounded read reply.
+  const deadline = started + 8_000;
   let tabId: number | undefined;
   let completed = false;
   let result: ExtensionCapabilityInspectionResult = failed();
@@ -83,7 +86,8 @@ export async function inspectDetachedBlooketCapabilities(
     const host = createExtensionCapabilityInspectionHost(
       chrome, tabId!, pause, now,
     );
-    result = await host.inspect({ textOnly });
+    result = await host.inspect({ textOnly, deadline });
+    if (now() >= deadline) return failed();
   } catch { return failed(); }
   finally {
     if (tabId !== undefined) {

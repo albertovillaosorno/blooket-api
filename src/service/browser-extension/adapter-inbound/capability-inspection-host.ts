@@ -146,11 +146,22 @@ export function createExtensionCapabilityInspectionHost(
   };
 
   return {
-    inspect: async (options: { readonly textOnly?: boolean } = {}):
-      Promise<ExtensionCapabilityInspectionResult> => {
+    inspect: async (options: {
+      readonly textOnly?: boolean;
+      readonly deadline?: number;
+    } = {}): Promise<ExtensionCapabilityInspectionResult> => {
       const startedAt = now();
-      const probeDeadline = startedAt + PROBE_BUDGET_MS;
-      const finishDeadline = startedAt + TOTAL_BUDGET_MS;
+      if (!Number.isFinite(startedAt) ||
+          (options.deadline !== undefined &&
+            (!Number.isFinite(options.deadline) ||
+             options.deadline <= startedAt))) return browserFailure();
+      // Detached callers already spent time loading an independent tab.
+      // Never start a fresh nine-second budget after that elapsed time.
+      const finishDeadline = Math.min(startedAt + TOTAL_BUDGET_MS,
+        options.deadline ?? Infinity);
+      const probeDeadline = Math.min(startedAt + PROBE_BUDGET_MS,
+        finishDeadline - 2_000);
+      if (probeDeadline <= startedAt) return browserFailure();
       let expectedReadUrl = MY_SETS_URL;
       const origins = new Map<string, number>();
       const ownsDocument = async (
@@ -200,6 +211,29 @@ export function createExtensionCapabilityInspectionHost(
         ) throw new Error("browser-capability-tab-changed");
         return result;
       };
+      // React can mount My Sets or Edit after the native document reports
+      // complete. Wait only for a precise transitional state on the same
+      // owned document, never for login, organization, or security stops.
+      const awaitObservedPage = async (
+        expected: "my-sets" | "edit",
+      ): Promise<boolean> => {
+        for (let attempt = 0; attempt < 35 && now() < probeDeadline;
+          attempt++) {
+          const observed = await readScript(
+            inspectBlooketPage as (...args: never[]) => unknown,
+            [{ kind: "session.observe" }],
+          );
+          if (exactObservedState(observed, expected)) return true;
+          const unavailable = exactCapabilityFields(observed,
+            ["ok", "code"]) && observed.ok === false &&
+            observed.code === "blooket-browser-failed";
+          if (!unavailable &&
+              !exactObservedState(observed, "unexpected-page"))
+            return false;
+          await pause(Math.min(POLL_MS, probeDeadline - now()));
+        }
+        return false;
+      };
       const nativeDocument = async (url: string): Promise<unknown> =>
         await script(
           inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
@@ -248,16 +282,28 @@ export function createExtensionCapabilityInspectionHost(
           nativeDocument,
         ))
           return browserFailure();
-        const observed = await readScript(
-          inspectBlooketPage as (...args: never[]) => unknown,
-          [{ kind: "session.observe" }],
-        );
-        if (!exactObservedState(observed, "my-sets")) return browserFailure();
-        const listed = await readScript(
-          inspectBlooketPage as (...args: never[]) => unknown,
-          [{ kind: "sets.list" }],
-        );
-        const selected = firstSetId(listed);
+        if (!await awaitObservedPage("my-sets"))
+          return browserFailure();
+        // React can expose authenticated My Sets navigation before its
+        // cards are ready. Retry only the first precisely unavailable list.
+        // A readable but invalid list is never repaired by later snapshots;
+        // the independent confirmation below is likewise never retried.
+        let listed: unknown;
+        let selected: string | null | undefined;
+        for (let attempt = 0; attempt < 15 && now() < probeDeadline;
+          attempt++) {
+          listed = await readScript(
+            inspectBlooketPage as (...args: never[]) => unknown,
+            [{ kind: "sets.list" }],
+          );
+          selected = firstSetId(listed);
+          if (selected !== undefined) break;
+          if (!exactCapabilityFields(listed, ["ok", "code"]) ||
+              listed.ok !== false ||
+              listed.code !== "blooket-browser-failed")
+            return browserFailure();
+          await pause(Math.min(POLL_MS, probeDeadline - now()));
+        }
         if (selected === undefined) return browserFailure();
         // Compare two My Sets views before selecting a probe set or
         // accepting the recovered empty-account state.
@@ -322,11 +368,8 @@ export function createExtensionCapabilityInspectionHost(
             return browserFailure();
           origins.set(editUrl, enteredOrigin);
           expectedReadUrl = editUrl;
-          const editState = await readScript(
-            inspectBlooketPage as (...args: never[]) => unknown,
-            [{ kind: "session.observe" }],
-          );
-          if (!exactObservedState(editState, "edit")) return browserFailure();
+          if (!await awaitObservedPage("edit"))
+            return browserFailure();
 
           if (!await editorReady(editUrl)) return browserFailure();
           questionOpenUnconfirmed = true;

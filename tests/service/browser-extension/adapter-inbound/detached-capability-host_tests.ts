@@ -48,10 +48,24 @@ function fixture(options: {
   readonly failedCleanup?: boolean;
   readonly pending?: boolean;
   readonly interruptedDrawer?: boolean;
+  readonly lateMySets?: boolean;
+  readonly lateEdit?: boolean;
+  readonly failedMySetsHydration?: boolean;
+  readonly challengeAfterShell?: boolean;
+  readonly neverHydrates?: boolean;
+  readonly changeOriginAfterShell?: boolean;
+  readonly delayedFirstList?: boolean;
+  readonly neverLists?: boolean;
+  readonly malformedFirstList?: boolean;
+  readonly accessorPageState?: boolean;
+  readonly loadAfterMs?: number;
+  readonly hydrateAfterMs?: number;
+  readonly scriptLatencyMs?: number;
 } = {}) {
   const events: string[] = [];
   let url = MY_SETS, removed = false, now = 1_000, scans = 0;
   let docOrigin = 9_000, panelOpen = false, drawerOpen = false;
+  let mySetsStages = 0, editStages = 0;
   const chrome: DetachedCapabilityChromePort = {
     tabs: {
       create: async ({ url: newUrl, active }) => {
@@ -64,7 +78,10 @@ function fixture(options: {
         assert.equal(id, 84);
         events.push("get");
         return { id, url: options.sourceRedirect ? "https://id.blooket.com/"
-          : url, status: options.pending ? "loading" : "complete" };
+          : url, status: options.pending ||
+          (options.loadAfterMs !== undefined &&
+            now - 1_000 < options.loadAfterMs)
+            ? "loading" : "complete" };
       },
       update: async (id, input) => {
         assert.equal(id, 84);
@@ -86,17 +103,52 @@ function fixture(options: {
       executeScript: async ({ target, func, args }) => {
         assert.equal(target.tabId, 84);
         events.push(func.name);
-        if (func.name === "inspectBlooketDocumentOrigin")
+        if (func.name === "inspectBlooketDocumentOrigin") {
+          if (options.changeOriginAfterShell && mySetsStages > 0)
+            return [{ result: docOrigin + 100 }];
           return [{ result: docOrigin }];
+        }
         if (func.name === "canLeaveBlooketPageForRead")
           return [{ result: true }];
         if (func.name === "inspectBlooketPage") {
+          now += options.scriptLatencyMs ?? 0;
           const operation = (args?.[0] ?? {}) as { kind?: string };
-          if (operation.kind === "session.observe")
+          if (operation.kind === "session.observe") {
+            if (options.accessorPageState) {
+              const hostile = { ok: true } as Record<string, unknown>;
+              Object.defineProperty(hostile, "value", {
+                enumerable: true,
+                get() { throw Error("untrusted-provider-status-getter"); },
+              });
+              return [{ result: hostile }];
+            }
+            if (url === MY_SETS) mySetsStages++;
+            else editStages++;
+            if (options.failedMySetsHydration && mySetsStages < 3)
+              return [{ result: { ok: false,
+                code: "blooket-browser-failed" } }];
             return [{ result: { ok: true,
-              value: url === MY_SETS ? "my-sets" : "edit" } }];
+              value: url === MY_SETS
+                ? options.challengeAfterShell && mySetsStages === 2
+                  ? "security-challenge"
+                  : options.neverHydrates ||
+                    (options.challengeAfterShell && mySetsStages === 1) ||
+                    (options.hydrateAfterMs !== undefined &&
+                      now - 1_000 < options.hydrateAfterMs) ||
+                    (options.lateMySets && mySetsStages < 3)
+                      ? "unexpected-page" : "my-sets"
+                : options.lateEdit && editStages < 3
+                  ? "unexpected-page" : "edit" } }];
+          }
           if (operation.kind === "sets.list") {
             scans++;
+            if (options.neverLists ||
+                (options.delayedFirstList && scans < 3))
+              return [{ result: { ok: false,
+                code: "blooket-browser-failed" } }];
+            if (options.malformedFirstList && scans === 1)
+              return [{ result: { ok: true,
+                value: { items: [], completeness: "unknown" } } }];
             const id = options.unstableLists && scans > 1
               ? "changed-set" : "synthetic-set";
             return [{ result: { ok: true, value: {
@@ -142,7 +194,8 @@ function fixture(options: {
     await inspectDetachedBlooketCapabilities(
       chrome, textOnly, pause, () => now,
     );
-  return { events, inspect, removed: () => removed };
+  return { events, inspect, removed: () => removed,
+    elapsed: () => now - 1_000 };
 }
 
 test("detached text capabilities admit stable read and close only own tab",
@@ -164,6 +217,74 @@ test("detached text capabilities admit stable read and close only own tab",
   assert.equal(page.events.filter(x => x === "remove").length, 1);
   assert.ok(!page.events.includes("update"));
   assert.ok(!page.events.some(x => /submit|save|upload/iu.test(x)));
+});
+
+test("detached text capability waits for its fresh My Sets hydration",
+  async () => {
+  const page = fixture({ lateMySets: true });
+  assert.equal((await page.inspect()).ok, true);
+  assert.equal(page.removed(), true);
+  assert.equal(page.events.filter(name =>
+    name === "inspectBlooketPage").length >= 5, true);
+});
+
+test("detached media capability waits for a fresh Edit hydration",
+  async () => {
+  const page = fixture({ lateEdit: true });
+  assert.equal((await page.inspect(false)).ok, true);
+  assert.equal(page.removed(), true);
+  assert.ok(page.events.includes("closeBlooketCapabilityQuestionPanel"));
+});
+
+test("detached capability can wait for narrowly unavailable initial shell",
+  async () => {
+  const page = fixture({ failedMySetsHydration: true });
+  assert.equal((await page.inspect()).ok, true);
+  assert.equal(page.removed(), true);
+});
+
+test("challenge and document replacement stop a detached capability read",
+  async () => {
+  for (const option of ["challengeAfterShell", "neverHydrates",
+    "changeOriginAfterShell", "accessorPageState"] as const) {
+    const page = fixture({ [option]: true });
+    assert.deepEqual(await page.inspect(),
+      { ok: false, code: "blooket-browser-failed" }, option);
+    assert.equal(page.removed(), true, option);
+    assert.ok(!page.events.includes("openBlooketCapabilityQuestionPanel"));
+  }
+});
+
+test("late first saved-list hydration is retried without opening controls",
+  async () => {
+  const page = fixture({ delayedFirstList: true });
+  assert.equal((await page.inspect()).ok, true);
+  assert.equal(page.removed(), true);
+  assert.equal(page.events.filter(x =>
+    x === "inspectBlooketPage").length >= 5, true);
+  assert.equal(page.events.filter(x => x === "update").length, 0);
+});
+
+test("an unavailable or malformed saved list cannot be repaired by guessing",
+  async () => {
+  for (const option of ["neverLists", "malformedFirstList"] as const) {
+    const page = fixture({ [option]: true });
+    assert.deepEqual(await page.inspect(),
+      { ok: false, code: "blooket-browser-failed" }, option);
+    assert.equal(page.removed(), true);
+    assert.ok(!page.events.includes("openBlooketCapabilityQuestionPanel"));
+  }
+});
+
+test("slow detached hydration never exceeds the whole read lease",
+  async () => {
+  const page = fixture({ loadAfterMs: 2_400, hydrateAfterMs: 9_000,
+    scriptLatencyMs: 420 });
+  assert.deepEqual(await page.inspect(),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.removed(), true);
+  assert.ok(page.elapsed() <= 8_000,
+    "inner probe exceeded its outer publication read budget");
 });
 
 test("detached capabilities reject redirect, drift, and pending hydration",

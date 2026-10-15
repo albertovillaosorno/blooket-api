@@ -85,6 +85,7 @@ interface BrowserTab {
   title?: string;
   status?: string;
   windowId?: number;
+  active?: boolean;
 }
 interface Connection {
   origin: string;
@@ -412,8 +413,16 @@ async function read(
       const finalBinding = await script(current, browser,
         inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
         [operation.setId]);
+      // A challenge may appear in the original Edit document while the
+      // detached tab is reading. A stable origin and submitted latch alone
+      // cannot turn the independent read into an authoritative receipt.
+      const finalState = await script(current, browser,
+        inspectBlooketPage as (...args: never[]) => unknown,
+        [{ kind: "session.observe" }]);
       if (finalTab.status !== "complete" || finalTab.url !== tab.url ||
           finalOrigin !== sourceOrigin || finalBinding !== true ||
+          !exactSessionObservation(finalState) ||
+          (finalState as { value?: unknown }).value !== "edit" ||
           Date.now() >= readDeadline)
         throw new Error("browser-navigation-unsafe");
       return detached;
@@ -826,30 +835,59 @@ function ownedBrowser(
         Date.now() >= deadline)
       throw new Error("retired-browser-connection");
   };
+  // Cleanup is allowed after a relay retires, but only for a tab this relay
+  // actually created. No abandoned read can remove a teacher-owned tab.
+  const temporaryTabs = new Map<number, {
+    readonly url: string; readonly windowId?: number;
+  }>();
+  const removeTemporary = async (id: number): Promise<void> => {
+    const owned = temporaryTabs.get(id);
+    if (!owned) throw Error("unowned-temporary-tab");
+    const observed = await chrome.tabs.get(id);
+    if (observed.id !== id || observed.url !== owned.url ||
+        observed.active === true ||
+        (owned.windowId !== undefined &&
+         observed.windowId !== owned.windowId))
+      throw Error("temporary-tab-changed");
+    await chrome.tabs.remove(id);
+    temporaryTabs.delete(id);
+  };
   return {
     tabs: {
       create: async (options: { url: string; active: false }) => {
         requireOwner();
         const result = await chrome.tabs.create(options);
-        try { requireOwner(); }
-        catch (error) {
-          if (Number.isSafeInteger(result.id) && result.id! > 0)
-            await chrome.tabs.remove(result.id!).catch(() => undefined);
+        if (Number.isSafeInteger(result.id) && result.id! > 0 &&
+            result.id !== current.tabId)
+          temporaryTabs.set(result.id!, {
+            url: options.url,
+            ...(result.windowId === undefined
+              ? {} : { windowId: result.windowId }),
+          });
+        try {
+          requireOwner();
+          if (!temporaryTabs.has(result.id!))
+            throw Error("unowned-temporary-tab");
+        } catch (error) {
+          if (temporaryTabs.has(result.id!))
+            await removeTemporary(result.id!).catch(() => undefined);
           throw error;
         }
         return result;
       },
       remove: async (id: number) => {
-        // Closing a tab created by this host is cleanup, not a new read.
-        // The deadline can expire while Chrome is removing it.
-        if (connection !== current || generation !== activeGeneration)
-          throw new Error("retired-browser-connection");
-        await chrome.tabs.remove(id);
+        // Retirement cancels reads and writes, not the cleanup obligation.
+        // Revalidate the original tab identity instead of reusing a stale ID.
+        await removeTemporary(id);
       },
       get: async (id: number) => {
         requireOwner();
         const result = await chrome.tabs.get(id);
         requireOwner();
+        // Once the user activates a background read tab, it is no longer
+        // disposable automation state. Stop the read and preserve that tab.
+        if (temporaryTabs.has(id) && result.active === true)
+          throw Error("temporary-tab-activated");
         return result;
       },
       update: async (
