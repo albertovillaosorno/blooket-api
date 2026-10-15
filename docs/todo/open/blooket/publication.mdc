@@ -73,6 +73,27 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, the updated installed companion and restarted local service
+created another private fictional set through the canonical CLI with a
+confirmed durable Create Set receipt. The following MC operation stopped
+during visible-control preparation, before its native submit latch. A
+read-only isolated-world diagnostic found the intended prompt, time, answers
+and correctness retained, but no preparation acknowledgement.
+
+The journal remains uncertain, reconciliation did not produce a receipt,
+and no Save or question step was repeated. A focused controlled-input
+fixture then reproduced an immediate DOM-value restoration before a deferred
+React commit; the old writer stopped before waiting for the eventual echo.
+The writer now waits for its same connected native field within the existing
+bounded budget, without dispatching another input event.
+
+All 167 targeted controls, submission and host tests passed. This fixture
+does not establish the exact reason for the live stop or a newly saved
+question. React's [controlled-input documentation][controlled-input], checked
+on 2026-10-15, explains value restoration and motivates the bounded echo wait.
+
+[controlled-input]: https://react.dev/reference/react-dom/components/input
+
 On 2026-10-15, the combined current publication changes passed TypeScript,
 roadmap validation, all 1,964 repository tests, and `jig validate` with zero
 diagnostics. Reviewed native-control, prepared-media and detached-read changes

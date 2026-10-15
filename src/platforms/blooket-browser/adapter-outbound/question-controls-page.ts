@@ -106,7 +106,9 @@ export async function prepareBlooketQuestionControls(
     finally { delete watch!.controlChangeTarget; }
     return owned();
   };
-  const setText = (element: HTMLElement | null, text: string): boolean => {
+  const setText = async (
+    element: HTMLElement | null, text: string,
+  ): Promise<boolean> => {
     if (!element || !owned() ||
         (element.tagName !== "INPUT" && element.tagName !== "TEXTAREA"))
       return false;
@@ -121,7 +123,10 @@ export async function prepareBlooketQuestionControls(
     setter.call(control, text);
     control.dispatchEvent(new Event("input", { bubbles: true }));
     control.dispatchEvent(new Event("change", { bubbles: true }));
-    return owned() && control.value === text;
+    // Controlled inputs can synchronously restore their previous DOM value
+    // before React commits the event's new state. Observe the same field;
+    // never send another input or accept a detached replacement as its echo.
+    return await wait(() => control.isConnected && control.value === text);
   };
   const raw = (): Record<string, unknown> | null => {
     if (!owned() || hidden!.value.length > 100_000) return null;
@@ -238,9 +243,9 @@ export async function prepareBlooketQuestionControls(
     if (!livePrompt || livePrompt.value !== "" ||
         raw()?.["question"] !== "" || !liveTime ||
         liveTime.value !== String(raw()?.["timeLimit"])) return false;
-    if (!setText(livePrompt, input.question) ||
+    if (!await setText(livePrompt, input.question) ||
         !await wait(() => raw()?.["question"] === input.question) ||
-        !setText(unique("input#time-limit"), String(input.timeLimit)) ||
+        !await setText(unique("input#time-limit"), String(input.timeLimit)) ||
         !await wait(() => raw()?.["timeLimit"] === input.timeLimit))
       return false;
     if (input.qType === "typing") {
@@ -262,7 +267,7 @@ export async function prepareBlooketQuestionControls(
         const typed = input.answers[index]!.text;
         if (fields.length !== index + 1 ||
             (fields[index] as HTMLInputElement).value !== "" ||
-            !setText(fields[index] as HTMLElement, typed) ||
+            !await setText(fields[index] as HTMLElement, typed) ||
             !await wait(() => {
               const value = raw()?.["answers"];
               return Array.isArray(value) &&
@@ -295,7 +300,7 @@ export async function prepareBlooketQuestionControls(
         if (!control || control.tagName !== "TEXTAREA") return false;
         if (answer) {
           if ((control as HTMLTextAreaElement).value !== "" ||
-              !setText(control, answer.text) || !await wait(() => {
+              !await setText(control, answer.text) || !await wait(() => {
             const serialized = raw()?.["answers"];
             return Array.isArray(serialized) &&
               serialized[index] === answer.text;
