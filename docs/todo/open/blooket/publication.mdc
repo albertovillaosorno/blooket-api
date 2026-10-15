@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+The canonical persisted executor also has two synthetic integration checks
+for aliased recovery files. A hard-linked attempting journal stops at
+`attempt-load`; a hard-linked question checkpoint stops at `checkpoint-load`.
+Neither path contacts the browser session, acquires pacing nor makes a remote
+write, and neither removes or rewrites the aliased bytes. This is portable
+recovery evidence, not a live provider receipt.
+
 A red-to-green hard-link regression exposed mutable aliases in both write
 attempt journals and saved publication checkpoints. An alternate filename for
 the same inode could previously bypass cooperative file locks while the
