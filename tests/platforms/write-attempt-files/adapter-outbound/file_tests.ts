@@ -477,13 +477,67 @@ test("cross-plan and symbolic journals remain recovery evidence", async () => {
   });
 });
 
+test("version-three attempt bytes cannot reinterpret journal phase",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "attempt.json");
+    assert.equal((await beginWriteAttempt(path, plan, 0)).ok, true);
+    const original = await readFile(path, "utf8");
+    const altered = [
+      original.trimEnd(),
+      original + " ",
+      JSON.stringify(JSON.parse(original)),
+      original.replace('"phase": "attempting"',
+        '"phase": "confirmed", "phase": "attempting"'),
+      original.replace('"phase": "attempting"',
+        '"phase": "attempting", "phase": "confirmed"'),
+      original.replace('"operationIndex": 0',
+        '"operationIndex": 1, "operationIndex": 0'),
+    ];
+    for (const bytes of altered) {
+      await writeFile(path, bytes);
+      const loaded = await loadWriteAttemptFile(path, plan);
+      assert.equal(loaded.ok, false);
+      assert.equal((await clearWriteAttempt(path, plan)).ok, false);
+      assert.equal(await readFile(path, "utf8"), bytes);
+    }
+    await writeFile(path, original);
+    assert.equal((await loadWriteAttemptFile(path, plan)).ok, true);
+  });
+});
+
+test("legacy attempts cannot hide duplicate version or phase fields",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "legacy.json");
+    const legacy = { schemaVersion: 1, planId: plan.planId,
+      operationId: "plan:attempt-test:set", operationIndex: 0,
+      phase: "attempting" };
+    const compact = JSON.stringify(legacy);
+    await writeFile(path, compact);
+    assert.equal((await loadWriteAttemptFile(path, plan)).ok, true);
+    const altered = [
+      compact.replace('"schemaVersion":1',
+        '"schemaVersion":3,"schemaVersion":1'),
+      compact.replace('"phase":"attempting"',
+        '"phase":"confirmed","phase":"attempting"'),
+    ];
+    for (const bytes of altered) {
+      await writeFile(path, bytes);
+      assert.equal((await loadWriteAttemptFile(path, plan)).ok, false);
+      assert.equal((await clearWriteAttempt(path, plan)).ok, false);
+      assert.equal(await readFile(path, "utf8"), bytes);
+    }
+  });
+});
+
 test("journal reads bound file bytes and reject dangling aliases", async () => {
   await withTemporaryDirectory(async directory => {
     const path = join(directory, "bounded-attempt.json");
     assert.equal((await beginWriteAttempt(path, plan, 0)).ok, true);
     const source = await readFile(path, "utf8");
     await writeFile(path, source.padEnd(65_536, " "));
-    assert.equal((await loadWriteAttemptFile(path, plan)).ok, true);
+    assert.equal((await loadWriteAttemptFile(path, plan)).ok, false);
     await writeFile(path, source.padEnd(65_537, " "));
     assert.deepEqual(await loadWriteAttemptFile(path, plan), {
       ok: false, kind: "io", code: "write-attempt-file-unsafe",
