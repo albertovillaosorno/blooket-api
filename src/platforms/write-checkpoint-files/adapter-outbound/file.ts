@@ -322,7 +322,8 @@ async function readOwnedTextFile(path: string): Promise<
     | { readonly kind: "unreadable" } = { kind: "unreadable" };
   try {
     const metadata = await handle.stat();
-    if (!metadata.isFile() || metadata.size > MAX_CHECKPOINT_FILE_BYTES) {
+    if (!metadata.isFile() || metadata.nlink !== 1 ||
+        metadata.size > MAX_CHECKPOINT_FILE_BYTES) {
       result = { kind: "unsafe" };
     } else {
       const bytes = Buffer.alloc(MAX_CHECKPOINT_FILE_BYTES + 1);
@@ -336,7 +337,14 @@ async function readOwnedTextFile(path: string): Promise<
         }
         size += part.bytesRead;
       }
-      result = complete
+      const after = await handle.stat();
+      const unchanged = complete && size === metadata.size &&
+        after.isFile() && after.nlink === 1 &&
+        after.size === metadata.size &&
+        after.dev === metadata.dev && after.ino === metadata.ino &&
+        after.mtimeMs === metadata.mtimeMs &&
+        after.ctimeMs === metadata.ctimeMs;
+      result = unchanged
         ? { kind: "text", value: bytes.subarray(0, size).toString("utf8") }
         : { kind: "unsafe" };
     }

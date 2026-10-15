@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import {
+  link,
   mkdtemp,
   readFile,
   rm,
@@ -96,6 +97,26 @@ async function withTemporaryDirectory(
     await rm(directory, { recursive: true, force: true });
   }
 }
+
+test("hard-linked attempting journal cannot authorize confirmation or clear",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "attempt.json");
+    const alias = join(directory, "attempt-alias.json");
+    assert.equal((await beginWriteAttempt(path, plan, 0)).ok, true);
+    const before = await readFile(path, "utf8");
+    await link(path, alias);
+    assert.deepEqual(await loadWriteAttemptFile(path, plan), {
+      ok: false, kind: "io", code: "write-attempt-file-unsafe",
+    });
+    assert.equal((await confirmWriteAttempt(
+      path, plan, "plan:attempt-test:set", "remote-set-1",
+    )).ok, false);
+    assert.equal((await clearWriteAttempt(path, plan)).ok, false);
+    assert.equal(await readFile(path, "utf8"), before);
+    assert.equal(await readFile(alias, "utf8"), before);
+  });
+});
 
 test("begin creates an attempting journal without overwriting it", async () => {
   await withTemporaryDirectory(async (directory) => {
