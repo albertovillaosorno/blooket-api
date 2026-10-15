@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+Canonical execution tests now also simulate journals and checkpoints with
+POSIX group/world-write permissions. Restart stops at `attempt-load` or
+`checkpoint-load` respectively, before browser session observation, pacing or
+another provider mutation. Both originals remain unchanged; no real account
+content is accessed.
+
 Red-to-green permission regressions likewise reject a write-attempt journal
 or checkpoint made group- or world-writable after its initial private atomic
 save. Such files cannot be used to confirm an ambiguous attempt, clear its
