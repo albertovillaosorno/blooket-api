@@ -104,6 +104,26 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+Another red-to-green cancellation regression keeps persisted recovery as the
+first operation, then stops an already cancelled *ready* publication without
+contacting the browser, reading a remote baseline or acquiring the pacing
+queue. Cancellation delivered during the first session or baseline read also
+stops before the next admission boundary. Tests verify zero budget or journal
+writes, no provider mutation, and the continued priority of an existing
+ambiguous attempt over an unrelated cancellation status.
+
+A red-to-green budget-file regression now rejects noncanonical plan-bound
+mutation budgets before a task attempt is reserved. The previous reader used
+`JSON.parse` and accepted duplicate `starts` fields, reordered root keys and
+trailing data; this could reinterpret previously consumed attempt counts.
+
+The adapter now requires the exact pretty-printed, newline-terminated bytes
+written by its atomic writer. Synthetic tests verify read and reservation both
+fail closed and preserve altered bytes, while canonical restart counts work.
+
+A read-only check found the existing local publication budgets canonical.
+No provider write or journal migration was attempted.
+
 A follow-up red-to-green guard restricts the transient missing native
 Edit-document lifetime wait to a host-owned navigation or reload. An existing
 teacher-selected Edit route with absent lifetime evidence now stops after one

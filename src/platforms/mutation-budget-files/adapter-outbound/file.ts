@@ -225,6 +225,17 @@ function decodeStoredBudget(
   const state = decodeBlooketMutationTaskBudgetState(value["state"]);
   if (state === undefined || state === null)
     return invalidFailure("mutation-budget-file-invalid");
+  // The writer owns the exact order and serialized bytes. JSON.parse alone
+  // accepts duplicate keys, reordered fields and trailing material that may
+  // conceal a different count of already attempted remote mutations.
+  const canonical = JSON.stringify({
+    schemaVersion: FILE_VERSION,
+    planId: value["planId"],
+    state: { version: 1, startedAtMs: state.startedAtMs,
+      starts: state.starts },
+  }, null, 2) + "\n";
+  if (source !== canonical)
+    return invalidFailure("mutation-budget-file-invalid");
   return { ok: true, state };
 }
 
