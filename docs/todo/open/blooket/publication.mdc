@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A red-to-green hard-link regression exposed mutable aliases in both write
+attempt journals and saved publication checkpoints. An alternate filename for
+the same inode could previously bypass cooperative file locks while the
+canonical reader still admitted the record. The adapters now refuse multiple
+hard links and verify the opened descriptor's identity, size and metadata
+before accepting its content.
+
+Synthetic integration fixtures confirm that an
+aliased attempting journal cannot be confirmed or cleared, and an aliased
+checkpoint cannot advance a remote question. The original bytes and aliases
+remain untouched; historical single-link files still decode normally.
+
 End-to-end persisted-executor fixtures now inject a duplicate phase in an
 attempting journal or a duplicate remote set ID in a checkpoint before resume.
 Recovery reports a stable file-load failure without querying the browser,

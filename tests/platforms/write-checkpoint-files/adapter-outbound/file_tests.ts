@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import {
   chmod,
   lstat,
+  link,
   mkdtemp,
   readFile,
   rm,
@@ -117,6 +118,26 @@ test("missing checkpoint files load initial progress", async () => {
       checkpoint: checkpoint(0),
       source: "initial",
     });
+  });
+});
+
+test("hard-linked checkpoint cannot authorize further publication progress",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "checkpoint.json");
+    const alias = join(directory, "checkpoint-alias.json");
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(1)), { ok: true });
+    const before = await readFile(path, "utf8");
+    await link(path, alias);
+    assert.deepEqual(await loadWriteCheckpointFile(path, plan), {
+      ok: false, kind: "io", code: "checkpoint-file-unsafe",
+    });
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(2)), { ok: false, kind: "io",
+      code: "checkpoint-file-unsafe" });
+    assert.equal(await readFile(path, "utf8"), before);
+    assert.equal(await readFile(alias, "utf8"), before);
   });
 });
 
