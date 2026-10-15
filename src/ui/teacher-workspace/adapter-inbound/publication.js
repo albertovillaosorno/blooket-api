@@ -152,7 +152,10 @@ export function publicationStopReason(error) {
     "blooket-remote-state-changed", "blooket-publication-draft-conflict",
     "blooket-publication-capabilities-changed"].includes(code))
     return "conflict";
-  if (code === "blooket-publication-media-unsupported") return "media";
+  if (["blooket-publication-media-unsupported",
+    "blooket-media-not-prepared", "blooket-media-stale",
+    "blooket-media-invalid", "blooket-media-unavailable"].includes(code))
+    return "media";
   if (code === "blooket-publication-busy") return "busy";
   if (["publication-storage-unavailable", "publication-lock-release-failed",
     "publication-snapshot-invalid"].includes(code)) return "storage";

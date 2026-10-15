@@ -36,8 +36,12 @@ import { decodeMediaId } from
   "../../../media/media-identifiers/domain/media-id.ts";
 import { preparedMediaBytesAdmitted } from
   "../../../media/rendition-optimization/domain/limits.ts";
+import { detectImageFormat } from
+  "../../../media/image-formats/domain/image-format.ts";
 import type { BlooketWriteOperation } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
+import type { ProjectDocument } from
+  "../../../projects/project-documents/domain/project.ts";
 import type {
   BlooketPreparedMedia,
   BlooketPreparedMediaReadPort,
@@ -69,7 +73,14 @@ export async function admitBlooketPreparedMedia(
   media: BlooketPreparedMediaReadPort,
   expected?: PreparedMediaIdentities,
 ): Promise<AdmitBlooketPreparedMediaResult> {
-  const required = operationMediaIds(operation);
+  return await admitMediaIds(operationMediaIds(operation), media, expected);
+}
+
+async function admitMediaIds(
+  required: readonly string[],
+  media: BlooketPreparedMediaReadPort,
+  expected?: PreparedMediaIdentities,
+): Promise<AdmitBlooketPreparedMediaResult> {
   const snapshot = expected === undefined ? undefined
     : decodePreparedMediaIdentities(expected);
   if (expected !== undefined && snapshot === undefined)
@@ -126,7 +137,8 @@ export async function admitBlooketPreparedMedia(
         format: data["format"] as "png" | "jpeg" | "gif",
         bytes: copied,
       });
-      if (!validPreparedMedia(owned, mediaId))
+      if (!validPreparedMedia(owned, mediaId) ||
+          detectImageFormat(owned.bytes)?.format !== owned.format)
         return invalidMedia(mediaId);
     } catch {
       return invalidMedia(mediaId);
@@ -142,6 +154,84 @@ export async function admitBlooketPreparedMedia(
     admitted.push(owned);
   }
   return { ok: true, media: admitted };
+}
+
+export type AdmitPreparedPublicationIdentitiesResult =
+  | { readonly ok: true; readonly identities: PreparedMediaIdentities }
+  | Exclude<AdmitBlooketPreparedMediaResult, { readonly ok: true }>
+  | { readonly ok: false; readonly code: "blooket-publication-cancelled";
+      readonly mediaId: string };
+
+// A new publication may freeze only media the service can identify by stable
+// ID and current prepared bytes. No bytes or filesystem paths enter the
+// durable snapshot. Covers and MC answer images remain unverified remotely.
+export async function admitPreparedPublicationIdentities(
+  document: ProjectDocument,
+  media: BlooketPreparedMediaReadPort,
+  signal?: AbortSignal,
+): Promise<AdmitPreparedPublicationIdentitiesResult> {
+  const stopped = (id: string): AdmitPreparedPublicationIdentitiesResult =>
+    ({ ok: false, code: "blooket-publication-cancelled", mediaId: id });
+  if (signal?.aborted) return stopped("snapshot");
+  const images = [document.coverImage,
+    ...document.questions.flatMap(question => [question.image,
+      ...(question.type === "multiple-choice"
+        ? question.answers.map(answer => answer.image) : []),
+    ]),
+  ].filter(image => image !== null);
+  const missing = images.find(image => image.mediaId === null);
+  if (missing) return { ok: false,
+    code: "blooket-media-not-prepared", mediaId: "unresolved" };
+  const ids = [...new Set(images.map(image => image.mediaId!))];
+  // The saved-card reader itself supports at most 200 questions. Refuse a
+  // larger image set before doing expensive local media reads. Hash each
+  // prepared rendition in turn instead of retaining every binary payload.
+  if (ids.length > 200) return {
+    ok: false, code: "blooket-media-invalid", mediaId: "snapshot",
+  };
+  const identities = [];
+  for (const id of ids) {
+    if (signal?.aborted) return stopped(id);
+    const admitted = signal
+      ? await waitForMediaOrAbort(admitMediaIds([id], media), signal)
+      : await admitMediaIds([id], media);
+    // Stop must respond even if the service-owned library reader is stalled.
+    // Its outstanding read has no remote mutation authority, and its later
+    // reply must never authorize new snapshot or journal progress.
+    if (signal?.aborted || admitted === null) return stopped(id);
+    if (!admitted.ok) return admitted;
+    const identity = identifyPreparedMedia(admitted.media[0]!);
+    if (!identity) return {
+      ok: false, code: "blooket-media-invalid", mediaId: id,
+    };
+    identities.push(identity);
+  }
+  if (signal?.aborted) return stopped("snapshot");
+  const decoded = decodePreparedMediaIdentities({
+    schemaVersion: 1, items: identities,
+  });
+  return decoded ? { ok: true, identities: decoded }
+    : { ok: false, code: "blooket-media-invalid",
+        mediaId: ids[0] ?? "snapshot" };
+}
+
+async function waitForMediaOrAbort<T>(
+  work: Promise<T>, signal: AbortSignal,
+): Promise<T | null> {
+  if (signal.aborted) return null;
+  let onAbort: () => void = () => {};
+  const canceled = new Promise<null>(resolve => {
+    onAbort = () => resolve(null);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    if (signal.aborted) return null;
+    // Promise.race retains the port rejection handler after cancellation,
+    // preventing a late media failure from becoming an unhandled rejection.
+    return await Promise.race([work, canceled]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
 }
 
 export function blooketWriteOperationMediaIds(

@@ -115,6 +115,10 @@ const SET_RECEIPT = {
   kind: "set-created" as const,
   remoteSetId: "remote-set-1",
 };
+// The media boundary validates actual format signatures in addition to size.
+const syntheticPng = (...body: number[]) =>
+  new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...body]);
+
 const mediaPlan: BlooketWritePlan = {
   ...plan,
   planId: "plan:persisted-media-test",
@@ -1147,7 +1151,7 @@ test(
                   mediaId,
                   revision: 1,
                   format: "png",
-                  bytes: new Uint8Array([1]),
+                  bytes: syntheticPng(1),
                 },
               };
             },
@@ -1240,7 +1244,7 @@ test(
     await withTemporaryDirectory(async (directory) => {
       const path = join(directory, "checkpoint.json");
       const paths = persistence(path);
-      const bytes = new Uint8Array([9, 8, 7, 6]);
+      const bytes = syntheticPng(9, 8, 7, 6);
       let receivedBytes: Uint8Array | undefined;
       const writesWithMedia: BlooketWriteExecutionPort = {
         execute: async (_operation, _target, context) => {
@@ -1278,7 +1282,8 @@ test(
       assert.notEqual(receivedBytes, bytes);
       assert.deepEqual(receivedBytes, bytes);
       bytes.fill(0);
-      assert.deepEqual(Array.from(receivedBytes ?? []), [9, 8, 7, 6]);
+      assert.deepEqual(Array.from(receivedBytes ?? []),
+        Array.from(syntheticPng(9, 8, 7, 6)));
       const attempt = await loadWriteAttemptFile(paths.attempt, mediaPlan);
       assert.equal(attempt.ok, true);
       if (attempt.ok && attempt.kind === "record")
@@ -2235,7 +2240,7 @@ test("changed snapshot media stops before journal, budget or remote write",
     const calls: string[] = [];
     const pacing: string[] = [];
     const original = { mediaId: "cover", revision: 1, format: "png" as const,
-      bytes: new Uint8Array([1, 2, 3]) };
+      bytes: syntheticPng(1, 2, 3) };
     const result = await executePersistedBlooketWrite(paths, mediaPlan,
       browser([]), secrets(), writes(SET_SUCCESS, calls),
       verification({ ok: true, baseline: SET_BASELINE }), {
@@ -2243,7 +2248,7 @@ test("changed snapshot media stops before journal, budget or remote write",
         expectedMedia: { schemaVersion: 1,
           items: [identifyPreparedMedia(original)!] },
         media: { read: async () => ({ ok: true,
-          value: { ...original, bytes: new Uint8Array([3, 2, 1]) } }) },
+          value: { ...original, bytes: syntheticPng(3, 2, 1) } }) },
         budget: { path: budgetPath,
           policy: { maximumStarts: 2, maximumDurationMs: 60_000 },
           now: () => 96_000 },
@@ -2268,8 +2273,8 @@ test("expected media context cannot drift while execution awaits the session",
       "../../../../src/projects/blooket-write-plans/domain/prepared-media-identities.ts"
     );
     const original = { mediaId: "cover", revision: 1, format: "png" as const,
-      bytes: new Uint8Array([1, 2, 3]) };
-    const changed = { ...original, bytes: new Uint8Array([3, 2, 1]) };
+      bytes: syntheticPng(1, 2, 3) };
+    const changed = { ...original, bytes: syntheticPng(3, 2, 1) };
     const expected = { schemaVersion: 1 as const,
       items: [{ ...identifyPreparedMedia(original)! }] };
     const calls: string[] = [];

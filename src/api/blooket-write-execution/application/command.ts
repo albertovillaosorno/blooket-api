@@ -86,6 +86,10 @@ import { verifyPersistedBlooketWrite } from "./verify-reconciliation.ts";
 import { blooketSetReadWriteVerifier, questionMatches } from
   "./set-read-verifier.ts";
 import { lowerBlooketWriteSubmission } from "./lower-submission.ts";
+import { admitPreparedPublicationIdentities } from
+  "./admit-prepared-media.ts";
+import { samePreparedMediaIdentity, type PreparedMediaIdentities } from
+  "../../../projects/blooket-write-plans/domain/prepared-media-identities.ts";
 import { isBrowserWriteExecutionPort,
   browserCreateSetConfirmationSupported } from "./browser-write-adapter.ts";
 
@@ -174,20 +178,36 @@ export async function executeBlooketPublicationCommand(
       const document = decodeProjectDocument(draft.value["document"]);
       if (!document.ok)
         return fail("blooket-publication-invalid-draft");
-      if (hasMedia(document.value))
+      // Cover and answer images still lack exact remote identity evidence.
+      // Only question images backed by current prepared bytes are admitted.
+      const unsupported = document.value.coverImage !== null ||
+        document.value.questions.some(question =>
+          question.type === "multiple-choice" &&
+          question.answers.some(answer => answer.image !== null));
+      if (unsupported || (hasMedia(document.value) && !host.preparedMedia))
         return fail("blooket-publication-media-unsupported");
       const capabilities = await inspectBlooketCapabilities(
         blooket.session, blooket.secrets, blooket.capabilities,
-        { readOnly: true, textOnly: true },
+        { readOnly: true, textOnly: !hasMedia(document.value) },
       );
       if (!capabilities.ok) return fail(capabilities.code);
       if (capabilities.kind !== "capabilities")
         return success({ draftId, phase: capabilities.kind,
           state: capabilities.state, published: false });
       currentCapabilities = capabilities.value;
+      let expectedMedia: PreparedMediaIdentities = {
+        schemaVersion: 1, items: [],
+      };
+      if (hasMedia(document.value)) {
+        const admitted = await admitPreparedPublicationIdentities(
+          document.value, host.preparedMedia!, signal,
+        );
+        if (!admitted.ok) return fail(admitted.code);
+        expectedMedia = admitted.identities;
+      }
       const candidate = {
         schemaVersion: 2, draftId, revision: expectedRevision,
-        expectedMedia: { schemaVersion: 1, items: [] },
+        expectedMedia,
         document: document.value, capabilities: capabilities.value,
       };
       const admitted = decodeSnapshot(candidate, draftId);
@@ -294,10 +314,21 @@ export async function executeBlooketPublicationCommand(
       });
     }
     if (signal?.aborted) return fail("blooket-publication-cancelled");
-    // Keep new media mutations closed until the live native upload is proven.
-    // Durable identity verification never consults current library bytes.
-    if (hasMedia(prepared.document))
-      return fail("blooket-publication-media-unsupported");
+    // Re-admit all frozen prepared bytes before any new remote mutation.
+    // Reconciliation and final verification above never read today's media.
+    if (hasMedia(prepared.document) && attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex < plan.operations.length) {
+      if (!host.preparedMedia || !expectedMedia)
+        return fail("blooket-publication-media-unsupported");
+      const current = await admitPreparedPublicationIdentities(
+        prepared.document, host.preparedMedia, signal,
+      );
+      if (!current.ok) return fail(current.code);
+      if (expectedMedia.items.length !== current.identities.items.length ||
+          !expectedMedia.items.every(item => current.identities.items.some(
+            candidate => samePreparedMediaIdentity(item, candidate))))
+        return fail("blooket-media-stale");
+    }
     if (attempt.kind === "missing" && checkpoint.nextOperationIndex === 0 &&
         isBrowserWriteExecutionPort(writes) &&
         !await browserCreateSetConfirmationSupported(writes))
@@ -309,7 +340,7 @@ export async function executeBlooketPublicationCommand(
       if (currentCapabilities === undefined) {
         const capabilities = await inspectBlooketCapabilities(
           blooket.session, blooket.secrets, blooket.capabilities,
-          { readOnly: true, textOnly: true },
+          { readOnly: true, textOnly: !hasMedia(prepared.document) },
         );
         if (!capabilities.ok) return fail(capabilities.code);
         if (capabilities.kind !== "capabilities")

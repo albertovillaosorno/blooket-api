@@ -354,8 +354,10 @@ test("publication error labels classify only owned safe codes", () => {
     Error("blooket-browser-companion-update-required")), "extension");
   assert.equal(publicationStopReason(
     Error("blooket-publication-remote-conflict")), "conflict");
-  assert.equal(publicationStopReason(
-    Error("blooket-publication-media-unsupported")), "media");
+  for (const code of ["blooket-publication-media-unsupported",
+    "blooket-media-not-prepared", "blooket-media-stale",
+    "blooket-media-invalid", "blooket-media-unavailable"])
+    assert.equal(publicationStopReason(Error(code)), "media");
   assert.equal(publicationStopReason(
     Error("blooket-publication-busy")), "busy");
   assert.equal(publicationStopReason(

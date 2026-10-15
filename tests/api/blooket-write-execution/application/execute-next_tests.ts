@@ -182,7 +182,7 @@ test(
           mediaId,
           revision: 2,
           format: "png",
-          bytes: new Uint8Array([1]),
+          bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
         },
       }),
     },

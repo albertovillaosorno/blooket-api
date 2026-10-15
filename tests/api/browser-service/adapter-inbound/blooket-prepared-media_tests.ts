@@ -112,6 +112,26 @@ test(
   },
 );
 
+test("canonical JPEG variants preserve the prepared media format",
+  async () => {
+  for (const suffix of ["jpg", "jpeg"] as const) {
+    const bytes = new Uint8Array([255, 216, 255, 217]);
+    const adapter = createBlooketPreparedMediaReadPort(
+      "/synthetic/root", {
+        loadPreferences: async () => preferences() as never,
+        readPrepared: async () => ({ bytes, revision: 3,
+          file: "renditions/sky/3." + suffix }),
+      },
+    );
+    const result = await adapter.read("sky");
+    assert.equal(result.ok, true, suffix);
+    if (result.ok) {
+      assert.equal(result.value.format, "jpeg");
+      assert.equal(result.value.bytes, bytes);
+    }
+  }
+});
+
 test("adapter maps only known prepared-media failures", async () => {
   const expected = new Map([
     ["media-not-found", "blooket-media-not-prepared"],

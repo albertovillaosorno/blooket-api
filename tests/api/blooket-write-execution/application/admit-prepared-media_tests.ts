@@ -34,6 +34,7 @@ import test from "node:test";
 
 import {
   admitBlooketPreparedMedia,
+  admitPreparedPublicationIdentities,
   blooketWriteOperationMediaIds,
 } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
@@ -76,6 +77,10 @@ function port(
   };
 }
 
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+const validPngBytes = (...body: number[]): Uint8Array =>
+  new Uint8Array([...PNG_SIGNATURE, ...body]);
+
 function prepared(
   mediaId: string,
   bytes = 128,
@@ -86,7 +91,8 @@ function prepared(
       mediaId,
       revision: 3,
       format: "jpeg",
-      bytes: new Uint8Array(bytes),
+      bytes: new Uint8Array([255, 216, 255,
+        ...new Array(Math.max(0, bytes - 3)).fill(0)]),
     },
   };
 }
@@ -125,6 +131,53 @@ test("prepared media admission reads each stable ID exactly once", async () => {
       ["moon", 3, "jpeg"],
     ],
   );
+});
+
+test("matching PNG, JPEG and GIF signatures retain bounded admission",
+  async () => {
+  const samples = [
+    { format: "png" as const, bytes: validPngBytes(1, 2) },
+    { format: "jpeg" as const,
+      bytes: new Uint8Array([255, 216, 255, 217]) },
+    { format: "gif" as const,
+      bytes: new Uint8Array([71, 73, 70, 56, 57, 97, 0, 0]) },
+  ];
+  for (const sample of samples) {
+    const reads: string[] = [];
+    const admitted = await admitBlooketPreparedMedia(multipleChoice, {
+      read: async mediaId => {
+        reads.push(mediaId);
+        return { ok: true, value: { mediaId, revision: 3,
+          format: sample.format, bytes: sample.bytes } };
+      },
+    });
+    assert.equal(admitted.ok, true, sample.format);
+    if (admitted.ok) {
+      assert.deepEqual(admitted.media.map(item => item.format),
+        [sample.format, sample.format]);
+    }
+    assert.deepEqual(reads, ["shared", "moon"]);
+  }
+});
+
+test("declared prepared image format must match its actual bytes",
+  async () => {
+  for (const [format, bytes] of [
+    ["png", new Uint8Array([0xff, 0xd8, 0xff, 0xd9])],
+    ["jpeg", new Uint8Array([0x89, 0x50, 0x4e, 0x47,
+      0x0d, 0x0a, 0x1a, 0x0a])],
+    ["gif", new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])],
+  ] as const) {
+    const calls: string[] = [];
+    assert.deepEqual(await admitBlooketPreparedMedia(
+      multipleChoice, { read: async mediaId => {
+        calls.push(mediaId);
+        return { ok: true, value: { mediaId, revision: 3,
+          format, bytes } };
+      } },
+    ), { ok: false, code: "blooket-media-invalid", mediaId: "shared" });
+    assert.deepEqual(calls, ["shared"]);
+  }
 });
 
 test("no-media operations make no media-port calls", async () => {
@@ -236,19 +289,21 @@ test(
 
 test("admission owns bytes before another media read can reuse a buffer",
   async () => {
-  const bytes = new Uint8Array([1, 2, 3]);
+  const bytes = validPngBytes(1, 2, 3);
   const result = await admitBlooketPreparedMedia(multipleChoice, {
     read: async mediaId => {
-      if (mediaId === "moon") bytes.fill(9);
+      if (mediaId === "moon") bytes.set([9, 9, 9], 8);
       return { ok: true, value: {
         mediaId, revision: 3, format: "png", bytes,
       } };
     },
   });
   assert.ok(result.ok);
-  assert.deepEqual(Array.from(result.media[0]!.bytes), [1, 2, 3]);
+  assert.deepEqual(Array.from(result.media[0]!.bytes),
+    Array.from(validPngBytes(1, 2, 3)));
   bytes.fill(0);
-  assert.deepEqual(Array.from(result.media[1]!.bytes), [9, 9, 9]);
+  assert.deepEqual(Array.from(result.media[1]!.bytes),
+    Array.from(validPngBytes(9, 9, 9)));
 });
 
 test("a durable media identity refuses changed bytes, format or revision",
@@ -258,7 +313,7 @@ test("a durable media identity refuses changed bytes, format or revision",
     "../../../../src/projects/blooket-write-plans/domain/prepared-media-identities.ts"
   );
   const prepared = { mediaId: "sun", revision: 3, format: "png" as const,
-    bytes: new Uint8Array([1, 2, 3]) };
+    bytes: validPngBytes(1, 2, 3) };
   const expected = { schemaVersion: 1 as const,
     items: [identifyPreparedMedia(prepared)!] };
   const operation: BlooketWriteOperation = { ...multipleChoice,
@@ -267,12 +322,15 @@ test("a durable media identity refuses changed bytes, format or revision",
       timeLimitSeconds: 10, imageMediaId: "sun", matchMode: "exact",
       answer: "sun" } };
   for (const change of [{}, { revision: 4 }, { format: "gif" as const },
-    { bytes: new Uint8Array([3, 2, 1]) }, { bytes: new Uint8Array([1, 2]) }]) {
+    { bytes: validPngBytes(3, 2, 1) },
+    { bytes: validPngBytes(1, 2) }]) {
     const actual = { ...prepared, ...change };
     const result = await admitBlooketPreparedMedia(operation,
       { read: async () => ({ ok: true, value: actual }) }, expected);
     assert.equal(result.ok, Object.keys(change).length === 0);
-    if (!result.ok) assert.equal(result.code, "blooket-media-stale");
+    if (!result.ok) assert.equal(result.code,
+      "format" in change ? "blooket-media-invalid" :
+        "blooket-media-stale");
   }
   let called = false;
   assert.equal((await admitBlooketPreparedMedia(operation, {
@@ -373,7 +431,7 @@ test("prepared media copies typed slots without inherited iterators",
         throw new Error("subclass iterator executed");
       }
     }
-    const bytes = new UntrustedBytes([1, 2, 3]);
+    const bytes = new UntrustedBytes(validPngBytes(1, 2, 3));
     const admitted = await admitBlooketPreparedMedia({
       operationId: "plan:test:q:typing", kind: "question",
       localQuestionId: "q1", questionNumber: 1,
@@ -385,7 +443,8 @@ test("prepared media copies typed slots without inherited iterators",
     } }) });
     assert.equal(admitted.ok, true);
     if (!admitted.ok) return;
-    assert.deepEqual(Array.from(admitted.media[0]!.bytes), [1, 2, 3]);
+    assert.deepEqual(Array.from(admitted.media[0]!.bytes),
+      Array.from(validPngBytes(1, 2, 3)));
     assert.equal(iteratorCalls, 0);
     assert.equal(countCalls, 0);
   },
@@ -415,3 +474,149 @@ test("media lookup IDs stay fixed across asynchronous read callbacks",
   assert.deepEqual(calls, ["shared", "moon"]);
   },
 );
+
+
+const syntheticPublication = {
+  schemaVersion: 1 as const, title: "Prepared images",
+  description: "Local fixture", quizLanguage: "English",
+  visibility: "private" as const, mediaIndex: "media.jsonl",
+  coverImage: null,
+  questions: [{
+    id: "q1", type: "typing-answer" as const, prompt: "Type sun.",
+    timeLimitSeconds: 15, matchMode: "exactly" as const,
+    answer: "sun", image: { description: "Sun", mediaId: "shared" },
+  }, {
+    id: "q2", type: "typing-answer" as const, prompt: "Type sky.",
+    timeLimitSeconds: 15, matchMode: "exactly" as const,
+    answer: "sky", image: { description: "Sky", mediaId: "shared" },
+  }],
+};
+
+test("snapshot media identities deduplicate stable IDs and freeze hashes",
+  async () => {
+  const calls: string[] = [];
+  const result = await admitPreparedPublicationIdentities(
+    syntheticPublication, port(id => prepared(id), calls),
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(calls, ["shared"]);
+  assert.deepEqual(result.identities.items.map(item =>
+    [item.mediaId, item.revision, item.format, item.byteLength]),
+  [["shared", 3, "jpeg", 128]]);
+  assert.match(result.identities.items[0]!.sha256, /^[a-f0-9]{64}$/u);
+  assert.equal(JSON.stringify(result.identities).includes("bytes"), false);
+});
+
+test("unresolved project images do not read a media port", async () => {
+  const calls: string[] = [];
+  const result = await admitPreparedPublicationIdentities({
+    ...syntheticPublication,
+    questions: [{ ...syntheticPublication.questions[0]!,
+      image: { description: "Missing asset", mediaId: null } }],
+  }, port(id => prepared(id), calls));
+  assert.deepEqual(result, {
+    ok: false, code: "blooket-media-not-prepared", mediaId: "unresolved",
+  });
+  assert.deepEqual(calls, []);
+});
+
+test("invalid oversized or mismatched media cannot freeze a publication",
+  async () => {
+  for (const result of [
+    prepared("foreign"),
+    { ok: true as const, value: { mediaId: "shared", revision: 1,
+      format: "png" as const, bytes: new Uint8Array(2_500_000) } },
+  ]) {
+    const stopped = await admitPreparedPublicationIdentities(
+      syntheticPublication, port(() => result, []),
+    );
+    assert.deepEqual(stopped, { ok: false,
+      code: "blooket-media-invalid", mediaId: "shared" });
+  }
+});
+
+test("more than 200 distinct publication images stop before media reads",
+  async () => {
+  const calls: string[] = [];
+  const document = { ...syntheticPublication,
+    questions: Array.from({ length: 201 }, (_, index) => ({
+      ...syntheticPublication.questions[0]!, id: "q" + (index + 1),
+      image: { description: "Synthetic image", mediaId: "asset" + index },
+    })),
+  };
+  assert.deepEqual(await admitPreparedPublicationIdentities(document,
+    port(id => prepared(id), calls)), {
+    ok: false, code: "blooket-media-invalid", mediaId: "snapshot",
+  });
+  assert.deepEqual(calls, []);
+});
+
+test("canceled media snapshot stops before subsequent stable-ID reads",
+  async () => {
+  const controller = new AbortController();
+  const calls: string[] = [];
+  const document = { ...syntheticPublication,
+    questions: [syntheticPublication.questions[0]!, {
+      ...syntheticPublication.questions[1]!,
+      image: { description: "Sky", mediaId: "sky" },
+    }],
+  };
+  const result = await admitPreparedPublicationIdentities(document, {
+    read: async mediaId => {
+      calls.push(mediaId);
+      controller.abort();
+      return prepared(mediaId);
+    },
+  }, controller.signal);
+  assert.deepEqual(result, { ok: false,
+    code: "blooket-publication-cancelled", mediaId: "shared" });
+  assert.deepEqual(calls, ["shared"]);
+});
+
+test("pre-canceled media snapshot does not open a prepared media port",
+  async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let reads = 0;
+  const result = await admitPreparedPublicationIdentities(
+    syntheticPublication, { read: async () => {
+      reads++;
+      throw Error("must-not-read-after-abort");
+    } }, controller.signal,
+  );
+  assert.deepEqual(result, { ok: false,
+    code: "blooket-publication-cancelled", mediaId: "snapshot" });
+  assert.equal(reads, 0);
+});
+
+test("Stop resolves a stalled prepared-media lookup without waiting for I/O",
+  async () => {
+  const controller = new AbortController();
+  let release!: (result: BlooketPreparedMediaReadResult) => void;
+  let notifyRead!: () => void;
+  const entered = new Promise<void>(resolve => { notifyRead = resolve; });
+  const waiting = new Promise<BlooketPreparedMediaReadResult>(resolve => {
+    release = resolve;
+  });
+  const lookup = admitPreparedPublicationIdentities(
+    syntheticPublication, { read: async () => {
+      notifyRead();
+      return await waiting;
+    } }, controller.signal,
+  );
+  await entered;
+  controller.abort();
+  try {
+    const outcome = await Promise.race([
+      lookup,
+      new Promise<"hung">(resolve =>
+        setTimeout(() => resolve("hung"), 150)),
+    ]);
+    assert.deepEqual(outcome, { ok: false,
+      code: "blooket-publication-cancelled", mediaId: "shared" });
+  } finally {
+    release(prepared("shared"));
+    await lookup;
+  }
+});
