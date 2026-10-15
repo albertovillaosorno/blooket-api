@@ -104,6 +104,19 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, canonical publication now snapshots and validates any
+caller-supplied pacing policy before reading drafts or opening a journal.
+Malformed, accessor-backed or unknown policy fields cannot trigger a remote
+write. A resumed synthetic two-step publication also proves that raising a
+previously exhausted start limit advances the original checkpoint exactly once
+and verifies without replaying Create Set.
+
+The last read-only Multiple Choice pre-submit check additionally requires all
+four observed correctness controls to remain unique, visible and enabled.
+Red-to-green regressions cover missing, duplicate and disabled toggles while
+leaving the native provider-serialized answer semantics authoritative. These
+checks do not establish live automatic Add Question completion.
+
 The version-four publication-policy decoder now owns only exact enumerable
 data fields. Red-to-green tests prove that accessor properties are not invoked,
 and symbol-owned and inherited policy keys cannot relax application pacing.

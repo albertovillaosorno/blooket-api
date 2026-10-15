@@ -391,6 +391,45 @@ test("each draft step writes once and requires separate fresh verification",
       "blooket-publication-remote-conflict");
   }); });
 
+test("injected malformed publication policy cannot start a remote write",
+  async () => { await fixture(async state => {
+  const base = { minimumStartIntervalMs: 2_000,
+    maximumStartsPerMinute: 20, maximumTaskStarts: 2,
+    maximumTaskDurationMs: 60_000 };
+  for (const policy of [
+    { ...base, maximumTaskStarts: 0 },
+    { ...base, maximumTaskDurationMs: 30_000 },
+    { ...base, unexpected: true },
+  ]) {
+    const attempt = await executeBlooketPublicationCommand(
+      command("step", state.revision), {
+        ...state.host,
+        publicationPolicy: policy,
+      });
+    assert.equal(attempt.ok, false);
+    if (attempt.ok) continue;
+    assert.equal(attempt.issues[0]?.code, "invalid-publication-policy");
+    assert.equal(state.writes(), 0);
+  }
+  let getters = 0;
+  const accessors = { ...base };
+  Object.defineProperty(accessors, "maximumTaskStarts", {
+    enumerable: true,
+    get() { getters++; throw Error("private synthetic state"); },
+  });
+  const stopped = await executeBlooketPublicationCommand(
+    command("step", state.revision), {
+      ...state.host, publicationPolicy: accessors,
+    });
+  assert.equal(stopped.ok, false);
+  assert.equal(getters, 0);
+  const files = await publicationFiles(state.root, "fixture");
+  await assert.rejects(readFile(files.snapshot));
+  await assert.rejects(readFile(files.attempt));
+  await assert.rejects(readFile(files.budget));
+  }); },
+);
+
 test("configured task start limit stops before a second journal or write",
   async () => { await fixture(async state => {
     const configured: BlooketPublicationDependencies = {
@@ -414,6 +453,21 @@ test("configured task start limit stops before a second journal or write",
       "mutation-task-start-budget-exhausted");
     assert.equal(state.writes(), 1);
     const files = await publicationFiles(state.root, "fixture");
+    await assert.rejects(readFile(files.attempt));
+    // Simulate an explicitly restarted service with a higher admitted task
+    // limit. The original plan/checkpoint/budget must resume without another
+    // Create Set; the failed second step left no uncertain journal.
+    const resumed: BlooketPublicationDependencies = {
+      ...configured,
+      publicationPolicy: { ...configured.publicationPolicy!,
+        maximumTaskStarts: 2 },
+    };
+    const advanced = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), resumed));
+    assert.equal(advanced["completedOperations"], 2);
+    assert.equal(state.writes(), 2);
+    assert.equal(value(await executeBlooketPublicationCommand(
+      command("verify"), resumed))["published"], true);
     await assert.rejects(readFile(files.attempt));
   }); },
 );

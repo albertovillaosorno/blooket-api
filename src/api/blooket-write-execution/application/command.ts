@@ -78,7 +78,8 @@ import type { BlooketWriteExecutionPort } from
   "../contract/write-execution.ts";
 import type { BlooketMutationPacer } from "./mutation-pacing.ts";
 import {
-  defaultPublicationPreferences, type PublicationPreferences,
+  decodePublicationPreferences, defaultPublicationPreferences,
+  type PublicationPreferences,
 } from "../../../settings/teacher-preferences/domain/preferences.ts";
 import { executePersistedBlooketWrite } from "./execute-persisted.ts";
 import { verifyPersistedBlooketWrite } from "./verify-reconciliation.ts";
@@ -129,6 +130,20 @@ export async function executeBlooketPublicationCommand(
   );
   if (!decoded.ok) return commandFailure(command.operationId, decoded.issues);
   if (!host) return fail("blooket-publication-unavailable");
+  // A service normally supplies a frozen decoded policy. Own it again here
+  // before any draft, browser, or journal I/O so alternate command hosts
+  // cannot pass getters, symbols or a relaxed invalid task budget.
+  let publicationPolicy: PublicationPreferences;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(host,
+      "publicationPolicy");
+    if (descriptor && (!descriptor.enumerable ||
+        !Object.hasOwn(descriptor, "value")))
+      return fail("invalid-publication-policy");
+    publicationPolicy = descriptor?.value === undefined
+      ? defaultPublicationPreferences()
+      : decodePublicationPreferences(descriptor.value);
+  } catch { return fail("invalid-publication-policy"); }
   const { draftId, expectedRevision } = decoded.value;
   const { root, blooket, writes, pacer, signal } = host;
   const success = (value: unknown) =>
@@ -441,11 +456,8 @@ export async function executeBlooketPublicationCommand(
           path: files.budget,
           policy: {
             maximumStarts: Math.min(plan.operations.length + 5,
-              (host.publicationPolicy ?? defaultPublicationPreferences())
-                .maximumTaskStarts),
-            maximumDurationMs:
-              (host.publicationPolicy ?? defaultPublicationPreferences())
-                .maximumTaskDurationMs,
+              publicationPolicy.maximumTaskStarts),
+            maximumDurationMs: publicationPolicy.maximumTaskDurationMs,
           },
         },
       },
