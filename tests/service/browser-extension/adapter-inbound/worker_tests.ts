@@ -59,6 +59,11 @@ test(
   let incompatibleStatus = false;
   let incompatiblePoll = false;
   let unsafeReadSource = false;
+  let submittedReadOwner = false;
+  let detachedSourceReload = false;
+  let detachedCreated = 0;
+  let detachedClosed = 0;
+  let detachedUrl = "";
   let denyFinalReadGuard = false;
   let readGuardChecks = 0;
   let reloadDuringLeave = false;
@@ -161,12 +166,27 @@ test(
         addListener: callback => { onTabUpdated = callback; },
       },
       query: async () => [{ id: 99, url: origin + "/" }],
-      create: async ({ url }) => {
+      create: async ({ url, active }) => {
+        if (active === false && url.startsWith(
+          "https://dashboard.blooket.com/edit?id=")) {
+          detachedCreated++;
+          detachedUrl = url;
+          return { id: 83, url, status: "complete", windowId: 3 };
+        }
         creates++;
         tabUrl = url;
         return { id: 7, url, status: "complete", windowId: 3 };
       },
+      remove: async (id) => {
+        assert.equal(id, 83);
+        detachedClosed++;
+        detachedUrl = "";
+      },
       get: async (id) => {
+        if (id === 83) {
+          if (!detachedUrl) throw Error("closed-detached-tab");
+          return { id, url: detachedUrl, status: "complete", windowId: 3 };
+        }
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
         return { id, url: tabUrl, status: "complete", windowId: 3 };
@@ -223,8 +243,26 @@ test(
           ]);
           return [];
         }
+        if (target.tabId === 83) {
+          scripts.push(func.name + ":detached");
+          if (func.name === "inspectBlooketDocumentOrigin")
+            return [{ result: 50_000 }];
+          if (func.name === "inspectBlooketPage")
+            return [{ result: { ok: true, value: "edit" } }];
+          if (func.name === "listBlooketQuestionNumbers") {
+            if (detachedSourceReload) {
+              detachedSourceReload = false;
+              documentOrigin += 1_000;
+            }
+            return [{ result: { ok: true, value: [] } }];
+          }
+          throw Error("unexpected-detached-question-script");
+        }
         assert.equal(target.tabId, 7);
         scripts.push(func.name);
+        if (func.name === "inspectBlooketQuestionWriteStage")
+          return [{ result: { kind: "blooket-question-write-stage",
+            stage: submittedReadOwner ? "submit-attempted" : "no-owner" } }];
         if (func.name === "inspectBlooketSessionDocumentOrigin") {
           assert.deepEqual(args, [tabUrl]);
           return [{ result: documentOrigin }];
@@ -936,6 +974,44 @@ test(
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
     ]);
+    // One exact submitted owner may inspect in a separate background tab.
+    // The original teacher editor must not be navigated or reloaded.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    submittedReadOwner = true;
+    questionSaved = false;
+    const beforeDetachedReloads = readReloads;
+    const detachedQuestions = await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    assert.deepEqual(detachedQuestions.value, []);
+    assert.equal(detachedQuestions.ok, true);
+    assert.equal(detachedCreated, 1);
+    assert.equal(detachedClosed, 1);
+    assert.equal(readReloads, beforeDetachedReloads);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=set-fixture");
+    // A real security challenge still blocks detached reads, even if a
+    // submit latch survives the original page's React transition.
+    observedSessionOverride = "security-challenge";
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, 1);
+    observedSessionOverride = null;
+    // The owner tab can reload during an independent read. Neither its old
+    // result nor its new origin may confirm the original attempted write.
+    detachedSourceReload = true;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, 2);
+    assert.equal(detachedClosed, 2);
+    submittedReadOwner = false;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, 2);
+    questionSaved = true;
     unsafeReadSource = false;
     tabUrl = "https://dashboard.blooket.com/my-sets";
     listFailuresRemaining = 2;

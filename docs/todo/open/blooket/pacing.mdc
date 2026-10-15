@@ -104,6 +104,26 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-15, a read-only probe in the existing Chrome extension
+isolated world found one `submit-attempted` Add Question owner and four other
+Edit tabs with no owner. The pending original form still had a connected
+visible editor, native generated question serialization and an enabled Save
+button. A separate background tab loaded the same remote Edit route and saw
+zero saved question cards and a zero question counter, then was closed.
+
+This is diagnostic evidence, not a durable write acknowledgement, and it does
+not authorize clicking Save again or clearing the attempt journal. The new
+browser worker can use one fresh, background, read-only question-inspection
+tab only when an exact same-set submitted owner remains in the original native
+document and the session still observes the Edit route. It refuses unrelated
+unsafe editor forms, human challenges, changed source documents, read drift and
+failure to close the temporary tab.
+
+The original editor is never reloaded, navigated, canceled or submitted by
+this path. Portable worker and detached host tests pass; the new
+extension build has not been loaded over the pending real form, so
+this is not yet live canonical read-back acceptance.
+
 A further fail-closed filesystem regression covers account pacing and
 plan-bound task budgets made writable by other POSIX users (`mode & 0o022`).
 Both adapters now inspect permissions before and after reading the same opened
