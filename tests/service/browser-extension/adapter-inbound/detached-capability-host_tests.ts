@@ -1,0 +1,217 @@
+// Copyright:
+//   - Copyright © 2026 Alberto Villa Osorno.
+// SPDX-License-Identifier:
+//   - MIT
+// Confidential:
+//   - false
+// License-File:
+//   - LICENSE-MIT
+//
+// Boundary-Contract:
+// - Owns:
+//   - Synthetic detached read verification for native capability probing.
+// - Must-Not:
+//   - Connect to Blooket or open any actual browser or teacher profile.
+// - Allows:
+//   - Inputs: Fake background Chrome tabs with stable/unstable observations.
+//   - Outputs: Admission, failure, and cleanup assertions.
+//   - Side effects: Only in-memory synthetic tab state changes.
+// - Split-When:
+//   - Detached capability families require separate browser lifecycles.
+// - Merge-When:
+//   - This host is merged into a shared temporary-tab abstraction.
+// - Summary:
+//   - An unsaved teacher editor is never used as a capability probe.
+// - Description:
+//   - Only a fresh authenticated tab can produce capability evidence.
+// - Usage:
+//   - Run with the standard repository Node test command.
+// - Defaults:
+//   - Failure or leaked temporary tabs invalidate otherwise good evidence.
+//
+import assert from "node:assert/strict";
+import test from "node:test";
+import { decodeBlooketCapabilitySnapshot } from
+  "../../../../src/ir/capability-snapshots/contract/blooket-capabilities.ts";
+import {
+  inspectDetachedBlooketCapabilities,
+  type DetachedCapabilityChromePort,
+} from
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../../src/service/browser-extension/adapter-inbound/detached-capability-host.ts";
+
+const MY_SETS = "https://dashboard.blooket.com/my-sets";
+
+function fixture(options: {
+  readonly sourceRedirect?: boolean;
+  readonly unstableLists?: boolean;
+  readonly failedCleanup?: boolean;
+  readonly pending?: boolean;
+  readonly interruptedDrawer?: boolean;
+} = {}) {
+  const events: string[] = [];
+  let url = MY_SETS, removed = false, now = 1_000, scans = 0;
+  let docOrigin = 9_000, panelOpen = false, drawerOpen = false;
+  const chrome: DetachedCapabilityChromePort = {
+    tabs: {
+      create: async ({ url: newUrl, active }) => {
+        events.push("create");
+        assert.deepEqual({ url: newUrl, active },
+          { url: MY_SETS, active: false });
+        return { id: 84, url: newUrl, status: "loading" };
+      },
+      get: async id => {
+        assert.equal(id, 84);
+        events.push("get");
+        return { id, url: options.sourceRedirect ? "https://id.blooket.com/"
+          : url, status: options.pending ? "loading" : "complete" };
+      },
+      update: async (id, input) => {
+        assert.equal(id, 84);
+        assert.ok(input.url === MY_SETS ||
+          input.url === "https://dashboard.blooket.com/edit?id=synthetic-set");
+        events.push("update");
+        url = input.url;
+        docOrigin += 1_000;
+        return { id, url, status: "complete" };
+      },
+      remove: async id => {
+        assert.equal(id, 84);
+        events.push("remove");
+        if (options.failedCleanup) throw Error("not-removed");
+        removed = true;
+      },
+    },
+    scripting: {
+      executeScript: async ({ target, func, args }) => {
+        assert.equal(target.tabId, 84);
+        events.push(func.name);
+        if (func.name === "inspectBlooketDocumentOrigin")
+          return [{ result: docOrigin }];
+        if (func.name === "canLeaveBlooketPageForRead")
+          return [{ result: true }];
+        if (func.name === "inspectBlooketPage") {
+          const operation = (args?.[0] ?? {}) as { kind?: string };
+          if (operation.kind === "session.observe")
+            return [{ result: { ok: true,
+              value: url === MY_SETS ? "my-sets" : "edit" } }];
+          if (operation.kind === "sets.list") {
+            scans++;
+            const id = options.unstableLists && scans > 1
+              ? "changed-set" : "synthetic-set";
+            return [{ result: { ok: true, value: {
+              items: [{ schemaVersion: 1, id,
+                title: "Synthetic capability probe" }],
+              completeness: "unknown",
+            } } }];
+          }
+        }
+        if (func.name === "openBlooketCapabilityQuestionPanel") {
+          panelOpen = true;
+          return [{ result: true }];
+        }
+        if (func.name === "isBlooketCapabilityQuestionPanelReady")
+          return [{ result: panelOpen }];
+        if (func.name === "openBlooketAudioCapabilityDrawer") {
+          drawerOpen = true;
+          if (options.interruptedDrawer)
+            throw Error("unacknowledged-drawer-open");
+          return [{ result: true }];
+        }
+        if (func.name === "inspectBlooketAudioCapabilityDrawer")
+          return [{ result: { ok: true, value: "unsupported" } }];
+        if (func.name === "closeBlooketAudioCapabilityDrawer") {
+          drawerOpen = false;
+          return [{ result: true }];
+        }
+        if (func.name === "isBlooketAudioCapabilityDrawerClosed")
+          return [{ result: !drawerOpen }];
+        if (func.name === "closeBlooketCapabilityQuestionPanel") {
+          if (drawerOpen) return [{ result: false }];
+          panelOpen = false;
+          return [{ result: true }];
+        }
+        if (func.name === "isBlooketCapabilityQuestionPanelClosed")
+          return [{ result: !panelOpen && !drawerOpen }];
+        throw Error("unexpected-script:" + func.name);
+      },
+    },
+  };
+  const pause = async (ms: number) => { now += Math.max(ms, 1); };
+  const inspect = async (textOnly = true) =>
+    await inspectDetachedBlooketCapabilities(
+      chrome, textOnly, pause, () => now,
+    );
+  return { events, inspect, removed: () => removed };
+}
+
+test("detached text capabilities admit stable read and close only own tab",
+  async () => {
+  const page = fixture();
+  const result = await page.inspect();
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    const accepted = decodeBlooketCapabilitySnapshot(result.value);
+    assert.equal(accepted.ok, true);
+    if (accepted.ok) {
+      assert.equal(accepted.value.features.answerImages,
+        "account-dependent");
+      assert.equal(accepted.value.features.audio, "account-dependent");
+    }
+  }
+  assert.equal(page.removed(), true);
+  assert.equal(page.events.filter(x => x === "create").length, 1);
+  assert.equal(page.events.filter(x => x === "remove").length, 1);
+  assert.ok(!page.events.includes("update"));
+  assert.ok(!page.events.some(x => /submit|save|upload/iu.test(x)));
+});
+
+test("detached capabilities reject redirect, drift, and pending hydration",
+  async () => {
+  for (const option of ["sourceRedirect", "unstableLists",
+    "pending"] as const) {
+    const page = fixture({ [option]: true });
+    assert.deepEqual(await page.inspect(),
+      { ok: false, code: "blooket-browser-failed" }, option);
+    assert.equal(page.removed(), true, option);
+  }
+});
+
+test("detached capabilities never accept a result after cleanup failure",
+  async () => {
+  const page = fixture({ failedCleanup: true });
+  assert.deepEqual(await page.inspect(),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.deepEqual(page.events.filter(x => x === "remove"), ["remove"]);
+  assert.equal(page.removed(), false);
+});
+
+
+test("detached full capabilities close question and audio controls in own tab",
+  async () => {
+  const page = fixture();
+  const result = await page.inspect(false);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    const snapshot = decodeBlooketCapabilitySnapshot(result.value);
+    assert.equal(snapshot.ok, true);
+    if (snapshot.ok) {
+      assert.equal(snapshot.value.features.answerImages, "unsupported");
+      assert.equal(snapshot.value.features.audio, "unsupported");
+    }
+  }
+  assert.equal(page.removed(), true);
+  assert.deepEqual(page.events.filter(x => x === "update"),
+    ["update", "update"]);
+  assert.ok(page.events.includes("closeBlooketAudioCapabilityDrawer"));
+  assert.ok(page.events.includes("closeBlooketCapabilityQuestionPanel"));
+});
+
+test("ambiguous temporary audio drawer never confirms media capabilities",
+  async () => {
+  const page = fixture({ interruptedDrawer: true });
+  assert.deepEqual(await page.inspect(false),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.removed(), true);
+  assert.equal(page.events.filter(x => x === "remove").length, 1);
+});
