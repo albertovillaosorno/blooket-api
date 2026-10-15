@@ -32,6 +32,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import {
+  chmod,
   mkdir,
   link,
   mkdtemp,
@@ -472,6 +473,51 @@ test("cancel after session observation skips baseline and pacing",
     assert.deepEqual(calls, ["observe"]);
     assert.deepEqual(pace, []);
     assert.deepEqual(writesCalled, []);
+  });
+});
+
+test("shared-writable attempting evidence blocks a restarted publication",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const files = persistence(join(dir, "checkpoint.json"));
+    assert.equal((await beginWriteAttempt(files.attempt, plan, 0)).ok, true);
+    const prior = await readFile(files.attempt, "utf8");
+    await chmod(files.attempt, 0o660);
+    const reads: string[] = [], writesCalled: string[] = [];
+    const pacing: string[] = [];
+    const result = await executePersistedBlooketWrite(files, plan,
+      browser(reads), secrets(), writes(SET_SUCCESS, writesCalled),
+      undefined, { pacer: immediatePacer(pacing) });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "attempt-load");
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writesCalled, []);
+    assert.deepEqual(pacing, []);
+    assert.equal(await readFile(files.attempt, "utf8"), prior);
+  });
+});
+
+test("shared-writable progress cannot authorize a later remote question",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const files = persistence(join(dir, "checkpoint.json"));
+    assert.equal((await saveWriteCheckpointFile(files.checkpoint, plan, {
+      schemaVersion: 2, planId: plan.planId,
+      nextOperationIndex: 1, remoteSetId: "remote-set-1",
+    })).ok, true);
+    const prior = await readFile(files.checkpoint, "utf8");
+    await chmod(files.checkpoint, 0o606);
+    const reads: string[] = [], writesCalled: string[] = [];
+    const pacing: string[] = [];
+    const result = await executePersistedBlooketWrite(files, plan,
+      browser(reads), secrets(), writes(QUESTION_SUCCESS, writesCalled),
+      undefined, { pacer: immediatePacer(pacing) });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "checkpoint-load");
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writesCalled, []);
+    assert.deepEqual(pacing, []);
+    assert.equal(await readFile(files.checkpoint, "utf8"), prior);
   });
 });
 
