@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import {
   mkdir,
+  link,
   mkdtemp,
   readFile,
   rm,
@@ -64,8 +65,10 @@ import type {
   BlooketWriteVerificationPort,
 } from
   "../../../../src/api/blooket-write-execution/contract/write-verification.ts";
-import { loadWriteAttemptFile } from
+import { beginWriteAttempt, loadWriteAttemptFile } from
   "../../../../src/platforms/write-attempt-files/adapter-outbound/file.ts";
+import { saveWriteCheckpointFile } from
+  "../../../../src/platforms/write-checkpoint-files/adapter-outbound/file.ts";
 import { loadMutationBudgetFile } from
   "../../../../src/platforms/mutation-budget-files/adapter-outbound/file.ts";
 import { tryAcquireFileLock } from
@@ -469,6 +472,53 @@ test("cancel after session observation skips baseline and pacing",
     assert.deepEqual(calls, ["observe"]);
     assert.deepEqual(pace, []);
     assert.deepEqual(writesCalled, []);
+  });
+});
+
+test("aliased attempting journal blocks browser admission on restart",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const files = persistence(join(dir, "checkpoint.json"));
+    assert.equal((await beginWriteAttempt(files.attempt, plan, 0)).ok, true);
+    const prior = await readFile(files.attempt, "utf8");
+    await link(files.attempt, files.attempt + ".alias");
+    const reads: string[] = [], writesCalled: string[] = [];
+    const pacing: string[] = [];
+    const result = await executePersistedBlooketWrite(files, plan,
+      browser(reads), secrets(), writes(SET_SUCCESS, writesCalled),
+      undefined, { pacer: immediatePacer(pacing) });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "attempt-load");
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writesCalled, []);
+    assert.deepEqual(pacing, []);
+    assert.equal(await readFile(files.attempt, "utf8"), prior);
+    assert.equal(await readFile(files.attempt + ".alias", "utf8"), prior);
+  });
+});
+
+test("aliased checkpoint blocks a question write before browser admission",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const files = persistence(join(dir, "checkpoint.json"));
+    assert.equal((await saveWriteCheckpointFile(files.checkpoint, plan, {
+      schemaVersion: 2, planId: plan.planId,
+      nextOperationIndex: 1, remoteSetId: "remote-set-1",
+    })).ok, true);
+    const prior = await readFile(files.checkpoint, "utf8");
+    await link(files.checkpoint, files.checkpoint + ".alias");
+    const reads: string[] = [], writesCalled: string[] = [];
+    const pacing: string[] = [];
+    const result = await executePersistedBlooketWrite(files, plan,
+      browser(reads), secrets(), writes(QUESTION_SUCCESS, writesCalled),
+      undefined, { pacer: immediatePacer(pacing) });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "checkpoint-load");
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writesCalled, []);
+    assert.deepEqual(pacing, []);
+    assert.equal(await readFile(files.checkpoint, "utf8"), prior);
+    assert.equal(await readFile(files.checkpoint + ".alias", "utf8"), prior);
   });
 });
 
