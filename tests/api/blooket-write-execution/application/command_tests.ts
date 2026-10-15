@@ -342,6 +342,34 @@ test("append detects a teacher edit between preflight and journal capture",
     assert.equal(s.questions[0]?.timeLimit, 40);
   }));
 
+test("append refuses metadata changed during pacing before the journal",
+  () => fixture(async s => {
+    const request = await appendFixture(s);
+    let changed = false;
+    const host: BlooketPublicationDependencies = { ...s.host,
+      pacer: { acquire: async signal => {
+        const result = await s.host.pacer.acquire(signal);
+        changed = true;
+        return result;
+      } },
+      blooket: { ...s.host.blooket, sets: {
+        ...s.host.blooket.sets,
+        get: async (...args) => {
+          const result = await s.host.blooket.sets.get(...args);
+          return result.ok && result.value && changed
+            ? { ok: true as const, value: { ...result.value,
+                visibility: "public" as const } } : result;
+        },
+      } },
+    };
+    const result = await executeBlooketPublicationCommand(request, host);
+    assert.equal(result.ok, false);
+    assert.equal(changed, true);
+    assert.equal(s.writes(), 2);
+    const files = await publicationFiles(s.root, "extension");
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
 test("append freezes the prior collection across an interrupted suffix", () =>
   fixture(async s => {
     const request = await appendFixture(s, 2);
