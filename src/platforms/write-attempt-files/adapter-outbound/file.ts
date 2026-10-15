@@ -171,6 +171,24 @@ export async function loadWriteAttemptFile(
   if (!decoded.ok) {
     return decoded;
   }
+  // A version-three journal is written only in the canonical field order.
+  // Refuse duplicate phase/receipt keys or trailing bytes before a restart
+  // can treat the record as a confirmed write and clear recovery evidence.
+  // Preserve historical versions one and two for their existing migration.
+  const storedVersion = (parsed.value as Record<string, unknown>)[
+    "schemaVersion"];
+  const compact = JSON.stringify(parsed.value);
+  const pretty = JSON.stringify(parsed.value, null, 2);
+  // Historic v1/v2 writers and imported fixtures used compact or indented
+  // JSON with an optional trailing newline. Preserve those exact formats,
+  // but never admit duplicate keys that can disguise the schema or phase.
+  const validBytes = storedVersion === WRITE_ATTEMPT_VERSION
+    ? read.value === serialize(decoded.value)
+    : [compact, compact + "\n", pretty, pretty + "\n"]
+      .includes(read.value);
+  if (!validBytes)
+    return invalidFailure("$", "write-attempt-noncanonical",
+      "Write attempt journal bytes differ from the admitted record.");
   return {
     ok: true,
     kind: "record",
