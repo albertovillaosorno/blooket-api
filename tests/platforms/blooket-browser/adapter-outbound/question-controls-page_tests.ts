@@ -461,6 +461,51 @@ test("read-only multiple-choice echo rejects late shuffle and answer changes",
   assert.equal(page.hiddenWrites(), 0);
 }, "mc"));
 
+test("pre-submit echo refuses changed prompt or timer control types",
+  async () => {
+  for (const variant of ["prompt-tag", "timer-tag", "timer-type",
+    "timer-disabled"])
+    await withEditor(async page => {
+      assert.equal(await prepareBlooketQuestionControls(input), true);
+      page.watch.prepared = true;
+      page.watch.finalized = true;
+      assert.equal(inspectBlooketPreparedQuestionEcho(input), true);
+      if (variant === "prompt-tag") page.prompt.tagName = "INPUT";
+      if (variant === "timer-tag") page.time.tagName = "BUTTON";
+      if (variant === "timer-type") page.time.type = "text";
+      if (variant === "timer-disabled") page.time.disabled = true;
+      assert.equal(inspectBlooketPreparedQuestionEcho(input), false);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+},
+);
+
+test("pre-submit MC echo refuses disabled or renamed shuffle controls",
+  async () => {
+  for (const variant of ["disabled", "readonly", "tag", "type"])
+    await withEditor(async page => {
+      const mc: BlooketQuestionPageInput = {
+        ...input, qType: "mc", random: false, answerTypes: null,
+        answers: [{ text: "Sun", correct: true },
+          { text: "Moon", correct: false },
+          { text: "Star", correct: true },
+          { text: "Earth", correct: false }],
+      };
+      assert.equal(await prepareBlooketQuestionControls(mc), true);
+      page.watch.prepared = true;
+      page.watch.finalized = true;
+      assert.equal(inspectBlooketPreparedQuestionEcho(mc), true);
+      const shuffle = page.form.selectors["input#shuffle-toggle"]![0]!;
+      if (variant === "disabled") shuffle.disabled = true;
+      if (variant === "readonly") shuffle.readOnly = true;
+      if (variant === "tag") shuffle.tagName = "BUTTON";
+      if (variant === "type") shuffle.type = "text";
+      assert.equal(inspectBlooketPreparedQuestionEcho(mc), false);
+      assert.equal(page.hiddenWrites(), 0);
+    }, "mc");
+},
+);
+
 test("pre-submit MC echo refuses replaced or disabled correctness controls",
   async () => {
   const mc: BlooketQuestionPageInput = {
