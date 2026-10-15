@@ -13,6 +13,32 @@ record first. It does not declare quiz publication or automatic installation
 complete. The human's current instructions determine account-mutation and Git
 authority; this document cannot grant either to another session.
 
+## Current delivery checkpoint (2026-10-15)
+
+Start with the unfinished `blooket-11` record. A real Create Set receipt and
+a reconciled typing-question publication exist, but the latest MC Save
+returned HTTP 429 and remains uncertain. Do not replay it, adopt a matching
+title, or remove its journal because a separate read shows zero questions.
+
+MC page-script arguments now travel as JSON text, preserving nullable fields
+that disappeared from injected object arguments in the authorized Chrome
+session. Actual preparation, finalization and visible echo passed without
+Save; the subsequent canonical Save reached the provider and was throttled.
+The product reports that stop while retaining reconciliation-required state.
+
+Prepared question-image snapshots use current stable IDs and frozen byte
+identities. Their scoped capability read excludes unrelated account-dependent
+Audio probes while still requiring explicit question-image support. A real
+repository-owned icon completed local intake, AI enrichment and JPEG
+preparation;
+its production media reader admitted the same 12,797 bytes.
+
+Live image publication, existing-quiz editing, the complete AI attachment
+journey and safe automatic installation remain unfinished. Native Mac/Safari
+execution stays in ongoing platform hardening; unavailable Apple hardware
+does not block portable implementation. Browserless agents should use current
+official Web Search sources and these contracts without inventing live receipts.
+
 ## Evidence and upstream documentation
 
 Use Web Search when available to verify current external documentation before

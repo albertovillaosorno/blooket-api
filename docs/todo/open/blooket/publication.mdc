@@ -73,6 +73,26 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, publication stopped depending on unrelated account-dependent
+Audio inspection for prepared question images. The existing scoped base
+snapshot already reports question-image availability separately; the
+planner still requires explicit support, and current prepared-byte identities
+are still checked before each new mutation.
+
+A red-to-green command fixture publishes an image-bearing quiz when its
+full account-media inspector is unavailable but its scoped snapshot explicitly
+supports question images. Separate fixtures refuse unknown, unsupported and
+account-dependent question-image availability before a snapshot or journal.
+These are portable provider doubles, not a live image upload.
+
+A separate real local HTTP workflow imported an existing repository icon,
+preserved its Spanish original name and description, applied canonical AI
+enrichment, and prepared a 12,797-byte JPEG at recipe revision two. The
+production Blooket media reader admitted those same bytes by stable ID, and
+normalization was completed. No native file chooser, external upload or
+Blooket write was involved; the small asset remains in the repository-owned
+development library for reproducibility.
+
 On 2026-10-15, the installed JSON-transport companion completed MC
 preparation, finalization and visible echo, then latched one native Save.
 The actual same-set POST returned HTTP 429 eleven milliseconds after the
