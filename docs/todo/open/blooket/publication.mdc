@@ -73,6 +73,20 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A recoverable, submitted Add Question watch was independently observed
+in the owner's existing Chrome on 2026-10-15. The unsaved original form was
+left untouched. A separate authenticated read-only browser tab loaded the
+same set and showed zero saved question cards, then was closed without a
+mutation. This does not prove that the attempt can safely be replayed.
+
+The extension worker now admits a narrowly scoped, detached `questions.list`
+read from a submitted owner without leaving the teacher's original Edit form.
+It requires the same native source document before and after the independent
+read and preserves all ordinary confirmation and human-stop gates. Synthetic
+worker and detached-host tests demonstrate stable empty read-back, drift,
+security stops and cleanup failures. The live worker was not reloaded over
+the pending question, and remote publication acceptance remains open.
+
 Canonical execution tests now also simulate journals and checkpoints with
 POSIX group/world-write permissions. Restart stops at `attempt-load` or
 `checkpoint-load` respectively, before browser session observation, pacing or

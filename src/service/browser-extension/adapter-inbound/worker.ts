@@ -44,6 +44,11 @@ import {
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { createExtensionQuestionInspectionHost } from
   "./question-inspection-host.ts";
+import { inspectDetachedBlooketQuestions } from
+  "./detached-question-read-host.ts";
+import { inspectBlooketQuestionWriteStage } from
+  // jig-ignore-next-line: TypeScript module specifier is indivisible.
+  "../../../platforms/blooket-browser/adapter-outbound/question-write-stage-page.ts";
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
 import { createExtensionCapabilityInspectionHost } from
   "./capability-inspection-host.ts";
@@ -105,6 +110,7 @@ declare const chrome: {
     };
     query(options: { url: string[] }): Promise<BrowserTab[]>;
     create(options: { url: string; active: boolean }): Promise<BrowserTab>;
+    remove(id: number): Promise<void>;
     get(id: number): Promise<BrowserTab>;
     reload(id: number, options: { bypassCache: true }): Promise<void>;
     update(
@@ -350,6 +356,52 @@ async function read(
       : origin !== "https://dashboard.blooket.com"
   )
     throw new Error("manual-blooket-sign-in-required");
+  // An uncertain Save may leave the teacher's owned form open indefinitely.
+  // Fresh verification may read a new background tab only when this same
+  // source document still holds the exact submitted mutation latch. It must
+  // never navigate, cancel or submit from the original teacher editor.
+  if (operation.kind === "questions.list" && target === tab.url &&
+      tab.status === "complete") {
+    const sourceOrigin = await script(current, browser,
+      inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+      [tab.url]);
+    const canLeave = await script(current, browser,
+      canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+    if (canLeave !== true && typeof sourceOrigin === "number" &&
+        Number.isFinite(sourceOrigin) && sourceOrigin > 0 &&
+        Date.now() < readDeadline) {
+      const stage = await script(current, browser,
+        inspectBlooketQuestionWriteStage as (...args: never[]) => unknown);
+      const state = await script(current, browser,
+        inspectBlooketPage as (...args: never[]) => unknown,
+        [{ kind: "session.observe" }]);
+      if (!exactWorkerKeys(stage, "kind,stage") ||
+          (stage as { kind?: unknown }).kind !==
+            "blooket-question-write-stage" ||
+          (stage as { stage?: unknown }).stage !== "submit-attempted" ||
+          !exactSessionObservation(state) ||
+          (state as { value?: unknown }).value !== "edit")
+        throw new Error("browser-navigation-unsafe");
+      const verified = await browser.tabs.get(current.tabId);
+      const originAgain = await script(current, browser,
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [tab.url]);
+      if (verified.status !== "complete" || verified.url !== tab.url ||
+          sourceOrigin !== originAgain || Date.now() >= readDeadline)
+        throw new Error("browser-navigation-unsafe");
+      const detached = await inspectDetachedBlooketQuestions(
+        browser, operation.setId, readDeadline, pause,
+      );
+      const finalTab = await browser.tabs.get(current.tabId);
+      const finalOrigin = await script(current, browser,
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [tab.url]);
+      if (finalTab.status !== "complete" || finalTab.url !== tab.url ||
+          finalOrigin !== sourceOrigin || Date.now() >= readDeadline)
+        throw new Error("browser-navigation-unsafe");
+      return detached;
+    }
+  }
   let approvedSourceOrigin: number | undefined;
   if (target !== null) {
     // The teacher may be editing a question, metadata, or a fresh set in
@@ -759,6 +811,24 @@ function ownedBrowser(
   };
   return {
     tabs: {
+      create: async (options: { url: string; active: false }) => {
+        requireOwner();
+        const result = await chrome.tabs.create(options);
+        try { requireOwner(); }
+        catch (error) {
+          if (Number.isSafeInteger(result.id) && result.id! > 0)
+            await chrome.tabs.remove(result.id!).catch(() => undefined);
+          throw error;
+        }
+        return result;
+      },
+      remove: async (id: number) => {
+        // Closing a tab created by this host is cleanup, not a new read.
+        // The deadline can expire while Chrome is removing it.
+        if (connection !== current || generation !== activeGeneration)
+          throw new Error("retired-browser-connection");
+        await chrome.tabs.remove(id);
+      },
       get: async (id: number) => {
         requireOwner();
         const result = await chrome.tabs.get(id);
