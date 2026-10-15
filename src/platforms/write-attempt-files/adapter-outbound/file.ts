@@ -710,6 +710,7 @@ async function readOwnedTextFile(path: string): Promise<
   try {
     const metadata = await handle.stat();
     if (!metadata.isFile() || metadata.nlink !== 1 ||
+        (metadata.mode & 0o022) !== 0 ||
         metadata.size > MAX_ATTEMPT_FILE_BYTES) {
       result = { kind: "unsafe" };
     } else {
@@ -727,6 +728,7 @@ async function readOwnedTextFile(path: string): Promise<
       const after = await handle.stat();
       const unchanged = complete && size === metadata.size &&
         after.isFile() && after.nlink === 1 &&
+        (after.mode & 0o022) === 0 &&
         after.size === metadata.size &&
         after.dev === metadata.dev && after.ino === metadata.ino &&
         after.mtimeMs === metadata.mtimeMs &&

@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import {
+  chmod,
   link,
   mkdtemp,
   readFile,
@@ -97,6 +98,24 @@ async function withTemporaryDirectory(
     await rm(directory, { recursive: true, force: true });
   }
 }
+
+test("world-writable attempt journals cannot confirm or clear a write",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const path = join(directory, "attempt.json");
+    assert.equal((await beginWriteAttempt(path, plan, 0)).ok, true);
+    const before = await readFile(path, "utf8");
+    await chmod(path, 0o606);
+    assert.deepEqual(await loadWriteAttemptFile(path, plan), {
+      ok: false, kind: "io", code: "write-attempt-file-unsafe",
+    });
+    assert.equal((await confirmWriteAttempt(
+      path, plan, "plan:attempt-test:set", "remote-set-1",
+    )).ok, false);
+    assert.equal((await clearWriteAttempt(path, plan)).ok, false);
+    assert.equal(await readFile(path, "utf8"), before);
+  });
+});
 
 test("hard-linked attempting journal cannot authorize confirmation or clear",
   async () => {
