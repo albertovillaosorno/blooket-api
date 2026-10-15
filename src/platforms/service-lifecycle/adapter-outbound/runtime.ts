@@ -30,12 +30,41 @@
 //   - Unsupported hosts and invalid lifecycle inputs fail closed.
 //
 import { constants } from "node:fs";
-import { open } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   object,
   exact,
 } from "../../../media/library-metadata/domain/metadata.ts";
+
+// A detached service may exit as a Linux zombie before the container's
+// init process reaps it. kill(pid, 0) still succeeds for that dead process;
+// combine this observation with the launcher's independent lock/port checks.
+export function isTerminatedLinuxProcessStat(
+  source: string, pid: number,
+): boolean {
+  if (!Number.isSafeInteger(pid) || pid < 1 ||
+      !source.startsWith(String(pid) + " (")) return false;
+  const end = source.lastIndexOf(") ");
+  if (end < 0 || end + 4 >= source.length) return false;
+  const state = source[end + 2];
+  return (state === "Z" || state === "X" || state === "x") &&
+    source[end + 3] === " ";
+}
+
+export async function serviceProcessExited(pid: number): Promise<boolean> {
+  if (!Number.isSafeInteger(pid) || pid < 1) return false;
+  try { process.kill(pid, 0); }
+  catch (error) {
+    return error instanceof Error && "code" in error &&
+      error.code === "ESRCH";
+  }
+  if (process.platform !== "linux") return false;
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+    return isTerminatedLinuxProcessStat(stat, pid);
+  } catch { return false; }
+}
 
 export interface LocalServiceRuntime {
   readonly version: 1;

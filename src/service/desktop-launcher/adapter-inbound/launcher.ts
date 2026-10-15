@@ -40,6 +40,7 @@ import {
   boundedResponseText,
   decodeServiceRuntime,
   existingService,
+  serviceProcessExited,
 } from "../../../platforms/service-lifecycle/adapter-outbound/runtime.ts";
 import { openLocalWorkspace } from
   "../../../platforms/browser-opening/adapter-outbound/open.ts";
@@ -59,13 +60,7 @@ async function observeServiceClosure(root: string,
   Promise<boolean> {
   const deadline = Date.now() + 5_000;
   for (;;) {
-    let exited = false;
-    try { process.kill(observed.pid, 0); }
-    catch (error) {
-      exited = error instanceof Error && "code" in error &&
-        error.code === "ESRCH";
-    }
-    if (exited) {
+    if (await serviceProcessExited(observed.pid)) {
       const missing = async (name: string): Promise<boolean> => {
         try { await lstat(join(root, name)); return false; }
         catch (error) { return error instanceof Error && "code" in error &&
