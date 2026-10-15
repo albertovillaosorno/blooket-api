@@ -147,10 +147,45 @@ export async function prepareBlooketQuestionControls(
         input.answers.length > (input.qType === "mc" ? 4 : 100)) return false;
     watch!.controlsStarted = true;
     if (!await wait(() => raw() !== null)) return false;
+    // Before picking a type or changing native fields, require the exact
+    // intended question slot and an empty provider media state. A remounted
+    // or mismatched editor must not be partly overwritten before failing.
+    const initial = raw();
+    if (!initial || initial["number"] !== input.number ||
+        initial["image"] !== "" || initial["audio"] !== "")
+      return false;
+    // A provider modal may already contain a teacher's unsaved text before
+    // this isolated watch was admitted. Never change its type or overwrite
+    // the prompt and answers of a nonempty editor.
+    if (initial["question"] !== "" ||
+        !Array.isArray(initial["answers"]) ||
+        initial["answers"].some(answer => answer !== "") ||
+        !Array.isArray(initial["correctAnswers"]) ||
+        initial["correctAnswers"].some(answer => answer !== ""))
+      return false;
+    // Visible React controls can contain unsaved text even while the hidden
+    // serializer has not registered a first MC answer input event.
+    const nativeAnswers = [
+      ...Array.from(form!.querySelectorAll('textarea[id^="answer-"]')),
+      ...Array.from(form!.querySelectorAll(
+        'input[name="accepted-answers"]',
+      )),
+    ] as (HTMLTextAreaElement | HTMLInputElement)[];
+    if (nativeAnswers.some(control => control.value !== "")) return false;
     // React may publish the hidden state before the visible picker mounts.
     // Waiting only for unique provider controls cannot cause another write.
-    if (!await wait(() => unique('[role="combobox"]') !== null))
-      return false;
+    if (!await wait(() => unique('[role="combobox"]') !== null &&
+        unique("textarea#question") !== null &&
+        unique("input#time-limit") !== null)) return false;
+    // A visible prompt may contain unsaved teacher text even while React's
+    // serialized hidden value still says empty. Check before changing types.
+    const originalPrompt = unique("textarea#question") as
+      HTMLTextAreaElement | null;
+    const originalTime = unique("input#time-limit") as
+      HTMLInputElement | null;
+    if (!originalPrompt || originalPrompt.value !== "" ||
+        raw()?.["question"] !== "" || !originalTime ||
+        originalTime.value !== String(raw()?.["timeLimit"])) return false;
     const picker = unique('[role="combobox"]');
     if (!picker) return false;
     if (raw()?.["qType"] !== input.qType) {
@@ -168,10 +203,45 @@ export async function prepareBlooketQuestionControls(
       if (options.length !== 1 || !click(options[0] as HTMLElement) ||
           !await wait(() => raw()?.["qType"] === input.qType)) return false;
     }
+    // A native answer field can become populated during the provider's type
+    // transition without reaching the hidden React serializer. Recheck every
+    // visible input before changing the prompt, timer, or accepted answers.
+    const liveAnswers = [
+      ...Array.from(form!.querySelectorAll('textarea[id^="answer-"]')),
+      ...Array.from(form!.querySelectorAll('input[name="accepted-answers"]')),
+    ] as (HTMLTextAreaElement | HTMLInputElement)[];
+    if (liveAnswers.some(answer => answer.value !== "")) return false;
+    // Before changing the prompt or timer, refuse a provider editor already
+    // containing unowned MC answer text in a slot this plan will not use.
+    // Otherwise a partially prepared form would retain teacher data after
+    // failure, but its other visible controls would already be overwritten.
+    if (input.qType === "mc") {
+      const existing = raw()?.["answers"];
+      if (!Array.isArray(existing) || existing.length > 4 ||
+          existing.some((answer, index) =>
+            typeof answer !== "string" ||
+            (index >= input.answers.length && answer !== "")))
+        return false;
+      for (let index = input.answers.length; index < 4; index++) {
+        const control = unique("textarea#answer-" + index);
+        if (!control || control.tagName !== "TEXTAREA" ||
+            (control as HTMLTextAreaElement).value !== "") return false;
+      }
+    }
     if (!await wait(() => unique("textarea#question") !== null &&
-        unique("input#time-limit") !== null) ||
-        !setText(unique("textarea#question"), input.question) ||
-        !setText(unique("input#time-limit"), String(input.timeLimit)))
+        unique("input#time-limit") !== null)) return false;
+    // Selecting a provider question type can replace the visible controls.
+    // Recheck the teacher's text before any automated field mutation.
+    const livePrompt = unique("textarea#question") as
+      HTMLTextAreaElement | null;
+    const liveTime = unique("input#time-limit") as HTMLInputElement | null;
+    if (!livePrompt || livePrompt.value !== "" ||
+        raw()?.["question"] !== "" || !liveTime ||
+        liveTime.value !== String(raw()?.["timeLimit"])) return false;
+    if (!setText(livePrompt, input.question) ||
+        !await wait(() => raw()?.["question"] === input.question) ||
+        !setText(unique("input#time-limit"), String(input.timeLimit)) ||
+        !await wait(() => raw()?.["timeLimit"] === input.timeLimit))
       return false;
     if (input.qType === "typing") {
       if (!input.answerTypes ||
@@ -189,9 +259,15 @@ export async function prepareBlooketQuestionControls(
         const fields = Array.from(form!.querySelectorAll(
           'input[name="accepted-answers"]',
         ));
+        const typed = input.answers[index]!.text;
         if (fields.length !== index + 1 ||
-            !setText(fields[index] as HTMLElement, input.answers[index]!.text))
-          return false;
+            (fields[index] as HTMLInputElement).value !== "" ||
+            !setText(fields[index] as HTMLElement, typed) ||
+            !await wait(() => {
+              const value = raw()?.["answers"];
+              return Array.isArray(value) &&
+                value[index] === input.answers[index]!.text;
+            })) return false;
         const parent = fields[index]!.parentElement;
         const matches = Array.from(parent?.querySelectorAll("button") ?? [])
           .filter(button => ["Is Exactly", "Contains"]
@@ -200,24 +276,47 @@ export async function prepareBlooketQuestionControls(
           ? "Is Exactly" : "Contains";
         if (matches.length !== 1 ||
             (matches[0]!.textContent?.trim() !== label &&
-              !click(matches[0]!))) return false;
+              !click(matches[0]!)) || !await wait(() => {
+              const modes = raw()?.["answerTypes"];
+              return Array.isArray(modes) &&
+                modes[index] === input.answerTypes![index];
+            })) return false;
       }
     } else {
       const shuffle = unique("input#shuffle-toggle") as
         HTMLInputElement | null;
       if (!shuffle || shuffle.type !== "checkbox" ||
-          (shuffle.checked !== input.random && !click(shuffle))) return false;
+          (shuffle.checked !== input.random && !click(shuffle)) ||
+          !await wait(() => raw()?.["random"] === input.random))
+        return false;
       for (let index = 0; index < 4; index++) {
         const answer = input.answers[index];
-        if (!setText(unique("textarea#answer-" + index), answer?.text ?? ""))
+        const control = unique("textarea#answer-" + index);
+        if (!control || control.tagName !== "TEXTAREA") return false;
+        if (answer) {
+          if ((control as HTMLTextAreaElement).value !== "" ||
+              !setText(control, answer.text) || !await wait(() => {
+            const serialized = raw()?.["answers"];
+            return Array.isArray(serialized) &&
+              serialized[index] === answer.text;
+          })) return false;
+        } else if ((control as HTMLTextAreaElement).value !== "") {
+          // React's MC state array grows when onChange touches a slot.
+          // Do not write empty strings to unused visible answer controls:
+          // the provider would serialize extra blank trailing answers.
           return false;
+        }
         const button = unique('button[aria-label="Mark Answer ' +
           (index + 1) + ' as Correct"]');
         const current = raw()?.["correctAnswers"];
         if (!button || !Array.isArray(current)) return false;
         const isCorrect = Boolean(answer && current.includes(answer.text));
-        if (isCorrect !== Boolean(answer?.correct) && !click(button))
-          return false;
+        if (isCorrect !== Boolean(answer?.correct) &&
+            (!click(button) || !await wait(() => {
+              const selected = raw()?.["correctAnswers"];
+              return Array.isArray(selected) &&
+                selected.includes(answer!.text) === answer!.correct;
+            }))) return false;
       }
     }
     const matches = await wait(() => {

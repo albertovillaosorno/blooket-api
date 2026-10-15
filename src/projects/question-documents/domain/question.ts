@@ -169,6 +169,25 @@ function decodeMultipleChoice(
     });
   }
 
+  // Blooket serializes MC correctness by the exact answer text. Two
+  // identical labels cannot identify which visible slot should be marked
+  // correct, even when the rest of the question is well formed.
+  if (answers !== undefined) {
+    const seen = new Set<string>();
+    for (let index = 0; index < answers.length; index++) {
+      const text = answers[index]?.text;
+      if (text === null || text === undefined) continue;
+      if (seen.has(text)) {
+        issues.push({
+          path: `${path}.answers[${index}].text`,
+          code: "duplicate-answer-text",
+          message: "Multiple Choice answer labels must be unique.",
+        });
+      }
+      seen.add(text);
+    }
+  }
+
   if (issues.length > 0) {
     return { ok: false, issues };
   }

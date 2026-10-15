@@ -145,6 +145,30 @@ function project(description = "Astronomy review.") {
 const mediaJsonl = media.map((record) => JSON.stringify(record)).join("\n")
   + "\n";
 
+test("duplicate native answer text never becomes an executable plan", () => {
+  const document = project();
+  const candidate = {
+    ...document,
+    questions: [{
+      ...document.questions[0],
+      answers: [
+        { text: "Same", correct: true, image: null },
+        { text: "Same", correct: false, image: null },
+      ],
+    }, document.questions[1]],
+  };
+  const result = buildBlooketWritePlan(
+    JSON.stringify(candidate), mediaJsonl, capabilities,
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.kind, "invalid-project");
+    if ("issues" in result) assert.deepEqual(result.issues.filter(issue =>
+      issue.code === "duplicate-answer-text").map(issue => issue.path),
+      ["$.project.questions[0].answers[1].text"]);
+  }
+});
+
 test("validated projects lower to ordered remote-neutral operations", () => {
   const result = buildBlooketWritePlan(
     JSON.stringify(project()),

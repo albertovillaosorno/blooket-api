@@ -137,19 +137,27 @@ function editor(kind: "typing" | "mc" = "typing") {
   const modes: string[] = [];
   const selected: boolean[] = [];
   let qType = "mc";
+  let number = 1;
+  let providerImage = "";
   let random = true;
   let ignored = false;
   let extraProviderField = false;
   let hiddenWrites = 0;
+  let mcAnswerLength = 0;
+  let mcTrailingEmptyEvents = 0;
   let serialized = "";
   const render = () => {
     if (ignored) return;
+    // Recovered Edit client module 89770 renders four visible answer slots,
+    // but its onChange assigns only the touched slot to the answers array.
+    const savedAnswers = qType === "mc"
+      ? answers.slice(0, mcAnswerLength) : answers;
     serialized = JSON.stringify({
-      number: 1, question: prompt.value,
-      answers: answers.map(answer => answer.value),
-      correctAnswers: answers.filter((answer, index) =>
+      number, question: prompt.value,
+      answers: savedAnswers.map(answer => answer.value),
+      correctAnswers: savedAnswers.filter((answer, index) =>
         qType === "typing" || selected[index]).map(answer => answer.value),
-      image: "", audio: "", qType, random,
+      image: providerImage, audio: "", qType, random,
       answerTypes: qType === "typing" ? [...modes] : null,
       timeLimit: Number(time.value),
       ...(extraProviderField ? { providerExtra: true } : {}),
@@ -175,7 +183,13 @@ function editor(kind: "typing" | "mc" = "typing") {
         ? "Is Exactly" : "Contains";
       render();
     };
-    answer.onEvent = () => { render(); };
+    answer.onEvent = () => {
+      if (qType === "mc") {
+        mcAnswerLength = Math.max(mcAnswerLength, index + 1);
+        if (index >= 2 && answer.value === "") mcTrailingEmptyEvents++;
+      }
+      render();
+    };
     form.selectors['input[name="accepted-answers"]'] = answers;
   };
   typing.onClick = () => {
@@ -221,10 +235,80 @@ function editor(kind: "typing" | "mc" = "typing") {
   prompt.onEvent = () => { render(); };
   time.onEvent = () => { render(); };
   render();
+  const delayTypingEvents = () => {
+    const original = typing.onClick;
+    typing.onClick = () => {
+      original();
+      const queued = (patch: (state: Record<string, unknown>) => void) => {
+        const prior = JSON.parse(serialized) as Record<string, unknown>;
+        patch(prior);
+        setTimeout(() => { serialized = JSON.stringify(prior); }, 40);
+      };
+      prompt.onEvent = () => queued(state => {
+        state["question"] = prompt.value;
+      });
+      time.onEvent = () => queued(state => {
+        state["timeLimit"] = Number(time.value);
+      });
+      const accepted = answers[0]!;
+      accepted.onEvent = () => queued(state => {
+        state["answers"] = [accepted.value];
+        state["correctAnswers"] = [accepted.value];
+      });
+      const mode = accepted.parentElement!.selectors["button"]![0]!;
+      mode.onClick = () => queued(state => {
+        const next = mode.textContent === "Is Exactly"
+          ? "contains" : "exactly";
+        mode.textContent = next === "exactly" ? "Is Exactly" : "Contains";
+        state["answerTypes"] = [next];
+      });
+    };
+  };
+  const delayMcEvents = () => {
+    // In React, two synthetic input events in one turn may read an old
+    // captured question object. The last asynchronous state update wins.
+    const queued = (patch: (old: Record<string, unknown>) => void) => {
+      const prior = JSON.parse(serialized) as Record<string, unknown>;
+      patch(prior);
+      setTimeout(() => { serialized = JSON.stringify(prior); }, 40);
+    };
+    prompt.onEvent = () => queued(record => {
+      record["question"] = prompt.value;
+    });
+    time.onEvent = () => queued(record => {
+      record["timeLimit"] = Number(time.value);
+    });
+    for (let index = 0; index < 4; index++) {
+      const answer = answers[index]!;
+      answer.onEvent = () => queued(record => {
+        const copied = [...record["answers"] as string[]];
+        copied[index] = answer.value;
+        record["answers"] = copied;
+      });
+      const correct = form.selectors['button[aria-label="Mark Answer ' +
+        (index + 1) + ' as Correct"]']![0]!;
+      correct.onClick = () => queued(record => {
+        selected[index] = !selected[index];
+        const current = record["correctAnswers"] as string[];
+        record["correctAnswers"] = selected[index]
+          ? [...current, answer.value]
+          : current.filter(value => value !== answer.value);
+      });
+    }
+  };
   return { document, form, hidden, watch, prompt, time, picker, list,
+    delayMcEvents, delayTypingEvents,
     render, hiddenWrites: () => hiddenWrites,
+    mcTrailingEmptyEvents: () => mcTrailingEmptyEvents,
     ignoreChanges: () => { ignored = true; },
     driftProviderShape: () => { extraProviderField = true; render(); },
+    driftQuestionNumber: () => { number = 2; render(); },
+    driftProviderImage: () => { providerImage = "owned-media"; render(); },
+    addSerializedTrailingAnswer: () => {
+      const native = JSON.parse(serialized) as Record<string, unknown>;
+      (native["answers"] as string[])[3] = "Unexpected provider answer";
+      serialized = JSON.stringify(native);
+    },
     clearGenerated: () => { serialized = ""; } };
 }
 
@@ -286,6 +370,254 @@ test("multiple choice visible answer controls build native serialized state",
     assert.equal(await prepareBlooketQuestionControls(mc), false);
   }, "mc"));
 
+test("two or three multiple-choice answers do not fill blank React slots",
+  async () => {
+  for (const count of [2, 3]) {
+    await withEditor(async page => {
+      const answers = [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false },
+        { text: "Star", correct: true }].slice(0, count);
+      const candidate: BlooketQuestionPageInput = {
+        ...input, qType: "mc", question: "Pick the light sources.",
+        answers, answerTypes: null, random: false, timeLimit: 20,
+      };
+      assert.equal(await prepareBlooketQuestionControls(candidate), true);
+      assert.deepEqual(JSON.parse(page.hidden.value).answers,
+        answers.map(answer => answer.text));
+      assert.equal(page.mcTrailingEmptyEvents(), 0);
+      assert.equal(page.hiddenWrites(), 0);
+    }, "mc");
+  }
+});
+
+test("delayed typing answer and match changes settle before admission",
+  async () => withEditor(async page => {
+    page.delayTypingEvents();
+    assert.equal(await prepareBlooketQuestionControls(input), true);
+    const saved = JSON.parse(page.hidden.value);
+    assert.equal(saved.question, input.question);
+    assert.equal(saved.timeLimit, 15);
+    assert.deepEqual(saved.answers, ["sun"]);
+    assert.deepEqual(saved.correctAnswers, ["sun"]);
+    assert.deepEqual(saved.answerTypes, ["contains"]);
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("React-batched MC edits must settle before the next native event",
+  async () => withEditor(async page => {
+    page.delayMcEvents();
+    const candidate: BlooketQuestionPageInput = {
+      ...input, qType: "mc", question: "Pick the light sources.",
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+      answerTypes: null, random: true, timeLimit: 15,
+    };
+    assert.equal(await prepareBlooketQuestionControls(candidate), true);
+    const saved = JSON.parse(page.hidden.value);
+    assert.equal(saved.question, candidate.question);
+    assert.equal(saved.timeLimit, 15);
+    assert.deepEqual(saved.answers, ["Sun", "Moon"]);
+    assert.deepEqual(saved.correctAnswers, ["Sun"]);
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc"));
+
+test("an unsynchronized human prompt blocks picker activation",
+  async () => withEditor(async page => {
+    // A native text input may have changed without a React onChange event.
+    // The hidden question JSON is empty, but the teacher's typed words are not.
+    page.prompt.value = "Teacher is still writing";
+    const prior = page.hidden.value;
+    assert.equal(JSON.parse(prior).question, "");
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.prompt.value, "Teacher is still writing");
+    assert.equal(page.hidden.value, prior);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.watch.controlsPrepared, false);
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("a prompt changed while choosing the type is never overwritten",
+  async () => withEditor(async page => {
+    const typing = page.list.selectors['[role="option"]']![1]!;
+    const original = typing.onClick;
+    typing.onClick = () => {
+      original();
+      // An unacknowledged native edit can happen after the initial preflight.
+      page.prompt.value = "Teacher continued editing during picker";
+    };
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.prompt.value,
+      "Teacher continued editing during picker");
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }));
+
+test("a typing answer appearing during type selection stays untouched",
+  async () => withEditor(async page => {
+    const typing = page.list.selectors['[role="option"]']![1]!;
+    const original = typing.onClick;
+    typing.onClick = () => {
+      original();
+      const control = page.form.selectors[
+        'input[name="accepted-answers"]']![0]!;
+      control.value = "Teacher's unpublished answer";
+    };
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    const answer = page.form.selectors[
+      'input[name="accepted-answers"]']![0]!;
+    assert.equal(answer.value, "Teacher's unpublished answer");
+    assert.equal(page.prompt.value, "",
+      "the writer must refuse before changing other visible controls");
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }));
+
+test("a late typing alternative is not overwritten after Add Answer",
+  async () => withEditor(async page => {
+    const addAlternative = page.form.selectors["button"]![0]!;
+    const original = addAlternative.onClick;
+    addAlternative.onClick = () => {
+      original();
+      page.form.selectors['input[name="accepted-answers"]']![1]!.value =
+        "Human answer added during form update";
+    };
+    const alternative: BlooketQuestionPageInput = {
+      ...input,
+      answers: [{ text: "sun", correct: true },
+        { text: "star", correct: true }],
+      answerTypes: ["exactly", "contains"],
+    };
+    assert.equal(await prepareBlooketQuestionControls(alternative), false);
+    assert.equal(page.form.selectors[
+      'input[name="accepted-answers"]']![1]!.value,
+    "Human answer added during form update");
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }));
+
+test("late MC answer text cannot be erased by the next automated edit",
+  async () => withEditor(async page => {
+    const first = page.form.selectors["textarea#answer-0"]![0]!;
+    const second = page.form.selectors["textarea#answer-1"]![0]!;
+    const original = first.onEvent;
+    first.onEvent = event => {
+      original(event);
+      second.value = "Human second answer";
+    };
+    const candidate: BlooketQuestionPageInput = {
+      ...input, qType: "mc", question: "Choose a star.",
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+      answerTypes: null, random: true, timeLimit: 20,
+    };
+    assert.equal(await prepareBlooketQuestionControls(candidate), false);
+    assert.equal(second.value, "Human second answer");
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }, "mc"));
+
+test("an unsynchronized teacher time limit is not overwritten",
+  async () => withEditor(async page => {
+    page.time.value = "30";
+    const before = page.hidden.value;
+    assert.equal(JSON.parse(before).timeLimit, 20);
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.time.value, "30");
+    assert.equal(page.hidden.value, before);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("time changed during question-type selection blocks further edits",
+  async () => withEditor(async page => {
+    const typing = page.list.selectors['[role="option"]']![1]!;
+    const original = typing.onClick;
+    typing.onClick = () => {
+      original();
+      page.time.value = "30";
+    };
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.time.value, "30");
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("an already populated native question refuses all automated edits",
+  async () => withEditor(async page => {
+    page.prompt.value = "Existing unsaved human prompt";
+    page.render();
+    const original = page.hidden.value;
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.prompt.value, "Existing unsaved human prompt");
+    assert.equal(page.hidden.value, original);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }));
+
+test("unowned native answer text refuses before changing a question type",
+  async () => withEditor(async page => {
+    const first = page.form.selectors["textarea#answer-0"]![0]!;
+    first.value = "Another teacher's answer";
+    page.render();
+    const original = page.hidden.value;
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(first.value, "Another teacher's answer");
+    assert.equal(page.hidden.value, original);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }, "mc"));
+
+test("unsynced native typing answer remains untouched before preparation",
+  async () => withEditor(async page => {
+    const type = page.list.selectors['[role="option"]']![1]!;
+    type.click();
+    const existing = page.form.selectors[
+      'input[name="accepted-answers"]']![0]!;
+    existing.value = "Unsubmitted typing answer";
+    const prior = page.hidden.value;
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.hidden.value, prior);
+    assert.equal(existing.value, "Unsubmitted typing answer");
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.watch.controlsPrepared, false);
+  }));
+
+test("unexpected text in an unused MC slot stops without erasing teacher work",
+  async () => withEditor(async page => {
+    const trailing = page.form.selectors["textarea#answer-3"]![0]!;
+    trailing.value = "Unowned trailing answer";
+    const candidate: BlooketQuestionPageInput = {
+      ...input, qType: "mc", question: "Pick the light sources.",
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+      answerTypes: null, random: false, timeLimit: 20,
+    };
+    assert.equal(await prepareBlooketQuestionControls(candidate), false);
+    assert.equal(trailing.value, "Unowned trailing answer");
+    assert.equal(page.prompt.value, "",
+      "MC preflight must refuse unowned text before changing the prompt");
+    assert.equal(page.time.value, "20");
+    assert.equal(page.mcTrailingEmptyEvents(), 0);
+    assert.equal(page.watch.controlsPrepared, false);
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc"));
+
+test("unexpected serialized MC text stops before editing visible controls",
+  async () => withEditor(async page => {
+    page.addSerializedTrailingAnswer();
+    const candidate: BlooketQuestionPageInput = {
+      ...input, qType: "mc", question: "Pick the light sources.",
+      answers: [{ text: "Sun", correct: true },
+        { text: "Moon", correct: false }],
+      answerTypes: null, random: false, timeLimit: 20,
+    };
+    assert.equal(await prepareBlooketQuestionControls(candidate), false);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.time.value, "20");
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(page.watch.controlsPrepared, false);
+  }, "mc"));
+
 test("a late initial provider serialization can hydrate before editing",
   async () => withEditor(async page => {
     page.clearGenerated();
@@ -308,6 +640,26 @@ test("visible React controls may mount after hidden state is ready",
     assert.equal(await prepareBlooketQuestionControls(input), true);
     assert.equal(page.hiddenWrites(), 0);
     assert.equal(JSON.parse(page.hidden.value).question, input.question);
+  }));
+
+test("a changed question number stops before any visible editor mutation",
+  async () => withEditor(async page => {
+    page.driftQuestionNumber();
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.time.value, "20");
+    assert.equal(page.hiddenWrites(), 0);
+  }));
+
+test("existing provider media prevents text writer from editing a form",
+  async () => withEditor(async page => {
+    page.driftProviderImage();
+    assert.equal(await prepareBlooketQuestionControls(input), false);
+    assert.equal(page.picker.clicked, 0);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.time.value, "20");
+    assert.equal(page.hiddenWrites(), 0);
   }));
 
 test("a provider-added hidden question property is detectable drift",

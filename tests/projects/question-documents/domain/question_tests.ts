@@ -71,6 +71,18 @@ test("multiple choice rejects fewer than two answers", () => {
   assert.equal(result.ok, false);
 });
 
+test("multiple choice refuses duplicate text labels before publication", () => {
+  const result = decodeQuestionDocument({
+    ...multipleChoice,
+    answers: [{ text: "Sun", correct: true, image: null },
+      { text: "Sun", correct: false, image: null }],
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.deepEqual(result.issues.filter(issue =>
+    issue.code === "duplicate-answer-text").map(issue => issue.path),
+    ["$.answers[1].text"]);
+});
+
 test("multiple choice rejects a set without a correct answer", () => {
   const result = decodeQuestionDocument({
     ...multipleChoice,
@@ -81,6 +93,28 @@ test("multiple choice rejects a set without a correct answer", () => {
   });
 
   assert.equal(result.ok, false);
+});
+
+test("distinct image-only answers retain stable media identity admission",
+  () => {
+  const image = (id: string) => ({ description: "Image " + id,
+    mediaId: id });
+  const accepted = decodeQuestionDocument({
+    ...multipleChoice,
+    answers: [
+      { text: null, correct: true, image: image("photo-1") },
+      { text: null, correct: false, image: image("photo-2") },
+    ],
+  });
+  assert.equal(accepted.ok, true);
+  const caseDistinct = decodeQuestionDocument({
+    ...multipleChoice,
+    answers: [
+      { text: "Sun", correct: true, image: null },
+      { text: "sun", correct: false, image: null },
+    ],
+  });
+  assert.equal(caseDistinct.ok, true);
 });
 
 test("multiple choice admits image-only answers structurally", () => {
