@@ -33,8 +33,10 @@ repository-owned icon completed local intake, AI enrichment and JPEG
 preparation;
 its production media reader admitted the same 12,797 bytes.
 
-Live image publication, existing-quiz editing, the complete AI attachment
-journey and safe automatic installation remain unfinished. Native Mac/Safari
+Live image publication and in-place question replacement/deletion remain
+unfinished. An existing-set append path now exists through canonical CLI/MCP,
+but live append acceptance, the complete AI attachment journey and safe
+automatic installation are still pending. Native Mac/Safari
 execution stays in ongoing platform hardening; unavailable Apple hardware
 does not block portable implementation. Browserless agents should use current
 official Web Search sources and these contracts without inventing live receipts.
@@ -144,11 +146,21 @@ journaled write. `publication status`, `publication reconcile`, and
 returns `published: true`. MCP exposes the corresponding
 `blooket_publication_*` tools through its ordinary CLI subprocess boundary.
 
+For an existing set, `publication append <draft-id> <revision> <set-id> --json`
+and `blooket_publication_append` freeze its exact metadata, question prefix
+and target ID before sending only the new suffix. Resume with ordinary
+`publication step`, then reconcile uncertainty and verify with fresh reads.
+Changed existing questions, metadata, replacements and deletions are refused;
+do not replace an existing set with a new one to bypass the stop.
+
 Portable integration crosses the actual MCP, CLI subprocess, localhost service,
 journals, and simulated browser bridge. It is not live provider acceptance.
-Media and editing existing quizzes remain pending. A legacy loaded extension
-returning bare My Sets arrays fails `blooket-browser-incompatible`; replace it
-with the current assembled worker before testing canonical publication.
+Live prepared-media upload and edits to saved question content remain pending.
+Append has portable transport coverage, not current live confirmation.
+
+A legacy loaded extension returning bare My Sets arrays fails
+`blooket-browser-incompatible`; replace it with the current assembled worker
+before testing canonical publication.
 
 As checked on 2026-10-08, Chrome can omit Origin on bridge GET while supplying
 it on POST. The current worker sends `x-blooket-browser-client` with its
