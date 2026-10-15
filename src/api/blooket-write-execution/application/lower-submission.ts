@@ -107,7 +107,9 @@ function lowerQuestion(
   remoteSetId: string,
 ): LowerBlooketWriteSubmissionResult {
   const question = operation.question;
-  const mathMarker = "`*`";
+  // Match the native editor's rejection of incomplete equation markers.
+  // Canonical publication preflights this lowering before journaling.
+  const mathMarker = "`*";
   const imageMarker = "`~`";
   if (question.prompt.includes(mathMarker))
     return { ok: false, code: "ambiguous-provider-text" };

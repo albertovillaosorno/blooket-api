@@ -220,6 +220,27 @@ async function appendFixture(s: Awaited<ReturnType<typeof state>>,
     } };
 }
 
+test("invalid provider math text stops before freezing a write journal", () =>
+  fixture(async s => {
+    const saved = await executeLibraryCommand({ version: 1,
+      operationId: "cli:math-marker-fixture", command: "drafts.put",
+      payload: { id: "unsafe-marker", expectedRevision: null,
+        document: { ...document, questions: [{ ...document.questions[0]!,
+          prompt: "Solve`*unfinished" }] } },
+    }, s.root);
+    assert.ok(saved.ok);
+    const attempted = await executeBlooketPublicationCommand({
+      ...command("step", (saved.value as { revision: string }).revision),
+      payload: { draftId: "unsafe-marker",
+        expectedRevision: (saved.value as { revision: string }).revision },
+    }, s.host);
+    assert.equal(attempted.ok, false);
+    assert.equal(s.writes(), 0);
+    const files = await publicationFiles(s.root, "unsafe-marker");
+    await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
 test("canonical append preserves existing questions and creates no set", () =>
   fixture(async s => {
     const request = await appendFixture(s);

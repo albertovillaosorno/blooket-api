@@ -103,6 +103,12 @@ append blocked by an edited existing question was advised to retry a Create
 Set flow. The shared diagnostic now explains existing-quiz and concurrent
 publication conflicts without suggesting another set creation or replay.
 
+A red-to-green provider-text regression reproduced an incomplete equation
+marker accepted by shared lowering but rejected by the native question editor.
+Canonical publication now preflights exact native text lowering before a
+snapshot or journal is opened, including stored plans on resume. Invalid
+literal markers retain the draft without spending a mutation start.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses
