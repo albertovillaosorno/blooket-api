@@ -48,6 +48,10 @@ import { decodeProjectDocument, type ProjectDocument } from
   "../../project-documents/domain/project.ts";
 import { decodePreparedMediaIdentities, type PreparedMediaIdentities } from
   "./prepared-media-identities.ts";
+import { decodeBlooketSetId } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
+import { decodeBlooketWriteVerificationBaseline,
+  type BlooketWriteVerificationBaseline } from "./verification-baseline.ts";
 import type {
   MultipleChoiceQuestion,
   QuestionDocument,
@@ -56,11 +60,54 @@ import type {
 
 export const BLOOKET_WRITE_PLAN_VERSION = 1 as const;
 
-export interface BlooketWritePlan {
-  readonly schemaVersion: typeof BLOOKET_WRITE_PLAN_VERSION;
+interface BlooketWritePlanIdentity {
   readonly planId: string;
   readonly desiredStateSha256: string;
   readonly operations: readonly BlooketWriteOperation[];
+}
+
+export interface BlooketCreateWritePlan extends BlooketWritePlanIdentity {
+  readonly schemaVersion: typeof BLOOKET_WRITE_PLAN_VERSION;
+}
+
+export interface BlooketAppendTarget {
+  readonly remoteSetId: string;
+  readonly baseline: BlooketWriteVerificationBaseline;
+}
+
+export interface BlooketAppendWritePlan extends BlooketWritePlanIdentity {
+  readonly schemaVersion: 2;
+  readonly target: BlooketAppendTarget;
+}
+
+export type BlooketWritePlan = BlooketCreateWritePlan | BlooketAppendWritePlan;
+
+// The complete desired quiz remains the validation authority. Only its new
+// suffix is executed; a target and prior collection digest bind recovery.
+export function buildBlooketAppendPlan(
+  desired: BlooketWritePlan, target: BlooketAppendTarget,
+): BlooketAppendWritePlan | undefined {
+  const id = decodeBlooketSetId(target.remoteSetId);
+  const baseline = decodeBlooketWriteVerificationBaseline(
+    target.baseline, "question-list",
+  );
+  if (desired.schemaVersion !== 1 || !id.ok || !baseline.ok ||
+      baseline.value.itemCount >= desired.operations.length - 1)
+    return undefined;
+  const suffix = desired.operations.slice(baseline.value.itemCount + 1);
+  if (suffix.some(operation => operation.kind !== "question"))
+    return undefined;
+  const binding = { remoteSetId: id.value, baseline: baseline.value };
+  const digest = createHash("sha256").update(JSON.stringify([
+    "append:v1", desired.desiredStateSha256, binding,
+  ]), "utf8").digest("hex");
+  const planId = "plan:" + digest;
+  return { schemaVersion: 2, planId, desiredStateSha256: digest,
+    target: binding,
+    operations: suffix.map((operation, index) => ({ ...operation,
+      operationId: planId + ":append:" + String(index),
+    })),
+  };
 }
 
 export type BlooketWriteOperation =

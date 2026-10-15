@@ -40,20 +40,30 @@ import { decodeBlooketCapabilitySnapshot } from
 import { decodePreparedMediaIdentities } from "./prepared-media-identities.ts";
 import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
   "./write-plan.ts";
+import { buildBlooketAppendPlan } from "./write-plan.ts";
+import { decodeBlooketSetId } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
+import { decodeBlooketWriteVerificationBaseline } from
+  "./verification-baseline.ts";
 
 export function decodeBlooketPublicationSnapshot(
   value: unknown, draftId: string,
 ) {
-  const current = exactOwnData(value, ["capabilities", "document",
-    "draftId", "expectedMedia", "revision", "schemaVersion"]);
-  const legacy = current === undefined
+  const append = exactOwnData(value, ["capabilities", "document",
+    "draftId", "expectedMedia", "revision", "schemaVersion", "target"]);
+  const current = append === undefined ? exactOwnData(value,
+    ["capabilities", "document",
+    "draftId", "expectedMedia", "revision", "schemaVersion"])
+    : undefined;
+  const legacy = append === undefined && current === undefined
     ? exactOwnData(value, ["capabilities", "document", "draftId",
       "revision", "schemaVersion"]) : undefined;
-  const owned = current ?? legacy;
+  const owned = append ?? current ?? legacy;
   if (!owned || owned["draftId"] !== draftId ||
       typeof owned["revision"] !== "string" ||
       !/^[a-f0-9]{64}$/u.test(owned["revision"]) ||
-      (current ? owned["schemaVersion"] !== 2 :
+      (append ? owned["schemaVersion"] !== 3 :
+        current ? owned["schemaVersion"] !== 2 :
         owned["schemaVersion"] !== 1)) return undefined;
   const version = owned["schemaVersion"];
   // Both nested decoders remain the authority for their respective
@@ -69,22 +79,37 @@ export function decodeBlooketPublicationSnapshot(
   if (version === 1 && publicationHasMedia(document.value)) return undefined;
   // Remote reads cannot establish cover or answer-image byte identity yet.
   // Do not admit a snapshot whose final verifier could ignore those effects.
-  if (version === 2 && (document.value.coverImage !== null ||
+  if (version !== 1 && (document.value.coverImage !== null ||
       document.value.questions.some(question =>
         question.type === "multiple-choice" &&
         question.answers.some(answer => answer.image !== null))))
     return undefined;
-  const expectedMedia = version === 2
+  const expectedMedia = version !== 1
     ? decodePreparedMediaIdentities(owned["expectedMedia"]) : undefined;
-  if (version === 2 && !expectedMedia) return undefined;
+  if (version !== 1 && !expectedMedia) return undefined;
   const built = expectedMedia
     ? buildPreparedBlooketWritePlan(document.value, expectedMedia,
         capabilities.value)
     : buildBlooketWritePlan(JSON.stringify(document.value), "",
         capabilities.value);
   if (!built.ok) return undefined;
+  let plan = built.value;
+  if (append) {
+    const target = exactOwnData(owned["target"], ["remoteSetId", "baseline"]);
+    if (!target) return undefined;
+    const id = decodeBlooketSetId(target["remoteSetId"]);
+    const baseline = decodeBlooketWriteVerificationBaseline(
+      target["baseline"], "question-list",
+    );
+    if (!id.ok || !baseline.ok) return undefined;
+    const bound = buildBlooketAppendPlan(plan, {
+      remoteSetId: id.value, baseline: baseline.value,
+    });
+    if (!bound) return undefined;
+    plan = bound;
+  }
   return { document: document.value, revision: owned["revision"],
-    plan: built.value, expectedMedia };
+    plan, desiredPlan: built.value, expectedMedia };
 }
 
 export function publicationHasMedia(document: ProjectDocument): boolean {

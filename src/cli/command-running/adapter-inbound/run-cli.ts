@@ -66,6 +66,7 @@ Usage:
   blooket sets get <set-id> [--json]
   blooket questions list <set-id> [--json]
   blooket publication step <draft-id> <revision> [--json]
+  blooket publication append <draft-id> <revision> <set-id> [--json]
   blooket publication status|verify|reconcile <draft-id> [--json]
   blooket media search <query> [options]
   blooket project validate <project.json> [options]

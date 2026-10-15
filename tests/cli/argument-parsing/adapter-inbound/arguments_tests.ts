@@ -158,6 +158,14 @@ test("publication arguments require a saved revision and bounded draft ID",
       payload: { draftId: "lesson-fixture", expectedRevision: revision },
       json: true,
     } });
+    assert.deepEqual(parseCliArguments([
+      "publication", "append", "lesson-fixture", revision, "remote-set",
+      "--json",
+    ]), { ok: true, invocation: {
+      kind: "blooket-publication", command: "blooket.publication.append",
+      payload: { draftId: "lesson-fixture", expectedRevision: revision,
+        remoteSetId: "remote-set" }, json: true,
+    } });
     for (const action of ["status", "verify", "reconcile"])
       assert.equal(parseCliArguments([
         "publication", action, "lesson-fixture", "--json",

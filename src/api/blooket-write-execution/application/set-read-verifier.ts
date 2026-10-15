@@ -414,7 +414,7 @@ function setBaselineFor(
   return baselineFor("set-list", items);
 }
 
-function questionBaselineFor(
+export function questionBaselineFor(
   questions: readonly BlooketQuestionRead[],
 ): BlooketWriteVerificationBaseline | null {
   // An image replacement must not pass as an unchanged prior collection.

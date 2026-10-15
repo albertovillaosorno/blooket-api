@@ -469,7 +469,17 @@ resubmission, and fresh reads verified its answer, exact matching and time.
 
 Prepared question images are admitted by stable library ID; covers, answer
 images and audio remain refused. Live prepared-image upload acceptance and
-existing-quiz editing remain unfinished.
+replacement of existing questions remain unfinished.
+
+Canonical `publication append <draft-id> <revision> <set-id>` and
+`blooket_publication_append` extend an existing set. The saved draft describes
+the full desired quiz, preserving its existing metadata and question prefix.
+Only the new suffix is sent; subsequent `step`, `status`, `reconcile` and
+`verify` calls reuse the same frozen target and journal. Conflicting changes,
+deletion, replacement and reordering are refused.
+
+Portable MCP-to-CLI-to-service
+coverage verifies append behavior; live append acceptance remains pending.
 
 An October 15 Chrome test identified omitted null fields in injected MC input;
 JSON text now preserves them and real native preparation passes. The next

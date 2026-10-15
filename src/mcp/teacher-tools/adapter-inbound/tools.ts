@@ -233,14 +233,21 @@ const tools = [
     { id, document: { type: "object" }, expectedRevision: revision },
     false,
   ),
-  ...["step", "status", "verify", "reconcile"].map(action => tool(
+  ...["step", "append", "status", "verify", "reconcile"].map(action => tool(
     "blooket_publication_" + action,
     "blooket.publication." + action,
     action === "step"
-      ? "Create an admitted text-only saved draft in Blooket, one journaled " +
+      ? "Publish an admitted saved draft in Blooket, one journaled " +
         "set/question write per call. Supply its saved revision. " +
         "Inspect progress; never retry an uncertain write blindly. " +
-        "Images and editing existing quizzes are not supported yet."
+        "Prepared question images use stable library IDs. Resume append " +
+        "work here after its initial append call."
+      : action === "append"
+        ? "Extend an existing Blooket set with new questions, one journaled " +
+          "write per call. Supply its exact set ID and a saved full desired " +
+          "quiz whose metadata and question prefix remain unchanged. " +
+          "Replacing, deleting or reordering existing questions is refused. " +
+          "Resume with step; reconcile uncertainty without resubmission."
       : action === "verify"
         ? "Freshly verify all text quiz metadata, questions, answers, " +
           "types and timing after all publication writes finish. " +
@@ -250,13 +257,15 @@ const tools = [
             "another remote write. Inconclusive results retain recovery."
           : "Read local publication progress. Completed writes do not " +
             "prove the current remote quiz; use publication verify.",
-    action === "step" ? { draftId: id, expectedRevision: {
+    action === "step" || action === "append" ? {
+      draftId: id, expectedRevision: {
       type: "string", pattern: "^[a-f0-9]{64}$",
       description: "The exact revision returned by drafts_get or drafts_put.",
-    } }
+    }, ...(action === "append" ? { remoteSetId: id } : {}) }
       : { draftId: id },
     action === "status" || action === "verify",
-    action === "step" ? ["draftId", "expectedRevision"] : ["draftId"],
+    action === "append" ? ["draftId", "expectedRevision", "remoteSetId"]
+      : action === "step" ? ["draftId", "expectedRevision"] : ["draftId"],
     action !== "status",
   )),
 ];

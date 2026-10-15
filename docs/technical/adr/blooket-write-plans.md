@@ -50,6 +50,31 @@ do not.
 
 Empty identity contexts retain the exact legacy text plan hash.
 
+Append publication uses snapshot version three and write-plan version two.
+The frozen snapshot retains the full desired quiz, capabilities and prepared
+identities, plus an explicit existing set ID and preexisting question collection
+count/digest. Its plan contains only the new ordered question suffix; the plan
+hash also includes the target and baseline. Legacy creation hashes remain
+unchanged.
+
+Append checkpoints use the existing version-two checkpoint representation with
+the explicitly bound target already present at index zero. This is not a Create
+Set receipt or an advancement: no set operation exists in an append plan.
+Decoding rejects a different or missing target, including old unbound progress.
+The same attempt journal, pacing, media admission, reconciliation and atomic
+persistence execute each new question without a second publication loop.
+
+Before every append, remote metadata and the entire completed question prefix
+must still match the frozen intent and original baseline. The executor's later
+baseline capture must also match that preflight collection before a write-ahead
+journal can start, detecting changes during intervening session/media awaits.
+Uncertain attempts require local recovery before another write.
+Final verification checks the entire desired quiz in two fresh observations.
+
+This initial existing-set workflow only appends. It refuses replacements,
+deletions, reordering or metadata changes; in-place question editing remains
+pending in `blooket-11`. Portable transport coverage is not live acceptance.
+
 Version-one snapshots remain text-only and retain their existing checkpoint and
 journal bindings. Final image verification and reconciliation consume the
 version-two frozen expected context without resolving today's media library.

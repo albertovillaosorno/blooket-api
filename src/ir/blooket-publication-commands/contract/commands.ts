@@ -32,16 +32,20 @@
 import { isRecord } from "../../runtime-decoding/domain/exact-object.ts";
 import type { DecodeResult } from
   "../../runtime-decoding/domain/decode-result.ts";
+import { decodeBlooketSetId } from
+  "../../blooket-set-reads/contract/set-read.ts";
 
 export const BLOOKET_PUBLICATION_COMMANDS = [
   "blooket.publication.step", "blooket.publication.status",
   "blooket.publication.verify", "blooket.publication.reconcile",
+  "blooket.publication.append",
 ] as const;
 export type BlooketPublicationCommandName =
   (typeof BLOOKET_PUBLICATION_COMMANDS)[number];
 export interface BlooketPublicationPayload {
   readonly draftId: string;
   readonly expectedRevision?: string;
+  readonly remoteSetId?: string;
 }
 export function isBlooketPublicationCommand(
   name: string,
@@ -51,7 +55,8 @@ export function isBlooketPublicationCommand(
 export function decodeBlooketPublicationCommand(
   name: BlooketPublicationCommandName, value: unknown,
 ): DecodeResult<BlooketPublicationPayload> {
-  const step = name === "blooket.publication.step";
+  const append = name === "blooket.publication.append";
+  const step = name === "blooket.publication.step" || append;
   const invalid = (): DecodeResult<BlooketPublicationPayload> => ({
     ok: false, issues: [{
       path: "$.payload", code: "invalid-publication-request",
@@ -62,7 +67,8 @@ export function decodeBlooketPublicationCommand(
   });
   try {
     if (!isRecord(value)) return invalid();
-    const fields = step ? ["draftId", "expectedRevision"] : ["draftId"];
+    const fields = append ? ["draftId", "expectedRevision", "remoteSetId"]
+      : step ? ["draftId", "expectedRevision"] : ["draftId"];
     const keys = Reflect.ownKeys(value);
     if (keys.length !== fields.length ||
         keys.some(key => typeof key !== "string" || !fields.includes(key)))
@@ -76,9 +82,15 @@ export function decodeBlooketPublicationCommand(
         (step && (!revision || !Object.hasOwn(revision, "value") ||
           !revision.enumerable || typeof revision.value !== "string" ||
           !/^[a-f0-9]{64}$/u.test(revision.value)))) return invalid();
+    const target = append ? decodeBlooketSetId(data["remoteSetId"]?.value)
+      : undefined;
+    if (append && (!data["remoteSetId"]?.enumerable ||
+        !Object.hasOwn(data["remoteSetId"]!, "value") || !target?.ok))
+      return invalid();
     return { ok: true, value: {
       draftId: draft.value,
       ...(step ? { expectedRevision: revision!.value as string } : {}),
+      ...(target?.ok ? { remoteSetId: target.value } : {}),
     } };
   } catch { return invalid(); }
 }
