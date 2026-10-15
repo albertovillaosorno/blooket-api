@@ -34,6 +34,25 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
+test("an uncertain throttled Save has a distinct waiting label", async () => {
+  const source = await readFile(new URL(
+    "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
+    import.meta.url,
+  ), "utf8");
+  const start = source.indexOf("function publicationLabel(");
+  const end = source.indexOf("\nfunction ", start + 1);
+  assert.ok(start > 0 && end > start);
+  const label = runInNewContext("(" + source.slice(start, end) + ")", {
+    t: (key: string) => key,
+  });
+  assert.equal(label({ phase: "reconciliation-required",
+    state: "rate-limited" }), "publicationRateLimitedUncertain");
+  assert.equal(label({ phase: "reconciliation-required" }),
+    "publicationUncertain");
+  assert.equal(label({ phase: "wait", state: "rate-limited" }),
+    "publicationRateLimited");
+});
+
 class Element {
   readonly children: Element[] = [];
   readonly dataset: Record<string, string> = {};

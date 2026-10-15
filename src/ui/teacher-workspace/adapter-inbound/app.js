@@ -295,6 +295,9 @@ const words = {
     publicationRefresh: "Actualizar estado",
     publicationRateLimited:
       "Blooket limitó las operaciones. Detente y vuelve a revisar más tarde.",
+    publicationRateLimitedUncertain:
+      "Blooket pidió esperar. El último guardado no está confirmado; " +
+      "reconcilia más tarde sin reenviarlo.",
     publicationStopSignIn:
       "Inicia sesión en la pestaña conectada y actualiza el estado.",
     publicationStopExtension:
@@ -624,6 +627,9 @@ const words = {
     publicationRefresh: "Refresh status",
     publicationRateLimited:
       "Blooket rate-limited the workflow. Stop and retry the check later.",
+    publicationRateLimitedUncertain:
+      "Blooket asked us to wait. The last save is unconfirmed; " +
+      "reconcile later without sending it again.",
     publicationStopSignIn:
       "Sign in using the connected Blooket tab, then refresh status.",
     publicationStopExtension:
@@ -2003,7 +2009,8 @@ function publicationLabel(value) {
   if (phase === "verified" && value.published === true)
     return t("publicationVerified");
   if (phase === "reconciliation-required")
-    return t("publicationUncertain");
+    return t(value.state === "rate-limited"
+      ? "publicationRateLimitedUncertain" : "publicationUncertain");
   if (phase === "human-action-required") {
     if (value.state === "organization-prompt") return t("readOrganization");
     if (value.state === "security-challenge") return t("readChallenge");

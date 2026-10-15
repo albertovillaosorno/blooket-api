@@ -539,6 +539,35 @@ test("uncertain writes stay journaled even after an empty read-back",
     assert.equal(await readFile(files.attempt, "utf8"), journal);
   }); });
 
+test("a rate-limited attempted write reports the stop without replay",
+  async () => { await fixture(async state => {
+    const created = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), state.host,
+    ));
+    assert.equal(created["completedOperations"], 1);
+    let attempted = 0;
+    const host = { ...state.host, writes: { execute: async () => {
+      attempted++;
+      return { ok: false as const, kind: "navigation" as const,
+        state: "rate-limited" as const };
+    } } };
+    const stopped = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), host,
+    ));
+    assert.equal(stopped["phase"], "reconciliation-required");
+    assert.equal(stopped["state"], "rate-limited");
+    assert.equal(stopped["completedOperations"], 1);
+    assert.equal(stopped["published"], false);
+    const files = await publicationFiles(state.root, "fixture");
+    const journal = await readFile(files.attempt, "utf8");
+    const again = value(await executeBlooketPublicationCommand(
+      command("step", state.revision), host,
+    ));
+    assert.equal(again["phase"], "reconciliation-required");
+    assert.equal(attempted, 1);
+    assert.equal(await readFile(files.attempt, "utf8"), journal);
+  }); });
+
 test("unknown collection stops new publication and preserves legacy recovery",
   async () => { await fixture(async state => {
     let mutations = 0;
