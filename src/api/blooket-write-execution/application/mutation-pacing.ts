@@ -142,7 +142,10 @@ export function createBlooketMutationPacer(
                   !Number.isSafeInteger(wait.value) || wait.value < 1 ||
                   wait.value > WINDOW_MS)
                 throw Error("mutation-pacing-history-unavailable");
+              const beforeWaitMs = clock.now();
               await clock.sleep(wait.value, signal);
+              if (clock.now() <= beforeWaitMs)
+                throw Error("mutation-pacing-clock-invalid");
               continue;
             }
             if (descriptor.value !== "admitted" || fields.length !== 1)
@@ -209,7 +212,7 @@ async function waitForStart(
   history: readonly number[],
   signal: AbortSignal | undefined,
 ): Promise<void> {
-  while (true) {
+  for (let checks = 0; checks < 64; checks++) {
     const now = runtime.now();
     const starts = pruneStarts(history, now);
     const afterInterval = starts.length === 0
@@ -221,7 +224,11 @@ async function waitForStart(
     const waitMs = Math.max(afterInterval, afterWindow) - now;
     if (waitMs <= 0) return;
     await runtime.sleep(waitMs, signal);
+    // A custom sleep or unreliable monotonic clock can return before any
+    // time passes. Never spin on the same timestamp and starve cancellation.
+    if (runtime.now() <= now) throw Error("mutation-pacing-clock-invalid");
   }
+  throw Error("mutation-pacing-clock-invalid");
 }
 
 function pruneStarts(starts: readonly number[], now: number): number[] {
