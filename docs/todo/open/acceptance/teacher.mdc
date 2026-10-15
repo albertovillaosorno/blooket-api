@@ -155,6 +155,17 @@ this final record.
 
 ## Evidence
 
+A same-day read-only Chrome 155 structural check against the existing
+Typing editor still found the expected numeric timer, visible prompt and
+Save Question control. The current Blooket provider build was not identifiable
+from this observation. The canonical authenticated session read succeeded but
+My Sets and capability reads remained unconfirmed while a local unsaved editor
+was present. The journal remained untouched; this compatibility signal alone
+is not a remote publication receipt.
+
+See
+`docs/technical/provider-change-detection.md` for the scoped evidence.
+
 On 2026-10-14, an explicit `provider:drift:check` command grouped the native
 Blooket page and extension-host regressions. It passed 290 synthetic tests
 before adding a separate read-only shape inspector for the question editor.

@@ -222,7 +222,8 @@ export function createExtensionAddQuestionHost(
         }
 
         const ready = await waitForEdit(
-          script, chrome, tabId, editUrl, pause,
+          script, chrome, tabId, editUrl, pause, undefined,
+          sourceOrigin !== undefined,
         );
         if (!ready.ok) return ready;
 
@@ -408,8 +409,10 @@ async function waitForEdit(
   editUrl: string,
   pause: (ms: number) => Promise<void>,
   previousOrigin?: number,
+  justNavigated = false,
 ): Promise<ExtensionAddQuestionResult & { readonly origin?: number }> {
   let pendingUnknown = false;
+  let pendingNativeOrigin: number | undefined;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.status === "complete") {
@@ -425,8 +428,16 @@ async function waitForEdit(
         await pause(POLL_MS);
         continue;
       }
+      if (origin === null) {
+        // Chrome may report a completed target navigation before the
+        // document's native lifetime becomes observable. Wait only within
+        // the existing bounded edit-read window; do not open a modal yet.
+        await pause(POLL_MS);
+        continue;
+      }
       if (typeof origin !== "number" || !Number.isFinite(origin) ||
-          origin <= 0) return browserFailure();
+          origin <= 0 || (pendingNativeOrigin !== undefined &&
+            origin !== pendingNativeOrigin)) return browserFailure();
       const observed = await observe(script);
       const after = await chrome.tabs.get(tabId);
       if (after.status !== "complete" || after.url !== editUrl)
@@ -439,7 +450,12 @@ async function waitForEdit(
       if (confirmedOrigin !== origin || stillThere.status !== "complete" ||
           stillThere.url !== editUrl) return browserFailure();
       if (observed === "edit") return { ok: true, origin };
-      if (previousOrigin !== undefined && observed === "unexpected-page") {
+      if ((previousOrigin !== undefined || justNavigated) &&
+          observed === "unexpected-page") {
+        // React can show a temporarily unclassified Edit shell after the
+        // host's own navigation. Never wait on an existing teacher-owned
+        // unknown route or defer explicit human/security stop states.
+        pendingNativeOrigin ??= origin;
         pendingUnknown = true;
         await pause(POLL_MS);
         continue;

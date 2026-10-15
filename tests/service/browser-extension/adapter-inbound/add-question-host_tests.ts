@@ -836,6 +836,62 @@ test("a preexisting contiguous question list permits only the next index",
   },
 );
 
+test("same-route replacement after saved-card read cannot open its modal",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let replace = false;
+  let listReads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (replace && request.func.name ===
+          "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] ===
+          "https://dashboard.blooket.com/edit?id=set-fixture")
+      return [{ result: 7_000 }];
+    const result = await original(request);
+    if (request.func.name === "listBlooketQuestionNumbers" &&
+        ++listReads === 3) replace = true;
+    return result;
+  };
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(listReads, 3);
+  assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
+test("lost Save reply cannot inspect a replacement document's question",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let replaced = false;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] ===
+          "https://dashboard.blooket.com/edit?id=set-fixture" &&
+        replaced) return [{ result: 9_000 }];
+    const result = await original(request);
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "submit") replaced = true;
+    return result;
+  };
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.includes("openBlooketQuestionPanel"), false);
+  assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), false);
+  assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
 test("same edit URL with a new document cannot submit or confirm a question",
   async () => {
   for (const phase of ["prepare", "submit", "inspectOpenedBlooketQuestion"]) {
@@ -962,6 +1018,162 @@ test("Add Question never opens a modal after reload during edit observation",
     false);
   assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
     false);
+  },
+);
+
+test("newly navigated Edit shell may hydrate before one question Save",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let transient = 4;
+  let pauses = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPage" && transient > 0) {
+      transient--;
+      return [{ result: { ok: true, value: "unexpected-page" } }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => { pauses++; },
+  ).addQuestion(input);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(transient, 0);
+  assert.ok(pauses >= 4);
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("existing unknown Edit route must not open a question modal",
+  async () => {
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/edit?id=set-fixture" });
+  let attempts = 0;
+  const original = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPage") {
+      attempts++;
+      return [{ result: { ok: true, value: "unexpected-page" } }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input);
+  assert.deepEqual(result, {
+    ok: false, kind: "navigation", state: "unexpected-page",
+  });
+  assert.equal(attempts, 1);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
+  },
+);
+
+test("target document swapped during React hydration never opens modal",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let nativeReads = 0;
+  let pageReads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPage") {
+      pageReads++;
+      if (pageReads === 1) return [{ result: {
+        ok: true, value: "unexpected-page",
+      } }];
+    }
+    if (request.func.name === "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] ===
+          "https://dashboard.blooket.com/edit?id=set-fixture") {
+      nativeReads++;
+      if (nativeReads >= 3) return [{ result: 3_000 }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, {
+    ok: false, kind: "browser", code: "blooket-browser-failed",
+  });
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:submit"),
+    false);
+  },
+);
+
+test("persistent unexpected fresh Edit shell never triggers Save",
+  async () => {
+  const fake = fakeChrome({ navigationState: "unexpected-page" });
+  let pauses = 0;
+  const result = await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => { pauses++; },
+  ).addQuestion(input);
+  assert.deepEqual(result, {
+    ok: false, kind: "navigation", state: "unexpected-page",
+  });
+  assert.ok(pauses >= 50);
+  assert.equal(fake.calls.includes("runBlooketAddQuestionPageAction:open"),
+    false);
+  },
+);
+
+test("transient missing target document proof waits before the only Save",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let missing = 3;
+  let pendingPauses = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] ===
+          "https://dashboard.blooket.com/edit?id=set-fixture" &&
+        missing > 0) {
+      missing--;
+      return [{ result: null }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => { pendingPauses++; }).addQuestion(input);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(missing, 0);
+  assert.ok(pendingPauses >= 3);
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("transient missing post-reload document proof cannot reuse old page",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let afterReload = 3;
+  let reloads = 0;
+  const savedReload = fake.chrome.tabs.reload.bind(fake.chrome.tabs);
+  fake.chrome.tabs.reload = async (...args) => {
+    reloads++;
+    await savedReload(...args);
+  };
+  fake.chrome.scripting.executeScript = async request => {
+    if (reloads === 1 &&
+        request.func.name === "inspectBlooketDocumentOrigin" &&
+        request.args?.[0] ===
+          "https://dashboard.blooket.com/edit?id=set-fixture" &&
+        afterReload > 0) {
+      afterReload--;
+      return [{ result: null }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(reloads, 1);
+  assert.equal(afterReload, 0);
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
   },
 );
 

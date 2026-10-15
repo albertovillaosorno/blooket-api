@@ -104,6 +104,21 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+A red-to-green Add Question continuation regression covers two more
+provider/Chrome hydration races. A newly navigated target may return no native
+document origin for several bounded observations, or the native Edit document
+may appear before React classifies it as Edit. The host now waits for these
+transitions only after a proven host-owned navigation or reload, and never
+opens a modal before verified edit-page readiness.
+
+The wait pins the first document lifetime observed during an unclassified
+post-navigation shell. A same-route document replacement during that interval
+fails before any modal open or Save; an existing unexpected teacher-selected
+route still fails immediately. Persistent unknown shells exhaust the original
+50-poll budget. Portable host tests prove one maximum Save for recovered
+hydration and zero Save for drift, replacement or failed readiness; this does
+not establish a new live question receipt.
+
 The owner-safe local launcher additionally recognizes a terminated Linux
 process that is temporarily retained as a zombie by the host. The service's
 exact prior PID, removed discovery and lock files, drained writer leases and
