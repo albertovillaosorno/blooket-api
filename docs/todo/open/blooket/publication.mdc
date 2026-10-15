@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+The shared pacing, cancellation and human-stop milestone `blooket-10` was
+completed from the previously verified authenticated one-question path and
+focused interruption tests. This record continues to own the unresolved
+post-Save receipt, uninterrupted multi-question publication, supported media
+and verified edit operations. A local edit-page fetch returned HTTP 429 during
+initial hydration on 2026-10-15; its timing does not establish that Save was
+throttled. The browser host now observes exact same-set fetch throttling only
+after its one submission, returning a bounded provider wait without replay.
+
 A recoverable, submitted Add Question watch was independently observed
 in the owner's existing Chrome on 2026-10-15. The unsaved original form was
 left untouched. A separate authenticated read-only browser tab loaded the

@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-10"
-status: "active"
+status: "completed"
 priority: "p1"
 horizon: "publication"
 order: 100
@@ -27,6 +27,23 @@ validation:
 ---
 
 # TODO - Mutation pacing and human checkpoints
+
+## Completion
+
+Completed the functional pacing and human-checkpoint milestone on 2026-10-15.
+The authorized Chrome/CLI/UI path had already created, reconciled and freshly
+verified a private single-question set using the shared server-owned queue.
+Focused deterministic tests demonstrate serialized operation starts, task and
+rolling budgets, early cancellation, human/security/rate-limit stops,
+interrupted recovery and preservation of uncertain journals without replay.
+Bounded EN/ES settings and the teacher-facing Stop control use the same
+canonical executor rather than introducing a second write path.
+
+The still-unconfirmed Add Question editor and uninterrupted multi-question
+publication do **not** meet task `blooket-11` acceptance yet. Current-provider
+HTTP 429 behavior and further selector drift are tracked under ongoing
+compatibility task `blooket-15`. No Mac/Safari or uninterrupted live
+multi-question acceptance is inferred from synthetic tests or this completion.
 
 ## Objective
 
