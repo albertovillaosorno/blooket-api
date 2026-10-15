@@ -314,6 +314,29 @@ test("changed visible editor echo prevents the single Save click",
   },
 );
 
+test("post-Save throttling stops before pending cards exhaust the lease",
+  async () => {
+  const fake = fakeChrome({ postSubmit429: true,
+    listReply: { ok: true, value: [] } });
+  const original = fake.chrome.scripting.executeScript;
+  let postSavePauses = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (postSavePauses >= 2) throw Error("expired-owner-lease");
+    return await original(request);
+  };
+  const host = createExtensionAddQuestionHost(fake.chrome, 7, async () => {
+    if (fake.calls.includes("runBlooketAddQuestionPageAction:submit"))
+      postSavePauses++;
+  });
+  assert.deepEqual(await host.addQuestion(input), {
+    ok: false, kind: "navigation", state: "rate-limited",
+  });
+  assert.equal(postSavePauses, 0);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.includes("reload"), false);
+});
+
 test("MC injection carries null semantics as JSON before any Save",
   async () => {
   const fake = fakeChrome({ prepareFails: true });

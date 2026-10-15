@@ -496,8 +496,15 @@ export async function executeBlooketPublicationCommand(
     if (!result.ok)
       return fail("code" in result ? result.code
         : "blooket-publication-recovery-required");
+    // A provider wait or human stop does not clear an attempted write.
+    // Report the current observation alongside its uncertain checkpoint;
+    // never convert it into permission to repeat the operation.
+    const observedStop = result.kind === "reconciliation-required" &&
+      "outcome" in result && result.outcome.ok && "state" in result.outcome
+      ? result.outcome.state : undefined;
     return success({ ...progress, phase: result.kind,
       ...("state" in result ? { state: result.state } : {}),
+      ...(observedStop === undefined ? {} : { state: observedStop }),
       ...("reason" in result ? { reason: result.reason } : {}),
       completedOperations: result.checkpoint.nextOperationIndex,
       remoteSetId: result.checkpoint.remoteSetId,

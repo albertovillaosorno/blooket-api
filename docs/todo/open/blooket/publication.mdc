@@ -73,6 +73,28 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, the installed JSON-transport companion completed MC
+preparation, finalization and visible echo, then latched one native Save.
+The actual same-set POST returned HTTP 429 eleven milliseconds after the
+submit latch; a separate read tab still showed zero saved cards. The response
+did not provide a `Retry-After` header, and no further write was sent.
+
+That publication remains uncertain and read-only reconciliation did not
+produce a receipt. The host now checks for its exact post-submit throttle
+before exhausting pending-card polls, so an expired script lease cannot hide
+this provider wait behind a generic failure. The canonical response keeps
+`reconciliation-required` and includes the current observed stop; EN/ES UI
+copy says to wait and reconcile without resending the uncertain Save.
+
+Three red-to-green regressions cover prompt throttle detection, retained
+journals and one-write counts, and the distinct uncertain-wait UI label.
+All 158 targeted host, command and UI tests passed. Cloudflare's
+[HTTP 429 documentation][provider-429], checked on 2026-10-15, explains the
+optional retry header; its API-specific numerical limits are not Blooket limits.
+
+<!-- jig-ignore-next-line: Preserve the exact official provider URL. -->
+[provider-429]: https://developers.cloudflare.com/support/troubleshooting/http-status-codes/4xx-client-error/error-429/
+
 On 2026-10-15, an isolated-world preparation diagnostic identified the live
 MC stop precisely: Blooket generated `answerTypes: null`, while the object
 received by the injected function had no own `answerTypes` field. All other

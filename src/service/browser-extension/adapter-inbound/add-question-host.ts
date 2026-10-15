@@ -528,6 +528,15 @@ async function observeQuestion(
     }
     pendingUnknown = false;
 
+    // Observe a Save-associated provider throttle while the write lease is
+    // still live. Waiting for every empty-card poll first can exhaust that
+    // lease and hide the actionable stop behind a generic browser failure.
+    const throttled = await script(
+      inspectBlooketPostSubmitRateLimit as (...args: never[]) => unknown,
+      [input.setId],
+    ).catch(() => false);
+    if (throttled === true) return navigationFailure("rate-limited");
+
     const panel = await script(
       runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
       ["is-ready", input.setId],
