@@ -189,7 +189,7 @@ async function persistBoundCheckpoint(path: string): Promise<void> {
     planId: plan.planId,
     nextOperationIndex: 1,
     remoteSetId: "remote-set-1",
-  }));
+  }, null, 2) + "\n");
 }
 
 test("verification receives the exact persisted baseline", async () => {

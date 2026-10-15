@@ -146,6 +146,38 @@ test("first save may persist initial or one-step progress", async () => {
   });
 });
 
+test("checkpoint cannot rebind a saved remote set at the same index",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const path = join(dir, "write.json");
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(1)), { ok: true });
+    const before = await readFile(path, "utf8");
+    const changed = await saveWriteCheckpointFile(path, plan,
+      { ...checkpoint(1), remoteSetId: "remote-set-2" });
+    assert.equal(changed.ok, false);
+    assert.equal(await readFile(path, "utf8"), before);
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(1)), { ok: true });
+  });
+});
+
+test("checkpoint cannot advance questions under another remote set",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const path = join(dir, "write.json");
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(1)), { ok: true });
+    const before = await readFile(path, "utf8");
+    const changed = await saveWriteCheckpointFile(path, plan,
+      { ...checkpoint(2), remoteSetId: "remote-set-2" });
+    assert.equal(changed.ok, false);
+    assert.equal(await readFile(path, "utf8"), before);
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(2)), { ok: true });
+  });
+});
+
 test("sequential saves retain the previous checkpoint backup", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "write.json");
@@ -283,13 +315,66 @@ test("invalid and symbolic checkpoint files fail closed", async () => {
   });
 });
 
+test("noncanonical checkpoints cannot redefine remote publication progress",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const path = join(dir, "write.json");
+    assert.deepEqual(await saveWriteCheckpointFile(path, plan,
+      checkpoint(1)), { ok: true });
+    const original = await readFile(path, "utf8");
+    const altered = [
+      original + " ", JSON.stringify(checkpoint(1)),
+      original.replace('"remoteSetId": "remote-set-1"',
+        '"remoteSetId": "remote-set-2", "remoteSetId": "remote-set-1"'),
+      original.replace('"nextOperationIndex": 1',
+        '"nextOperationIndex": 0, "nextOperationIndex": 1'),
+    ];
+    for (const bytes of altered) {
+      await writeFile(path, bytes);
+      assert.equal((await loadWriteCheckpointFile(path, plan)).ok, false);
+      assert.equal((await saveWriteCheckpointFile(path, plan,
+        checkpoint(1))).ok, false);
+      assert.equal(await readFile(path, "utf8"), bytes);
+    }
+    await writeFile(path, original);
+    assert.equal((await loadWriteCheckpointFile(path, plan)).ok, true);
+  });
+});
+
+test("legacy checkpoints keep compact migration but refuse shadow indexes",
+  async () => {
+  await withTemporaryDirectory(async dir => {
+    const path = join(dir, "legacy.json");
+    const legacy = { schemaVersion: 1, planId: plan.planId,
+      nextOperationIndex: 0 };
+    const compact = JSON.stringify(legacy);
+    await writeFile(path, compact);
+    assert.deepEqual(await loadWriteCheckpointFile(path, plan), {
+      ok: true, checkpoint: checkpoint(0), source: "file",
+    });
+    const altered = [
+      compact.replace('"schemaVersion":1',
+        '"schemaVersion":2,"schemaVersion":1'),
+      compact.replace('"nextOperationIndex":0',
+        '"nextOperationIndex":1,"nextOperationIndex":0'),
+    ];
+    for (const bytes of altered) {
+      await writeFile(path, bytes);
+      assert.equal((await loadWriteCheckpointFile(path, plan)).ok, false);
+      assert.equal((await saveWriteCheckpointFile(path, plan,
+        checkpoint(0))).ok, false);
+      assert.equal(await readFile(path, "utf8"), bytes);
+    }
+  });
+});
+
 test("checkpoint reads bound actual bytes and reject dangling aliases",
   async () => {
   await withTemporaryDirectory(async directory => {
     const path = join(directory, "checkpoint.json");
     await writeFile(path, JSON.stringify(checkpoint(0)).padEnd(65_536, " "));
     const admitted = await loadWriteCheckpointFile(path, plan);
-    assert.equal(admitted.ok, true);
+    assert.equal(admitted.ok, false);
     await writeFile(path, "x".repeat(65_537));
     assert.deepEqual(await loadWriteCheckpointFile(path, plan), {
       ok: false, kind: "io", code: "checkpoint-file-unsafe",

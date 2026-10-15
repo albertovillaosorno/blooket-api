@@ -197,7 +197,7 @@ test(
       planId: plan.planId,
       nextOperationIndex: 1,
       remoteSetId: "remote-set-1",
-    }));
+    }, null, 2) + "\n");
     await beginWriteAttempt(value.attempt, plan, 0);
     await confirmWriteAttempt(
       value.attempt,
@@ -232,7 +232,7 @@ test("confirmed receipt mismatch preserves recovery evidence", async () => {
       planId: plan.planId,
       nextOperationIndex: 1,
       remoteSetId: "different-remote-set",
-    }));
+    }, null, 2) + "\n");
     await beginWriteAttempt(value.attempt, plan, 0);
     await confirmWriteAttempt(
       value.attempt,
@@ -272,7 +272,7 @@ test("inconsistent attempt progress requires reconciliation", async () => {
       planId: plan.planId,
       nextOperationIndex: 1,
       remoteSetId: "remote-set-1",
-    }));
+    }, null, 2) + "\n");
     await beginWriteAttempt(value.attempt, plan, 0);
 
     const result = await recoverPersistedBlooketWrite(

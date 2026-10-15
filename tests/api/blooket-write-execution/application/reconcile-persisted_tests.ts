@@ -234,7 +234,7 @@ test("inconsistent progress cannot be externally resolved", async () => {
       planId: plan.planId,
       nextOperationIndex: 1,
       remoteSetId: "remote-set-1",
-    }));
+    }, null, 2) + "\n");
     await beginWriteAttempt(value.attempt, plan, 0);
 
     assert.deepEqual(

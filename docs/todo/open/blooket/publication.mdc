@@ -73,6 +73,25 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A red-to-green recovery regression found that an idempotent checkpoint save
+could report success for a different `remoteSetId` at the same operation index.
+The same file adapter also accepted advancing later questions under a newly
+substituted set ID. It now refuses remote identity changes once Create Set has
+been durably confirmed, without replacing the checkpoint or its backup.
+
+Current write-attempt v3 and checkpoint v2 files now require exactly the bytes
+produced by their atomic writers. Duplicated phase, index or set fields,
+reordered root objects and padded JSON cannot reinterpret publication progress
+or authorize cleanup of ambiguous attempts. Legacy attempt v1/v2 and checkpoint
+v1 compact or indented inputs retain compatible migrations, but duplicate keys
+are refused. Synthetic tests cover successful historical decoding as well as
+malformed input, persistent immutability and successful original-ID progress.
+
+The authenticated local data root was inspected only for schema/byte format:
+its twelve attempt journals are canonical v3 and its four checkpoints are
+canonical v2. No real journal, checkpoint or Blooket content was modified.
+These portable proofs do not establish live publication acceptance.
+
 The canonical `questions.list` read-back path now tolerates transient
 post-Cancel card remounting with a bounded exact-unavailable retry, while
 preserving the non-retriable second saved-list confirmation. The common

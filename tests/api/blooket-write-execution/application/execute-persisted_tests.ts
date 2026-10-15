@@ -1605,7 +1605,7 @@ test("persisted progress resumes at the exact next operation", async () => {
       planId: plan.planId,
       nextOperationIndex: 1,
       remoteSetId: "remote-set-1",
-    }));
+    }, null, 2) + "\n");
     const writeCalls: string[] = [];
     const targets: Array<string | null> = [];
     const verificationCalls: Array<{
