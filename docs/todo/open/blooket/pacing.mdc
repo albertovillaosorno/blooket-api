@@ -104,6 +104,12 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+An additional read-only editor regression verifies that prompt, timer and
+Multiple Choice shuffle controls retain their observed element types and
+required enabled state after React preparation. Synthetic tag/type changes or
+disabled shuffle controls previously could pass the final visible echo;
+the pre-Save guard now stops them without issuing another mutation.
+
 On 2026-10-14, canonical publication now snapshots and validates any
 caller-supplied pacing policy before reading drafts or opening a journal.
 Malformed, accessor-backed or unknown policy fields cannot trigger a remote

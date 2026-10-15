@@ -298,6 +298,8 @@ export function inspectBlooketPreparedQuestionEcho(
       HTMLTextAreaElement | null;
     const time = unique("input#time-limit") as HTMLInputElement | null;
     if (!unique('[role="combobox"]') || !prompt || !time ||
+        prompt.tagName !== "TEXTAREA" ||
+        time.tagName !== "INPUT" || time.type !== "number" ||
         prompt.disabled || prompt.readOnly || time.disabled || time.readOnly ||
         prompt.value !== input.question ||
         time.value !== String(input.timeLimit)) return false;
@@ -337,8 +339,9 @@ export function inspectBlooketPreparedQuestionEcho(
     const correctnessControls = Array.from({ length: 4 }, (_, index) =>
       unique('button[aria-label="Mark Answer ' +
         (index + 1) + ' as Correct"]'));
-    return choices.length === 4 && shuffle?.type === "checkbox" &&
-      shuffle.checked === input.random &&
+    return choices.length === 4 && shuffle?.tagName === "INPUT" &&
+      shuffle.type === "checkbox" && !shuffle.disabled &&
+      !shuffle.readOnly && shuffle.checked === input.random &&
       correctnessControls.every(button => button?.tagName === "BUTTON" &&
         !(button as HTMLButtonElement).disabled) &&
       choices.every((choice, index) =>
