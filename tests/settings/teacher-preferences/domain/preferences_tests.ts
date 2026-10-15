@@ -178,3 +178,40 @@ test("version-four publication settings reject unsafe limits and additions",
     ...defaults, publication: stricter,
   }, "/tmp/media").publication, stricter);
 });
+
+
+test("publication decoder does not evaluate accessor-controlled policy fields",
+  () => {
+  const defaults = defaultTeacherPreferences("/tmp/media");
+  for (const field of Object.keys(defaults.publication)) {
+    let accessed = 0;
+    const policy = { ...defaults.publication };
+    Object.defineProperty(policy, field, {
+      configurable: true, enumerable: true,
+      get() { accessed++; throw Error("synthetic untrusted getter"); },
+    });
+    assert.throws(() => decodeTeacherPreferences({
+      ...defaults, publication: policy,
+    }, "/tmp/media"));
+    assert.equal(accessed, 0, field);
+  }
+});
+
+test("publication rejects symbol and inherited policy keys", () => {
+  const defaults = defaultTeacherPreferences("/tmp/media");
+  const symbol = Symbol("fixture-extra");
+  const policy = { ...defaults.publication,
+    [symbol]: "synthetic-hidden-policy" };
+  assert.throws(() => decodeTeacherPreferences({
+    ...defaults, publication: policy,
+  }, "/tmp/media"));
+  const inherited = Object.create({ maximumTaskStarts: 2 });
+  Object.assign(inherited, {
+    minimumStartIntervalMs: 2_000,
+    maximumStartsPerMinute: 20,
+    maximumTaskDurationMs: 86_400_000,
+  });
+  assert.throws(() => decodeTeacherPreferences({
+    ...defaults, publication: inherited,
+  }, "/tmp/media"));
+});

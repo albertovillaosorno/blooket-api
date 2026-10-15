@@ -53,6 +53,8 @@ import type { BlooketQuestionRead } from
   "../../../../src/ir/blooket-question-reads/contract/question-read.ts";
 import type { BlooketSetDetail } from
   "../../../../src/ir/blooket-set-reads/contract/set-read.ts";
+import { reserveMutationBudgetStart, loadMutationBudgetFile } from
+  "../../../../src/platforms/mutation-budget-files/adapter-outbound/file.ts";
 import { publicationFiles, createPublicationSnapshot } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/write-checkpoint-files/adapter-outbound/publication.ts";
@@ -413,6 +415,40 @@ test("configured task start limit stops before a second journal or write",
     assert.equal(state.writes(), 1);
     const files = await publicationFiles(state.root, "fixture");
     await assert.rejects(readFile(files.attempt));
+  }); },
+);
+
+test("configured task duration stops before journal after elapsed budget",
+  async () => { await fixture(async state => {
+  const configured: BlooketPublicationDependencies = {
+    ...state.host,
+    publicationPolicy: {
+      minimumStartIntervalMs: 2_000,
+      maximumStartsPerMinute: 20,
+      maximumTaskStarts: 10,
+      maximumTaskDurationMs: 60_000,
+    },
+  };
+  const built = buildBlooketWritePlan(JSON.stringify(document), "",
+    capabilities);
+  assert.ok(built.ok);
+  if (!built.ok) return;
+  const files = await publicationFiles(state.root, "fixture");
+  const previous = await reserveMutationBudgetStart(files.budget,
+    built.value.planId, {
+      maximumStarts: 10, maximumDurationMs: 86_400_000,
+    }, Date.now() - 120_000);
+  assert.equal(previous.ok, true);
+  const expired = await executeBlooketPublicationCommand(
+    command("step", state.revision), configured);
+  assert.equal(expired.ok, false);
+  if (expired.ok) return;
+  assert.equal(expired.issues[0]?.code,
+    "mutation-task-duration-exhausted");
+  assert.equal(state.writes(), 0);
+  assert.deepEqual(await loadMutationBudgetFile(files.budget,
+    built.value.planId), previous);
+  await assert.rejects(readFile(files.attempt));
   }); },
 );
 

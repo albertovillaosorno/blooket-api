@@ -30,6 +30,8 @@
 //   - Unsupported or invalid requests fail closed.
 //
 import { isAbsolute } from "node:path";
+import { exactOwnData } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 import {
   decodeLocalServiceSettings,
   defaultLocalServiceSettings,
@@ -55,9 +57,10 @@ export function defaultPublicationPreferences(): PublicationPreferences {
 export function decodePublicationPreferences(
   value: unknown,
 ): PublicationPreferences {
-  const record = object(value);
-  exact(record, ["minimumStartIntervalMs", "maximumStartsPerMinute",
-    "maximumTaskStarts", "maximumTaskDurationMs"]);
+  const record = exactOwnData(value,
+    ["minimumStartIntervalMs", "maximumStartsPerMinute",
+      "maximumTaskStarts", "maximumTaskDurationMs"]);
+  if (!record) throw new Error("invalid-publication-policy");
   // Settings use whole seconds and whole minutes so values saved by the
   // local UI remain exactly representable on the next load.
   if (!integer(record["minimumStartIntervalMs"], 2_000, 60_000) ||

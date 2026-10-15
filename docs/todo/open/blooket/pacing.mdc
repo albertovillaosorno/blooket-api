@@ -104,6 +104,18 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+The version-four publication-policy decoder now owns only exact enumerable
+data fields. Red-to-green tests prove that accessor properties are not invoked,
+and symbol-owned and inherited policy keys cannot relax application pacing.
+Unknown fields still fail closed; no account state was inspected or changed.
+
+A follow-up canonical publication fixture seeds an expired, otherwise valid
+durable budget and applies the configured one-minute duration. The next step
+returns `mutation-task-duration-exhausted` without touching the prior budget
+bytes, opening an attempt journal or contacting Blooket. UI error labels now
+distinguish configured budget exhaustion from provider rate limiting and never
+suggest automatic retries. This is synthetic acceptance only.
+
 On 2026-10-14, publication pacing gained persisted version-four teacher
 preferences and local Settings controls. Four exact bounded values now govern
 the running service's shared CLI/MCP/UI mutation-start queue and canonical
