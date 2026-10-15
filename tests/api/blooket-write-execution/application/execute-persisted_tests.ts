@@ -472,6 +472,64 @@ test("cancel after session observation skips baseline and pacing",
   });
 });
 
+test("shadowed attempt phase blocks recovery before browser admission",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const calls: string[] = [];
+    const first = await executePersistedBlooketWrite(paths, plan,
+      browser([]), secrets(), writes({ ok: false,
+        kind: "navigation", state: "rate-limited" }, calls));
+    assert.equal(first.ok && first.kind === "reconciliation-required",
+      true);
+    const previous = await readFile(paths.attempt, "utf8");
+    const shadowed = previous.replace('"phase": "attempting"',
+      '"phase": "confirmed", "phase": "attempting"');
+    assert.notEqual(previous, shadowed);
+    await writeFile(paths.attempt, shadowed);
+    const reads: string[] = [], writesCalled: string[] = [];
+    const pacing: string[] = [];
+    const resumed = await executePersistedBlooketWrite(paths, plan,
+      browser(reads), secrets(), writes(SET_SUCCESS, writesCalled),
+      undefined, { pacer: immediatePacer(pacing) });
+    assert.equal(resumed.ok, false);
+    if (!resumed.ok) assert.equal(resumed.stage, "attempt-load");
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writesCalled, []);
+    assert.deepEqual(pacing, []);
+    assert.deepEqual(calls, ["plan:persisted-test:set"]);
+    assert.equal(await readFile(paths.attempt, "utf8"), shadowed);
+  });
+});
+
+test("shadowed checkpoint target blocks publication before browser use",
+  async () => {
+  await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const progress = {
+      schemaVersion: 2, planId: plan.planId,
+      nextOperationIndex: 1, remoteSetId: "remote-set-1",
+    };
+    const original = JSON.stringify(progress, null, 2) + "\n";
+    const shadowed = original.replace('"remoteSetId": "remote-set-1"',
+      '"remoteSetId": "other", "remoteSetId": "remote-set-1"');
+    await writeFile(paths.checkpoint, shadowed);
+    const reads: string[] = [], writesCalled: string[] = [];
+    const pace: string[] = [];
+    const result = await executePersistedBlooketWrite(paths, plan,
+      browser(reads), secrets(), writes(QUESTION_SUCCESS, writesCalled),
+      undefined, { pacer: immediatePacer(pace) });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.stage, "checkpoint-load");
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writesCalled, []);
+    assert.deepEqual(pace, []);
+    assert.equal(await readFile(paths.checkpoint, "utf8"), shadowed);
+    assert.deepEqual(await loadWriteAttemptFile(paths.attempt, plan),
+      { ok: true, kind: "missing" });
+  });
+});
+
 test("abort after pacing grant still stops before journal", async () => {
   await withTemporaryDirectory(async (directory) => {
     const path = join(directory, "checkpoint.json");
