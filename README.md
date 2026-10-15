@@ -552,8 +552,9 @@ node --check src/ui/teacher-workspace/adapter-inbound/app.js
 Jig's `scalability.repository-graph` rule currently records an evidenced
 `not-evaluated` outcome while Jig's own schema/migration contract matures.
 The repository's `npm run validate` runs strict TypeScript checking, roadmap
-integrity, all portable tests, and `jig validate --root .`. `jig check` is a
-separate rule-outcome report and currently retains the external graph gap.
+integrity, all portable tests, the existing `jig check --root .` rule
+outcome report, and the authoritative `jig validate --root .` policy gate.
+`jig check` currently retains the external graph gap.
 
 Successful Jig validation has zero policy diagnostics but does not imply this
 particular graph rule has been fully evaluated. The supporting schema source
