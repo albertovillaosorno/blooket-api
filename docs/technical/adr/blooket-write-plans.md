@@ -221,3 +221,22 @@ metadata does not.
 Checkpoint tests prove progress binds to one exact plan, advances one confirmed
 operation at a time, rejects skipped and cross-plan operations, and
 distinguishes completion from mismatch.
+
+**Conservative user-configured pacing**
+
+Local settings schema v4 adds versioned publication pacing: minimum mutation
+start interval, maximum starts per rolling minute, maximum task starts, and
+maximum task duration. The validated local UI accepts seconds, counts and
+minutes but persists canonical milliseconds and counts. An on-disk v3 profile
+upgrades in memory with the original conservative defaults and retains its
+previous byte content until the owner explicitly saves settings.
+
+The local service freezes the loaded policy at startup for its shared mutation
+pacer and the canonical journaled task budget used by UI, CLI and MCP. Changing
+settings does not rewrite an in-flight plan, journal, lease, or started budget;
+the user must restart the service to activate a new policy. Legacy v3 settings
+saves are refused to prevent a stale UI from dropping stricter policy fields.
+
+Application pacing cannot establish Blooket's actual account quota. Exhaustion
+is a recoverable pre-write stop; it does not justify replaying any prior
+uncertain attempt, clearing a journal, or claiming remote success.

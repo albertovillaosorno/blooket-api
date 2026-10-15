@@ -6,6 +6,9 @@ import {
   readClipboardImage,
 } from "./library.js";
 import { publishTextDraft, publicationStopReason } from "./publication.js";
+import {
+  publicationFormValues, readPublicationFormValues,
+} from "./pacing-settings.js";
 
 const words = {
   es: {
@@ -185,6 +188,16 @@ const words = {
     onlineHelp:
       "Cloudflare es el único proveedor. La conexión " +
       "requiere autenticación; la UI permanece local.",
+    publicationPacing: "Ritmo de publicación en Blooket",
+    publicationPacingHelp:
+      "Estos límites conservadores se comparten entre la interfaz, CLI y MCP.",
+    publicationInterval: "Segundos entre inicios de escritura",
+    publicationPerMinute: "Máximo de escrituras por minuto",
+    publicationTaskStarts: "Máximo de intentos por publicación",
+    publicationTaskDuration: "Duración máxima de publicación (minutos)",
+    publicationRestartHelp:
+      "Los cambios de ritmo se aplican al reiniciar el servicio. " +
+      "Las escrituras inciertas nunca se reenvían automáticamente.",
     exportDefaults: "Defaults de exportación",
     defaultsHelp:
       "Ancho y alto forman el lienzo global de toda la biblioteca. " +
@@ -294,9 +307,14 @@ const words = {
       "Ya hay otra operación en curso. Revisa el estado antes de continuar.",
     publicationStopStorage:
       "No se pudo comprobar el journal. No repitas la escritura.",
+    publicationStopLimit:
+      "Se agotó el límite configurado de publicación. Revisa el estado y " +
+      "ajusta los límites en Configuración; reinicia el servicio antes de " +
+      "continuar. Nunca reenvíes una escritura incierta.",
     configured: "Configurado",
     missing: "Sin configurar",
-    saved: "Guardado. Reinicia el servicio si cambiaste el puerto.",
+    saved:
+      "Guardado. Reinicia el servicio si cambiaste el puerto o el ritmo.",
     ready: "Listo",
     pending: "Por preparar",
     effectiveDetail: "detalle",
@@ -497,6 +515,16 @@ const words = {
     onlineHelp:
       "Cloudflare is the only provider. The connection " +
       "requires authentication; the UI stays local.",
+    publicationPacing: "Blooket publication pacing",
+    publicationPacingHelp:
+      "These conservative limits are shared across the UI, CLI and MCP.",
+    publicationInterval: "Seconds between write starts",
+    publicationPerMinute: "Maximum writes per minute",
+    publicationTaskStarts: "Maximum attempts per publication",
+    publicationTaskDuration: "Maximum publication duration (minutes)",
+    publicationRestartHelp:
+      "Pacing changes take effect after restarting the service. " +
+      "Uncertain writes are never replayed automatically.",
     exportDefaults: "Export defaults",
     defaultsHelp:
       "Width and height form the global canvas for the whole library. " +
@@ -604,9 +632,13 @@ const words = {
       "Another operation is running. Refresh status before proceeding.",
     publicationStopStorage:
       "The journal could not be verified. Do not replay the write.",
+    publicationStopLimit:
+      "The configured publication limit was exhausted. Check the status " +
+      "and adjust Settings, then restart the service before continuing. " +
+      "Never replay an uncertain write.",
     configured: "Configured",
     missing: "Not configured",
-    saved: "Saved. Restart the service if you changed the port.",
+    saved: "Saved. Restart the service after port or pacing changes.",
     ready: "Ready",
     pending: "Needs preparation",
     effectiveDetail: "detail",
@@ -1639,6 +1671,9 @@ function fillSettings() {
   field(settingsForm, "publicUrl").value = settings.online.publicUrl;
   for (const name of ["width", "height", "gifFps", "compression"])
     field(settingsForm, name).value = settings.defaults[name];
+  for (const [name, value] of Object.entries(
+    publicationFormValues(settings.publication),
+  )) field(settingsForm, name).value = value;
   $("#onlineFields").disabled = !settings.online.enabled;
   renderSettingsState();
 }
@@ -1839,6 +1874,8 @@ settingsForm.addEventListener("submit", async (event) => {
         ? field(settingsForm, name).value
         : Number(field(settingsForm, name).value);
   try {
+    preferences.publication = readPublicationFormValues(name =>
+      field(settingsForm, name).value);
     const response = await fetch("/api/settings", {
       method: "POST",
       headers: {
@@ -1984,6 +2021,7 @@ function publicationFailureText(error) {
     media: "publicationStopMedia",
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",
+    limit: "publicationStopLimit",
     paused: "publicationPaused",
   }[publicationStopReason(error)];
   return t(message ?? "publicationPaused");

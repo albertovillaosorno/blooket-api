@@ -77,6 +77,9 @@ import { acquirePublicationBoundary } from
 import type { BlooketWriteExecutionPort } from
   "../contract/write-execution.ts";
 import type { BlooketMutationPacer } from "./mutation-pacing.ts";
+import {
+  defaultPublicationPreferences, type PublicationPreferences,
+} from "../../../settings/teacher-preferences/domain/preferences.ts";
 import { executePersistedBlooketWrite } from "./execute-persisted.ts";
 import { verifyPersistedBlooketWrite } from "./verify-reconciliation.ts";
 import { blooketSetReadWriteVerifier, questionMatches } from
@@ -90,6 +93,7 @@ export interface BlooketPublicationDependencies {
   readonly blooket: BlooketReadDependencies;
   readonly writes: BlooketWriteExecutionPort;
   readonly pacer: BlooketMutationPacer;
+  readonly publicationPolicy?: PublicationPreferences;
   readonly preparedMedia?: BlooketPreparedMediaReadPort;
   readonly signal?: AbortSignal;
 }
@@ -436,8 +440,12 @@ export async function executeBlooketPublicationCommand(
         ...(expectedMedia ? { expectedMedia } : {}), budget: {
           path: files.budget,
           policy: {
-            maximumStarts: Math.min(10_000, plan.operations.length + 5),
-            maximumDurationMs: 86_400_000,
+            maximumStarts: Math.min(plan.operations.length + 5,
+              (host.publicationPolicy ?? defaultPublicationPreferences())
+                .maximumTaskStarts),
+            maximumDurationMs:
+              (host.publicationPolicy ?? defaultPublicationPreferences())
+                .maximumTaskDurationMs,
           },
         },
       },

@@ -49,6 +49,25 @@ function store(write: HostSecretStore["write"]): HostSecretStore {
   };
 }
 
+test("stale v3 settings saves cannot relax a retained publication policy",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "settings-stale-policy-"));
+  try {
+    const preferences = await loadPreferences(root);
+    const { publication: _ignored, ...stale } = preferences;
+    const attempted = { ...stale, schemaVersion: 3 };
+    let secretWrites = 0;
+    await assert.rejects(saveConfiguration(root, {
+      preferences: attempted,
+      password: "synthetic-secret", tunnelToken: "",
+    }, store(async () => { secretWrites++; return { ok: true }; })),
+    /invalid-settings/u);
+    assert.equal(secretWrites, 0);
+    assert.deepEqual(await loadPreferences(root), preferences);
+  } finally { await rm(root, { recursive: true, force: true }); }
+},
+);
+
 test("all replacement byte limits are validated before any write", async () => {
   const root = await mkdtemp(join(tmpdir(), "settings-bytes-"));
   try {

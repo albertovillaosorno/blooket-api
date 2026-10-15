@@ -117,8 +117,14 @@ export async function saveConfiguration(
     if (value !== "" && !validateHostSecretValue(value).ok)
       throw new Error("invalid-secret-replacement");
   }
+  // Legacy v3 JSON is accepted only when reading the on-disk migration.
+  // A stale UI must not erase stricter publication limits by saving a v3
+  // payload whose policy field did not exist.
+  const preferenceRequest = object(request["preferences"]);
+  if (preferenceRequest["schemaVersion"] !== 4)
+    throw new Error("invalid-settings");
   const preferences = decodeTeacherPreferences(
-    request["preferences"],
+    preferenceRequest,
     join(root, "media"),
   );
   const acquired = await tryAcquireFileLock(join(root, ".configuration.lock"));

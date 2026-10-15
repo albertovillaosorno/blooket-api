@@ -59,6 +59,36 @@ test("fresh preferences are durable and the exact byte limit is admitted",
   },
 );
 
+test("on-disk v3 settings migrate in memory without erasing original data",
+  async () => {
+  await withRoot(async root => {
+    const current = await loadPreferences(root);
+    const path = join(root, "settings.json");
+    const { publication: _discard, ...legacy } = current;
+    const prior = JSON.stringify({ ...legacy, schemaVersion: 3,
+      locale: "en" }, null, 2) + "\n";
+    await writeFile(path, prior);
+    const migrated = await loadPreferences(root);
+    assert.equal(migrated.schemaVersion, 4);
+    assert.equal(migrated.locale, "en");
+    assert.deepEqual(migrated.publication, current.publication);
+    assert.equal(await readFile(path, "utf8"), prior);
+    await savePreferences(root, { ...migrated, publication: {
+      minimumStartIntervalMs: 6_000,
+      maximumStartsPerMinute: 10,
+      maximumTaskStarts: 8,
+      maximumTaskDurationMs: 600_000,
+    } });
+    const modern = await loadPreferences(root);
+    assert.equal(modern.schemaVersion, 4);
+    assert.equal(modern.publication.minimumStartIntervalMs, 6_000);
+    const priorCopy = await readFile(join(root,
+      "settings.previous.json"), "utf8");
+    assert.equal(priorCopy, prior);
+  });
+},
+);
+
 test("oversized teacher settings refuse read rather than resetting defaults",
   async () => {
   await withRoot(async root => {
