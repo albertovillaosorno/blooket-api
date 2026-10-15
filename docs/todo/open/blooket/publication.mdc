@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+End-to-end persisted-executor fixtures now inject a duplicate phase in an
+attempting journal or a duplicate remote set ID in a checkpoint before resume.
+Recovery reports a stable file-load failure without querying the browser,
+acquiring a pacing lease or issuing a second remote write. The original
+uncertain files survive byte-for-byte for manual reconciliation.
+
 A red-to-green recovery regression found that an idempotent checkpoint save
 could report success for a different `remoteSetId` at the same operation index.
 The same file adapter also accepted advancing later questions under a newly
