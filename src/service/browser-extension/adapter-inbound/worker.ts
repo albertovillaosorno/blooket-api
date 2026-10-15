@@ -54,6 +54,8 @@ import {
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
 import { createExtensionCapabilityInspectionHost } from
   "./capability-inspection-host.ts";
+import { inspectDetachedBlooketCapabilities } from
+  "./detached-capability-host.ts";
 import { canLeaveBlooketPageForRead } from
   "../../../platforms/blooket-browser/adapter-outbound/capability-page.ts";
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
@@ -358,6 +360,12 @@ async function read(
       : origin !== "https://dashboard.blooket.com"
   )
     throw new Error("manual-blooket-sign-in-required");
+  if (operation.kind === "sets.list") {
+    const separate = await detachedSubmittedRead(
+      current, browser, "sets.list", false,
+    );
+    if (separate !== undefined) return separate;
+  }
   // An uncertain Save may leave the teacher's owned form open indefinitely.
   // Fresh verification may read a new background tab only when this same
   // source document still holds the exact submitted mutation latch. It must
@@ -872,6 +880,115 @@ function ownedBrowser(
   };
 }
 
+// Preserve the original submitted editor and its journal. The temporary tab
+// is a separate read-only source, never a replacement Blooket write owner.
+// Reuse the existing double-observed My Sets read contract rather than a new
+// weaker DOM parser. Only this freshly created tab may be reloaded or closed.
+async function inspectDetachedBlooketSets(
+  current: Connection,
+  browser: ReturnType<typeof ownedBrowser>,
+): Promise<unknown> {
+  const failed = () => ({ ok: false, code: "blooket-browser-failed" });
+  const url = "https://dashboard.blooket.com/my-sets";
+  let tabId: number | undefined;
+  let removed = false;
+  let result: unknown = failed();
+  try {
+    const created = await browser.tabs.create({ url, active: false });
+    if (!Number.isSafeInteger(created.id) || created.id! < 1)
+      return failed();
+    tabId = created.id;
+    // The full read owns a separate fresh-document reload and two list
+    // observations, subject to its normal eight-second bridge deadline.
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      const tab = await browser.tabs.get(tabId!);
+      if (tab.url !== url) return failed();
+      if (tab.status === "complete") { ready = true; break; }
+      await pause(100);
+    }
+    if (!ready) return failed();
+    result = await read({ ...current, tabId: tabId! }, browser,
+      { kind: "sets.list" });
+  } catch { return failed(); }
+  finally {
+    if (tabId !== undefined) {
+      try { await browser.tabs.remove(tabId); removed = true; }
+      catch { /* Never claim an unclosed temporary read tab. */ }
+    }
+  }
+  return removed ? result : failed();
+}
+
+// Capabilities are read-only, but their native host navigates My Sets and
+// temporarily opens feature drawers. Never do that on a submitted teacher
+// question. A detached tab is allowed only for an exact, still-submitted
+// owner in the original source document; arbitrary editor modals remain stops.
+async function detachedSubmittedRead(
+  current: Connection,
+  browser: ReturnType<typeof ownedBrowser>,
+  operation: "capabilities" | "sets.list",
+  textOnly: boolean,
+): Promise<unknown | undefined> {
+  const failed = () => ({ ok: false, code: "blooket-browser-failed" });
+  const tab = await browser.tabs.get(current.tabId);
+  if (tab.status !== "complete" || !tab.url) return undefined;
+  const url = new URL(tab.url);
+  const setId = url.searchParams.get("id");
+  if (url.origin !== "https://dashboard.blooket.com" ||
+      url.pathname !== "/edit" || url.hash ||
+      url.searchParams.size !== 1 || !setId || setId.length > 512)
+    return undefined;
+  const canLeave = await script(current, browser,
+    canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+  if (canLeave === true) return undefined;
+  if (canLeave !== false) return failed();
+  const sourceOrigin = await script(current, browser,
+    inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+    [tab.url]);
+  const stage = await script(current, browser,
+    inspectBlooketQuestionWriteStage as (...args: never[]) => unknown);
+  const bound = await script(current, browser,
+    inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
+    [setId]);
+  const observed = await script(current, browser,
+    inspectBlooketPage as (...args: never[]) => unknown,
+    [{ kind: "session.observe" }]);
+  if (typeof sourceOrigin !== "number" ||
+      !Number.isFinite(sourceOrigin) || sourceOrigin <= 0 ||
+      bound !== true || !exactWorkerKeys(stage, "kind,stage") ||
+      (stage as { kind?: unknown }).kind !==
+        "blooket-question-write-stage" ||
+      (stage as { stage?: unknown }).stage !== "submit-attempted" ||
+      !exactSessionObservation(observed) ||
+      (observed as { value?: unknown }).value !== "edit") return failed();
+  const before = await browser.tabs.get(current.tabId);
+  const beforeOrigin = await script(current, browser,
+    inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+    [tab.url]);
+  if (before.url !== tab.url || before.status !== "complete" ||
+      beforeOrigin !== sourceOrigin) return failed();
+  const detached = operation === "sets.list"
+    ? await inspectDetachedBlooketSets(current, browser)
+    : await inspectDetachedBlooketCapabilities(browser, textOnly, pause);
+  const after = await browser.tabs.get(current.tabId);
+  const afterOrigin = await script(current, browser,
+    inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+    [tab.url]);
+  const afterBound = await script(current, browser,
+    inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
+    [setId]);
+  const afterState = await script(current, browser,
+    inspectBlooketPage as (...args: never[]) => unknown,
+    [{ kind: "session.observe" }]);
+  if (after.url !== tab.url || after.status !== "complete" ||
+      afterOrigin !== sourceOrigin || afterBound !== true ||
+      !exactSessionObservation(afterState) ||
+      (afterState as { value?: unknown }).value !== "edit")
+    return failed();
+  return detached;
+}
+
 // A verified human challenge is shown in the real browser's existing tab.
 // Never launch an automated solver, change the User-Agent, or copy cookies.
 async function showHumanBlooketTab(
@@ -879,7 +996,7 @@ async function showHumanBlooketTab(
   stillOwned: () => boolean = () => true,
 ): Promise<boolean> {
   if (!stillOwned()) return false;
-  const tab = await chrome.tabs.get(tabId);
+  const tab = await chrome.tabs.get(tabId!);
   if (tab.id !== tabId || !tab.url || !stillOwned() ||
       !["https://dashboard.blooket.com", "https://id.blooket.com"]
         .includes(new URL(tab.url).origin)) return false;
@@ -891,7 +1008,7 @@ async function showHumanBlooketTab(
       active.windowId !== tab.windowId) return false;
   // A manual tab switch may finish while activation is pending. Never focus
   // the remembered window if the active tab has become foreign or replaced.
-  const checked = await chrome.tabs.get(tabId);
+  const checked = await chrome.tabs.get(tabId!);
   if (!stillOwned() || checked.id !== tabId ||
       checked.url !== tab.url || checked.windowId !== tab.windowId ||
       !checked.url ||
@@ -974,14 +1091,18 @@ async function relay(current: Connection, activeGeneration: number) {
             });
           } else if (job.command.kind === "capabilities.inspect" ||
               job.command.kind === "capabilities.inspect-text") {
-            const host = createExtensionCapabilityInspectionHost(
-              jobBrowser,
-              current.tabId,
-              pause,
+            const textOnly =
+              job.command.kind === "capabilities.inspect-text";
+            const detached = await detachedSubmittedRead(
+              current, jobBrowser, "capabilities", textOnly,
             );
-            result = await host.inspect({
-              textOnly: job.command.kind === "capabilities.inspect-text",
-            });
+            if (detached !== undefined) result = detached;
+            else {
+              const host = createExtensionCapabilityInspectionHost(
+                jobBrowser, current.tabId, pause,
+              );
+              result = await host.inspect({ textOnly });
+            }
           } else if (job.command.kind === "sets.create") {
             const host = createExtensionCreateSetHost(
               jobBrowser,

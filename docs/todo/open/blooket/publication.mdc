@@ -73,6 +73,32 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-15, the canonical authenticated CLI could observe the Edit
+session, while its text capability inspection returned a browser failure with
+an unresolved submitted Add Question editor still present. This is a source
+tab safety stop, not evidence of lost authentication or a remote receipt.
+
+The Chrome worker now allows a narrowly scoped capability read in an isolated
+background tab **only** while the original exact-set submitted question owner
+and its native document are still confirmed. The temporary My Sets tab runs
+the existing strict capability host, supports text and full-media inspection,
+closes its own feature drawers and tab, and never reloads or navigates the
+teacher's unsaved form. Challenge, missing or cross-set ownership, read drift,
+source document replacement and cleanup failure block acceptance.
+
+The same exact submitted-owner gate now admits a separate **My Sets** read.
+It creates a background tab, delegates to the established double-observed
+native document and library-model verifier, then removes only that tab. The
+original teacher editor stays open even if the independent read needs its own
+reload. Integrated worker tests prove ordinary list and text/full capability
+reads, changed owner documents, ownership changes and security stops.
+
+Portable detached-host and integrated worker regressions pass. Neither the
+installed live extension nor its original submitted form was reloaded, so this
+source change is not yet live compatibility acceptance and does not resolve
+existing ambiguous journals. The latest observed provider media entitlement
+and uninterrupted multi-question publication remain unverified.
+
 The shared pacing, cancellation and human-stop milestone `blooket-10` was
 completed from the previously verified authenticated one-question path and
 focused interruption tests. This record continues to own the unresolved

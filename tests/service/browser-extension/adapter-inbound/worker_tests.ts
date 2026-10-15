@@ -65,6 +65,13 @@ test(
   let detachedSourceReload = false;
   let detachedCreated = 0;
   let detachedClosed = 0;
+  let capabilityTabsCreated = 0;
+  let capabilityTabsClosed = 0;
+  let detachedCapabilityUrl = "";
+  let detachedCapabilityDocumentOrigin = 90_000;
+  let detachedCapabilityDrift = false;
+  let detachedCapabilitySourceReload = false;
+  let detachedCapabilityChallenge = false;
   let detachedUrl = "";
   let denyFinalReadGuard = false;
   let readGuardChecks = 0;
@@ -175,16 +182,33 @@ test(
           detachedUrl = url;
           return { id: 83, url, status: "complete", windowId: 3 };
         }
+        if (active === false && submittedReadOwner &&
+            tabUrl === "https://dashboard.blooket.com/edit?id=set-fixture" &&
+            url === "https://dashboard.blooket.com/my-sets") {
+          capabilityTabsCreated++;
+          detachedCapabilityUrl = url;
+          return { id: 84, url, status: "complete", windowId: 3 };
+        }
         creates++;
         tabUrl = url;
         return { id: 7, url, status: "complete", windowId: 3 };
       },
       remove: async (id) => {
+        if (id === 84) {
+          capabilityTabsClosed++;
+          detachedCapabilityUrl = "";
+          return;
+        }
         assert.equal(id, 83);
         detachedClosed++;
         detachedUrl = "";
       },
       get: async (id) => {
+        if (id === 84) {
+          if (!detachedCapabilityUrl) throw Error("closed-capability-tab");
+          return { id, url: detachedCapabilityUrl,
+            status: "complete", windowId: 3 };
+        }
         if (id === 83) {
           if (!detachedUrl) throw Error("closed-detached-tab");
           return { id, url: detachedUrl, status: "complete", windowId: 3 };
@@ -194,6 +218,14 @@ test(
         return { id, url: tabUrl, status: "complete", windowId: 3 };
       },
       update: async (id, { url, active }) => {
+        if (id === 84) {
+          if (url !== undefined) {
+            detachedCapabilityUrl = url;
+            detachedCapabilityDocumentOrigin += 1_000;
+          }
+          return { id, url: detachedCapabilityUrl,
+            status: "complete", windowId: 3 };
+        }
         assert.equal(id, 7);
         if (url !== undefined) {
           tabUrl = url;
@@ -209,6 +241,10 @@ test(
         return { id, url: tabUrl, status: "complete", windowId: 3 };
       },
       reload: async (id, options) => {
+        if (id === 84) {
+          detachedCapabilityDocumentOrigin += 1_000;
+          return;
+        }
         assert.equal(id, 7);
         assert.deepEqual(options, { bypassCache: true });
         documentOrigin += 1_000;
@@ -244,6 +280,37 @@ test(
             "src/ui/browser-extension/adapter-inbound/workspace.js",
           ]);
           return [];
+        }
+        if (target.tabId === 84) {
+          scripts.push(func.name + ":capabilities-detached");
+          if (func.name === "inspectBlooketDocumentOrigin")
+            return [{ result: detachedCapabilityDocumentOrigin }];
+          if (func.name === "canLeaveBlooketPageForRead")
+            return [{ result: true }];
+          if (func.name === "captureBlooketLibraryModel")
+            return [{ result: null }];
+          if (func.name === "inspectBlooketPage") {
+            const op = args?.[0];
+            if (op?.kind === "session.observe")
+              return [{ result: { ok: true, value: "my-sets" } }];
+            if (op?.kind === "sets.list") {
+              if (detachedCapabilitySourceReload) {
+                detachedCapabilitySourceReload = false;
+                documentOrigin += 1_000;
+              }
+              if (detachedCapabilityChallenge) {
+                detachedCapabilityChallenge = false;
+                observedSessionOverride = "security-challenge";
+              }
+              return [{ result: { ok: true, value: {
+                items: [{ schemaVersion: 1, id: detachedCapabilityDrift
+                  ? "different-set" : "set-fixture",
+                  title: "Synthetic capability fixture" }],
+                completeness: "unknown",
+              } } }];
+            }
+          }
+          throw Error("unexpected-capability-read-script");
         }
         if (target.tabId === 83) {
           scripts.push(func.name + ":detached");
@@ -981,7 +1048,9 @@ test(
         "https://dashboard.blooket.com/edit?id=teacher-draft");
     }
     assert.deepEqual(scripts.slice(beforeUnsafeRead), [
-      "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+      "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "inspectBlooketQuestionWriteStage",
+      "inspectBlooketSubmittedQuestionOwner", "inspectBlooketPage",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
     ]);
@@ -1001,6 +1070,67 @@ test(
     assert.equal(readReloads, beforeDetachedReloads);
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=set-fixture");
+    // Text capability admission is also non-mutating, but must inspect in
+    // a temporary tab rather than navigating away from a submitted editor.
+    const beforeDetachedCapabilities = readReloads;
+    const sourceListing = await expectReply({ kind: "sets.list" });
+    assert.equal(sourceListing.ok, true);
+    assert.equal(sourceListing.value.items.length, 1);
+    assert.equal(capabilityTabsCreated, 1);
+    assert.equal(capabilityTabsClosed, 1);
+    assert.equal(readReloads, beforeDetachedCapabilities);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=set-fixture");
+    const capability = await expectReply({ kind: "capabilities.inspect-text" });
+    assert.equal(capability.ok, true);
+    assert.equal(capability.value.features.audio, "account-dependent");
+    assert.equal(capabilityTabsCreated, 2);
+    assert.equal(capabilityTabsClosed, 2);
+    assert.equal(readReloads, beforeDetachedCapabilities);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=set-fixture");
+    // No extra tab or navigation under changed account identity, a human
+    // challenge, or a stale submitted owner bound to another set.
+    observedSessionOverride = "security-challenge";
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    observedSessionOverride = null;
+    submittedBoundSet = "unrelated-set";
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    submittedBoundSet = "set-fixture";
+    submittedReadOwner = false;
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    submittedReadOwner = true;
+    assert.equal(capabilityTabsCreated, 2);
+    detachedCapabilitySourceReload = true;
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(capabilityTabsCreated, 3);
+    assert.equal(capabilityTabsClosed, 3);
+    detachedCapabilityChallenge = true;
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(capabilityTabsCreated, 4);
+    assert.equal(capabilityTabsClosed, 4);
+    observedSessionOverride = null;
+    // A changed source document cannot launder two correct My Sets snapshots
+    // into a positive read from the old submitted attempt.
+    const beforeStaleSetList = capabilityTabsCreated;
+    detachedCapabilitySourceReload = true;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(capabilityTabsCreated, beforeStaleSetList + 1);
+    assert.equal(capabilityTabsClosed, beforeStaleSetList + 1);
+    submittedBoundSet = "other-set";
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(capabilityTabsCreated, beforeStaleSetList + 1);
+    submittedBoundSet = "set-fixture";
     // A real security challenge still blocks detached reads, even if a
     // submit latch survives the original page's React transition.
     observedSessionOverride = "security-challenge";
