@@ -73,6 +73,9 @@ export type ExtensionQuestionInspectionResult =
   | { readonly ok: false; readonly code: "blooket-browser-failed" };
 
 const POLL_MS = 100;
+// An empty React shell is not evidence of an empty saved quiz. Space the
+// independent counter checks without extending the caller's fixed deadline.
+const EMPTY_STABILITY_MS = 250;
 const MAX_POLLS = 15;
 const MAX_QUESTIONS = 200;
 // Leave space for the bridge response envelope and JSON framing (1 MB limit).
@@ -333,7 +336,10 @@ export function createExtensionQuestionInspectionHost(
           if (totalBytes > MAX_RESULT_BYTES) return browserFailure();
           questions.push(decoded);
         }
-        if (numbers.length === 0) await pause(0);
+        // An Edit page may show its native zero counter before the provider
+        // hydrates saved cards. Require time-separated observations for an
+        // empty result; immediate microtask reads can all see the same shell.
+        if (numbers.length === 0) await pause(EMPTY_STABILITY_MS);
         // Cancel can remount the saved cards after closing the read-owned
         // panel. Wait only for an exact not-ready shape; a readable drift or
         // malformed success cannot be polled until it happens to match.
@@ -344,7 +350,7 @@ export function createExtensionQuestionInspectionHost(
         // A just-canceled modal can briefly return a stale card collection.
         // Require two independent final saved-list observations before the
         // read becomes positive evidence for journal reconciliation.
-        await pause(0);
+        await pause(numbers.length === 0 ? EMPTY_STABILITY_MS : 0);
         const afterAgain = await enumerate(setId, url, deadline);
         if (!afterAgain || afterAgain.length !== after.length ||
             afterAgain.some((number, index) => number !== after[index]))

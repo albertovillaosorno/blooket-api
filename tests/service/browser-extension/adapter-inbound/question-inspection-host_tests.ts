@@ -57,6 +57,7 @@ const validQuestion = {
 interface Scenario {
   readonly initial?: unknown;
   readonly listReplies?: readonly unknown[];
+  readonly lateQuestionAtMs?: number;
   readonly after?: unknown;
   readonly inspected?: unknown;
   readonly inspectedReplies?: readonly unknown[];
@@ -138,9 +139,12 @@ function synthetic(options: Scenario = {}) {
           if (enumerations === options.switchAtEnumeration)
             currentUrl = "https://dashboard.blooket.com/edit?id=other";
           return [{
-            result: options.listReplies
-              ? options.listReplies[enumerations - 1]
-              : enumerations === 1
+            result: options.lateQuestionAtMs !== undefined
+              ? { ok: true, value: tick >= options.lateQuestionAtMs
+                  ? [1] : [] }
+              : options.listReplies
+                ? options.listReplies[enumerations - 1]
+                : enumerations === 1
                 ? ("initial" in options
                     ? options.initial : { ok: true, value: [1] })
                 : ("after" in options
@@ -306,6 +310,30 @@ test(
   assert.equal(fixture.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
+
+test("a late saved card cannot turn a transient empty shell into absence",
+  async () => {
+  const fixture = synthetic({ lateQuestionAtMs: 150 });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.enumerations(), 2);
+  assert.ok(fixture.tick() >= 150);
+});
+
+test("a slower React card mount cannot confirm an empty saved set",
+  async () => {
+  const fixture = synthetic({ lateQuestionAtMs: 350 });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(fixture.enumerations(), 3);
+  assert.ok(fixture.tick() >= 350);
+});
+
+test("empty state never extends a shorter fixed read deadline",
+  async () => {
+  const fixture = synthetic({ initial: { ok: true, value: [] },
+    after: { ok: true, value: [] } });
+  assert.deepEqual(await fixture.host.inspect(FIXTURE_SET, 400), failed);
+  assert.ok(fixture.tick() >= 400);
+});
 
 test(
   "changed visible question numbers invalidate the entire read",
@@ -536,7 +564,7 @@ test(
   });
   assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), failed);
   assert.equal(page.enumerations(), 2);
-  assert.equal(page.tick(), 0);
+  assert.equal(page.tick(), 250);
   assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
   },
 );

@@ -122,19 +122,66 @@ export async function inspectDetachedBlooketQuestions(
     );
     if (typeof origin !== "number" || !Number.isFinite(origin) ||
         origin <= 0 || now() >= deadline) return failed();
-    const state = await script(
-      inspectBlooketPage as (...args: never[]) => unknown,
-      [{ kind: "session.observe" }],
-    );
-    if (!state || typeof state !== "object" || Array.isArray(state) ||
-        Reflect.ownKeys(state).length !== 2 ||
-        Object.getOwnPropertyDescriptor(state, "ok")?.value !== true ||
-        Object.getOwnPropertyDescriptor(state, "value")?.value !== "edit")
-      return failed();
+    // Chrome's complete document can precede React's authenticated Edit
+    // shell. Poll only a precise transitional page within the same native
+    // document. Login, challenges and malformed replies stop immediately.
+    let ready = false;
+    for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
+      const tab = await chrome.tabs.get(createdId!);
+      if (tab.url !== target || tab.status !== "complete" ||
+          await script(inspectBlooketDocumentOrigin as
+            (...args: never[]) => unknown, [target]) !== origin)
+        return failed();
+      const state = await script(
+        inspectBlooketPage as (...args: never[]) => unknown,
+        [{ kind: "session.observe" }],
+      );
+      if (!state || typeof state !== "object" || Array.isArray(state) ||
+          Reflect.ownKeys(state).length !== 2) return failed();
+      const admitted = Object.getOwnPropertyDescriptor(state, "ok");
+      if (!admitted || !admitted.enumerable ||
+          !("value" in admitted) || admitted.value !== true)
+        return failed();
+      const status = Object.getOwnPropertyDescriptor(state, "value");
+      if (!status || !status.enumerable || !("value" in status))
+        return failed();
+      const afterTab = await chrome.tabs.get(createdId!);
+      if (afterTab.url !== target || afterTab.status !== "complete" ||
+          await script(inspectBlooketDocumentOrigin as
+            (...args: never[]) => unknown, [target]) !== origin)
+        return failed();
+      if (status.value === "edit") { ready = true; break; }
+      if (status.value !== "unexpected-page") return failed();
+      await pause(100);
+    }
+    if (!ready || now() >= deadline) return failed();
     const host = createExtensionQuestionInspectionHost(
       chrome, createdId!, pause, now,
     );
     answer = await host.inspect(setId, deadline, origin);
+    if (!answer.ok || now() >= deadline) return failed();
+    // A challenge can replace React's Edit shell in the same native document
+    // after all cards were read. Never certify a stale page just because its
+    // URL and performance.timeOrigin have not changed.
+    const afterReadState = await script(
+      inspectBlooketPage as (...args: never[]) => unknown,
+      [{ kind: "session.observe" }],
+    );
+    if (!afterReadState || typeof afterReadState !== "object" ||
+        Array.isArray(afterReadState) ||
+        Reflect.ownKeys(afterReadState).length !== 2) return failed();
+    const admittedFinal = Object.getOwnPropertyDescriptor(
+      afterReadState, "ok",
+    );
+    if (!admittedFinal || !admittedFinal.enumerable ||
+        !("value" in admittedFinal) || admittedFinal.value !== true)
+      return failed();
+    const finalStatus = Object.getOwnPropertyDescriptor(
+      afterReadState, "value",
+    );
+    if (!finalStatus || !finalStatus.enumerable ||
+        !("value" in finalStatus) || finalStatus.value !== "edit")
+      return failed();
     const check = await chrome.tabs.get(createdId!);
     const finalOrigin = await script(
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,

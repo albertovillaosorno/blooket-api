@@ -62,7 +62,10 @@ test(
   let submittedReadOwner = false;
   let submittedBoundSet = "set-fixture";
   let detachedSourceOwnerLost = false;
+  let detachedSourceChallenge = false;
   let detachedSourceReload = false;
+  let detachedTabNavigatedByUser = false;
+  let detachedTabActivatedByUser = false;
   let detachedCreated = 0;
   let detachedClosed = 0;
   let capabilityTabsCreated = 0;
@@ -145,6 +148,24 @@ test(
   const readScriptRelease = new Promise<void>((resolve) => {
     releaseReadScript = resolve;
   });
+  let holdDetachedCreate = false;
+  let signalDetachedCreate!: () => void;
+  let releaseDetachedCreate!: () => void;
+  const detachedCreateStarted = new Promise<void>(resolve => {
+    signalDetachedCreate = resolve;
+  });
+  const detachedCreateRelease = new Promise<void>(resolve => {
+    releaseDetachedCreate = resolve;
+  });
+  let holdDetachedRead = false;
+  let signalDetachedRead!: () => void;
+  let releaseDetachedRead!: () => void;
+  const detachedReadStarted = new Promise<void>(resolve => {
+    signalDetachedRead = resolve;
+  });
+  const detachedReadRelease = new Promise<void>(resolve => {
+    releaseDetachedRead = resolve;
+  });
   let reportWriteOpen!: () => void;
   let releaseWriteOpen!: () => void;
   const writeOpenStarted = new Promise<void>((resolve) => {
@@ -180,6 +201,11 @@ test(
           "https://dashboard.blooket.com/edit?id=")) {
           detachedCreated++;
           detachedUrl = url;
+          if (holdDetachedCreate) {
+            holdDetachedCreate = false;
+            signalDetachedCreate();
+            await detachedCreateRelease;
+          }
           return { id: 83, url, status: "complete", windowId: 3 };
         }
         if (active === false && submittedReadOwner &&
@@ -211,7 +237,8 @@ test(
         }
         if (id === 83) {
           if (!detachedUrl) throw Error("closed-detached-tab");
-          return { id, url: detachedUrl, status: "complete", windowId: 3 };
+          return { id, url: detachedUrl, status: "complete", windowId: 3,
+            active: detachedTabActivatedByUser };
         }
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
@@ -319,6 +346,15 @@ test(
           if (func.name === "inspectBlooketPage")
             return [{ result: { ok: true, value: "edit" } }];
           if (func.name === "listBlooketQuestionNumbers") {
+            if (detachedTabNavigatedByUser) {
+              detachedTabNavigatedByUser = false;
+              detachedUrl = "https://untrusted.invalid/owner-navigation";
+            }
+            if (holdDetachedRead) {
+              holdDetachedRead = false;
+              signalDetachedRead();
+              await detachedReadRelease;
+            }
             if (detachedSourceReload) {
               detachedSourceReload = false;
               documentOrigin += 1_000;
@@ -326,6 +362,10 @@ test(
             if (detachedSourceOwnerLost) {
               detachedSourceOwnerLost = false;
               submittedReadOwner = false;
+            }
+            if (detachedSourceChallenge) {
+              detachedSourceChallenge = false;
+              observedSessionOverride = "security-challenge";
             }
             return [{ result: { ok: true, value: [] } }];
           }
@@ -1162,11 +1202,42 @@ test(
     })).ok, false);
     assert.equal(detachedCreated, 3);
     assert.equal(detachedClosed, 3);
+    submittedReadOwner = true;
+    // The provider may present a security challenge after a detached scan.
+    // Identical source URL, document, and latch are not enough to accept it.
+    detachedSourceChallenge = true;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, 4);
+    assert.equal(detachedClosed, 4);
+    observedSessionOverride = null;
+    // Never delete a temporary tab after its route changes outside the
+    // owned read. The tab now belongs to the person controlling Chrome.
+    detachedTabNavigatedByUser = true;
+    const displacedTemporary = await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    assert.equal(displacedTemporary.ok, false);
+    assert.equal(detachedCreated, 5);
+    assert.equal(detachedClosed, 4);
+    assert.equal(detachedUrl,
+      "https://untrusted.invalid/owner-navigation");
+    // If the teacher takes focus of the temporary tab, do not close it
+    // under them, even if its URL and window identity are unchanged.
+    detachedTabActivatedByUser = true;
+    const focusedTemporary = await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    assert.equal(focusedTemporary.ok, false);
+    assert.equal(detachedCreated, 6);
+    assert.equal(detachedClosed, 4);
+    detachedTabActivatedByUser = false;
     submittedReadOwner = false;
     assert.equal((await expectReply({
       kind: "questions.list", setId: "set-fixture",
     })).ok, false);
-    assert.equal(detachedCreated, 3);
+    assert.equal(detachedCreated, 6);
     questionSaved = true;
     unsafeReadSource = false;
     tabUrl = "https://dashboard.blooket.com/my-sets";
@@ -1808,6 +1879,55 @@ test(
     ), ["inspectBlooketPage"]);
     assert.equal(replies.some((reply) => reply.id === staleReadJob.id), false);
 
+    // A retiring browser connection must stop the read while still removing
+    // its own temporary tab. Never grant a retired owner further scripts.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    unsafeReadSource = true;
+    submittedReadOwner = true;
+    submittedBoundSet = "set-fixture";
+    holdDetachedRead = true;
+    const temporaryBefore = detachedCreated;
+    const closedBefore = detachedClosed;
+    const retiredDetachedJob = job({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    jobs.push(retiredDetachedJob);
+    await waitForMilestone(detachedReadStarted, "detached-read");
+    const fourthToken = "d".repeat(43);
+    token = fourthToken;
+    assert.equal((await announce({ origin, token: fourthToken })).ok,
+      true);
+    releaseDetachedRead();
+    await pause(200);
+    assert.equal(detachedCreated, temporaryBefore + 1);
+    assert.equal(detachedClosed, closedBefore + 1,
+      "retired detached read leaked a temporary Chrome tab");
+    assert.equal(replies.some((reply) =>
+      reply.id === retiredDetachedJob.id), false);
+    // An in-flight tabs.create can finish after the old connection retires.
+    // Its exact newly opened ID must still be removed, without a read reply.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    holdDetachedCreate = true;
+    const openingBefore = detachedCreated;
+    const openingClosedBefore = detachedClosed;
+    const retiredCreateJob = job({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    jobs.push(retiredCreateJob);
+    await waitForMilestone(detachedCreateStarted, "detached-create");
+    const fifthToken = "e".repeat(43);
+    token = fifthToken;
+    assert.equal((await announce({ origin, token: fifthToken })).ok,
+      true);
+    releaseDetachedCreate();
+    await pause(200);
+    assert.equal(detachedCreated, openingBefore + 1);
+    assert.equal(detachedClosed, openingClosedBefore + 1);
+    assert.equal(replies.some((reply) =>
+      reply.id === retiredCreateJob.id), false);
+    unsafeReadSource = false;
+    submittedReadOwner = false;
+
     tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
     expireWriteAtOpen = true;
     const beforeExpiredWrite = scripts.length;
@@ -1845,6 +1965,8 @@ test(
   } finally {
     Date.now = realNow;
     releaseReadScript();
+    releaseDetachedCreate();
+    releaseDetachedRead();
     releaseWriteOpen();
     closed = true;
     await pause(1100);

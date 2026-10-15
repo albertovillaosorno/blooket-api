@@ -232,6 +232,22 @@ function fixture(options: {
 
 const noPause = async () => {};
 
+test("invalid upstream capability deadline stops before tab access",
+  async () => {
+  for (const deadline of [0, -1, NaN, Infinity, Date.now() - 1]) {
+    const page = fixture();
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+    ).inspect({ textOnly: true, deadline });
+    assert.deepEqual(result, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.deepEqual(page.scripts, []);
+    assert.deepEqual(page.navigations, []);
+    assert.equal(page.currentUrl(), page.originalUrl);
+  }
+});
+
 test("capability navigation waits for native destination readiness",
   async () => {
   const page = fixture();
