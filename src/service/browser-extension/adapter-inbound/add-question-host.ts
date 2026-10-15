@@ -590,10 +590,19 @@ async function observeQuestion(
         if (!confirmed) return browserFailure();
         // A concurrent teacher edit can append another card while this
         // read-owned panel is open. Never confirm a changed collection.
-        const finalList = await script(
-          listBlooketQuestionNumbers as (...args: never[]) => unknown,
-          [input.setId],
-        ).catch(() => null);
+        let finalList: unknown;
+        for (let readAttempt = 0; readAttempt < 15; readAttempt++) {
+          finalList = await script(
+            listBlooketQuestionNumbers as (...args: never[]) => unknown,
+            [input.setId],
+          ).catch(() => null);
+          if (questionNumberPresent(finalList, input.number)) break;
+          // React may remount cards just after closing an inspected modal.
+          // Only an exact unavailable page shape can wait; a readable but
+          // incomplete or conflicting set of cards stops immediately.
+          if (!pageUnavailable(finalList)) return browserFailure();
+          await pause(POLL_MS);
+        }
         if (!questionNumberPresent(finalList, input.number))
           return browserFailure();
         // Closing a read-owned panel can trigger a delayed card rerender.

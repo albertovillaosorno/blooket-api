@@ -1482,6 +1482,78 @@ test("image identity refuses hidden and symbol-owned success fields",
   },
 );
 
+test("post-Cancel unready cards may hydrate without replaying Save",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let listReads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "listBlooketQuestionNumbers" &&
+        ++listReads === 4) return [{ result: {
+      ok: false, code: "blooket-browser-failed",
+    } }];
+    return await original(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: true });
+  assert.equal(listReads, 9);
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  },
+);
+
+test("post-Cancel read refuses an endlessly unready saved-card list",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "listBlooketQuestionNumbers") {
+      reads++;
+      if (reads >= 4) return [{ result: {
+        ok: false, code: "blooket-browser-failed",
+      } }];
+    }
+    return await original(request);
+  };
+  assert.deepEqual(await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input), { ok: false, kind: "browser",
+    code: "blooket-browser-failed" });
+  assert.equal(reads, 18);
+  assert.equal(fake.calls.filter(x => x ===
+    "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.includes("reload"), false);
+  },
+);
+
+test("post-Cancel malformed or readable missing cards stop immediately",
+  async () => {
+  for (const bad of [
+    { ok: false, code: "blooket-browser-failed", extra: true },
+    { ok: true, value: [] },
+    { ok: true, value: [1, 2] },
+  ]) {
+    const fake = fakeChrome({});
+    const original = fake.chrome.scripting.executeScript;
+    let listReads = 0;
+    fake.chrome.scripting.executeScript = async request => {
+      if (request.func.name === "listBlooketQuestionNumbers" &&
+          ++listReads === 4) return [{ result: bad }];
+      return await original(request);
+    };
+    assert.deepEqual(await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input), { ok: false, kind: "browser",
+      code: "blooket-browser-failed" });
+    assert.equal(listReads, 4);
+    assert.equal(fake.calls.filter(x => x ===
+      "runBlooketAddQuestionPageAction:submit").length, 1);
+  }
+  },
+);
+
 test("post-Cancel card drift never confirms the question", async () => {
   const fake = fakeChrome({});
   const original = fake.chrome.scripting.executeScript;

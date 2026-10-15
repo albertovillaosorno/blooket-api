@@ -104,7 +104,7 @@ test("an already loaded route reloads before a fresh read", async () => {
   assert.deepEqual(result, { url: SETS, status: "complete" });
   assert.equal(page.updates(), 0);
   assert.equal(page.reloads(), 1);
-  assert.equal(page.gets(), 4);
+  assert.equal(page.gets(), 5);
 });
 
 test("an exact route is confirmed only after loading completes", async () => {
@@ -117,7 +117,7 @@ test("an exact route is confirmed only after loading completes", async () => {
   );
   assert.deepEqual(result, { url: EDIT, status: "complete" });
   assert.equal(page.updates(), 1);
-  assert.equal(page.gets(), 5);
+  assert.equal(page.gets(), 6);
   assert.equal(page.elapsed(), 100);
 });
 
@@ -335,6 +335,42 @@ test("fresh read navigation transfers only its proven target document epoch",
     origin => origins.push(origin),
   ), { url: EDIT, status: "complete" });
   assert.deepEqual(origins, [2_000]);
+  },
+);
+
+test("a fresh tab check cannot bind a subsequently replaced Edit lifetime",
+  async () => {
+  const page = fixture();
+  let finalCheckReached = false;
+  let targetObserved = false;
+  let replaced = false;
+  const tabs = {
+    ...page.tabs,
+    get: async (id: number) => {
+      const tab = await page.tabs.get(id);
+      if (targetObserved) {
+        finalCheckReached = true;
+        replaced = true;
+      }
+      return tab;
+    },
+  };
+  const proofs: number[] = [];
+  const result = await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, EDIT, 8_000, page.pause,
+    async url => {
+      const original = await page.documentOrigin(url);
+      if (url === EDIT && page.updates() === 1) {
+        targetObserved = true;
+        return replaced ? 3_000 : original;
+      }
+      return original;
+    }, page.now, undefined, origin => proofs.push(origin),
+  );
+  assert.equal(finalCheckReached, true);
+  assert.equal(result, undefined);
+  assert.deepEqual(proofs, []);
+  assert.equal(page.updates(), 1);
   },
 );
 

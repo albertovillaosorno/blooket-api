@@ -115,8 +115,18 @@ export async function confirmBlooketReadNavigation(
         const checked = await tabs.get(tabId);
         if (now() >= deadline || checked.url !== target ||
             checked.status !== "complete") return undefined;
+        // A native document can be replaced at the exact same URL while
+        // Chrome resolves tabs.get. Re-observe its epoch before transferring
+        // read authority; never adopt the replacement as the old document.
+        let again: unknown;
+        try { again = await documentOrigin(target); }
+        catch { return undefined; }
+        if (now() >= deadline || again !== origin) return undefined;
+        const finalTab = await tabs.get(tabId);
+        if (now() >= deadline || finalTab.url !== target ||
+            finalTab.status !== "complete") return undefined;
         onConfirmedTargetOrigin?.(origin);
-        return checked;
+        return finalTab;
       }
     }
     await pause(Math.min(POLL_MS, deadline - now()));
