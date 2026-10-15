@@ -104,6 +104,12 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+An older Quizzes Refresh can also fail after the teacher has started a
+publication. The UI now suppresses failures from obsolete status requests
+instead of surfacing a misleading unrelated error during the active operation.
+The synthetic-DOM suite forces this rejected-promise interleaving while
+checking that the Stop control survives unchanged.
+
 A second synthetic-DOM regression showed that overlapping Quizzes status
 reads could complete out of order and restore an obsolete Publish button after
 a newer read had already offered Verify. Each draft's rendered status now has
