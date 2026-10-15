@@ -1,0 +1,9 @@
+identity:
+  id: function:mutation-pacing-files
+  name: mutation-pacing-files
+  path: src/platforms/mutation-pacing-files
+classification:
+  repository: blooket-api
+  domain: platforms
+architecture:
+  kind: adapter-outbound

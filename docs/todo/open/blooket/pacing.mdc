@@ -104,6 +104,26 @@ challenge/session secrets through MCP, or suppress unfamiliar login stops.
 
 ## Evidence
 
+On 2026-10-14, the per-data-root rolling account pacing ledger is now
+durable across service restarts rather than only in memory. The normal
+server-owned pacer commits recent start timestamps in an atomic owner-only
+`mutation-pacing.json` before returning its mutation lease. The file holds
+only epoch millisecond timestamps and contains no account IDs, quiz content,
+provider data or credentials.
+
+The adapter locks each reservation and refuses malformed, oversized, symlinked
+or unreadable evidence. A stricter policy continues to count preceding starts,
+and a wall-clock rollback fails closed. Cancellation while waiting holds no
+new reservation. Unknown storage status returns a pre-write pacing failure
+without task budget consumption, attempt journal or provider call.
+
+Synthetic regressions cover process restart, 2-second and rolling-minute
+limits, simultaneous writers, policy getters and symbols, invalid clocks,
+corrupted files, and service boot preserving existing history unchanged.
+The actual Chrome service remains independent of the synthetic provider tests;
+no old ambiguous write was replayed. Live multi-question acceptance remains
+pending and this TODO stays open.
+
 An additional read-only editor regression verifies that prompt, timer and
 Multiple Choice shuffle controls retain their observed element types and
 required enabled state after React preparation. Synthetic tag/type changes or

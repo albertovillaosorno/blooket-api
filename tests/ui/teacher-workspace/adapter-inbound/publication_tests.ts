@@ -363,6 +363,8 @@ test("publication error labels classify only owned safe codes", () => {
   for (const code of ["mutation-task-start-budget-exhausted",
     "mutation-task-duration-exhausted"])
     assert.equal(publicationStopReason(Error(code)), "limit");
+  assert.equal(publicationStopReason(Error("mutation-pacing-failed")),
+    "pacing");
   assert.equal(publicationStopReason(
     Error("blooket-publication-cancelled")), "paused");
   assert.equal(publicationStopReason(

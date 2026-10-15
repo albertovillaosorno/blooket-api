@@ -38,6 +38,8 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:net";
 import { startBrowserService } from
   "../../../../src/api/browser-service/adapter-inbound/server.ts";
+import { reserveDurableMutationStart } from
+  "../../../../src/platforms/mutation-pacing-files/adapter-outbound/history.ts";
 import { createBlooketBrowserBridgeBroker } from
   "../../../../src/platforms/blooket-browser/adapter-outbound/broker.ts";
 import { loadSharp } from
@@ -83,6 +85,39 @@ test("local icons load and image intake requires origin and CSRF", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("service restarts retain account pacing evidence without new writes",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "service-history-restart-"));
+  const path = join(root, "mutation-pacing.json");
+  let service: Awaited<ReturnType<typeof startBrowserService>> | undefined;
+  try {
+    await loadPreferences(root);
+    assert.deepEqual(await reserveDurableMutationStart(path, {
+      minimumStartIntervalMs: 2_000, maximumStartsPerMinute: 20,
+    }, () => 200_000), { kind: "admitted" });
+    const original = await readFile(path, "utf8");
+    for (let i = 0; i < 2; i++) {
+      service = await startBrowserService({ root, port: 0 });
+      const response = await fetch(service.origin + "/api/bootstrap");
+      assert.equal(response.status, 200);
+      const bootstrap = await response.json();
+      assert.deepEqual(bootstrap.preferences.publication, {
+        minimumStartIntervalMs: 2_000,
+        maximumStartsPerMinute: 20,
+        maximumTaskStarts: 10_000,
+        maximumTaskDurationMs: 86_400_000,
+      });
+      await service.quiesce();
+      service = undefined;
+      assert.equal(await readFile(path, "utf8"), original);
+    }
+  } finally {
+    await service?.quiesce();
+    await rm(root, { recursive: true, force: true });
+  }
+},
+);
 
 test("publication pacing settings persist through HTTP and service restart",
   async () => {

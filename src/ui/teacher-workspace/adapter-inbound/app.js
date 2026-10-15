@@ -311,6 +311,10 @@ const words = {
       "Se agotó el límite configurado de publicación. Revisa el estado y " +
       "ajusta los límites en Configuración; reinicia el servicio antes de " +
       "continuar. Nunca reenvíes una escritura incierta.",
+    publicationStopPacing:
+      "No se pudo verificar el historial de ritmo de publicación. " +
+      "Revisa el almacenamiento local antes de continuar. " +
+      "No reenvíes una escritura incierta.",
     configured: "Configurado",
     missing: "Sin configurar",
     saved:
@@ -635,6 +639,10 @@ const words = {
     publicationStopLimit:
       "The configured publication limit was exhausted. Check the status " +
       "and adjust Settings, then restart the service before continuing. " +
+      "Never replay an uncertain write.",
+    publicationStopPacing:
+      "The publication pacing history could not be verified. " +
+      "Check local storage before continuing. " +
       "Never replay an uncertain write.",
     configured: "Configured",
     missing: "Not configured",
@@ -2022,6 +2030,7 @@ function publicationFailureText(error) {
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",
     limit: "publicationStopLimit",
+    pacing: "publicationStopPacing",
     paused: "publicationPaused",
   }[publicationStopReason(error)];
   return t(message ?? "publicationPaused");
