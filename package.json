@@ -16,7 +16,7 @@
       "npm run check && npm run roadmap:check && npm run validate:tests",
     "start": "node src/service/background-service/adapter-inbound/main.ts",
     "dev": "npm start -- --development",
-    "validate:tests": "npm test && jig validate --root .",
+    "validate:tests": "npm test && jig check --root . && jig validate --root .",
     "blooket": "node src/cli/executable/adapter-inbound/blooket.ts",
     "launch": "node src/service/desktop-launcher/adapter-inbound/launcher.ts",
     "package": "node src/platforms/distribution/adapter-inbound/package.ts",
