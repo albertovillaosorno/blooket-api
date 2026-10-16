@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green prepared-image bridge regressions exposed that
+image envelopes with inherited `format` and `base64` fields could be accepted
+as if the byte identity were an exact owned request. The versioned decoder
+and direct byte helper now snapshot exactly two enumerable data properties
+without invoking accessors or inherited values. Valid PNG, JPEG and GIF
+prepared bytes remain admissible within the existing strict byte limit.
+No provider upload or publication acceptance is implied by these fixtures.
+
 On 2026-10-16, red-to-green Create Set fixtures showed that a shortened
 native title/description limit, password-type title, or disabled/read-only
 metadata field could be detected only after a partial form fill. The native

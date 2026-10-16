@@ -88,6 +88,42 @@ test("prepared image envelopes reject ambiguous files and encoding", () => {
     { ok: true, value: valid });
 });
 
+test("prepared image requires exact own data, not inherited credentials",
+  () => {
+  const image = { format: "png", base64: encoded(png) };
+  const inherited = Object.create(image) as unknown;
+  const partiallyOwned = Object.assign(Object.create({
+    base64: image.base64,
+  }) as Record<string, unknown>, { format: image.format });
+  const inheritedAccessor = Object.create(null) as Record<string, unknown>;
+  let accesses = 0;
+  Object.defineProperty(inheritedAccessor, "format", {
+    enumerable: true, get: () => { accesses++; return image.format; },
+  });
+  inheritedAccessor["base64"] = image.base64;
+  for (const candidate of [inherited, partiallyOwned, inheritedAccessor]) {
+    assert.equal(decodeBlooketPreparedImage(candidate).ok, false);
+  }
+  assert.equal(accesses, 0);
+  assert.equal(decodeBlooketPreparedImage({ ...image }).ok, true);
+});
+
+test("direct prepared-byte access cannot read inherited or accessor data",
+  () => {
+  const image = { format: "png" as const, base64: encoded(png) };
+  const inherited = Object.create(image) as typeof image;
+  let reads = 0;
+  const accessor = Object.defineProperty({ base64: image.base64 },
+    "format", { enumerable: true,
+      get: () => { reads++; throw new Error("untrusted"); },
+    }) as typeof image;
+  for (const candidate of [inherited, accessor]) {
+    assert.equal(blooketPreparedImageBytes(candidate), undefined);
+  }
+  assert.equal(reads, 0);
+  assert.deepEqual(Array.from(blooketPreparedImageBytes(image) ?? []), png);
+});
+
 test("prepared bytes reject the exact upper bound without partial reads",
   () => {
     const under = new Uint8Array(2_499_999);

@@ -31,7 +31,7 @@
 //
 import type { DecodeResult } from
   "../../runtime-decoding/domain/decode-result.ts";
-import { isRecord, unknownFieldIssues } from
+import { exactOwnData } from
   "../../runtime-decoding/domain/exact-object.ts";
 
 export interface BlooketPreparedImage {
@@ -43,13 +43,12 @@ export function decodeBlooketPreparedImage(
   value: unknown,
   path = "$",
 ): DecodeResult<BlooketPreparedImage> {
-  if (isRecord(value) &&
-      unknownFieldIssues(value, new Set(["format", "base64"]), path)
-        .length === 0 &&
-      (value["format"] === "png" || value["format"] === "jpeg" ||
-        value["format"] === "gif") && typeof value["base64"] === "string") {
+  const owned = exactOwnData(value, ["format", "base64"]);
+  if (owned &&
+      (owned["format"] === "png" || owned["format"] === "jpeg" ||
+        owned["format"] === "gif") && typeof owned["base64"] === "string") {
     const image: BlooketPreparedImage = {
-      format: value["format"], base64: value["base64"],
+      format: owned["format"], base64: owned["base64"],
     };
     if (blooketPreparedImageBytes(image) !== undefined)
       return { ok: true, value: image };
@@ -63,20 +62,23 @@ export function decodeBlooketPreparedImage(
 export function blooketPreparedImageBytes(
   value: BlooketPreparedImage,
 ): Uint8Array<ArrayBuffer> | undefined {
-  if (typeof value.base64 !== "string" || value.base64.length < 4 ||
-      value.base64.length > 3_333_332) return undefined;
+  const owned = exactOwnData(value, ["format", "base64"]);
+  const format = owned?.["format"];
+  const base64 = owned?.["base64"];
+  if (typeof base64 !== "string" || base64.length < 4 ||
+      base64.length > 3_333_332) return undefined;
   try {
-    const binary = atob(value.base64);
+    const binary = atob(base64);
     if (binary.length < 1 || binary.length >= 2_500_000 ||
-        btoa(binary) !== value.base64) return undefined;
+        btoa(binary) !== base64) return undefined;
     const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-    const valid = value.format === "png"
+    const valid = format === "png"
       ? bytes.length >= 8 &&
         [137, 80, 78, 71, 13, 10, 26, 10].every((b, i) => bytes[i] === b)
-      : value.format === "jpeg"
+      : format === "jpeg"
         ? bytes.length >= 3 && bytes[0] === 255 &&
           bytes[1] === 216 && bytes[2] === 255
-        : value.format === "gif" && bytes.length >= 6 &&
+        : format === "gif" && bytes.length >= 6 &&
           bytes[0] === 71 && bytes[1] === 73 && bytes[2] === 70 &&
           bytes[3] === 56 && (bytes[4] === 55 || bytes[4] === 57) &&
           bytes[5] === 97;

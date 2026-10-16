@@ -399,6 +399,10 @@ test("Add Question image transport accepts only prepared bounded bytes", () => {
   if (admitted.ok && admitted.value.command.kind === "questions.create")
     assert.deepEqual(admitted.value.command.image, image);
   for (const value of [
+    { ...valid, image: Object.create(image) },
+    { ...valid, image: Object.assign(Object.create({
+      base64: image.base64,
+    }), { format: "png" }) },
     { ...valid, image: null },
     { ...valid, image: { ...image, path: "/tmp/private-media" } },
     { ...valid, image: { ...image, url: "https://example.invalid/" } },
