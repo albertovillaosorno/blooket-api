@@ -70,6 +70,9 @@ baseline capture must also match that preflight collection before a write-ahead
 journal can start, detecting changes during intervening session/media awaits.
 Uncertain attempts require local recovery before another write.
 
+Checkpoint and verification-baseline decoders accept only own data fields;
+accessors and inherited values never authorize progress or read-back claims.
+
 A checkpoint rotation backup (`checkpoint.json.bak`) is also recovery evidence:
 if a snapshot is missing, neither its own draft nor a competing draft may
 silently treat that backup as a fresh publication.

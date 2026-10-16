@@ -145,6 +145,25 @@ test(
   },
 );
 
+test("baseline decoder never invokes accessor or inherited fields", () => {
+  for (const field of ["schemaVersion", "kind", "itemCount",
+    "sha256"] as const) {
+    let calls = 0;
+    const base = { schemaVersion: 1, kind: "question-list",
+      itemCount: 1, sha256: DIGEST };
+    const own = { ...base };
+    Object.defineProperty(own, field, { configurable: true,
+      enumerable: true, get() { calls++; throw new Error("accessor"); } });
+    assert.equal(decodeBlooketWriteVerificationBaseline(own).ok, false);
+    assert.equal(calls, 0, field);
+    const inherited = Object.create({ [field]: base[field] }) as
+      Record<string, unknown>;
+    for (const key of ["schemaVersion", "kind", "itemCount",
+      "sha256"] as const) if (key !== field) inherited[key] = base[key];
+    assert.equal(decodeBlooketWriteVerificationBaseline(inherited).ok, false);
+  }
+});
+
 test("collection framing is versioned ordered and unambiguous", () => {
   assert.equal(
     frameBlooketWriteVerificationCollection(["alpha", "beta"]),

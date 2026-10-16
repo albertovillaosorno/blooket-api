@@ -33,6 +33,7 @@ import type { ValidationIssue } from
   "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
   isRecord,
+  ownDataField,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
 
@@ -84,12 +85,12 @@ export function decodeBlooketWriteVerificationBaseline(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, BASELINE_KEYS, "$"),
   ];
-  const kind = value["kind"];
-  const itemCount = value["itemCount"];
-  const sha256 = value["sha256"];
+  const kind = ownDataField(value, "kind");
+  const itemCount = ownDataField(value, "itemCount");
+  const sha256 = ownDataField(value, "sha256");
 
   if (
-    value["schemaVersion"]
+    ownDataField(value, "schemaVersion")
     !== BLOOKET_WRITE_VERIFICATION_BASELINE_VERSION
   ) {
     issues.push({

@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, two versioned publication recovery decoders were found to
+invoke getters on untrusted object fields: checkpoint progress and the
+collection verification baseline. Red-to-green synthetic tests now cover
+all admitted fields, rejecting both accessor fields and inherited values
+without executing their getters. The decoder changes preserve the same
+on-disk schema and recovery invariants; no browser request was made.
+
 On 2026-10-16, red-to-green missing-snapshot regressions found that a
 surviving `checkpoint.json.bak` was ignored both for its own draft and by
 competing-draft scans. Checkpoint updates create this backup during atomic
