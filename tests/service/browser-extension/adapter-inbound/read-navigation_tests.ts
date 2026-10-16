@@ -49,6 +49,13 @@ test("Chrome pendingUrl is load evidence, not a committed document", () => {
     status: "complete" }, SETS), "changed");
 });
 
+test("a complete tab with a pending navigation is not a stable read", () => {
+  assert.equal(classifyBlooketReadTabLoad({ url: SETS,
+    pendingUrl: SETS, status: "complete" }, SETS), "changed");
+  assert.equal(classifyBlooketReadTabLoad({ url: SETS,
+    pendingUrl: SETS, status: "loading" }, SETS), "loading");
+});
+
 test("pending foreign navigation invalidates the old expected URL", () => {
   for (const url of [SETS, "about:blank", undefined])
     assert.equal(classifyBlooketReadTabLoad({ url, status: "loading",
@@ -196,6 +203,91 @@ test("session observation does not navigate when no route is required",
   assert.equal(page.updates(), 0);
   },
 );
+
+test("pending foreign navigation blocks a source tab before reload",
+  async () => {
+  const page = fixture();
+  const tabs = { ...page.tabs, get: async (id: number) => ({
+    ...await page.tabs.get(id),
+    pendingUrl: "https://foreign.invalid/",
+  }) };
+  const result = await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, SETS, 500, page.pause,
+    page.documentOrigin, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.reloads(), 0);
+  assert.equal(page.updates(), 0);
+});
+
+test("foreign pending route after update never transfers read authority",
+  async () => {
+  const page = fixture();
+  const proofs: number[] = [];
+  const tabs = { ...page.tabs, get: async (id: number) => {
+    const tab = await page.tabs.get(id);
+    return page.updates() ? { ...tab,
+      pendingUrl: "https://foreign.invalid/" } : tab;
+  } };
+  const result = await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, EDIT, 500, page.pause,
+    page.documentOrigin, page.now, undefined, origin => proofs.push(origin),
+  );
+  assert.equal(result, undefined);
+  assert.deepEqual(proofs, []);
+  assert.equal(page.updates(), 1);
+});
+
+test("a foreign pending route during the source recheck blocks updates",
+  async () => {
+  const page = fixture();
+  let checks = 0;
+  const tabs = { ...page.tabs, get: async (id: number) => {
+    const tab = await page.tabs.get(id);
+    return ++checks === 2 ? { ...tab,
+      pendingUrl: "https://foreign.invalid/" } : tab;
+  } };
+  assert.equal(await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, EDIT, 500, page.pause,
+    page.documentOrigin, page.now,
+  ), undefined);
+  assert.equal(page.updates(), 0);
+  assert.equal(page.reloads(), 0);
+});
+
+test("a foreign pending URL in the final tab check vetoes a read",
+  async () => {
+  const page = fixture();
+  let checks = 0;
+  const tabs = { ...page.tabs, get: async (id: number) => {
+    const tab = await page.tabs.get(id);
+    return ++checks === 5 ? { ...tab,
+      pendingUrl: "https://foreign.invalid/" } : tab;
+  } };
+  const proofs: number[] = [];
+  const result = await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, EDIT, 500, page.pause,
+    page.documentOrigin, page.now, undefined, origin => proofs.push(origin),
+  );
+  assert.equal(checks, 5);
+  assert.equal(result, undefined);
+  assert.deepEqual(proofs, []);
+});
+
+test("a read-only session observation cannot adopt a pending redirect",
+  async () => {
+  const page = fixture();
+  const tabs = { ...page.tabs, get: async (id: number) => ({
+    ...await page.tabs.get(id),
+    pendingUrl: "https://foreign.invalid/",
+  }) };
+  assert.equal(await confirmBlooketReadNavigation(
+    tabs, 7, page.previous, null, 500, page.pause,
+    page.documentOrigin, page.now,
+  ), undefined);
+  assert.equal(page.reloads(), 0);
+  assert.equal(page.updates(), 0);
+});
 
 test("a stale tab snapshot must not overwrite manual navigation", async () => {
   const manuallySelected = "https://dashboard.blooket.com/create";
