@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green native editor regression showed that a
+new provider `maxLength` constraint on the timer or answer input could
+reject a late field assignment only after the prompt had already been
+written. The independently injected preparation adapter now validates
+control-specific text limits for the prompt, timer, initial typing answer,
+and four multiple-choice textarea slots before filling the prompt. This
+preserves the untouched form on a changed provider control; no live Save
+or verification receipt is implied.
+
 On 2026-10-16, an authorized canonical image append stopped during its
 verification baseline, before opening a question editor or uploading bytes.
 A native Edit Info read received HTTP 429 with a Cloudflare response, while

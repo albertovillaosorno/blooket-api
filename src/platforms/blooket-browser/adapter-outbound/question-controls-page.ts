@@ -111,6 +111,9 @@ export async function prepareBlooketQuestionControls(
     finally { delete watch!.controlChangeTarget; }
     return owned();
   };
+  const withinControlLimit = (
+    control: HTMLInputElement | HTMLTextAreaElement, text: string,
+  ): boolean => control.maxLength < 0 || text.length <= control.maxLength;
   const setText = async (
     element: HTMLElement | null, text: string,
   ): Promise<boolean> => {
@@ -285,7 +288,9 @@ export async function prepareBlooketQuestionControls(
         const control = unique("textarea#answer-" + index) as
           HTMLTextAreaElement | null;
         if (!control || control.tagName !== "TEXTAREA" ||
-            control.disabled || control.readOnly || control.value !== "")
+            control.disabled || control.readOnly || control.value !== "" ||
+            (index < input.answers.length &&
+              !withinControlLimit(control, input.answers[index]!.text)))
           return false;
         if (index < input.answers.length) {
           const correct = unique('button[aria-label="Mark Answer ' +
@@ -306,7 +311,8 @@ export async function prepareBlooketQuestionControls(
       const first = unique('input[name="accepted-answers"]') as
         HTMLInputElement | null;
       if (!first || first.tagName !== "INPUT" || first.type !== "text" ||
-          first.disabled || first.readOnly || first.value !== "")
+          first.disabled || first.readOnly || first.value !== "" ||
+          !withinControlLimit(first, input.answers[0]!.text))
         return false;
     }
     // Selecting a provider question type can replace the visible controls.
@@ -320,7 +326,9 @@ export async function prepareBlooketQuestionControls(
         !liveTime || liveTime.tagName !== "INPUT" ||
         liveTime.type !== "number" || liveTime.disabled ||
         liveTime.readOnly ||
-        liveTime.value !== String(raw()?.["timeLimit"])) return false;
+        liveTime.value !== String(raw()?.["timeLimit"]) ||
+        !withinControlLimit(livePrompt, input.question) ||
+        !withinControlLimit(liveTime, String(input.timeLimit))) return false;
     if (!await setText(livePrompt, input.question) ||
         !await wait(() => raw()?.["question"] === input.question) ||
         !await setText(unique("input#time-limit"), String(input.timeLimit)) ||
