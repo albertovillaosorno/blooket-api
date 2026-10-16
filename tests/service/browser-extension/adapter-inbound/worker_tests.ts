@@ -68,6 +68,7 @@ test(
   let pendingSourceAfterRead = false;
   let pendingAfterSetObservation = false;
   let pendingAfterDetailSidebar = false;
+  let pendingDuringSessionScript = false;
   let detachedTabNavigatedByUser = false;
   let detachedTabActivatedByUser = false;
   let detachedCreated = 0;
@@ -679,6 +680,11 @@ test(
           }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "session.observe" &&
+            pendingDuringSessionScript) {
+          pendingDuringSessionScript = false;
+          pendingSourceRedirect = true;
+        }
         if (operation.kind === "session.observe" &&
             sessionSecondHasHiddenField) {
           sessionReadProbeCount++;
@@ -1849,6 +1855,11 @@ test(
     assert.equal(ready.ok, true);
     assert.equal(ready.value, "my-sets");
     assert.equal((await message({ kind: "status" })).status, "connected");
+    // The session script may run before Chrome exposes an in-flight foreign
+    // navigation. Its earlier observed value must not certify authentication.
+    pendingDuringSessionScript = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, false);
+    pendingSourceRedirect = false;
     sessionPrototypeSerialization = true;
     assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
     assert.equal(inheritedSerializerCalls, 0);
