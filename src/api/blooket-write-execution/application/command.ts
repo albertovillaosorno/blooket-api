@@ -117,8 +117,9 @@ export async function executeBlooketPublicationCommand(
   // The current detached native question reader refuses collections larger
   // than 200. Do not initiate writes the verifier cannot read back.
   const maximumVerifiableQuestions = 200;
-  const fail = (code: string) => commandFailure(command.operationId, [{
-    path: "$.publication", code,
+  const fail = (code: string, stage?: string) =>
+    commandFailure(command.operationId, [{
+    path: stage ? "$.publication." + stage : "$.publication", code,
     message: code === "blooket-publication-question-limit"
       ? "This quiz exceeds the current 200-question read-back limit. " +
         "Keep the draft and publish a smaller quiz; no new write was sent."
@@ -218,7 +219,7 @@ export async function executeBlooketPublicationCommand(
         blooket.session, blooket.secrets, blooket.capabilities,
         { readOnly: true, textOnly: true },
       );
-      if (!capabilities.ok) return fail(capabilities.code);
+      if (!capabilities.ok) return fail(capabilities.code, "capabilities");
       if (capabilities.kind !== "capabilities")
         return success({ draftId, phase: capabilities.kind,
           state: capabilities.state, published: false });
@@ -244,14 +245,14 @@ export async function executeBlooketPublicationCommand(
       if (requestedSetId !== undefined) {
         const detail = await getBlooketSet(blooket.session, blooket.secrets,
           blooket.sets, requestedSetId, { readOnly: true });
-        if (!detail.ok) return fail(detail.code);
+        if (!detail.ok) return fail(detail.code, "metadata");
         if (detail.kind !== "set")
           return success({ draftId, phase: detail.kind,
             state: detail.state, published: false });
         const existing = await listBlooketQuestions(blooket.session,
           blooket.secrets, blooket.questions, requestedSetId,
           { readOnly: true });
-        if (!existing.ok) return fail(existing.code);
+        if (!existing.ok) return fail(existing.code, "questions");
         if (existing.kind !== "questions")
           return success({ draftId, phase: existing.kind,
             state: existing.state, published: false });
@@ -456,7 +457,7 @@ export async function executeBlooketPublicationCommand(
           blooket.session, blooket.secrets, blooket.capabilities,
           { readOnly: true, textOnly: true },
         );
-        if (!capabilities.ok) return fail(capabilities.code);
+        if (!capabilities.ok) return fail(capabilities.code, "capabilities");
         if (capabilities.kind !== "capabilities")
           return success({ ...progress, phase: capabilities.kind,
             state: capabilities.state });
@@ -557,7 +558,7 @@ export async function executeBlooketPublicationCommand(
         blooket.session, blooket.secrets, blooket.sets,
         checkpoint.remoteSetId, { readOnly: true },
       );
-      if (!detail.ok) return fail(detail.code);
+      if (!detail.ok) return fail(detail.code, "metadata");
       if (detail.kind !== "set")
         return success({ ...progress, phase: detail.kind,
           state: detail.state });
@@ -571,7 +572,7 @@ export async function executeBlooketPublicationCommand(
           blooket.session, blooket.secrets, blooket.questions,
           checkpoint.remoteSetId, { readOnly: true },
         );
-        if (!existing.ok) return fail(existing.code);
+        if (!existing.ok) return fail(existing.code, "questions");
         if (existing.kind !== "questions")
           return success({ ...progress, phase: existing.kind,
             state: existing.state });
@@ -614,7 +615,8 @@ export async function executeBlooketPublicationCommand(
     );
     if (!result.ok)
       return fail("code" in result ? result.code
-        : "blooket-publication-recovery-required");
+        : "blooket-publication-recovery-required",
+        "stage" in result ? result.stage : undefined);
     // A provider wait or human stop does not clear an attempted write.
     // Report the current observation alongside its uncertain checkpoint;
     // never convert it into permission to repeat the operation.

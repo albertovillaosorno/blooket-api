@@ -220,6 +220,32 @@ async function appendFixture(s: Awaited<ReturnType<typeof state>>,
     } };
 }
 
+test("publication identifies a baseline read failure before sending a write",
+  () => fixture(async s => {
+    value(await executeBlooketPublicationCommand(command("step", s.revision),
+      s.host));
+    let observations = 0;
+    const host: BlooketPublicationDependencies = { ...s.host, blooket: {
+      ...s.host.blooket, questions: { list: async (...args) => {
+        if (++observations === 2)
+          return { ok: false, code: "blooket-browser-failed" };
+        return s.host.blooket.questions.list(...args);
+      } },
+    } };
+    const result = await executeBlooketPublicationCommand(
+      command("step", s.revision), host,
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.issues[0]?.code, "blooket-browser-failed");
+      assert.equal(result.issues[0]?.path,
+        "$.publication.verification-baseline");
+    }
+    assert.equal(s.writes(), 1);
+    const files = await publicationFiles(s.root, "fixture");
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
 test("invalid provider math text stops before freezing a write journal", () =>
   fixture(async s => {
     const saved = await executeLibraryCommand({ version: 1,

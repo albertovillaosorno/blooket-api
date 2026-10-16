@@ -73,6 +73,19 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, Computer Use reached the authorized Chrome session, preserved
+its older pending question form, and exercised the new local saved-account
+connection control. A fresh login and My Sets read succeeded with fifteen
+visible sets and unknown completeness. Credentials remained behind the existing
+secret boundary, and no quiz write was part of that connection check.
+
+A new canonical append draft retained its existing target and zero completed
+operations when capability preflight failed from the saved quiz editor. No
+attempt journal or question submission was created. Publication failures now
+identify their local stage; scoped base capability reads use a temporary tab
+instead of navigating a clean Edit page, while unsaved forms retain their
+existing submitted-owner requirements. Live append remains pending.
+
 On 2026-10-16, runtime capability snapshots could invoke untrusted nested
 getters or array iterators while assessing provider and account support.
 Red-to-green tests now cover nested evidence, metadata, feature, and upload
