@@ -153,6 +153,20 @@ test(
   },
 );
 
+test("login refuses query or fragment redirects before credential scripts",
+  async () => {
+  for (const suffix of ["?next=https://foreign.invalid/", "#redirect",
+    "?provider=other#redirect"]) {
+    const page = fixture({ url: "https://id.blooket.com/login" + suffix });
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => undefined,
+    ).authenticate(credentials);
+    assert.equal(result.ok, false, suffix);
+    assert.deepEqual(page.calls, [], suffix);
+    assert.deepEqual(page.argumentsSeen, [], suffix);
+  }
+});
+
 test("login never sends credentials to a pending foreign page", async () => {
   for (const phase of ["initial", "after-prepare", "after-poll"] as const) {
     const page = fixture({});

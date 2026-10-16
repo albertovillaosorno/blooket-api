@@ -133,6 +133,11 @@ Changing controllers does not authorize bypassing a blocked page or protocol
 restriction. A supported extension reload is separate from opening its popup.
 Never report that the current worker loaded merely because disk files changed.
 
+The native login host and injected form restrict credential entry to
+the exact `https://id.blooket.com/login` URL. A redirect query or fragment
+must stop without forwarding credential-bearing scripts. These synthetic
+safety checks do not prove an authenticated login or provider response.
+
 ## Acceptance and continuation
 
 On 2026-10-14, the existing auto-connect controller enumerated pages in the

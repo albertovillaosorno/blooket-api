@@ -175,7 +175,9 @@ function exactLoginTab(tab: BrowserTab): boolean {
       tab.pendingUrl !== undefined) return false;
   try {
     const url = new URL(tab.url);
-    return url.origin === LOGIN_ORIGIN && url.pathname === "/login";
+    return url.origin === LOGIN_ORIGIN && url.pathname === "/login" &&
+      url.search === "" && url.hash === "" &&
+      url.href === LOGIN_ORIGIN + "/login";
   } catch {
     return false;
   }

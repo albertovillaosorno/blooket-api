@@ -70,7 +70,8 @@ export function runBlooketLoginPageAction(
     const url = new URL(location.href);
     if (
       url.origin !== "https://id.blooket.com" ||
-      url.pathname !== "/login"
+      url.pathname !== "/login" || url.search !== "" ||
+      url.hash !== "" || url.href !== "https://id.blooket.com/login"
     )
       return null;
     const visible = (element: Element) => {
