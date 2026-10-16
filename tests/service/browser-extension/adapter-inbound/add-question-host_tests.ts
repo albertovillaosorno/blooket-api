@@ -640,6 +640,35 @@ test(
   },
 );
 
+test("pending foreign navigation cannot reach Add Question Save",
+  async () => {
+  for (const phase of ["initial", "after-prepare"] as const) {
+    const fake = fakeChrome({ initialUrl:
+      "https://dashboard.blooket.com/edit?id=set-fixture" });
+    let pending = phase === "initial";
+    const get = fake.chrome.tabs.get;
+    fake.chrome.tabs.get = async id => ({ ...await get(id),
+      ...(pending ? { pendingUrl: "https://foreign.invalid/" } : {}),
+    });
+    const execute = fake.chrome.scripting.executeScript;
+    fake.chrome.scripting.executeScript = async request => {
+      const reply = await execute(request);
+      if (phase === "after-prepare" &&
+          request.func.name === "runBlooketAddQuestionPageAction" &&
+          request.args?.[0] === "prepare") pending = true;
+      return reply;
+    };
+    const host = createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    );
+    assert.equal((await host.addQuestion(input)).ok, false, phase);
+    assert.equal(fake.calls.some(call =>
+      call === "runBlooketAddQuestionPageAction:submit"), false, phase);
+    if (phase === "initial")
+      assert.equal(fake.calls.some(call => call.startsWith("update:")), false);
+  }
+});
+
 test(
   "a switched tab after an Add Question opener never prepares or submits",
   async () => {

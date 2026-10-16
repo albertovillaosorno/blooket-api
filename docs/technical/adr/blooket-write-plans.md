@@ -100,6 +100,13 @@ both the frozen publication plan and the independent provider form boundary.
 Reserved math or image markers embedded in prompt text are refused just
 as they are in text answers; actual media must use the separately
 admitted media slot.
+
+An uncommitted Chrome `pendingUrl` is never a trusted Create Set or Add
+Question source document. Both browser mutation hosts recheck their exact
+committed route before touching form controls or invoking Save. A Create
+Set Save acknowledgment may acknowledge an exact *loading* pending Edit
+redirect, but this never replaces the separately required durable read-back.
+
 A later native-contract change cannot make an old attempting journal disappear:
 status and read-only reconciliation remain available even when a new write
 would fail today's provider-text preflight.
