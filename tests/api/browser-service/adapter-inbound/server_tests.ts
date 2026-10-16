@@ -1221,11 +1221,14 @@ test("explicit local connection uses saved credentials and preserves stops",
         assert.equal(broker.next(broker.pairingToken(), client), null);
       }
       const pending = post();
+      // Prove that the first request has actually entered its session job
+      // before racing another HTTP request. Fetch invocation alone does not
+      // guarantee which request reaches the connection gate first.
+      await next("session.observe", "signed-out");
       const competing = await post();
       assert.equal(competing.status, 409);
       assert.deepEqual(await competing.json(),
         { ok: false, code: "blooket-connect-busy" });
-      await next("session.observe", "signed-out");
       await next("session.authenticate", null);
       await next("session.observe", "my-sets");
       const response = await pending;
