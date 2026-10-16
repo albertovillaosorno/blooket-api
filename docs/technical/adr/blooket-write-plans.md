@@ -414,6 +414,11 @@ image signatures. An image's file path, URL or raw teacher-source filename
 never becomes transport authority. These checks supplement, but do not
 replace, upstream full-file media admission and saved-byte verification.
 
+Saved-image byte verification only hashes a complete HTTP 200 media-origin
+response without Content-Range. RFC 9110 defines 206 as a range response,
+whose body cannot establish the full remote representation. Partial or
+non-200 responses stay unconfirmed, preserving the uncertain Save journal.
+
 The Add Question host likewise snapshots script-result envelopes before
 accepting form preparation, session observations and saved-image byte
 identities. An accessor or proxy property read cannot substitute an apparent

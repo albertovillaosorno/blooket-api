@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green saved-question image regression showed a
+synthetic HTTP 206 Partial Content response could prove the prepared-image
+digest even though its bytes need not represent the complete provider file.
+The owned, credential-free image reader now requires HTTP 200 with no
+Content-Range header before hashing content. Other response statuses remain
+unknown evidence and cannot confirm an ambiguous Save; no live image was
+uploaded or fetched during these tests.
+
 On 2026-10-16, red-to-green browser-bridge regressions found question
 position 201 could reach browser orchestration although its saved-card reader
 only verifies collections up to 200. The bridge now refuses positions beyond

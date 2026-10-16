@@ -258,6 +258,24 @@ test("streamed body overflow, bad lengths, and non-images remain unknown",
   },
 );
 
+test("partial HTTP image reads cannot prove full saved media identity",
+  async () => {
+  for (const response of [
+    () => new Response(png, { status: 206 }),
+    () => new Response(png, { status: 206, headers: {
+      "content-range": "bytes 0-8/100",
+    } }),
+    () => new Response(png, { status: 200, headers: {
+      "content-range": "bytes 0-8/100",
+    } }),
+    () => new Response(png, { status: 201 }),
+  ]) await fixture(async state => {
+    state.response = async () => response();
+    assert.deepEqual(await serialized("fixture", 1, 1_000), unknown);
+    assert.equal(state.calls.length, 1);
+  });
+});
+
 test("response stream interaction stops evidence and cancels the stream",
   async () => fixture(async state => {
     let canceled = 0;

@@ -154,7 +154,10 @@ export async function inspectOpenedBlooketQuestionImage(
       });
       body = response.body;
       if (!stillOwned()) return failed();
-      if (!response.ok || response.redirected || !response.body)
+      // 206 transfers only a range, not necessarily the saved resource.
+      // Only one complete 200 representation can prove prepared-byte identity.
+      if (response.status !== 200 || response.redirected ||
+          response.headers.has("content-range") || !response.body)
         return unknown();
       const length = response.headers.get("content-length");
       if (length !== null && (!/^[1-9][0-9]*$/u.test(length) ||
