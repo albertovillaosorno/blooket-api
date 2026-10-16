@@ -106,6 +106,11 @@ would refuse it. Native answer topology (unique alternatives, explicit
 correctness, typing match modes, and MC slot counts) is also checked before
 opening or modifying the visible form rather than only before Save.
 
+Before preparing the prompt, the native controls adapter verifies the
+textarea prompt, numeric timer, and initial plain-text typing-answer input
+are writable and correctly typed. This prevents a drifting page from
+receiving teacher answers in unrelated, renamed, or password controls.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even
