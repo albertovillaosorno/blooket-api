@@ -73,6 +73,11 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a regression found that a whitespace-only set title passed
+native lowering and could freeze a snapshot before Create Set had a usable
+title. Provider preflight now refuses it without normalizing valid teacher
+text. Synthetic coverage does not establish live publication acceptance.
+
 On 2026-10-16, a canonical regression found that missing snapshots
 reported not-started even when their own attempt, checkpoint, or budget
 survived. All publication commands now refuse orphaned evidence before a remote
