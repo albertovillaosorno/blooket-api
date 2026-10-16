@@ -35,6 +35,7 @@ import {
 } from "../../../ir/runtime-decoding/domain/decode-result.ts";
 import {
   isRecord,
+  ownDataField,
   requiredString,
   unknownFieldIssues,
 } from "../../../ir/runtime-decoding/domain/exact-object.ts";
@@ -99,7 +100,7 @@ export function decodeBlooketWriteCheckpoint(
     };
   }
 
-  const inputVersion = value["schemaVersion"];
+  const inputVersion = ownDataField(value, "schemaVersion");
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(
       value,
@@ -110,15 +111,15 @@ export function decodeBlooketWriteCheckpoint(
     ),
   ];
   const planId = requiredString(
-    value["planId"],
+    ownDataField(value, "planId"),
     "$.planId",
     issues,
   );
-  const nextOperationIndex = value["nextOperationIndex"];
+  const nextOperationIndex = ownDataField(value, "nextOperationIndex");
   const remoteSetId = inputVersion === LEGACY_BLOOKET_WRITE_CHECKPOINT_VERSION
     ? null
     : decodeNullableRemoteSetId(
-        value["remoteSetId"],
+        ownDataField(value, "remoteSetId"),
         "$.remoteSetId",
         issues,
       );

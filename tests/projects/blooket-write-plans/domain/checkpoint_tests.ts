@@ -324,6 +324,27 @@ test("checkpoint decoding binds progress to one exact plan", () => {
   }
 });
 
+test("checkpoint decoder does not invoke accessors or inherited fields", () => {
+  const bound = plan();
+  const base = initialBlooketWriteCheckpoint(bound);
+  for (const field of ["schemaVersion", "planId", "nextOperationIndex",
+    "remoteSetId"] as const) {
+    let called = 0;
+    const candidate = { ...base };
+    Object.defineProperty(candidate, field, {
+      enumerable: true, get() { called++; throw new Error("accessor"); },
+    });
+    assert.equal(decodeBlooketWriteCheckpoint(candidate, bound).ok, false);
+    assert.equal(called, 0, field);
+    const inherited = Object.create({ [field]: base[field] }) as
+      Record<string, unknown>;
+    for (const key of ["schemaVersion", "planId", "nextOperationIndex",
+      "remoteSetId"] as const) if (key !== field)
+      inherited[key] = base[key];
+    assert.equal(decodeBlooketWriteCheckpoint(inherited, bound).ok, false);
+  }
+});
+
 test("legacy fresh checkpoints migrate without inventing a binding", () => {
   const value = plan();
   assert.deepEqual(
