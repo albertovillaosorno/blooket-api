@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, another native-form regression caught an image syntax marker
+in the question prompt: lowering and the exact provider-hidden-form adapter
+both accepted the marker while rejecting the same marker in text answers.
+Both layers now reject the reserved image marker in prompts, keeping image
+content confined to admitted media slots. The red-to-green tests are synthetic;
+no live Blooket save or image interpretation was inferred.
+
 On 2026-10-16, red-to-green native lowering and browser-page regressions
 refused whitespace-only question prompts and text answers before either a
 publication snapshot or the Add Question Save click. The browser fixture uses

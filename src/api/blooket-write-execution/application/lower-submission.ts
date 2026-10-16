@@ -126,7 +126,8 @@ function lowerQuestion(
       !Number.isSafeInteger(question.timeLimitSeconds) ||
       question.timeLimitSeconds < 1 || question.timeLimitSeconds > 86_400)
     return { ok: false, code: "invalid-question-content" };
-  if (question.prompt.includes(mathMarker))
+  if (question.prompt.includes(mathMarker) ||
+      question.prompt.includes(imageMarker))
     return { ok: false, code: "ambiguous-provider-text" };
   if (question.type === "typing-answer") {
     if (invalidNativeAnswer(question.answer))
