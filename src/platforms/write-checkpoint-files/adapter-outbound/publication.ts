@@ -114,6 +114,27 @@ export async function createPublicationSnapshot(path: string, value: unknown) {
 }
 
 
+// A missing snapshot is not proof of a new publication when a partial
+// transaction may still have its journal, checkpoint, or budget on disk.
+// Only presence is examined: untrusted bytes must stay untouched for recovery.
+export async function publicationRecoveryEvidencePresent(
+  files: { readonly attempt: string; readonly checkpoint: string;
+    readonly budget: string },
+): Promise<boolean> {
+  for (const path of [files.attempt, files.checkpoint, files.budget]) {
+    try {
+      await lstat(path);
+      return true;
+    } catch (error) {
+      if (error instanceof Error && "code" in error &&
+          error.code === "ENOENT") continue;
+      throw new Error("publication-storage-unavailable");
+    }
+  }
+  return false;
+}
+
+
 export async function readOtherPublicationSnapshots(
   root: string,
   excludedDraftId: string,

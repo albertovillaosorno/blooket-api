@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a canonical regression found that missing snapshots
+reported not-started even when their own attempt, checkpoint, or budget
+survived. All publication commands now refuse orphaned evidence before a remote
+write or replacement snapshot. Portable tests preserve the bytes and retain
+expired-budget coverage with a valid snapshot. This is synthetic safety
+evidence, not a live publication receipt.
+
 On 2026-10-15, canonical CLI/MCP append publication began extending an explicit
 existing set without Create Set. Version-three snapshots bind the full desired
 quiz and original collection digest; version-two plans execute only the new
