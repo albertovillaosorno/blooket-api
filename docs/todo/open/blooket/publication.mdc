@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, synthetic read-navigation regressions reproduced a Chrome
+pending redirect being accepted as an exact committed source, destination,
+or final read tab. The shared navigation gate and temporary question reader
+now refuse any pending navigation when authorizing an already-complete
+document, including after individual page scripts and before cleanup. An
+initial background tab may still transition from its exact loading
+`pendingUrl` to a committed target; foreign destinations never transfer read
+authority. This is regression coverage, not a new live publication receipt.
+
 On 2026-10-16, a real Chrome background-tab diagnostic returned only the exact
 `pendingUrl`, `status: loading` and an inactive tab identity before navigation
 committed. The previous detached reader rejected this normal initial state.

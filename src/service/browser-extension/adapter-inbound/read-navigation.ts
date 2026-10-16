@@ -41,14 +41,15 @@ interface ReadTab {
 export function classifyBlooketReadTabLoad(
   tab: ReadTab, target: string,
 ): "ready" | "loading" | "changed" {
-  if (tab.pendingUrl !== undefined && tab.pendingUrl !== target)
-    return "changed";
+  if (tab.pendingUrl !== undefined)
+    return tab.pendingUrl === target && tab.status === "loading" &&
+      (tab.url === undefined || tab.url === "" ||
+       tab.url === "about:blank" || tab.url === target)
+      ? "loading" : "changed";
   if (tab.url === target)
     return tab.status === "complete" ? "ready"
       : tab.status === "loading" ? "loading" : "changed";
-  return tab.status === "loading" && tab.pendingUrl === target &&
-      (tab.url === undefined || tab.url === "" || tab.url === "about:blank")
-    ? "loading" : "changed";
+  return "changed";
 }
 
 interface ReadTabsPort {
@@ -81,7 +82,8 @@ export async function confirmBlooketReadNavigation(
     // Re-check its exact route before allowing a navigation request.
     const current = await tabs.get(tabId);
     if (now() >= deadline || !current.url ||
-        current.url !== previous.url || current.status !== "complete")
+        current.url !== previous.url || current.status !== "complete" ||
+        current.pendingUrl !== undefined)
       return undefined;
     const origin = await documentOrigin(current.url);
     if (now() >= deadline || !validOrigin(origin) ||
@@ -90,7 +92,8 @@ export async function confirmBlooketReadNavigation(
     previousOrigin = origin;
     const checked = await tabs.get(tabId);
     if (now() >= deadline || checked.url !== current.url ||
-        checked.status !== "complete") return undefined;
+        checked.status !== "complete" || checked.pendingUrl !== undefined)
+      return undefined;
     // A same-URL document replacement after the first origin script may
     // contain a teacher's new unsaved work. Do not reload or leave it.
     const originAgain = await documentOrigin(current.url);
@@ -104,7 +107,8 @@ export async function confirmBlooketReadNavigation(
         return undefined;
       const last = await tabs.get(tabId);
       if (now() >= deadline || last.url !== current.url ||
-          last.status !== "complete") return undefined;
+          last.status !== "complete" || last.pendingUrl !== undefined)
+        return undefined;
       const lastOrigin = await documentOrigin(current.url);
       if (now() >= deadline || lastOrigin !== previousOrigin)
         return undefined;
@@ -120,7 +124,10 @@ export async function confirmBlooketReadNavigation(
     const tab = await tabs.get(tabId);
     // A delayed tabs.get result cannot prove that the budget was respected.
     if (now() >= deadline) return undefined;
-    if (tab.status === "complete" && (!target || tab.url === target)) {
+    if (tab.pendingUrl !== undefined &&
+        (target === null || tab.pendingUrl !== target)) return undefined;
+    if (tab.status === "complete" && tab.pendingUrl === undefined &&
+        (!target || tab.url === target)) {
       if (!target) return tab;
       // Chrome may still report the old complete document immediately after
       // reload/update. Only a changed native document epoch admits a read.
@@ -131,7 +138,8 @@ export async function confirmBlooketReadNavigation(
       if (validOrigin(origin) && origin !== previousOrigin) {
         const checked = await tabs.get(tabId);
         if (now() >= deadline || checked.url !== target ||
-            checked.status !== "complete") return undefined;
+            checked.status !== "complete" ||
+            checked.pendingUrl !== undefined) return undefined;
         // A native document can be replaced at the exact same URL while
         // Chrome resolves tabs.get. Re-observe its epoch before transferring
         // read authority; never adopt the replacement as the old document.
@@ -141,7 +149,8 @@ export async function confirmBlooketReadNavigation(
         if (now() >= deadline || again !== origin) return undefined;
         const finalTab = await tabs.get(tabId);
         if (now() >= deadline || finalTab.url !== target ||
-            finalTab.status !== "complete") return undefined;
+            finalTab.status !== "complete" ||
+            finalTab.pendingUrl !== undefined) return undefined;
         onConfirmedTargetOrigin?.(origin);
         return finalTab;
       }

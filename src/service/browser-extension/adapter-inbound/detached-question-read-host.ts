@@ -132,6 +132,7 @@ export async function inspectDetachedBlooketQuestions(
     for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
       const tab = await chrome.tabs.get(createdId!);
       if (tab.url !== target || tab.status !== "complete" ||
+          tab.pendingUrl !== undefined ||
           await script(inspectBlooketDocumentOrigin as
             (...args: never[]) => unknown, [target]) !== origin)
         return failed();
@@ -150,6 +151,7 @@ export async function inspectDetachedBlooketQuestions(
         return failed();
       const afterTab = await chrome.tabs.get(createdId!);
       if (afterTab.url !== target || afterTab.status !== "complete" ||
+          afterTab.pendingUrl !== undefined ||
           await script(inspectBlooketDocumentOrigin as
             (...args: never[]) => unknown, [target]) !== origin)
         return failed();
@@ -191,6 +193,7 @@ export async function inspectDetachedBlooketQuestions(
       [target],
     );
     if (check.status !== "complete" || check.url !== target ||
+        check.pendingUrl !== undefined ||
         finalOrigin !== origin || now() >= deadline) return failed();
   } catch { return failed(); }
   finally {

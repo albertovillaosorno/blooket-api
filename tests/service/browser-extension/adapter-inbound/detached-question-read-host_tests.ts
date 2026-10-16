@@ -44,7 +44,8 @@ type Behavior = "normal" | "redirect" | "challenge" | "drift" |
   "nested-frame" | "no-cleanup" | "not-ready" | "no-hydration" |
   "late-edit" | "never-edit" | "switch-origin" |
   "challenge-after-shell" | "accessor-state" | "challenge-after-scan" |
-  "hidden-ok-after-scan" | "uncommitted";
+  "hidden-ok-after-scan" | "uncommitted" |
+  "pending-after-shell" | "pending-after-scan";
 
 function fixture(behavior: Behavior = "normal") {
   const events: string[] = [];
@@ -64,7 +65,12 @@ function fixture(behavior: Behavior = "normal") {
         assert.equal(id, temporaryTabId);
         events.push("get");
         if (closed) throw Error("already-closed");
-        if (behavior === "uncommitted" && ++tabReads <= 2)
+        tabReads++;
+        if (behavior === "pending-after-shell" && tabReads >= 2 ||
+            behavior === "pending-after-scan" && calls >= 3)
+          return { id, url: TARGET, status: "complete",
+            pendingUrl: "https://foreign.invalid/" };
+        if (behavior === "uncommitted" && tabReads <= 2)
           return { id, status: "loading", pendingUrl: TARGET };
         return {
           id, url: behavior === "redirect" ? "https://id.blooket.com/"
@@ -174,6 +180,16 @@ test("never-hydrated and replaced detached documents do not become receipts",
       { ok: false, code: "blooket-browser-failed" }, behavior);
     assert.equal(page.closed(), true);
     assert.equal(page.events.filter(x => x === "remove").length, 1);
+  }
+});
+
+test("pending foreign navigation vetoes detached question reads", async () => {
+  for (const behavior of ["pending-after-shell",
+    "pending-after-scan"] as const) {
+    const page = fixture(behavior);
+    assert.deepEqual(await page.inspect(),
+      { ok: false, code: "blooket-browser-failed" }, behavior);
+    assert.equal(page.closed(), true);
   }
 });
 

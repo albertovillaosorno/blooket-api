@@ -13,6 +13,13 @@ record first. It does not declare quiz publication or automatic installation
 complete. The human's current instructions determine account-mutation and Git
 authority; this document cannot grant either to another session.
 
+The 2026-10-16 portable navigation regression checks that a foreign
+`pendingUrl` cannot authorize a saved-state read even if Chrome still reports
+the last committed provider URL. The shared navigation gate and temporary
+question reader now refuse any pending redirect before recognizing a complete
+document. This extends the existing Chrome Tabs API evidence; it is not a live
+publication receipt.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and

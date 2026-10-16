@@ -52,6 +52,7 @@ import {
 
 interface BrowserTab {
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -133,7 +134,8 @@ export function createExtensionQuestionInspectionHost(
     // Chrome may finish a tab request after the caller's read deadline.
     // Never let that late response authorize another page script or click.
     return now() < deadline && tab.status === "complete" &&
-      tab.url === url && await sameDocument(url) && now() < deadline;
+      tab.pendingUrl === undefined && tab.url === url &&
+      await sameDocument(url) && now() < deadline;
   };
   const enumerate = async (
     setId: string, url: string, deadline: number,
@@ -188,6 +190,7 @@ export function createExtensionQuestionInspectionHost(
     // unless the exact tab and panel closure are actually observed.
     const tab = await chrome.tabs.get(tabId).catch(() => undefined);
     if (tab?.status !== "complete" || tab.url !== url ||
+        tab.pendingUrl !== undefined ||
         !await sameDocument(url)) return false;
     const canceled = await script(
       closeBlooketQuestionPanel as (...args: never[]) => unknown,
@@ -199,6 +202,7 @@ export function createExtensionQuestionInspectionHost(
       // the teacher's newly selected page, even during best-effort cleanup.
       const current = await chrome.tabs.get(tabId).catch(() => undefined);
       if (current?.status !== "complete" || current.url !== url ||
+          current.pendingUrl !== undefined ||
           !await sameDocument(url)) return false;
       const closed = await script(
         isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
