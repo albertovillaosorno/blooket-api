@@ -98,6 +98,13 @@ Native typing alternatives likewise use single-line
 and the independent Save guard. Multiple-choice answers use `textarea`
 controls, so their authored multiline text remains admissible and unchanged.
 
+Textarea API values normalize CR/CRLF into LF under the
+[HTML Standard][textarea-newlines]. The canonical question writer,
+visible-controls preparation and independent Add Question Save guard refuse
+CR-bearing prompts and MC answer text instead of silently changing authored
+bytes. Native LF-only multiline prompts and MC answers remain admissible.
+
+
 The separately injected question-controls preparation step checks the same
 provider-text and timer boundaries before changing a visible React editor.
 Rejection must not leave a partially filled prompt, question type, or typing
@@ -370,3 +377,6 @@ original lease before recording the new start. The gate applies any newly
 stricter validated policy against prior starts. A durable reservation counts
 conservatively even when post-lease revalidation stops before a browser write;
 no uncertain journal is ever reopened to recover that unused allowance.
+
+<!-- jig-ignore-next-line: Official specification URL is indivisible. -->
+[textarea-newlines]: https://html.spec.whatwg.org/multipage/form-elements.html#the-textarea-element

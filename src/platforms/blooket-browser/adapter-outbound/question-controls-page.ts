@@ -178,12 +178,14 @@ export async function prepareBlooketQuestionControls(
     // the form watch or changing a question type, prompt, or answer field.
     if (typeof input.question !== "string" || !input.question.trim() ||
         input.question.length > 20_000 || input.question.includes("\0") ||
+        input.question.includes("\r") ||
         input.question.includes("`*") || input.question.includes("`~`") ||
         !Number.isSafeInteger(input.timeLimit) ||
         input.timeLimit < 1 || input.timeLimit > 86_400 ||
         input.answers.some(answer => !answer ||
           typeof answer.text !== "string" || !answer.text.trim() ||
           answer.text.length > 10_000 || answer.text.includes("\0") ||
+          answer.text.includes("\r") ||
           answer.text.includes("`*") || answer.text.includes("`~`") ||
           typeof answer.correct !== "boolean")) return false;
     // Typing alternatives are single-line native input elements. Reject

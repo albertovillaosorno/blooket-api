@@ -925,6 +925,29 @@ test("single-line typing answers never admit CR or LF through Save", () => {
   }
 });
 
+test("textarea CR lines cannot authorize a native Add Question Save", () => {
+  for (const mode of ["prompt", "mc-answer"] as const) {
+    const page = fixture();
+    const input: BlooketTextQuestionPageInput = mode === "prompt"
+      ? { ...typing, question: "Type\rsun." }
+      : { ...typing, qType: "mc", random: false,
+          answers: [{ text: "Sun\r\nStar", correct: true },
+            { text: "Moon", correct: false }], answerTypes: null };
+    const raw = JSON.parse(page.hidden.value);
+    page.hidden.value = JSON.stringify({ ...raw, question: input.question,
+      answers: input.answers.map(answer => answer.text),
+      correctAnswers: input.answers.filter(answer => answer.correct)
+        .map(answer => answer.text), qType: input.qType,
+      random: input.random, answerTypes: input.answerTypes });
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+        assert.equal(prepareBlooketAddQuestionForm(input).ok, false);
+        assert.equal(submitBlooketAddQuestionForm(input).ok, false);
+        assert.equal(page.submit.clicked, 0);
+      });
+  }
+});
+
 test("provider-matching image marker in prompt is refused before Save", () => {
   const page = fixture();
   const prompt = "Image`~`https://provider.invalid/fake.png";
