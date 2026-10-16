@@ -401,3 +401,8 @@ values, accessor properties and unknown keys before inspecting encoded
 image signatures. An image's file path, URL or raw teacher-source filename
 never becomes transport authority. These checks supplement, but do not
 replace, upstream full-file media admission and saved-byte verification.
+
+The Add Question host likewise snapshots script-result envelopes before
+accepting form preparation, session observations and saved-image byte
+identities. An accessor or proxy property read cannot substitute an apparent
+success for a mismatching own-data result or a signed-out provider state.
