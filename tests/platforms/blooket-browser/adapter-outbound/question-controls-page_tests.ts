@@ -79,8 +79,9 @@ class Control {
 async function withEditor(
   run: (page: ReturnType<typeof editor>) => Promise<void>,
   kind: "typing" | "mc" = "typing",
+  mcAnswerTypes: readonly string[] | null = null,
 ): Promise<void> {
-  const page = editor(kind);
+  const page = editor(kind, mcAnswerTypes);
   const names = ["document", "location", "HTMLInputElement",
     "HTMLTextAreaElement", "getComputedStyle",
     "__blooketAddQuestionFormWatch"] as const;
@@ -106,7 +107,8 @@ async function withEditor(
   }
 }
 
-function editor(kind: "typing" | "mc" = "typing") {
+function editor(kind: "typing" | "mc" = "typing",
+  mcAnswerTypes: readonly string[] | null = null) {
   const form = new Control();
   form.tagName = "FORM";
   const hidden = new Control();
@@ -158,7 +160,7 @@ function editor(kind: "typing" | "mc" = "typing") {
       correctAnswers: savedAnswers.filter((answer, index) =>
         qType === "typing" || selected[index]).map(answer => answer.value),
       image: providerImage, audio: "", qType, random,
-      answerTypes: qType === "typing" ? [...modes] : null,
+      answerTypes: qType === "typing" ? [...modes] : mcAnswerTypes,
       timeLimit: Number(time.value),
       ...(extraProviderField ? { providerExtra: true } : {}),
     });
@@ -550,6 +552,24 @@ test("two or three multiple-choice answers do not fill blank React slots",
     }, "mc");
   }
 });
+
+test("native MC empty match modes prepare without rewriting hidden state",
+  async () => {
+    for (const modes of [[], ["exactly"]]) {
+      await withEditor(async page => {
+        const candidate: BlooketQuestionPageInput = {
+          ...input, qType: "mc", question: "Choose a planet.",
+          answers: [{ text: "Earth", correct: true },
+            { text: "Sun", correct: false }],
+          answerTypes: null, random: false, timeLimit: 20,
+        };
+        assert.equal(await prepareBlooketQuestionControls(candidate),
+          modes.length === 0);
+        assert.deepEqual(JSON.parse(page.hidden.value).answerTypes, modes);
+        assert.equal(page.hiddenWrites(), 0);
+      }, "mc", modes);
+    }
+  });
 
 test("JSON text preserves nullable MC fields across Chrome injection",
   async () => withEditor(async page => {

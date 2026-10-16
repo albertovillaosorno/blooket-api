@@ -280,6 +280,11 @@ export function runBlooketAddQuestionPageAction(
       return keys.every(key => {
         if (!Object.hasOwn(actual, key)) return false;
         const left = actual[key], right = prepared[key];
+        // Native MC has no typing match modes. Admit its observed empty
+        // list without replacing the provider-generated hidden JSON.
+        if (key === "answerTypes" && expected.qType === "mc" &&
+            right === null && Array.isArray(left) && left.length === 0)
+          return true;
         if (Array.isArray(right)) return Array.isArray(left) &&
           JSON.stringify(left) === JSON.stringify(right);
         return left === right;

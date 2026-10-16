@@ -73,6 +73,20 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, the current Chrome companion reached a canonical append
+question form with the exact prompt, two answers, correctness, shuffle and
+20-second timer, but stopped before Save. A read-only probe in the companion's
+isolated world confirmed `controlsStarted: true`, `submitted: false` and native
+multiple-choice `answerTypes: []`. The adapter had required `null`, so it
+rejected an otherwise matching provider serialization. The controls and
+submission guards now accept an empty native match-mode list for MC only;
+typing modes and nonempty MC modes remain strict.
+
+Regression fixtures retain
+provider-generated JSON and verify the one-submit latch without writing the
+hidden field. The existing attempt journal and its visible form are preserved;
+this correction is not a confirmed remote question save.
+
 On 2026-10-16, red-to-green native multiple-choice fixtures showed that
 disabled or replaced answer textareas, correctness controls and shuffle
 switches were discovered only after the question prompt was already filled.

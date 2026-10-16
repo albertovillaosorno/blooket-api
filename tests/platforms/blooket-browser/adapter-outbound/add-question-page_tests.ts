@@ -821,6 +821,37 @@ test("multiple-choice textarea text keeps meaningful line breaks", () => {
     });
 });
 
+test("native empty MC match modes survive preparation and the single submit",
+  () => {
+    for (const modes of [[], ["exactly"]]) {
+      const page = fixture();
+      const candidate: BlooketTextQuestionPageInput = {
+        setId: "set-fixture", number: 1, question: "Choose a planet.",
+        answers: [{ text: "Earth", correct: true },
+          { text: "Sun", correct: false }],
+        qType: "mc", random: false, answerTypes: null, timeLimit: 20,
+      };
+      withPage(page.document,
+        "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+          page.hidden.value = JSON.stringify({
+            number: 1, question: candidate.question,
+            answers: ["Earth", "Sun"], correctAnswers: ["Earth"],
+            image: "", audio: "", qType: "mc", random: false,
+            answerTypes: modes, timeLimit: 20,
+          });
+          const original = page.hidden.value;
+          const prepared = prepareBlooketAddQuestionForm(candidate);
+          assert.equal(prepared.ok, modes.length === 0);
+          assert.equal(page.hidden.value, original);
+          if (modes.length === 0) {
+            assert.deepEqual(submitBlooketAddQuestionForm(candidate),
+              { ok: true });
+            assert.equal(page.submit.clicked, 1);
+          } else assert.equal(page.submit.clicked, 0);
+        });
+    }
+  });
+
 test("provider JSON key order does not replace genuine editor state", () => {
   const page = fixture();
   withPage(page.document,
