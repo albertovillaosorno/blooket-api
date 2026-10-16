@@ -46,6 +46,11 @@ stale, correctly committed `/login` URL, before forwarding any further
 credentials. Portable tests cover redirects before initial admission,
 after preparation, and after a prepared-state poll.
 
+Browser human-stop foregrounding also fails closed when Chrome reports a
+pending navigation, even if its last committed URL remains Blooket. That
+includes a redirect beginning while the owned tab is being activated;
+window focus is then withheld.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and

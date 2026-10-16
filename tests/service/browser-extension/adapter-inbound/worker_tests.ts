@@ -65,6 +65,7 @@ test(
   let detachedSourceChallenge = false;
   let detachedSourceReload = false;
   let pendingSourceRedirect = false;
+  let pendingAfterActivate = false;
   let pendingSourceAfterRead = false;
   let pendingAfterSetObservation = false;
   let pendingAfterDetailSidebar = false;
@@ -282,6 +283,10 @@ test(
         }
         if (active === true) {
           foregroundedTabs.push(id);
+          if (pendingAfterActivate) {
+            pendingAfterActivate = false;
+            pendingSourceRedirect = true;
+          }
           if (switchAfterActivate) {
             switchAfterActivate = false;
             tabUrl = "https://untrusted.invalid/after-activation";
@@ -1910,9 +1915,19 @@ test(
     assert.deepEqual(foregroundedTabs, [7]);
     assert.equal((await message({ kind: "status" })).status,
       "blooket-attention-required");
+    pendingSourceRedirect = true;
+    const beforePendingFocus = foregroundedTabs.length;
+    assert.equal((await message({ kind: "open-blooket" })).ok, false);
+    assert.equal(foregroundedTabs.length, beforePendingFocus);
+    pendingSourceRedirect = false;
     assert.equal((await message({ kind: "open-blooket" })).ok, true);
     assert.deepEqual(foregroundedTabs, [7, 7]);
     assert.deepEqual(focusedWindows, [3, 3]);
+    pendingAfterActivate = true;
+    const priorFocus = focusedWindows.length;
+    assert.equal((await message({ kind: "open-blooket" })).ok, false);
+    assert.equal(focusedWindows.length, priorFocus);
+    pendingSourceRedirect = false;
     observedSessionOverride = null;
     assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
     assert.equal((await message({ kind: "status" })).status, "connected");
