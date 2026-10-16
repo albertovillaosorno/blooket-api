@@ -87,6 +87,12 @@ stranding an unverified question. Existing larger snapshots remain readable
 for status and reconciliation without granting another write start.
 
 Provider form limits are checked independently of project-document syntax.
+The native Create Set title is a single-line `input type=text` control.
+The WHATWG HTML Standard strips CR and LF characters when assigning that
+control's value. Canonical lowering and the independent prepare/submit
+functions therefore reject such titles without changing teacher-authored
+text or creating an unfinishable publication journal.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even

@@ -73,6 +73,17 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green native Create Set regressions rejected
+carriage returns and line feeds in single-line set titles. The canonical
+lowering and both independent browser form actions now refuse that content
+without opening a publication snapshot or clicking Save.
+
+The WHATWG HTML Standard's `input type=text` sanitization rule strips
+those newlines, so
+rejecting them preserves the exact teacher title rather than silently
+normalizing it. Description textarea content is unchanged. This is portable
+preflight evidence, not a live Blooket publication confirmation.
+
 On 2026-10-16, red-to-green Create Set receipt regressions found that
 post-submit observation could inspect stale Create controls while Chrome
 still reported an exact pending Edit redirect, or inspect a stale page
