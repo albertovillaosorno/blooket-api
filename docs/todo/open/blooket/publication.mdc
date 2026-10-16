@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green native multiple-choice fixtures showed that
+disabled or replaced answer textareas, correctness controls and shuffle
+switches were discovered only after the question prompt was already filled.
+The controls writer now confirms the four empty writable textarea slots,
+required answer toggles, and the enabled checkbox shuffle control before
+changing prompt or timer state. This remains synthetic compatibility and
+fail-closed evidence, not remote Save confirmation.
+
 On 2026-10-16, red-to-green provider-control regressions showed that
 replaced prompt, timer and typing-answer inputs could receive writes
 before the later Save checks found a changed control. Native preparation now

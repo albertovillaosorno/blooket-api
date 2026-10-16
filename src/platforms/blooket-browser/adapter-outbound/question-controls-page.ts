@@ -274,6 +274,26 @@ export async function prepareBlooketQuestionControls(
         if (!control || control.tagName !== "TEXTAREA" ||
             (control as HTMLTextAreaElement).value !== "") return false;
       }
+      // A changed shuffle switch must not receive an owned click after
+      // prompt and answers have already been written.
+      const shuffle = unique("input#shuffle-toggle") as
+        HTMLInputElement | null;
+      if (!shuffle || shuffle.tagName !== "INPUT" ||
+          shuffle.type !== "checkbox" || shuffle.disabled ||
+          shuffle.readOnly) return false;
+      for (let index = 0; index < 4; index++) {
+        const control = unique("textarea#answer-" + index) as
+          HTMLTextAreaElement | null;
+        if (!control || control.tagName !== "TEXTAREA" ||
+            control.disabled || control.readOnly || control.value !== "")
+          return false;
+        if (index < input.answers.length) {
+          const correct = unique('button[aria-label="Mark Answer ' +
+            (index + 1) + ' as Correct"]') as HTMLButtonElement | null;
+          if (!correct || correct.tagName !== "BUTTON" || correct.disabled)
+            return false;
+        }
+      }
     }
     if (!await wait(() => unique("textarea#question") !== null &&
         unique("input#time-limit") !== null)) return false;
