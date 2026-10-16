@@ -292,6 +292,22 @@ test("line breaks in a single-line set title cannot fill or submit", () => {
   }
 });
 
+test("description textarea CR text never partly prepares Create Set", () => {
+  for (const description of ["Sun\rMoon", "Sun\r\nMoon"]) {
+    const page = fixture(false);
+    const input = { title: "Synthetic", description, private: false };
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.title.value, "");
+      assert.equal(page.description.value, "");
+      page.title.value = input.title;
+      page.description.value = description;
+      assert.equal(submitBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+    });
+  }
+});
+
 test("NUL-bearing Create Set metadata cannot fill or submit", () => {
   for (const input of [
     { title: "Bad\0Title", description: "Draft", private: false },
@@ -308,6 +324,18 @@ test("NUL-bearing Create Set metadata cannot fill or submit", () => {
       assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
     });
   }
+});
+
+test("LF-only multiline descriptions retain their original value", () => {
+  const page = fixture(false);
+  const input = { title: "Synthetic", description: "One\nTwo",
+    private: true };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.deepEqual(prepareBlooketCreateSetForm(input), { ok: true });
+    assert.equal(page.description.value, input.description);
+    assert.deepEqual(submitBlooketCreateSetForm(input), { ok: true });
+    assert.equal(page.form.selectors["button"]![0]!.clicked, 1);
+  });
 });
 
 test("Create Set staying disabled after a title never submits", () => {

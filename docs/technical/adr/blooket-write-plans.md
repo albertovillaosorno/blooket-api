@@ -128,6 +128,11 @@ visible controls before changing the prompt or timer. A provider-imposed
 shorter timer or answer limit cannot strand an otherwise unfinished form
 with partly written text.
 
+Create Set descriptions also use a textarea. Since the HTML textarea API
+normalizes carriage returns, canonical lowering and independent form actions
+refuse CR/CRLF in descriptions without changing LF-only multiline content.
+This check precedes filling the single-line title and freezing the attempt.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even

@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green Create Set regressions established that CR/CRLF
+in the native description textarea could be normalized after the title had
+already been filled. Canonical lowering and both independent Create Set form
+steps now refuse CR-bearing descriptions before journaling or interacting
+with the controls. LF-only multiline descriptions retain their original
+value and remain admissible. Synthetic preflight does not establish a live
+publication receipt.
+
 On 2026-10-16, red-to-green native textarea regressions found that the
 canonical writer, the visible controls helper, and the independent Save guard
 accepted CR-bearing prompt and multiple-choice answer text. The HTML

@@ -228,6 +228,8 @@ test("native set and remote identifier bounds fail before submission", () => {
     { ...set, title: "Sun\nMoon" },
     { ...set, title: "Sun\rMoon" },
     { ...set, title: "X".repeat(1_001) },
+    { ...set, description: "Sun\rMoon" },
+    { ...set, description: "Sun\r\nMoon" },
     { ...set, description: "X".repeat(10_001) },
   ]) assert.deepEqual(lowerBlooketWriteSubmission(operation,
     { remoteSetId: null }), { ok: false, code: "invalid-set-content" });

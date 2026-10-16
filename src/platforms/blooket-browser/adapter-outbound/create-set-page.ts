@@ -102,6 +102,7 @@ export function prepareBlooketCreateSetForm(
       typeof input.description !== "string" ||
       input.description.length > 10_000 ||
       input.description.includes("\0") ||
+      input.description.includes("\r") ||
       typeof input.private !== "boolean"
     )
       return failed();
@@ -364,6 +365,7 @@ export function submitBlooketCreateSetForm(
       typeof expected.description !== "string" ||
       expected.description.length > 10_000 ||
       expected.description.includes("\0") ||
+      expected.description.includes("\r") ||
       typeof expected.private !== "boolean"
     )
       return failed();
