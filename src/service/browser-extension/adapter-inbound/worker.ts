@@ -1066,7 +1066,8 @@ async function showHumanBlooketTab(
 ): Promise<boolean> {
   if (!stillOwned()) return false;
   const tab = await chrome.tabs.get(tabId!);
-  if (tab.id !== tabId || !tab.url || !stillOwned() ||
+  if (tab.id !== tabId || !tab.url ||
+      tab.pendingUrl !== undefined || !stillOwned() ||
       !["https://dashboard.blooket.com", "https://id.blooket.com"]
         .includes(new URL(tab.url).origin)) return false;
   if (typeof tab.windowId !== "number" ||
@@ -1074,12 +1075,14 @@ async function showHumanBlooketTab(
     return false;
   const active = await chrome.tabs.update(tabId, { active: true });
   if (!stillOwned() || active.id !== tabId || active.url !== tab.url ||
+      active.pendingUrl !== undefined ||
       active.windowId !== tab.windowId) return false;
   // A manual tab switch may finish while activation is pending. Never focus
   // the remembered window if the active tab has become foreign or replaced.
   const checked = await chrome.tabs.get(tabId!);
   if (!stillOwned() || checked.id !== tabId ||
-      checked.url !== tab.url || checked.windowId !== tab.windowId ||
+      checked.url !== tab.url || checked.pendingUrl !== undefined ||
+      checked.windowId !== tab.windowId ||
       !checked.url ||
       !["https://dashboard.blooket.com", "https://id.blooket.com"]
         .includes(new URL(checked.url).origin)) return false;

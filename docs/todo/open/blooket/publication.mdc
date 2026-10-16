@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green worker regression found that focusing an old
+committed Blooket tab could still activate a foreign pending navigation while
+a human challenge was being surfaced. The owned-tab foreground helper now
+refuses pending redirects at admission, after activation and before focusing
+the window. Synthetic checks do not establish any live account state.
+
 On 2026-10-16, a red-to-green extension-login regression found that an old
 committed `/login` page could still receive a credential-bearing script while
 Chrome had a foreign `pendingUrl`. The login host now rejects that tab
