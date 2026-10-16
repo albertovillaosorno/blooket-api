@@ -41,6 +41,7 @@ import { inspectBlooketSessionDocumentOrigin } from
 
 interface BrowserTab {
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -170,7 +171,8 @@ export function createExtensionSessionAuthenticationHost(
 }
 
 function exactLoginTab(tab: BrowserTab): boolean {
-  if (!tab.url || tab.status !== "complete") return false;
+  if (!tab.url || tab.status !== "complete" ||
+      tab.pendingUrl !== undefined) return false;
   try {
     const url = new URL(tab.url);
     return url.origin === LOGIN_ORIGIN && url.pathname === "/login";
