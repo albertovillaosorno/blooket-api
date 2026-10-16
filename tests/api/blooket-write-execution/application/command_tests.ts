@@ -1962,7 +1962,7 @@ test("missing snapshot with its own recovery files never reports not-started",
     const paths = await publicationFiles(state.root, "fixture");
     await mkdir(dirname(paths.snapshot), { recursive: true });
     for (const evidence of [paths.attempt, paths.checkpoint,
-      paths.budget]) {
+      paths.checkpoint + ".bak", paths.budget]) {
       const bytes = "{uncertain-prior-publication}";
       await writeFile(evidence, bytes);
       for (const action of ["status", "reconcile", "verify", "step"]) {

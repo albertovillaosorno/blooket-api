@@ -69,6 +69,10 @@ must still match the frozen intent and original baseline. The executor's later
 baseline capture must also match that preflight collection before a write-ahead
 journal can start, detecting changes during intervening session/media awaits.
 Uncertain attempts require local recovery before another write.
+
+A checkpoint rotation backup (`checkpoint.json.bak`) is also recovery evidence:
+if a snapshot is missing, neither its own draft nor a competing draft may
+silently treat that backup as a fresh publication.
 Final verification checks the entire desired quiz in two fresh observations.
 
 The current native question reader establishes no complete collection above

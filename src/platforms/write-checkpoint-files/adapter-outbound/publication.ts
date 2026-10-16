@@ -116,12 +116,15 @@ export async function createPublicationSnapshot(path: string, value: unknown) {
 
 // A missing snapshot is not proof of a new publication when a partial
 // transaction may still have its journal, checkpoint, or budget on disk.
-// Only presence is examined: untrusted bytes must stay untouched for recovery.
+// Checkpoint rotation keeps a .bak file. It is still progress evidence even
+// when the main checkpoint and snapshot have disappeared. Only presence is
+// examined: untrusted bytes must stay untouched for recovery.
 export async function publicationRecoveryEvidencePresent(
   files: { readonly attempt: string; readonly checkpoint: string;
     readonly budget: string },
 ): Promise<boolean> {
-  for (const path of [files.attempt, files.checkpoint, files.budget]) {
+  for (const path of [files.attempt, files.checkpoint,
+    files.checkpoint + ".bak", files.budget]) {
     try {
       await lstat(path);
       return true;
@@ -177,9 +180,10 @@ export async function readOtherPublicationSnapshots(
     });
     if (bytes === undefined) {
       // An interrupted snapshot creation can leave an empty directory, but
-      // never ignore a directory holding write-attempt or budget evidence.
+      // never ignore a directory holding a write journal, checkpoint backup,
+      // or budget evidence.
       for (const evidence of ["attempt.json", "checkpoint.json",
-        "budget.json"]) {
+        "checkpoint.json.bak", "budget.json"]) {
         const path = await safeLibraryPath(root,
           "publications/" + entry.name + "/" + evidence);
         const present = await lstat(path).catch((error: unknown) => {
