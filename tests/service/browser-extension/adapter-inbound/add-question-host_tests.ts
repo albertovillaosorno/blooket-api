@@ -248,6 +248,23 @@ function fakeChrome(options: {
   } };
 }
 
+test("invalid native question text never enters browser orchestration",
+  async () => {
+  const candidates: BlooketTextQuestionPageInput[] = [
+    { ...input, question: "Type\rsun" },
+    { ...input, question: "Math`*marker" },
+    { ...input, answers: [{ text: "sun\nmoon", correct: true }] },
+    { ...input, answers: [{ text: "sun`~`moon", correct: true }] },
+  ];
+  for (const candidate of candidates) {
+    const fake = fakeChrome({});
+    assert.equal((await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(candidate)).ok, false);
+    assert.deepEqual(fake.calls, []);
+  }
+});
+
 test("a post-Save 429 stops as rate-limited without a second Save",
   async () => {
   const fake = fakeChrome({ mismatchReadBack: true,

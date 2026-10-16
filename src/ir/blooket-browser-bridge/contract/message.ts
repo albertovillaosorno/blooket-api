@@ -207,12 +207,13 @@ export function decodeBlooketBrowserBridgeRequest(
     const description = ownDataField(candidate, "description");
     const privateValue = ownDataField(candidate, "private");
     if (
-      title &&
+      title && title.trim() &&
       title.length <= 1_000 &&
       !/[\x00-\x1f\x7f]/u.test(title) &&
       typeof description === "string" &&
       description.length <= 10_000 &&
       !/[\x00\x01-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(description) &&
+      !description.includes("\r") &&
       typeof privateValue === "boolean"
     ) {
       command = {
@@ -289,9 +290,11 @@ export function decodeBlooketBrowserBridgeRequest(
         );
         const correct = ownDataField(answer, "correct");
         if (
-          text &&
+          text && text.trim() &&
           text.length <= 10_000 &&
-          !text.includes("\0") &&
+          !text.includes("\0") && !text.includes("\r") &&
+          !text.includes("`*") && !text.includes("`~`") &&
+          (qType !== "typing" || !text.includes("\n")) &&
           !seen.has(text) &&
           typeof correct === "boolean"
         ) {
@@ -344,9 +347,10 @@ export function decodeBlooketBrowserBridgeRequest(
       setId &&
       setId.length <= 512 &&
       !/[\x00-\x1f\x7f]/u.test(setId) &&
-      question &&
+      question && question.trim() &&
       question.length <= 20_000 &&
-      !question.includes("\0") &&
+      !question.includes("\0") && !question.includes("\r") &&
+      !question.includes("`*") && !question.includes("`~`") &&
       Number.isSafeInteger(number) &&
       (number as number) >= 1 &&
       (number as number) <= 10_000 &&
