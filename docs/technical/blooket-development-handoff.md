@@ -31,6 +31,11 @@ and rechecks the source after temporary background scans. Portable worker
 regressions cover both already-pending and newly-pending foreign navigation;
 the unchanged editor URL alone never certifies live saved state.
 
+Further portable worker regressions cover Chrome navigation beginning
+after My Sets or Edit sidebar inspection: stable document-origin numbers and
+old committed URLs alone no longer authorize saved-state reads or clicks.
+Real authenticated provider read-back remains an independent acceptance gate.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and
