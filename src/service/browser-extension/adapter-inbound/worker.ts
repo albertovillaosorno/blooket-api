@@ -812,7 +812,8 @@ async function read(
     if (
       Date.now() >= readDeadline ||
       currentTab.status !== "complete" ||
-      currentTab.url !== tab.url || afterOrigin !== sessionOrigin
+      currentTab.url !== tab.url || currentTab.pendingUrl !== undefined ||
+      afterOrigin !== sessionOrigin
     ) throw new Error("browser-session-changed");
     // React or a verification interstitial can change without navigation.
     // A single read cannot establish the current state in that transition.
@@ -820,7 +821,8 @@ async function read(
     if (Date.now() >= readDeadline)
       throw new Error("browser-session-changed");
     const beforeAgain = await browser.tabs.get(current.tabId);
-    if (beforeAgain.status !== "complete" || beforeAgain.url !== tab.url)
+    if (beforeAgain.status !== "complete" || beforeAgain.url !== tab.url ||
+        beforeAgain.pendingUrl !== undefined)
       throw new Error("browser-session-changed");
     const again = await script(
       current,
@@ -835,7 +837,8 @@ async function read(
     if (
       Date.now() >= readDeadline ||
       afterAgain.status !== "complete" ||
-      afterAgain.url !== tab.url || finalOrigin !== sessionOrigin ||
+      afterAgain.url !== tab.url || afterAgain.pendingUrl !== undefined ||
+      finalOrigin !== sessionOrigin ||
       !exactSessionObservation(again) ||
       observed.value !== again.value
     ) throw new Error("browser-session-changed");

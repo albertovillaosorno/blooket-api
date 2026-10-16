@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green worker regression queued a foreign Chrome
+navigation during `session.observe` after its initial native-document proof.
+The worker previously returned the old signed-in observation; it now checks
+pending navigation in all subsequent session comparisons. This is synthetic
+read-boundary coverage, not live authentication or publication evidence.
+
 On 2026-10-16, synthetic read regression fixtures triggered a foreign Chrome
 `pendingUrl` after My Sets' first saved-list script and after the Edit
 sidebar's first saved-state observation. Both previously allowed a successful
