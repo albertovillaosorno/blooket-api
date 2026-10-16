@@ -406,3 +406,9 @@ The Add Question host likewise snapshots script-result envelopes before
 accepting form preparation, session observations and saved-image byte
 identities. An accessor or proxy property read cannot substitute an apparent
 success for a mismatching own-data result or a signed-out provider state.
+
+The Create Set host makes the same descriptor-backed decisions for
+preparation, session state, redirect receipts and independently verified
+saved metadata. The Edit Info visibility read uses a copied reply rather
+than trusting accessors after its field-key check. Neither host is allowed
+to turn an unconfirmed browser response into a duplicate Save attempt.

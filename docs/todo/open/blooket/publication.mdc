@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green Create Set host regressions demonstrated
+that property-read traps could invent a successful preparation, a signed-in
+Create session, an exact Edit redirect receipt, matching saved-sidebar text,
+or a matching Edit Info privacy read despite contrary own data. The host now
+snapshots the exact script reply and nested metadata fields without reading
+proxy getters. Its staged metadata and visibility checks retain their
+separate fresh-document confirmation; synthetic evidence is not a live Save.
+
 On 2026-10-16, red-to-green Add Question host regressions showed that
 property-read traps could spoof a prepared-form acknowledgment, signed-in
 Edit observation, or saved-image SHA-256 identity despite conflicting own

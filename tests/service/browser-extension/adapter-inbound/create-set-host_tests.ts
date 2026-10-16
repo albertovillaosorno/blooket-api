@@ -219,6 +219,105 @@ test(
   },
 );
 
+test("Create Set cannot adopt a proxy-spoofed preparation success",
+  async () => {
+  let reads = 0;
+  const claimed = new Proxy({ ok: false }, { get(target, key) {
+    if (key === "ok") { reads++; return true; }
+    return Reflect.get(target, key);
+  } });
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/create", scripts: [claimed] });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).prepareCreateSet({ title: "Synthetic", description: "Draft",
+    private: true });
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  },
+);
+
+test("Create Set cannot claim a proxy-spoofed signed-out page",
+  async () => {
+  let reads = 0;
+  const forged = new Proxy({ ok: false, value: "signed-out" }, {
+    get(target, key) {
+      if (key === "ok" || key === "value") {
+        reads++;
+        return key === "ok" ? true : "create";
+      }
+      return Reflect.get(target, key);
+    },
+  });
+  const fake = fakeChrome({
+    afterUpdate: [{ url: "https://dashboard.blooket.com/create",
+      status: "complete" }],
+    scripts: [forged],
+  });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).openCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  assert.equal(fake.calls.includes("create-ownership:claim"), false);
+  },
+);
+
+test("Create Set redirect receipt must use owned remote ID fields",
+  async () => {
+  let reads = 0;
+  const forged = new Proxy({ ok: false, remoteSetId: "other-set" }, {
+    get(target, key) {
+      if (key === "ok" || key === "remoteSetId") {
+        reads++;
+        return key === "ok" ? true : "remote-set-1";
+      }
+      return Reflect.get(target, key);
+    },
+  });
+  const fake = fakeChrome({ scripts: [forged, forged] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet();
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  },
+);
+
+test("a proxy cannot spoof saved metadata before opening Edit Info",
+  async () => {
+  const expected = { title: "Synthetic", description: "Draft",
+    private: true };
+  const fake = fakeChrome({ scripts: [observed, observed] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketDetailSidebar") {
+      const value = { title: "foreign-title", description: "foreign" };
+      const forged = new Proxy(value, { get(target, key) {
+        if (key === "title" || key === "description") {
+          reads++;
+          return key === "title" ? expected.title : expected.description;
+        }
+        return Reflect.get(target, key);
+      } });
+      return [{ result: { ok: true, value: forged } }];
+    }
+    return await original(request);
+  };
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  assert.equal(fake.calls.includes("detail-open"), false);
+  },
+);
+
 test("pending foreign navigation cannot own Create Set actions", async () => {
   const pendingUrl = "https://foreign.invalid/next";
   for (const phase of ["open", "prepare", "submit"] as const) {
@@ -1541,6 +1640,38 @@ test("fresh Create Set observes saved private and public visibility",
         "detail-final-sidebar", "detail-is-closed"]);
     assert.equal(fake.calls.filter(call => call === "reload").length, 1);
   }
+  },
+);
+
+test("Create Set privacy proof ignores proxy-spoofed Edit Info reads",
+  async () => {
+  const expected = { title: "Synthetic", description: "Example",
+    private: true };
+  const sidebar = { ok: true, value: { title: expected.title,
+    description: expected.description } };
+  const saved = { schemaVersion: 1, id: "remote-set-1",
+    title: expected.title, description: expected.description,
+    visibility: "private" };
+  let reads = 0;
+  const forged = new Proxy({ ok: false, value: { ...saved,
+    title: "foreign" } }, { get(target, key) {
+    if (key === "ok" || key === "value") {
+      reads++;
+      return key === "ok" ? true : saved;
+    }
+    return Reflect.get(target, key);
+  } });
+  const fake = fakeChrome({ savedVisibility: "private", panelRead: forged,
+    scripts: [observed, observed, sidebar, sidebar,
+      observed, sidebar, observed, sidebar] });
+  fake.setTab({ url: "https://dashboard.blooket.com/edit?id=remote-set-1",
+    status: "complete" });
+  const result = await createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  ).observeCreateSet(expected);
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  assert.equal(fake.calls.includes("detail-open"), true);
   },
 );
 
