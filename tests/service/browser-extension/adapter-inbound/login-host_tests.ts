@@ -153,6 +153,33 @@ test(
   },
 );
 
+test("login never sends credentials to a pending foreign page", async () => {
+  for (const phase of ["initial", "after-prepare", "after-poll"] as const) {
+    const page = fixture({});
+    let pending = phase === "initial";
+    const get = page.chrome.tabs.get;
+    page.chrome.tabs.get = async () => ({ ...await get(),
+      ...(pending ? { pendingUrl: "https://foreign.invalid/login" } : {}),
+    });
+    const execute = page.chrome.scripting.executeScript;
+    page.chrome.scripting.executeScript = async request => {
+      const reply = await execute(request);
+      if ((phase === "after-prepare" &&
+          request.args?.[0] === "prepare") ||
+          (phase === "after-poll" &&
+            request.args?.[0] === "is-prepared")) pending = true;
+      return reply;
+    };
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => undefined,
+    ).authenticate(credentials);
+    assert.equal(result.ok, false, phase);
+    assert.equal(page.calls.includes("submit"), false, phase);
+    if (phase === "initial")
+      assert.deepEqual(page.argumentsSeen, []);
+  }
+});
+
 test(
   "host never submits after malformed preparation or stale controls",
   async () => {

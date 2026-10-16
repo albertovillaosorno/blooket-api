@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green extension-login regression found that an old
+committed `/login` page could still receive a credential-bearing script while
+Chrome had a foreign `pendingUrl`. The login host now rejects that tab
+before preparation and between every later prepared-state or submit step.
+No fixture credential entered a changed tab, and the test makes no claim
+about authenticating a real Blooket account.
+
 On 2026-10-16, red-to-green native mutation-host regressions found that an
 old committed dashboard or Edit URL could still authorize Create Set or Add
 Question interactions while Chrome had a foreign `pendingUrl`. Both hosts

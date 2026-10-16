@@ -41,6 +41,11 @@ pending navigation beginning during the first page script cannot certify the
 old signed-in state. The second state and native-document checks now require
 a committed, non-navigating Chrome tab.
 
+The Chrome login host now rejects pending foreign navigation despite a
+stale, correctly committed `/login` URL, before forwarding any further
+credentials. Portable tests cover redirects before initial admission,
+after preparation, and after a prepared-state poll.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and
