@@ -425,6 +425,37 @@ test("native input length limits fail before partially writing the form",
   }, "mc");
 });
 
+test("textarea CR line endings refuse early, while LF stays authored",
+  async () => {
+  await withEditor(async page => {
+    assert.equal(await prepareBlooketQuestionControls({
+      ...input, question: "Type\rsun.",
+    }), false);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.watch.controlsStarted, undefined);
+  });
+  const mc: BlooketQuestionPageInput = {
+    ...input, qType: "mc", random: false, answerTypes: null,
+    answers: [
+      { text: "Sun\r\nStar", correct: true },
+      { text: "Moon", correct: false },
+    ],
+  };
+  await withEditor(async page => {
+    assert.equal(await prepareBlooketQuestionControls(mc), false);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc");
+  await withEditor(async page => {
+    const newline = { ...mc, answers: [
+      { text: "Sun\nStar", correct: true },
+      { text: "Moon", correct: false },
+    ] };
+    assert.equal(await prepareBlooketQuestionControls(newline), true);
+    assert.equal(JSON.parse(page.hidden.value).answers[0], "Sun\nStar");
+  }, "mc");
+});
+
 test("visible editor events generate typing state without hidden overrides",
   async () => withEditor(async page => {
     const serialized = Function("return (" +

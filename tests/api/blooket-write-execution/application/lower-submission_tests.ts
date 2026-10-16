@@ -259,6 +259,7 @@ test("native question and answer bounds fail before browser lowering", () => {
     { ...base.question, prompt: "" },
     { ...base.question, prompt: " \t " },
     { ...base.question, prompt: "Type\0sun" },
+    { ...base.question, prompt: "Type\rsun" },
     { ...base.question, timeLimitSeconds: 86_401 },
     { ...base.question, timeLimitSeconds: 0 },
   ]) assert.deepEqual(lowerBlooketWriteSubmission(
@@ -280,7 +281,8 @@ test("native question and answer bounds fail before browser lowering", () => {
   } };
   if (mc.kind !== "question" || mc.question.type !== "multiple-choice")
     return;
-  for (const answer of ["", " \t ", "x".repeat(10_001), "Sun\0Moon"]) {
+  for (const answer of ["", " \t ", "x".repeat(10_001), "Sun\0Moon",
+    "Sun\rMoon", "Sun\r\nMoon"]) {
     assert.deepEqual(lowerBlooketWriteSubmission({ ...mc,
       question: { ...mc.question, answers: [
         { ...mc.question.answers[0]!, text: answer },

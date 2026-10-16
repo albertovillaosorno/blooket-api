@@ -204,7 +204,8 @@ export function runBlooketAddQuestionPageAction(
       input.number < 1 || input.number > 10_000 ||
       typeof input.question !== "string" ||
       !input.question.trim() || input.question.length > 20_000 ||
-      input.question.includes("\0") || input.question.includes("`*") ||
+      input.question.includes("\0") || input.question.includes("\r") ||
+      input.question.includes("`*") ||
       input.question.includes("`~`") ||
       typeof input.random !== "boolean" ||
       !Number.isSafeInteger(input.timeLimit) ||
@@ -227,6 +228,7 @@ export function runBlooketAddQuestionPageAction(
           !textField.value.trim() || textField.value.length > 10_000 ||
           typeof correctField.value !== "boolean" ||
           textField.value.includes("\0") ||
+          textField.value.includes("\r") ||
           textField.value.includes("`*") ||
           textField.value.includes("`~`") ||
           seen.has(textField.value)) return null;

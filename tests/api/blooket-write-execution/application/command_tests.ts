@@ -316,6 +316,7 @@ test("native field bounds stop publication before a frozen snapshot", () =>
       { ...document.questions[0]!, prompt: "x".repeat(20_001) },
       { ...document.questions[0]!, prompt: " \t " },
       { ...document.questions[0]!, prompt: "Type\0sun" },
+      { ...document.questions[0]!, prompt: "Type\rsun" },
       { ...document.questions[0]!, answer: " \t " },
       { ...document.questions[0]!, answer: "sun\0moon" },
       { ...document.questions[0]!, answer: "sun\nmoon" },

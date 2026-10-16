@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green native textarea regressions found that the
+canonical writer, the visible controls helper, and the independent Save guard
+accepted CR-bearing prompt and multiple-choice answer text. The HTML
+Standard normalizes CR/CRLF to LF when reading a textarea value; the writer
+now refuses CR-bearing strings before freezing a publication journal or
+partially changing the form, preserving author-intended text exactly.
+LF-only multiline textarea text remains admissible. This is portable
+provider-control evidence, not a live Save or remote read-back.
+
 On 2026-10-16, a red-to-green native editor regression showed that a
 new provider `maxLength` constraint on the timer or answer input could
 reject a late field assignment only after the prompt had already been

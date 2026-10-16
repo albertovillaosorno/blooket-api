@@ -126,7 +126,7 @@ function lowerQuestion(
   const mathMarker = "`*";
   const imageMarker = "`~`";
   if (!question.prompt.trim() || question.prompt.length > 20_000 ||
-      question.prompt.includes("\0") ||
+      question.prompt.includes("\0") || question.prompt.includes("\r") ||
       !Number.isSafeInteger(question.timeLimitSeconds) ||
       question.timeLimitSeconds < 1 || question.timeLimitSeconds > 86_400)
     return { ok: false, code: "invalid-question-content" };
@@ -178,7 +178,7 @@ function lowerQuestion(
   const answers: BlooketQuestionAnswerSubmission[] = [];
   for (const answer of question.answers) {
     if (answer.text !== null && answer.imageMediaId === null) {
-      if (invalidNativeAnswer(answer.text))
+      if (invalidNativeAnswer(answer.text) || answer.text.includes("\r"))
         return { ok: false, code: "invalid-answer-content" };
       if (answer.text.includes(mathMarker) || answer.text.includes(imageMarker))
         return { ok: false, code: "ambiguous-provider-text" };
