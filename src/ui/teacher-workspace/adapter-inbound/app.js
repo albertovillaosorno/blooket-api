@@ -310,6 +310,9 @@ const words = {
       "Ya hay otra operación en curso. Revisa el estado antes de continuar.",
     publicationStopStorage:
       "No se pudo comprobar el journal. No repitas la escritura.",
+    publicationStopContent:
+      "El borrador contiene campos que Blooket no puede guardar. " +
+      "Revisa el contenido antes de publicar de nuevo.",
     publicationStopCapacity:
       "El lector actual permite verificar hasta 200 preguntas por quiz. " +
       "Guarda un quiz más pequeño; no se inició otra escritura.",
@@ -646,6 +649,9 @@ const words = {
       "Another operation is running. Refresh status before proceeding.",
     publicationStopStorage:
       "The journal could not be verified. Do not replay the write.",
+    publicationStopContent:
+      "The draft contains fields Blooket cannot save. " +
+      "Review its content before publishing again.",
     publicationStopCapacity:
       "The current reader can verify up to 200 questions per quiz. " +
       "Save a smaller quiz; no additional write was started.",
@@ -2045,6 +2051,7 @@ function publicationFailureText(error) {
     media: "publicationStopMedia",
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",
+    content: "publicationStopContent",
     limit: "publicationStopLimit",
     capacity: "publicationStopCapacity",
     pacing: "publicationStopPacing",
