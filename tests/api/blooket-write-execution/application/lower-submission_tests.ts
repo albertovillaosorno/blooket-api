@@ -247,6 +247,32 @@ test("native question and answer bounds fail before browser lowering", () => {
   }
 });
 
+test("multiple-choice native slots reject ambiguous answer sets", () => {
+  const base: BlooketWriteOperation = {
+    operationId: "plan:test:q:slots", kind: "question",
+    localQuestionId: "slots", questionNumber: 1,
+    question: { type: "multiple-choice", prompt: "Which is a star?",
+      timeLimitSeconds: 20, randomOrder: true, imageMediaId: null,
+      answers: [
+        { text: "Sun", correct: true, imageMediaId: null },
+        { text: "Moon", correct: false, imageMediaId: null },
+      ],
+    },
+  };
+  if (base.kind !== "question" || base.question.type !== "multiple-choice")
+    return;
+  const original = base.question.answers;
+  for (const answers of [
+    [original[0]!],
+    [...original, original[0]!, original[1]!, original[0]!],
+    original.map(answer => ({ ...answer, correct: false })),
+    [{ ...original[0]!, text: "Moon" }, original[1]!],
+  ]) assert.deepEqual(lowerBlooketWriteSubmission({ ...base,
+    question: { ...base.question, answers },
+  }, { remoteSetId: "remote-set-1" }),
+  { ok: false, code: "invalid-answer-content" });
+});
+
 test(
   "target and impossible answer invariants fail before browser mechanics",
   () => {

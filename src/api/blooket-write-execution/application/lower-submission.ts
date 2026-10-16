@@ -152,6 +152,14 @@ function lowerQuestion(
     };
   }
 
+  // The native MC editor has two to four distinct text slots and at
+  // least one correct answer. Do not defer impossible forms to the browser.
+  const texts = question.answers.flatMap(answer =>
+    answer.text === null ? [] : [answer.text]);
+  if (question.answers.length < 2 || question.answers.length > 4 ||
+      !question.answers.some(answer => answer.correct) ||
+      new Set(texts).size !== texts.length)
+    return { ok: false, code: "invalid-answer-content" };
   const answers: BlooketQuestionAnswerSubmission[] = [];
   for (const answer of question.answers) {
     if (answer.text !== null && answer.imageMediaId === null) {
