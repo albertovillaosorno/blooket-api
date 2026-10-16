@@ -210,6 +210,7 @@ test("native set and remote identifier bounds fail before submission", () => {
     visibility: "private", coverMediaId: null };
   for (const operation of [
     { ...set, title: "" },
+    { ...set, title: " \t " },
     { ...set, title: "X".repeat(1_001) },
     { ...set, description: "X".repeat(10_001) },
   ]) assert.deepEqual(lowerBlooketWriteSubmission(operation,

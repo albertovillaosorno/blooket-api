@@ -78,6 +78,8 @@ stranding an unverified question. Existing larger snapshots remain readable
 for status and reconciliation without granting another write start.
 
 Provider form limits are checked independently of project-document syntax.
+Whitespace-only set titles are rejected before opening a write journal while
+valid teacher-authored title text remains unchanged.
 A later native-contract change cannot make an old attempting journal disappear:
 status and read-only reconciliation remain available even when a new write
 would fail today's provider-text preflight.

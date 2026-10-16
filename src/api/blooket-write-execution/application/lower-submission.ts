@@ -76,7 +76,7 @@ export function lowerBlooketWriteSubmission(
     if (target.remoteSetId !== null) {
       return { ok: false, code: "unexpected-remote-set-binding" };
     }
-    if (operation.title.length < 1 || operation.title.length > 1_000 ||
+    if (!operation.title.trim() || operation.title.length > 1_000 ||
         operation.description.length > 10_000)
       return { ok: false, code: "invalid-set-content" };
     return {

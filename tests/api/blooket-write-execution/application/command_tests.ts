@@ -241,6 +241,26 @@ test("invalid provider math text stops before freezing a write journal", () =>
     await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
   }));
 
+test("whitespace-only set titles stop before publication persistence", () =>
+  fixture(async state => {
+    const saved = await executeLibraryCommand({ version: 1,
+      operationId: "cli:blank-title", command: "drafts.put",
+      payload: { id: "blank-title", expectedRevision: null,
+        document: { ...document, title: " \t " } },
+    }, state.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const result = await executeBlooketPublicationCommand({
+      ...command("step", revision),
+      payload: { draftId: "blank-title", expectedRevision: revision },
+    }, state.host);
+    assert.equal(result.ok, false);
+    assert.equal(state.writes(), 0);
+    const files = await publicationFiles(state.root, "blank-title");
+    await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
 test("native field bounds stop publication before a frozen snapshot", () =>
   fixture(async s => {
     const badQuestions = [
