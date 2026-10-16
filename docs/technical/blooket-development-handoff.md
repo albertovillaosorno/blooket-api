@@ -51,6 +51,18 @@ pending navigation, even if its last committed URL remains Blooket. That
 includes a redirect beginning while the owned tab is being activated;
 window focus is then withheld.
 
+A 2026-10-16 read-only acceptance preflight reused the already running
+localhost service under its approved development root. Workspace and
+bootstrap returned HTTP 200; the bridge had one connected companion, zero
+pending jobs, no incompatible clients, and no required update.
+
+Canonical CLI session inspection succeeded on the Edit surface, but a
+scoped text-only capability inspection returned `blooket-browser-failed`
+twice. This alone cannot distinguish an unsaved editor, a loaded-worker
+revision mismatch, or another native guard. No browser reload, navigation,
+profile restart, ambiguous Save replay, or account mutation was attempted.
+Check the active editor and loaded contract before another publication.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and
