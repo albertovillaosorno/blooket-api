@@ -78,9 +78,26 @@ See Chrome's [Tabs API][pending-tabs] and the shared read-navigation classifier.
 [pending-tabs]: https://developer.chrome.com/docs/extensions/reference/api/tabs
 
 Start with the unfinished `blooket-11` record. A real Create Set receipt and
-a reconciled typing-question publication exist, but the latest MC Save
-returned HTTP 429 and remains uncertain. Do not replay it, adopt a matching
-title, or remove its journal because a separate read shows zero questions.
+a reconciled typing-question publication exist. On 2026-10-16, the companion
+built from `85720eb` also completed a new private MC quiz through canonical
+CLI publication: Create Set advanced to 1/2, Add Question advanced to 2/2,
+and a separate fresh verification returned `published: true`, `phase: verified`
+at 17:49 UTC. Computer Use independently observed the saved one-question card
+with its Spanish prompt and 20-second timer after the product's reload.
+
+This confirms the text Create Set/Add Question journey, including the actual
+native empty MC match-mode list. It does not close the image, existing-question
+replacement or complete AI-client acceptance requirements. A subsequent extra
+question read reported a security challenge.
+
+A later read, after the native
+page showed no challenge and without interacting with a CAPTCHA, independently
+confirmed both answers, correctness, shuffle off and the 20-second timer.
+Keep transient human stops explicit instead of extrapolating old evidence.
+
+The earlier HTTP-429 MC attempt and the pre-submit append attempt remain
+unconfirmed and preserved. Do not replay either, adopt a matching title, or
+remove a journal because another read shows no new question.
 
 MC page-script arguments now travel as JSON text, preserving nullable fields
 that disappeared from injected object arguments in the authorized Chrome
