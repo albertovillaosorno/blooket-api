@@ -190,6 +190,7 @@ test("provider text markers fail before browser lowering", () => {
   for (const question of [
     { ...base.question, prompt: "Solve`*`x^2`*`" },
     { ...base.question, prompt: "Solve`*unfinished" },
+    { ...base.question, prompt: "Picture`~`https://provider.invalid" },
     { ...base.question, answer: "sun`*`x`*`" },
     { ...base.question, answer: "sun`*unfinished" },
     { ...base.question, answer: "sun`~`https://provider.invalid" },

@@ -82,6 +82,10 @@ Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. Similarly, native
 question/answer lowering and the browser form guard refuse whitespace-only
 prompts or text answers without changing meaningful authored text.
+
+Reserved
+math or image markers embedded in prompt text are refused just as they are in
+text answers; actual media must use the separately admitted media slot.
 A later native-contract change cannot make an old attempting journal disappear:
 status and read-only reconciliation remain available even when a new write
 would fail today's provider-text preflight.
