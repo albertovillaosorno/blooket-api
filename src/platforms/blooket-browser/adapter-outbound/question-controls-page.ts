@@ -156,6 +156,24 @@ export async function prepareBlooketQuestionControls(
         (input.qType === "mc" && input.answerTypes !== null) ||
         !Array.isArray(input.answers) || input.answers.length < 1 ||
         input.answers.length > (input.qType === "mc" ? 4 : 100)) return false;
+    // This step edits visible React controls before the final Save guard.
+    // Refuse already-invalid provider text and timers *before* activating
+    // the form watch or changing a question type, prompt, or answer field.
+    if (typeof input.question !== "string" || !input.question.trim() ||
+        input.question.length > 20_000 || input.question.includes("\0") ||
+        input.question.includes("`*") || input.question.includes("`~`") ||
+        !Number.isSafeInteger(input.timeLimit) ||
+        input.timeLimit < 1 || input.timeLimit > 86_400 ||
+        input.answers.some(answer => !answer ||
+          typeof answer.text !== "string" || !answer.text.trim() ||
+          answer.text.length > 10_000 || answer.text.includes("\0") ||
+          answer.text.includes("`*") || answer.text.includes("`~`") ||
+          typeof answer.correct !== "boolean")) return false;
+    // Typing alternatives are single-line native input elements. Reject
+    // content the DOM would silently strip before touching any visible field.
+    if (input.qType === "typing" && input.answers.some(answer =>
+      !answer || typeof answer.text !== "string" ||
+      /[\r\n]/u.test(answer.text))) return false;
     watch!.controlsStarted = true;
     if (!await wait(() => raw() !== null)) return false;
     // Before picking a type or changing native fields, require the exact

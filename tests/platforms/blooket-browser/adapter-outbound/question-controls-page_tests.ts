@@ -333,6 +333,45 @@ test("visible editor events generate typing state without hidden overrides",
     assert.equal(await serialized(input), false);
   }));
 
+test("invalid native typing values never partially fill the editor",
+  async () => {
+  const invalid: BlooketQuestionPageInput[] = [
+    { ...input, question: " \t " },
+    { ...input, question: "Type\0sun" },
+    { ...input, question: "Type`*sun" },
+    { ...input, answers: [{ text: " \t ", correct: true }] },
+    { ...input, answers: [{ text: "sun\0moon", correct: true }] },
+    { ...input, answers: [{ text: "sun`~`moon", correct: true }] },
+    { ...input, timeLimit: 0 },
+    { ...input, timeLimit: 86_401 },
+  ];
+  for (const candidate of invalid) {
+    await withEditor(async page => {
+      assert.equal(await prepareBlooketQuestionControls(candidate), false);
+      assert.equal(page.prompt.value, "");
+      assert.equal(page.picker.clicked, 0);
+      assert.equal(page.watch.controlsStarted, undefined);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+  }
+});
+
+test("typing input newline is refused before modifying visible controls",
+  async () => {
+  for (const answer of ["sun\nmoon", "sun\rmoon"]) {
+    await withEditor(async page => {
+      const attempted = await prepareBlooketQuestionControls({ ...input,
+        answers: [{ text: answer, correct: true }],
+      });
+      assert.equal(attempted, false);
+      assert.equal(page.prompt.value, "");
+      assert.equal(page.picker.clicked, 0);
+      assert.equal(page.watch.controlsStarted, undefined);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+  }
+});
+
 test("alternative typing answers preserve independent match controls",
   async () => withEditor(async page => {
     assert.equal(await prepareBlooketQuestionControls({ ...input,

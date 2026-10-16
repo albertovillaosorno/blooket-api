@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green synthetic form-control regressions showed that
+the pre-Save visible-controls writer could partly fill a provider editor with
+unsupported prompt, answer, or timer values before the later Save guard
+refused the publication. The writer now rejects blank or malformed native
+text, reserved markers, impossible timers and typing-input line breaks
+before starting its form watch or touching visible controls. The MC textarea
+still accepts authored multiline answers. No live provider Save was claimed.
+
 On 2026-10-16, a second red-to-green single-line input regression refused
 CR and LF in native typing-answer text. The recovered Blooket form uses
 `input[name="accepted-answers"]` for typing alternatives, unlike the

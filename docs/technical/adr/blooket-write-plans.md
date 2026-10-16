@@ -98,6 +98,12 @@ Native typing alternatives likewise use single-line
 and the independent Save guard. Multiple-choice answers use `textarea`
 controls, so their authored multiline text remains admissible and unchanged.
 
+The separately injected question-controls preparation step checks the same
+provider-text and timer boundaries before changing a visible React editor.
+Rejection must not leave a partially filled prompt, question type, or typing
+answer waiting in an unsubmitted form merely because the later Save guard
+would refuse it.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even
