@@ -871,6 +871,21 @@ test("provider-matching image marker in prompt is refused before Save", () => {
     });
 });
 
+test("provider-matching NUL prompt cannot authorize Save", () => {
+  const page = fixture();
+  const prompt = "Type\0sun";
+  page.hidden.value = JSON.stringify({ ...JSON.parse(page.hidden.value),
+    question: prompt });
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.equal(prepareBlooketAddQuestionForm({ ...typing,
+        question: prompt }).ok, false);
+      assert.equal(submitBlooketAddQuestionForm({ ...typing,
+        question: prompt }).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+});
+
 test("provider marker text never reaches the hidden question field", () => {
   const page = fixture();
   const before = page.hidden.value;

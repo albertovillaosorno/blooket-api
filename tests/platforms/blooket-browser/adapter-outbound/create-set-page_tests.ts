@@ -277,6 +277,24 @@ test("whitespace-only native set titles cannot fill or submit", () => {
   });
 });
 
+test("NUL-bearing Create Set metadata cannot fill or submit", () => {
+  for (const input of [
+    { title: "Bad\0Title", description: "Draft", private: false },
+    { title: "Title", description: "Bad\0Notes", private: false },
+  ]) {
+    const page = fixture(false);
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.title.value, "");
+      assert.equal(page.description.value, "");
+      page.title.value = input.title;
+      page.description.value = input.description;
+      assert.equal(submitBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+    });
+  }
+});
+
 test("Create Set staying disabled after a title never submits", () => {
   const page = fixture(true);
   const submit = page.form.selectors["button"]![0]!;

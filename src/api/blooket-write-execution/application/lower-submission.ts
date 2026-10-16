@@ -77,7 +77,9 @@ export function lowerBlooketWriteSubmission(
       return { ok: false, code: "unexpected-remote-set-binding" };
     }
     if (!operation.title.trim() || operation.title.length > 1_000 ||
-        operation.description.length > 10_000)
+        operation.title.includes("\0") ||
+        operation.description.length > 10_000 ||
+        operation.description.includes("\0"))
       return { ok: false, code: "invalid-set-content" };
     return {
       ok: true,
@@ -123,6 +125,7 @@ function lowerQuestion(
   const mathMarker = "`*";
   const imageMarker = "`~`";
   if (!question.prompt.trim() || question.prompt.length > 20_000 ||
+      question.prompt.includes("\0") ||
       !Number.isSafeInteger(question.timeLimitSeconds) ||
       question.timeLimitSeconds < 1 || question.timeLimitSeconds > 86_400)
     return { ok: false, code: "invalid-question-content" };
