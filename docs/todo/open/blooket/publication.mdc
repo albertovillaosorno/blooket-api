@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green capability-host regression proved that an
+apparently complete My Sets route could certify account capabilities while
+Chrome reported a pending foreign navigation. The capability inspection
+boundary now checks committed-route stability before and after page scripts,
+during owned navigation, while confirming account media, and before any modal
+cleanup or restoration. A pending redirect cannot grant a new inspection or
+allow Cancel to touch a potentially replaced editor. These synthetic checks
+do not establish live publication or account entitlement.
+
 On 2026-10-16, synthetic read-navigation regressions reproduced a Chrome
 pending redirect being accepted as an exact committed source, destination,
 or final read tab. The shared navigation gate and temporary question reader

@@ -248,6 +248,53 @@ test("invalid upstream capability deadline stops before tab access",
   }
 });
 
+test("a source tab pending foreign navigation cannot start probing",
+  async () => {
+  const page = fixture();
+  const original = page.chrome.tabs.get;
+  page.chrome.tabs.get = async id => ({ ...await original(id),
+    pendingUrl: "https://foreign.invalid/" });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect({ textOnly: true });
+  assert.equal(result.ok, false);
+  assert.deepEqual(page.navigations, []);
+  assert.deepEqual(page.scripts, []);
+});
+
+test("a pending redirect after My Sets load cannot certify capabilities",
+  async () => {
+  const page = fixture();
+  const original = page.chrome.tabs.get;
+  const target = "https://dashboard.blooket.com/my-sets";
+  page.chrome.tabs.get = async id => ({ ...await original(id),
+    ...(page.currentUrl() === target ? {
+      pendingUrl: "https://foreign.invalid/" } : {}),
+  });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect({ textOnly: true });
+  assert.equal(result.ok, false);
+  assert.equal(page.scripts.includes("inspectBlooketPage"), false);
+});
+
+test("a pending redirect blocks capability modal cleanup", async () => {
+  const page = fixture();
+  const original = page.chrome.tabs.get;
+  page.chrome.tabs.get = async id => ({ ...await original(id),
+    ...(page.scripts.includes("openBlooketCapabilityQuestionPanel") ? {
+      pendingUrl: "https://foreign.invalid/" } : {}),
+  });
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect();
+  assert.equal(result.ok, false);
+  assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
+    true);
+  assert.equal(page.scripts.includes("closeBlooketCapabilityQuestionPanel"),
+    false);
+});
+
 test("capability navigation waits for native destination readiness",
   async () => {
   const page = fixture();
