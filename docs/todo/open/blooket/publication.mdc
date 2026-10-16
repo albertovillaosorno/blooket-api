@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green Create Set fixtures showed that a shortened
+native title/description limit, password-type title, or disabled/read-only
+metadata field could be detected only after a partial form fill. The native
+prepare and independent Save checks now require the plain-text title input,
+writable metadata controls, and admissible field lengths before any write.
+The same controls are revalidated during form ownership checks. This is
+portable compatibility evidence, not a remote publication receipt.
+
 On 2026-10-16, red-to-green Create Set regressions established that CR/CRLF
 in the native description textarea could be normalized after the title had
 already been filled. Canonical lowering and both independent Create Set form

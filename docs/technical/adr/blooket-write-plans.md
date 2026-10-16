@@ -133,6 +133,12 @@ normalizes carriage returns, canonical lowering and independent form actions
 refuse CR/CRLF in descriptions without changing LF-only multiline content.
 This check precedes filling the single-line title and freezing the attempt.
 
+Create Set metadata preparation also requires the observed single-line
+plain-text title control and writable title/description controls; it checks
+both native `maxLength` values before setting either field. Independent Save
+admission rechecks these controls so changed form types cannot receive an
+unintended write or click.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even

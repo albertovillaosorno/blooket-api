@@ -165,6 +165,9 @@ export function prepareBlooketCreateSetForm(
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;
     const privacyInput = privacy as HTMLInputElement;
+    if (titleInput.type !== "text" || titleInput.disabled ||
+        titleInput.readOnly || descriptionInput.disabled ||
+        descriptionInput.readOnly) return failed();
     const readyControl = (element: Element): boolean => {
       const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -232,6 +235,9 @@ export function prepareBlooketCreateSetForm(
             privacyInput ||
           !readyControl(form) || !readyControl(titleInput) ||
           !readyControl(descriptionInput) || !readyControl(privacyInput) ||
+          titleInput.type !== "text" || titleInput.disabled ||
+          titleInput.readOnly || descriptionInput.disabled ||
+          descriptionInput.readOnly ||
           privacyInput.disabled ||
           privacyInput.getAttribute("aria-disabled") === "true" ||
           document.querySelectorAll(logoutSelector).length !== 1 ||
@@ -288,6 +294,13 @@ export function prepareBlooketCreateSetForm(
       element.dispatchEvent(new Event("change", { bubbles: true }));
     };
 
+    // A provider-side field limit change must not leave only the title
+    // written when a later description assignment is rejected.
+    if ((titleInput.maxLength >= 0 &&
+          input.title.length > titleInput.maxLength) ||
+        (descriptionInput.maxLength >= 0 &&
+          input.description.length > descriptionInput.maxLength))
+      return failed();
     setValue(titleInput, input.title);
     if (!intact(currentPrivate) || titleInput.value !== input.title)
       return failed();
@@ -410,6 +423,9 @@ export function submitBlooketCreateSetForm(
     const titleInput = title as HTMLInputElement;
     const descriptionInput = description as HTMLTextAreaElement;
     const privacyInput = privacy as HTMLInputElement;
+    if (titleInput.type !== "text" || titleInput.disabled ||
+        titleInput.readOnly || descriptionInput.disabled ||
+        descriptionInput.readOnly) return failed();
     const readyControl = (element: Element): boolean => {
       const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);
