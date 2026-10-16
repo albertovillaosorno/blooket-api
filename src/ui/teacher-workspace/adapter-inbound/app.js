@@ -31,6 +31,14 @@ const words = {
       "vez.",
     openBlooketBrowser: "Abrir Blooket en mi navegador",
     checkBlooketReadiness: "Comprobar lectura de Mis Sets",
+    connectBlooket: "Iniciar sesión con la cuenta guardada",
+    readConnecting: "Conectando con tu cuenta guardada…",
+    readConnectFailed:
+      "No se pudo iniciar sesión. Revisa tu correo y contraseña en " +
+      "Configuración y la pestaña de Blooket.",
+    readRateLimited: "Blooket pide esperar. No se ha repetido el inicio.",
+    readConnectBusy:
+      "Hay una acción de Blooket en curso. Espera a que termine.",
     readChecking: "Comprobando la sesión y Mis Sets…",
     readInterrupted: "La lectura se interrumpió: ",
     readNotConnected:
@@ -374,6 +382,13 @@ const words = {
       "Blooket API stopped. Open the application to start it again.",
     openBlooketBrowser: "Open Blooket in my browser",
     checkBlooketReadiness: "Check My Sets read",
+    connectBlooket: "Sign in with the saved account",
+    readConnecting: "Connecting with your saved account…",
+    readConnectFailed:
+      "Sign-in failed. Check your email and password in Settings and " +
+      "the Blooket tab.",
+    readRateLimited: "Blooket asks you to wait. Sign-in was not repeated.",
+    readConnectBusy: "A Blooket action is in progress. Wait for it to finish.",
     readChecking: "Checking your session and My Sets…",
     readInterrupted: "The read was interrupted: ",
     readNotConnected:
@@ -807,6 +822,7 @@ function renderBlooketReadiness() {
         state === "signed-out" || state === "expired-session"
           ? "readSignedOut" :
           state === "organization-prompt" ? "readOrganization" :
+            state === "rate-limited" ? "readRateLimited" :
             "readUnexpected",
     );
     return;
@@ -1835,6 +1851,27 @@ $("#checkBlooketReadiness").addEventListener("click", async event => {
       ? "readMultipleClients" :
       error.message === "blooket-browser-not-connected"
         ? "readNotConnected" : "readUnconfirmed";
+  } finally {
+    renderBlooketReadiness();
+    event.target.disabled = false;
+  }
+});
+$("#connectBlooket").addEventListener("click", async event => {
+  event.target.disabled = true;
+  blooketReadiness = "readConnecting";
+  renderBlooketReadiness();
+  try {
+    const result = await api("/api/blooket-connect", {});
+    blooketReadiness = result.kind === "ready"
+      ? await api("/api/blooket-readiness-check", {})
+      : { read: "not-attempted", state: result.state };
+  } catch (error) {
+    blooketReadiness = error.message === "blooket-browser-multiple-clients"
+      ? "readMultipleClients" :
+      error.message === "blooket-browser-not-connected"
+        ? "readNotConnected" :
+        error.message === "blooket-connect-busy"
+          ? "readConnectBusy" : "readConnectFailed";
   } finally {
     renderBlooketReadiness();
     event.target.disabled = false;

@@ -38,6 +38,8 @@ import { createPackagedLoginItemControl, type LoginItemControl } from
 import { inspectLoginItem, setLoginItemPreference } from
   "../../teacher-configuration/application/login-item.ts";
 import { createBlooketRuntimePorts } from "./blooket-runtime.ts";
+import { ensureConfiguredBlooketSession } from
+  "../../blooket-session/application/ensure-session.ts";
 import {
   BLOOKET_BROWSER_CLIENT_HEADER, decodeBlooketBrowserClient,
 } from "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -218,6 +220,7 @@ export async function startBrowserService(
   let quiescing = false;
   let closing: Promise<void> | undefined;
   let resourcesClosed = false;
+  let blooketConnecting = false;
   let closingFailure: unknown;
   function closeResources() {
     if (resourcesClosed) return;
@@ -527,6 +530,30 @@ export async function startBrowserService(
           ? 36_000_000
           : 1_000_000,
       );
+      if (url.pathname === "/api/blooket-connect") {
+        if (!body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).length !== 0)
+          throw new Error("invalid-blooket-connect");
+        const status = browserBridge.status();
+        if (!status.connected) {
+          json(response, 409, { ok: false, code: status.multipleBrowserClients
+            ? "blooket-browser-multiple-clients"
+            : "blooket-browser-not-connected" });
+          return;
+        }
+        if (blooketConnecting || status.pending !== 0) {
+          json(response, 409, { ok: false, code: "blooket-connect-busy" });
+          return;
+        }
+        blooketConnecting = true;
+        try {
+          const result = await ensureConfiguredBlooketSession(
+            blooket.session, root, secrets,
+          );
+          json(response, result.ok ? 200 : 409, result);
+        } finally { blooketConnecting = false; }
+        return;
+      }
       if (url.pathname === "/api/blooket-readiness-check") {
         if (!body || typeof body !== "object" || Array.isArray(body) ||
             Object.keys(body).length !== 0)
