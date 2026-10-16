@@ -66,6 +66,8 @@ test(
   let detachedSourceReload = false;
   let pendingSourceRedirect = false;
   let pendingSourceAfterRead = false;
+  let pendingAfterSetObservation = false;
+  let pendingAfterDetailSidebar = false;
   let detachedTabNavigatedByUser = false;
   let detachedTabActivatedByUser = false;
   let detachedCreated = 0;
@@ -257,7 +259,9 @@ test(
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
         return { id, url: tabUrl, status: "complete", windowId: 3,
-          ...(pendingSourceRedirect ? {
+          ...(pendingSourceRedirect ||
+              (pendingAfterSetObservation && setListReads > 0) ||
+              (pendingAfterDetailSidebar && detailSidebarReadCount > 0) ? {
             pendingUrl: "https://foreign.invalid/teacher-navigation",
           } : {}) };
       },
@@ -1312,6 +1316,12 @@ test(
     assert.equal(delayedSets.value.completeness, "unknown");
     assert.equal(setListReads, 4);
     assert.equal(listFailuresRemaining, 0);
+    // Pending navigation after the first My Sets script invalidates the
+    // apparent stable collection, even when the old URL never changes.
+    pendingAfterSetObservation = true;
+    setListReads = 0;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    pendingAfterSetObservation = false;
     listReloadDuringCapture = true;
     setListReads = 0;
     assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
@@ -1414,6 +1424,14 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    // A pending redirect after a saved sidebar observation is not proof
+    // of the old exact Edit route, and cannot authorize the next click.
+    pendingAfterDetailSidebar = true;
+    detailSidebarReadCount = 0;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    pendingAfterDetailSidebar = false;
     detailSidebarReadCount = 0;
     detailSidebarFailuresRemaining = 1;
     const beforeHydration = scripts.length;

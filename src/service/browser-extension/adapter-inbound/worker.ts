@@ -496,6 +496,10 @@ async function read(
     const observe = async () => {
       const observed = await script(current, browser,
         inspectBlooketPage as (...args: never[]) => unknown, [operation]);
+      const between = await browser.tabs.get(current.tabId);
+      if (between.status !== "complete" || between.url !== target ||
+          between.pendingUrl !== undefined || Date.now() >= readDeadline)
+        throw new Error("browser-set-list-unavailable");
       const captured = await script(current, browser,
         captureBlooketLibraryModel as (...args: never[]) => unknown);
       const afterOrigin = await script(current, browser,
@@ -503,7 +507,10 @@ async function read(
         [target]);
       // Both scripts must belong to the same native document. A same-route
       // replacement cannot make two unrelated snapshots look consistent.
-      if (afterOrigin !== expectedOrigin || Date.now() >= readDeadline)
+      const checked = await browser.tabs.get(current.tabId);
+      if (afterOrigin !== expectedOrigin || Date.now() >= readDeadline ||
+          checked.url !== target || checked.status !== "complete" ||
+          checked.pendingUrl !== undefined)
         throw new Error("browser-set-list-unavailable");
       // Raw initial model text remains inside this local extension call.
       return checkBlooketLibraryObservation(observed, captured);
@@ -514,7 +521,8 @@ async function read(
     for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
       attempt++) {
       const currentTab = await browser.tabs.get(current.tabId);
-      if (currentTab.status !== "complete" || currentTab.url !== target)
+      if (currentTab.status !== "complete" || currentTab.url !== target ||
+          currentTab.pendingUrl !== undefined)
         throw new Error("browser-set-list-unavailable");
       const result = await observe();
       if (
@@ -540,7 +548,8 @@ async function read(
     if (Date.now() >= readDeadline)
       throw new Error("browser-set-list-unavailable");
     const tabAfter = await browser.tabs.get(current.tabId);
-    if (tabAfter.status !== "complete" || tabAfter.url !== target)
+    if (tabAfter.status !== "complete" || tabAfter.url !== target ||
+          tabAfter.pendingUrl !== undefined)
       throw new Error("browser-set-list-unavailable");
     const after = await observe();
     const admittedAfter = admittedLibraryRead(after);
@@ -548,7 +557,8 @@ async function read(
         JSON.stringify(initial) !== JSON.stringify(admittedAfter))
       throw new Error("browser-set-list-unavailable");
     const checkedTab = await browser.tabs.get(current.tabId);
-    if (checkedTab.status !== "complete" || checkedTab.url !== target)
+    if (checkedTab.status !== "complete" || checkedTab.url !== target ||
+          checkedTab.pendingUrl !== undefined)
       throw new Error("browser-set-list-unavailable");
     return initial;
   }
@@ -566,13 +576,15 @@ async function read(
     const ownsDetailRoute = async () => {
       const observed = await browser.tabs.get(current.tabId);
       if (Date.now() >= readDeadline || observed.status !== "complete" ||
-          observed.url !== target) return false;
+          observed.url !== target || observed.pendingUrl !== undefined)
+        return false;
       const currentOrigin = await script(current, browser,
         inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
         [target]);
       const after = await browser.tabs.get(current.tabId);
       return Date.now() < readDeadline && after.status === "complete" &&
-        after.url === target && currentOrigin === documentOrigin;
+        after.url === target && after.pendingUrl === undefined &&
+        currentOrigin === documentOrigin;
     };
     // Module 12048 unmounts the original title/description sidebar once
     // Edit Info opens. Capture two identical independent sidebar readings

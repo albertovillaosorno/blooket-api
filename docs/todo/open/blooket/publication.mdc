@@ -73,6 +73,16 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, synthetic read regression fixtures triggered a foreign Chrome
+`pendingUrl` after My Sets' first saved-list script and after the Edit
+sidebar's first saved-state observation. Both previously allowed a successful
+read from the old committed URL. Worker My Sets now checks the route between
+scripts and at each confirmation boundary.
+
+Set-detail checks prevent a pending redirect from authorizing modal or
+Cancel actions. A provider account was not contacted; this remains portable
+fail-closed evidence.
+
 On 2026-10-16, red-to-green worker-level synthetic regressions showed that
 Chrome's old committed Edit URL could still authorize scoped My Sets,
 capability, or submitted-question reads while a foreign `pendingUrl` was
