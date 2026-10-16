@@ -157,8 +157,11 @@ export function publicationStopReason(error) {
     "blooket-media-invalid", "blooket-media-unavailable"].includes(code))
     return "media";
   if (code === "blooket-publication-busy") return "busy";
+  if (code === "blooket-publication-invalid-draft") return "content";
   if (["publication-storage-unavailable", "publication-lock-release-failed",
-    "publication-snapshot-invalid"].includes(code)) return "storage";
+    "publication-snapshot-invalid",
+    "blooket-publication-recovery-required"].includes(code))
+    return "storage";
   if (code === "blooket-publication-question-limit") return "capacity";
   if (["mutation-task-start-budget-exhausted",
     "mutation-task-duration-exhausted"].includes(code)) return "limit";
