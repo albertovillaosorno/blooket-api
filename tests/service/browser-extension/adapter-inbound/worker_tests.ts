@@ -208,7 +208,7 @@ test(
           }
           return { id: 83, url, status: "complete", windowId: 3 };
         }
-        if (active === false && submittedReadOwner &&
+        if (active === false &&
             tabUrl === "https://dashboard.blooket.com/edit?id=set-fixture" &&
             url === "https://dashboard.blooket.com/my-sets") {
           capabilityTabsCreated++;
@@ -1697,12 +1697,19 @@ test(
     assert.ok(scripts.includes("closeBlooketCapabilityQuestionPanel"));
 
     const beforeText = scripts.length;
+    const beforeTextTabs = capabilityTabsCreated;
+    const beforeTextReloads = readReloads;
+    const beforeTextUrl = tabUrl;
     const textCapability = await expectReply({
       kind: "capabilities.inspect-text",
     });
     assert.equal(textCapability.ok, true);
     assert.equal(textCapability.value.schemaVersion, 3);
     assert.equal(textCapability.value.features.audio, "account-dependent");
+    assert.equal(capabilityTabsCreated, beforeTextTabs + 1,
+      "scoped capability checks must not navigate the saved quiz editor");
+    assert.equal(readReloads, beforeTextReloads);
+    assert.equal(tabUrl, beforeTextUrl);
     assert.deepEqual(scripts.slice(beforeText).filter(name =>
       name === "openBlooketCapabilityQuestionPanel" ||
       name === "openBlooketAudioCapabilityDrawer"), []);

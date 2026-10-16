@@ -362,7 +362,7 @@ async function read(
   )
     throw new Error("manual-blooket-sign-in-required");
   if (operation.kind === "sets.list") {
-    const separate = await detachedSubmittedRead(
+    const separate = await detachedEditRead(
       current, browser, "sets.list", false,
     );
     if (separate !== undefined) return separate;
@@ -959,10 +959,10 @@ async function inspectDetachedBlooketSets(
 }
 
 // Capabilities are read-only, but their native host navigates My Sets and
-// temporarily opens feature drawers. Never do that on a submitted teacher
-// question. A detached tab is allowed only for an exact, still-submitted
-// owner in the original source document; arbitrary editor modals remain stops.
-async function detachedSubmittedRead(
+// temporarily opens feature drawers. Scoped base reads also leave a clean
+// quiz editor untouched. An unclosed modal still requires the exact submitted
+// owner; arbitrary teacher forms cannot authorize detached execution.
+async function detachedEditRead(
   current: Connection,
   browser: ReturnType<typeof ownedBrowser>,
   operation: "capabilities" | "sets.list",
@@ -979,25 +979,29 @@ async function detachedSubmittedRead(
     return undefined;
   const canLeave = await script(current, browser,
     canLeaveBlooketPageForRead as (...args: never[]) => unknown);
-  if (canLeave === true) return undefined;
-  if (canLeave !== false) return failed();
+  if (canLeave === true && !(operation === "capabilities" && textOnly))
+    return undefined;
+  if (canLeave !== true && canLeave !== false) return failed();
+  const submitted = canLeave === false;
   const sourceOrigin = await script(current, browser,
     inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
     [tab.url]);
-  const stage = await script(current, browser,
-    inspectBlooketQuestionWriteStage as (...args: never[]) => unknown);
-  const bound = await script(current, browser,
+  const stage = submitted ? await script(current, browser,
+    inspectBlooketQuestionWriteStage as (...args: never[]) => unknown)
+    : undefined;
+  const bound = submitted ? await script(current, browser,
     inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
-    [setId]);
+    [setId]) : undefined;
   const observed = await script(current, browser,
     inspectBlooketPage as (...args: never[]) => unknown,
     [{ kind: "session.observe" }]);
   if (typeof sourceOrigin !== "number" ||
       !Number.isFinite(sourceOrigin) || sourceOrigin <= 0 ||
-      bound !== true || !exactWorkerKeys(stage, "kind,stage") ||
-      (stage as { kind?: unknown }).kind !==
-        "blooket-question-write-stage" ||
-      (stage as { stage?: unknown }).stage !== "submit-attempted" ||
+      (submitted && (bound !== true ||
+        !exactWorkerKeys(stage, "kind,stage") ||
+        (stage as { kind?: unknown }).kind !==
+          "blooket-question-write-stage" ||
+        (stage as { stage?: unknown }).stage !== "submit-attempted")) ||
       !exactSessionObservation(observed) ||
       (observed as { value?: unknown }).value !== "edit") return failed();
   const before = await browser.tabs.get(current.tabId);
@@ -1013,14 +1017,14 @@ async function detachedSubmittedRead(
   const afterOrigin = await script(current, browser,
     inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
     [tab.url]);
-  const afterBound = await script(current, browser,
+  const afterBound = submitted ? await script(current, browser,
     inspectBlooketSubmittedQuestionOwner as (...args: never[]) => unknown,
-    [setId]);
+    [setId]) : undefined;
   const afterState = await script(current, browser,
     inspectBlooketPage as (...args: never[]) => unknown,
     [{ kind: "session.observe" }]);
   if (after.url !== tab.url || after.status !== "complete" ||
-      afterOrigin !== sourceOrigin || afterBound !== true ||
+      afterOrigin !== sourceOrigin || (submitted && afterBound !== true) ||
       !exactSessionObservation(afterState) ||
       (afterState as { value?: unknown }).value !== "edit")
     return failed();
@@ -1131,7 +1135,7 @@ async function relay(current: Connection, activeGeneration: number) {
               job.command.kind === "capabilities.inspect-text") {
             const textOnly =
               job.command.kind === "capabilities.inspect-text";
-            const detached = await detachedSubmittedRead(
+            const detached = await detachedEditRead(
               current, jobBrowser, "capabilities", textOnly,
             );
             if (detached !== undefined) result = detached;

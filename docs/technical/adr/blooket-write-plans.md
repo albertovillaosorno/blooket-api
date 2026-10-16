@@ -123,6 +123,12 @@ explicit supported question-image availability and validated current media
 identities. A failed unrelated audio probe cannot substitute for an image
 entitlement decision, and unknown image availability remains blocking.
 
+When the source is a clean Edit page, this scoped read uses its own temporary
+tab, preserving the saved quiz's document and route. Source document identity
+and session checks still bracket the independent read; an unsaved source form
+continues to require the existing exact submitted owner. Full account-dependent
+media inspection retains its separate host behavior.
+
 Progress uses a version-two checkpoint containing the exact plan ID, the next
 operation index, and the opaque remote set ID after Create Set succeeds. The
 checkpoint advances only when the executor confirms the exact next operation ID.
