@@ -159,6 +159,7 @@ export function publicationStopReason(error) {
   if (code === "blooket-publication-busy") return "busy";
   if (["publication-storage-unavailable", "publication-lock-release-failed",
     "publication-snapshot-invalid"].includes(code)) return "storage";
+  if (code === "blooket-publication-question-limit") return "capacity";
   if (["mutation-task-start-budget-exhausted",
     "mutation-task-duration-exhausted"].includes(code)) return "limit";
   if (code === "mutation-pacing-failed") return "pacing";

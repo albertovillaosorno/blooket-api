@@ -359,6 +359,8 @@ test("publication error labels classify only owned safe codes", () => {
     "blooket-media-invalid", "blooket-media-unavailable"])
     assert.equal(publicationStopReason(Error(code)), "media");
   assert.equal(publicationStopReason(
+    Error("blooket-publication-question-limit")), "capacity");
+  assert.equal(publicationStopReason(
     Error("blooket-publication-busy")), "busy");
   assert.equal(publicationStopReason(
     Error("publication-storage-unavailable")), "storage");

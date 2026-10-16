@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, rm, symlink, mkdir, writeFile } from
+import { link, mkdtemp, readFile, rm, symlink, mkdir, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -267,6 +267,170 @@ test("native field bounds stop publication before a frozen snapshot", () =>
       await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
       await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
     }
+  }));
+
+test("hard-linked frozen publication snapshots block recovery and writes",
+  () => fixture(async s => {
+    const snapshot = { schemaVersion: 2, draftId: "fixture",
+      revision: s.revision, capabilities, document,
+      expectedMedia: { schemaVersion: 1, items: [] },
+    };
+    const files = await publicationFiles(s.root, "fixture");
+    await createPublicationSnapshot(files.snapshot, snapshot);
+    const original = await readFile(files.snapshot);
+    await link(files.snapshot, join(s.root, "unsafe-snapshot-alias"));
+    for (const action of ["status", "step", "reconcile"]) {
+      const stopped = await executeBlooketPublicationCommand(
+        command(action, action === "step" ? s.revision : undefined),
+        s.host);
+      assert.equal(stopped.ok, false);
+      assert.equal(s.writes(), 0);
+    }
+    assert.deepEqual(await readFile(files.snapshot), original);
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
+test("unverifiable question counts cannot start or freeze publication", () =>
+  fixture(async s => {
+    const large = { ...document, questions: Array.from(
+      { length: 201 }, (_, index) => ({ ...document.questions[0]!,
+        id: "q" + String(index + 1),
+        prompt: "Type sun number " + String(index + 1),
+      }),
+    ) };
+    const saved = await executeLibraryCommand({ version: 1,
+      operationId: "cli:unverifiable", command: "drafts.put",
+      payload: { id: "unverifiable", expectedRevision: null,
+        document: large },
+    }, s.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const requested = { ...command("step", revision),
+      payload: { draftId: "unverifiable", expectedRevision: revision } };
+    const stopped = await executeBlooketPublicationCommand(requested, s.host);
+    assert.equal(stopped.ok, false);
+    if (!stopped.ok) assert.equal(stopped.issues[0]?.code,
+      "blooket-publication-question-limit");
+    assert.equal(s.writes(), 0);
+    const files = await publicationFiles(s.root, "unverifiable");
+    await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
+test("the final readable 200-question boundary may start creation", () =>
+  fixture(async s => {
+    const exact = { ...document, questions: Array.from(
+      { length: 200 }, (_, index) => ({ ...document.questions[0]!,
+        id: "q" + String(index + 1),
+        prompt: "Type sun number " + String(index + 1),
+      }),
+    ) };
+    const saved = await executeLibraryCommand({ version: 1,
+      operationId: "cli:readable-bound", command: "drafts.put",
+      payload: { id: "readable-bound", expectedRevision: null,
+        document: exact },
+    }, s.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const result = value(await executeBlooketPublicationCommand({
+      ...command("step", revision), payload: { draftId: "readable-bound",
+        expectedRevision: revision },
+    }, s.host));
+    assert.equal(result["phase"], "advanced");
+    assert.equal(result["totalOperations"], 201);
+    assert.equal(s.writes(), 1);
+  }));
+
+test("oversized append is refused without another set or frozen draft", () =>
+  fixture(async s => {
+    value(await executeBlooketPublicationCommand(
+      command("step", s.revision), s.host));
+    value(await executeBlooketPublicationCommand(
+      command("step", s.revision), s.host));
+    const oversized = { ...document, questions: Array.from(
+      { length: 201 }, (_, index) => ({ ...document.questions[0]!,
+        id: "q" + String(index + 1),
+        prompt: index === 0 ? "Type sun." :
+          "Type sun number " + String(index + 1),
+      }),
+    ) };
+    const saved = await executeLibraryCommand({ version: 1,
+      operationId: "cli:oversized-append", command: "drafts.put",
+      payload: { id: "oversized-append", expectedRevision: null,
+        document: oversized },
+    }, s.root);
+    assert.ok(saved.ok);
+    const revision = (saved.value as { revision: string }).revision;
+    const attempted = await executeBlooketPublicationCommand({
+      version: 1, operationId: "cli:oversized-append",
+      command: "blooket.publication.append",
+      payload: { draftId: "oversized-append", expectedRevision: revision,
+        remoteSetId: "synthetic-remote" },
+    }, s.host);
+    assert.equal(attempted.ok, false);
+    if (!attempted.ok) assert.equal(attempted.issues[0]?.code,
+      "blooket-publication-question-limit");
+    assert.equal(s.writes(), 2);
+    const files = await publicationFiles(s.root, "oversized-append");
+    await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
+test("historical oversized snapshots remain inspectable without writes", () =>
+  fixture(async s => {
+    const legacy = { ...document, questions: Array.from(
+      { length: 201 }, (_, index) => ({ ...document.questions[0]!,
+        id: "q" + String(index + 1),
+        prompt: "Type sun number " + String(index + 1),
+      }),
+    ) };
+    const files = await publicationFiles(s.root, "fixture");
+    await createPublicationSnapshot(files.snapshot, { schemaVersion: 2,
+      draftId: "fixture", revision: s.revision,
+      document: legacy, capabilities,
+      expectedMedia: { schemaVersion: 1, items: [] },
+    });
+    const progress = value(await executeBlooketPublicationCommand(
+      command("status"), s.host));
+    assert.equal(progress["phase"], "ready");
+    assert.equal(progress["totalOperations"], 202);
+    const refused = await executeBlooketPublicationCommand(
+      command("step", s.revision), s.host);
+    assert.equal(refused.ok, false);
+    if (!refused.ok) assert.equal(refused.issues[0]?.code,
+      "blooket-publication-question-limit");
+    assert.equal(s.writes(), 0);
+    await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+  }));
+
+test("legacy unsafe native text keeps status and uncertain recovery", () =>
+  fixture(async s => {
+    const snapshot = { schemaVersion: 2, draftId: "fixture",
+      revision: s.revision, capabilities,
+      document: { ...document, questions: [{ ...document.questions[0]!,
+        prompt: "Solve`*unfinished" }] },
+      expectedMedia: { schemaVersion: 1, items: [] },
+    };
+    const decoded = decodeBlooketPublicationSnapshot(snapshot, "fixture");
+    assert.ok(decoded);
+    const files = await publicationFiles(s.root, "fixture");
+    await createPublicationSnapshot(files.snapshot, snapshot);
+    const begun = await beginWriteAttempt(files.attempt, decoded.plan, 0);
+    assert.ok(begun.ok);
+    const prior = await readFile(files.attempt, "utf8");
+    const status = value(await executeBlooketPublicationCommand(
+      command("status"), s.host));
+    assert.equal(status["phase"], "reconciliation-required");
+    const recovery = value(await executeBlooketPublicationCommand(
+      command("reconcile"), s.host));
+    assert.equal(recovery["phase"], "reconciliation-required");
+    assert.equal(s.writes(), 0);
+    assert.equal(await readFile(files.attempt, "utf8"), prior);
+    const blocked = await executeBlooketPublicationCommand(
+      command("step", s.revision), s.host);
+    assert.equal(blocked.ok, false);
+    assert.equal(s.writes(), 0);
+    assert.equal(await readFile(files.attempt, "utf8"), prior);
   }));
 
 test("canonical append preserves existing questions and creates no set", () =>

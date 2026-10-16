@@ -310,6 +310,9 @@ const words = {
       "Ya hay otra operación en curso. Revisa el estado antes de continuar.",
     publicationStopStorage:
       "No se pudo comprobar el journal. No repitas la escritura.",
+    publicationStopCapacity:
+      "El lector actual permite verificar hasta 200 preguntas por quiz. " +
+      "Guarda un quiz más pequeño; no se inició otra escritura.",
     publicationStopLimit:
       "Se agotó el límite configurado de publicación. Revisa el estado y " +
       "ajusta los límites en Configuración; reinicia el servicio antes de " +
@@ -643,6 +646,9 @@ const words = {
       "Another operation is running. Refresh status before proceeding.",
     publicationStopStorage:
       "The journal could not be verified. Do not replay the write.",
+    publicationStopCapacity:
+      "The current reader can verify up to 200 questions per quiz. " +
+      "Save a smaller quiz; no additional write was started.",
     publicationStopLimit:
       "The configured publication limit was exhausted. Check the status " +
       "and adjust Settings, then restart the service before continuing. " +
@@ -2040,6 +2046,7 @@ function publicationFailureText(error) {
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",
     limit: "publicationStopLimit",
+    capacity: "publicationStopCapacity",
     pacing: "publicationStopPacing",
     paused: "publicationPaused",
   }[publicationStopReason(error)];
