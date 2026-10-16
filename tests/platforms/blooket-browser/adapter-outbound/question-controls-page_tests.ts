@@ -356,6 +356,52 @@ test("invalid native typing values never partially fill the editor",
   }
 });
 
+test("invalid typing mode and alternatives never start form preparation",
+  async () => {
+  const cases: BlooketQuestionPageInput[] = [
+    { ...input, random: false },
+    { ...input, answerTypes: null },
+    { ...input, answerTypes: [] },
+    { ...input, answerTypes: ["unknown"] as never },
+    { ...input, answers: [{ text: "sun", correct: false }] },
+    { ...input, answers: [
+      { text: "sun", correct: true }, { text: "sun", correct: true }],
+      answerTypes: ["exactly", "contains"] },
+  ];
+  for (const candidate of cases) {
+    await withEditor(async page => {
+      assert.equal(await prepareBlooketQuestionControls(candidate), false);
+      assert.equal(page.prompt.value, "");
+      assert.equal(page.picker.clicked, 0);
+      assert.equal(page.watch.controlsStarted, undefined);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+  }
+});
+
+test("invalid MC answer topology never starts form preparation", async () => {
+  const mc: BlooketQuestionPageInput = {
+    ...input, qType: "mc", random: false, answerTypes: null,
+    answers: [
+      { text: "Sun", correct: true }, { text: "Moon", correct: false },
+    ],
+  };
+  const cases: BlooketQuestionPageInput[] = [
+    { ...mc, answers: [mc.answers[0]!] },
+    { ...mc, answers: mc.answers.map(a => ({ ...a, correct: false })) },
+    { ...mc, answers: [mc.answers[0]!, mc.answers[0]!] },
+  ];
+  for (const candidate of cases) {
+    await withEditor(async page => {
+      assert.equal(await prepareBlooketQuestionControls(candidate), false);
+      assert.equal(page.prompt.value, "");
+      assert.equal(page.picker.clicked, 0);
+      assert.equal(page.watch.controlsStarted, undefined);
+      assert.equal(page.hiddenWrites(), 0);
+    }, "mc");
+  }
+});
+
 test("typing input newline is refused before modifying visible controls",
   async () => {
   for (const answer of ["sun\nmoon", "sun\rmoon"]) {

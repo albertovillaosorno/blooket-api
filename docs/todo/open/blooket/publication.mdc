@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green visible-controls regressions found that
+impossible native answer topology could change a question's prompt or picker
+before the final Save check rejected it. The separately injected controls
+writer now refuses repeated answers, typing alternatives with invalid match
+modes or correctness, and multiple choice with fewer than two slots or no
+correct option, before touching the form watch. Synthetic checks do not prove
+remote publication.
+
 On 2026-10-16, red-to-green synthetic form-control regressions showed that
 the pre-Save visible-controls writer could partly fill a provider editor with
 unsupported prompt, answer, or timer values before the later Save guard
