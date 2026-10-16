@@ -310,6 +310,27 @@ test("single-line set titles stop before publication snapshot persistence",
   }
 }));
 
+test("Create Set description CR cannot freeze a publication journal",
+  () => fixture(async state => {
+  const draftId = "description-cr";
+  const saved = await executeLibraryCommand({ version: 1,
+    operationId: "cli:" + draftId, command: "drafts.put",
+    payload: { id: draftId, expectedRevision: null,
+      document: { ...document, description: "Line\r\nTwo" } },
+  }, state.root);
+  assert.equal(saved.ok, true);
+  const revision = (saved.value as { revision: string }).revision;
+  const attempted = await executeBlooketPublicationCommand({
+    ...command("step", revision),
+    payload: { draftId, expectedRevision: revision },
+  }, state.host);
+  assert.equal(attempted.ok, false);
+  assert.equal(state.writes(), 0);
+  const files = await publicationFiles(state.root, draftId);
+  await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
+  await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+}));
+
 test("native field bounds stop publication before a frozen snapshot", () =>
   fixture(async s => {
     const badQuestions = [

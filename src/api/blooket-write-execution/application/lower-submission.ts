@@ -80,7 +80,8 @@ export function lowerBlooketWriteSubmission(
         /[\r\n]/u.test(operation.title) ||
         operation.title.includes("\0") ||
         operation.description.length > 10_000 ||
-        operation.description.includes("\0"))
+        operation.description.includes("\0") ||
+        operation.description.includes("\r"))
       return { ok: false, code: "invalid-set-content" };
     return {
       ok: true,
