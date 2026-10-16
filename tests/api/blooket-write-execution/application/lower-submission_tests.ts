@@ -241,12 +241,13 @@ test("native question and answer bounds fail before browser lowering", () => {
   for (const question of [
     { ...base.question, prompt: "x".repeat(20_001) },
     { ...base.question, prompt: "" },
+    { ...base.question, prompt: " \t " },
     { ...base.question, timeLimitSeconds: 86_401 },
     { ...base.question, timeLimitSeconds: 0 },
   ]) assert.deepEqual(lowerBlooketWriteSubmission(
     { ...base, question }, { remoteSetId: "remote-set-1" },
   ), { ok: false, code: "invalid-question-content" });
-  for (const answer of ["", "x".repeat(10_001), "sun\0moon"]) {
+  for (const answer of ["", " \t ", "x".repeat(10_001), "sun\0moon"]) {
     assert.deepEqual(lowerBlooketWriteSubmission({ ...base,
       question: { ...base.question, answer },
     }, { remoteSetId: "remote-set-1" }),
@@ -261,7 +262,7 @@ test("native question and answer bounds fail before browser lowering", () => {
   } };
   if (mc.kind !== "question" || mc.question.type !== "multiple-choice")
     return;
-  for (const answer of ["", "x".repeat(10_001), "Sun\0Moon"]) {
+  for (const answer of ["", " \t ", "x".repeat(10_001), "Sun\0Moon"]) {
     assert.deepEqual(lowerBlooketWriteSubmission({ ...mc,
       question: { ...mc.question, answers: [
         { ...mc.question.answers[0]!, text: answer },

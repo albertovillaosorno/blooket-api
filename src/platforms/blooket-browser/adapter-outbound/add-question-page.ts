@@ -203,7 +203,7 @@ export function runBlooketAddQuestionPageAction(
       !Number.isSafeInteger(input.number) ||
       input.number < 1 || input.number > 10_000 ||
       typeof input.question !== "string" ||
-      input.question.length < 1 || input.question.length > 20_000 ||
+      !input.question.trim() || input.question.length > 20_000 ||
       input.question.includes("`*") ||
       typeof input.random !== "boolean" ||
       !Number.isSafeInteger(input.timeLimit) ||
@@ -223,7 +223,7 @@ export function runBlooketAddQuestionPageAction(
       if (!textField?.enumerable || !("value" in textField) ||
           !correctField?.enumerable || !("value" in correctField) ||
           typeof textField.value !== "string" ||
-          textField.value.length < 1 || textField.value.length > 10_000 ||
+          !textField.value.trim() || textField.value.length > 10_000 ||
           typeof correctField.value !== "boolean" ||
           textField.value.includes("\0") ||
           textField.value.includes("`*") ||

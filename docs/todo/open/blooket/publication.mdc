@@ -73,6 +73,16 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green native lowering and browser-page regressions
+refused whitespace-only question prompts and text answers before either a
+publication snapshot or the Add Question Save click. The browser fixture uses
+a matching provider-generated hidden form, rather than a mismatch that would
+fail for unrelated reasons. This is conservative local admission, not evidence
+that any live provider form accepted or rejected that content. The official
+Blooket question-set guide (Help Center article 16289513807383), checked
+on 2026-10-16, describes adding a question and corresponding answers; it
+does not establish private save acceptance rules.
+
 On 2026-10-16, a regression found that a whitespace-only set title passed
 native lowering and could freeze a snapshot before Create Set had a usable
 title. Provider preflight now refuses it without normalizing valid teacher
