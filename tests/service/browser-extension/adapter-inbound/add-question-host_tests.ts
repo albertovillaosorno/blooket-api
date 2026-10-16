@@ -251,6 +251,7 @@ function fakeChrome(options: {
 test("invalid native question text never enters browser orchestration",
   async () => {
   const candidates: BlooketTextQuestionPageInput[] = [
+    { ...input, number: 201 },
     { ...input, question: "Type\rsun" },
     { ...input, question: "Math`*marker" },
     { ...input, answers: [{ text: "sun\nmoon", correct: true }] },

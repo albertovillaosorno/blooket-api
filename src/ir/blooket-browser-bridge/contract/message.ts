@@ -353,7 +353,7 @@ export function decodeBlooketBrowserBridgeRequest(
       !question.includes("`*") && !question.includes("`~`") &&
       Number.isSafeInteger(number) &&
       (number as number) >= 1 &&
-      (number as number) <= 10_000 &&
+      (number as number) <= 200 &&
       Number.isSafeInteger(timeLimit) &&
       (timeLimit as number) >= 1 &&
       (timeLimit as number) <= 86_400 &&

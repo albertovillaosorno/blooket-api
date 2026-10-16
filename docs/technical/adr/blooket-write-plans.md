@@ -104,6 +104,12 @@ CR/LF typing answers, blank-only values and reserved provider markup markers
 cannot reach the tab/navigation host from an alternate transport, while
 LF-only multiline MC textarea answers remain valid.
 
+The bridge refuses new question positions above 200, matching the native
+saved-collection read-back limit. The journaled command already rejects new
+oversized drafts; standalone lowering retains its historical 10,000-slot
+bound to keep archived publication snapshots inspectable with their stable
+question-limit diagnostic. This is not an inferred provider account quota.
+
 Textarea API values normalize CR/CRLF into LF under the
 [HTML Standard][textarea-newlines]. The canonical question writer,
 visible-controls preparation and independent Add Question Save guard refuse
