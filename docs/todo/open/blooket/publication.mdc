@@ -114,6 +114,15 @@ shared lowering even though the Chrome writer caps it at 10,000. The
 submission now rejects that number before browser execution, and canonical
 preflight applies the same cap before opening a new journal.
 
+A later red-to-green preflight caught more native form contract drift:
+canonical question documents permitted prompts longer than 20,000 characters,
+text answers longer than 10,000 characters, embedded NUL answers, and time
+limits above 86,400 seconds. The native Chrome editor rejected these after
+journal admission. Shared provider lowering now applies the observed limits
+before snapshot creation and browser execution; the domain document stays
+provider-neutral. Unit and canonical command fixtures prove refusal without
+a frozen snapshot, write-attempt journal, or remote mutation.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses
