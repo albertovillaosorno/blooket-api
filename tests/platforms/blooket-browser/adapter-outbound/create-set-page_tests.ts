@@ -50,6 +50,9 @@ interface FixtureNode {
   clicked: number;
   visibility: string;
   disabled?: boolean;
+  maxLength?: number;
+  readOnly?: boolean;
+  type?: string;
   selectors: Record<string, FixtureNode[]>;
   attributes: Record<string, string>;
   getAttribute(name: string): string | null;
@@ -193,6 +196,7 @@ function fixture(privateSet: boolean) {
   ];
   const form = node("FORM");
   const title = node("INPUT");
+  title.type = "text";
   const description = node("TEXTAREA");
   const privacy = node("INPUT", "", {
     type: "checkbox",
@@ -336,6 +340,45 @@ test("LF-only multiline descriptions retain their original value", () => {
     assert.deepEqual(submitBlooketCreateSetForm(input), { ok: true });
     assert.equal(page.form.selectors["button"]![0]!.clicked, 1);
   });
+});
+
+test("shortened Create Set field limits refuse all form edits", () => {
+  for (const target of ["title", "description"] as const) {
+    const page = fixture(false);
+    page[target].maxLength = 2;
+    const input = { title: "Synthetic", description: "Draft",
+      private: false };
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.title.value, "");
+      assert.equal(page.description.value, "");
+      assert.equal(page.privacy.clicked, 0);
+    });
+  }
+});
+
+test("changed metadata controls cannot receive form writes or Save", () => {
+  for (const kind of ["password-title", "checkbox-title", "title-readonly",
+    "title-disabled", "description-readonly", "description-disabled"]) {
+    const page = fixture(false);
+    if (kind === "password-title") page.title.type = "password";
+    if (kind === "checkbox-title") page.title.type = "checkbox";
+    if (kind === "title-readonly") page.title.readOnly = true;
+    if (kind === "title-disabled") page.title.disabled = true;
+    if (kind === "description-readonly") page.description.readOnly = true;
+    if (kind === "description-disabled") page.description.disabled = true;
+    const input = { title: "Synthetic", description: "Draft",
+      private: false };
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false, kind);
+      assert.equal(page.title.value, "", kind);
+      assert.equal(page.description.value, "", kind);
+      page.title.value = input.title;
+      page.description.value = input.description;
+      assert.equal(submitBlooketCreateSetForm(input).ok, false, kind);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0, kind);
+    });
+  }
 });
 
 test("Create Set staying disabled after a title never submits", () => {
