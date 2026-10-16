@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green worker-level synthetic regressions showed that
+Chrome's old committed Edit URL could still authorize scoped My Sets,
+capability, or submitted-question reads while a foreign `pendingUrl` was
+already present. The real worker now refuses those reads before opening a
+temporary tab, and checks the original editor again after independent reads.
+Additional tests queue the redirect during a detached scan and confirm that
+no stale result becomes authority. No provider account was mutated and no
+new live publication receipt was inferred.
+
 On 2026-10-16, a red-to-green capability-host regression proved that an
 apparently complete My Sets route could certify account capabilities while
 Chrome reported a pending foreign navigation. The capability inspection

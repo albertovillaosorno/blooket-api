@@ -64,6 +64,8 @@ test(
   let detachedSourceOwnerLost = false;
   let detachedSourceChallenge = false;
   let detachedSourceReload = false;
+  let pendingSourceRedirect = false;
+  let pendingSourceAfterRead = false;
   let detachedTabNavigatedByUser = false;
   let detachedTabActivatedByUser = false;
   let detachedCreated = 0;
@@ -235,6 +237,7 @@ test(
       get: async (id) => {
         if (id === 84) {
           if (!detachedCapabilityUrl) throw Error("closed-capability-tab");
+          if (pendingSourceAfterRead) pendingSourceRedirect = true;
           if (capabilityPendingRedirect)
             return { id, url: detachedCapabilityUrl,
               pendingUrl: "https://foreign.invalid/teacher-navigation",
@@ -247,12 +250,16 @@ test(
         }
         if (id === 83) {
           if (!detachedUrl) throw Error("closed-detached-tab");
+          if (pendingSourceAfterRead) pendingSourceRedirect = true;
           return { id, url: detachedUrl, status: "complete", windowId: 3,
             active: detachedTabActivatedByUser };
         }
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
-        return { id, url: tabUrl, status: "complete", windowId: 3 };
+        return { id, url: tabUrl, status: "complete", windowId: 3,
+          ...(pendingSourceRedirect ? {
+            pendingUrl: "https://foreign.invalid/teacher-navigation",
+          } : {}) };
       },
       update: async (id, { url, active }) => {
         if (id === 84) {
@@ -1147,6 +1154,21 @@ test(
     assert.equal(readReloads, beforeDetachedCapabilities);
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=set-fixture");
+    // A committed Edit URL does not authorize a detached read while Chrome
+    // has already queued a foreign navigation in that same source tab.
+    pendingSourceRedirect = true;
+    const beforePendingSourceQuestions = detachedCreated;
+    const beforePendingSourceCapabilities = capabilityTabsCreated;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(detachedCreated, beforePendingSourceQuestions);
+    assert.equal(capabilityTabsCreated, beforePendingSourceCapabilities);
+    pendingSourceRedirect = false;
     // No extra tab or navigation under changed account identity, a human
     // challenge, or a stale submitted owner bound to another set.
     observedSessionOverride = "security-challenge";
@@ -1256,6 +1278,30 @@ test(
       kind: "questions.list", setId: "set-fixture",
     })).ok, false);
     assert.equal(detachedCreated, 6);
+    detachedTabNavigatedByUser = false;
+    submittedReadOwner = true;
+    // The original submitted owner can begin a foreign navigation during
+    // the separate page scan. A correct detached result is not authority to
+    // claim that the original attempted form is still the same document.
+    pendingSourceAfterRead = true;
+    const priorLateQuestionTabs = detachedCreated;
+    const lateQuestion = await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    assert.equal(lateQuestion.ok, false);
+    assert.equal(detachedCreated, priorLateQuestionTabs + 1);
+    pendingSourceAfterRead = false;
+    pendingSourceRedirect = false;
+    pendingSourceAfterRead = true;
+    const priorLateCapabilityTabs = capabilityTabsCreated;
+    const lateCapability = await expectReply({
+      kind: "capabilities.inspect-text",
+    });
+    assert.equal(lateCapability.ok, false);
+    assert.equal(capabilityTabsCreated, priorLateCapabilityTabs + 1);
+    pendingSourceAfterRead = false;
+    pendingSourceRedirect = false;
+    submittedReadOwner = false;
     questionSaved = true;
     unsafeReadSource = false;
     tabUrl = "https://dashboard.blooket.com/my-sets";
