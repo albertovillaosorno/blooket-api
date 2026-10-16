@@ -418,8 +418,14 @@ export async function prepareBlooketQuestionControls(
         value["audio"] === "" &&
         JSON.stringify(value["answers"]) === JSON.stringify(answers) &&
         JSON.stringify(value["correctAnswers"]) === JSON.stringify(correct) &&
-        JSON.stringify(value["answerTypes"]) ===
-          JSON.stringify(input.answerTypes);
+        (input.qType === "mc"
+          // The native MC editor emits an empty list because text matching
+          // modes apply only to typing answers. Preserve null compatibility.
+          ? value["answerTypes"] === null ||
+            (Array.isArray(value["answerTypes"]) &&
+              value["answerTypes"].length === 0)
+          : JSON.stringify(value["answerTypes"]) ===
+            JSON.stringify(input.answerTypes));
     });
     if (!matches) return false;
     watch!.controlsPrepared = true;
