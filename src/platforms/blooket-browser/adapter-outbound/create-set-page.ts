@@ -96,7 +96,7 @@ export function prepareBlooketCreateSetForm(
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/create" || location.search || location.hash ||
       typeof input.title !== "string" ||
-      input.title.length < 1 ||
+      !input.title.trim() ||
       input.title.length > 1_000 ||
       typeof input.description !== "string" ||
       input.description.length > 10_000 ||
@@ -355,7 +355,12 @@ export function submitBlooketCreateSetForm(
       return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
-      location.pathname !== "/create" || location.search || location.hash
+      location.pathname !== "/create" || location.search || location.hash ||
+      typeof expected.title !== "string" || !expected.title.trim() ||
+      expected.title.length > 1_000 ||
+      typeof expected.description !== "string" ||
+      expected.description.length > 10_000 ||
+      typeof expected.private !== "boolean"
     )
       return failed();
     const forms = Array.from(document.querySelectorAll(

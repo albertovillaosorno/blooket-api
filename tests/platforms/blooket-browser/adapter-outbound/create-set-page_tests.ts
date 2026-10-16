@@ -260,6 +260,23 @@ test("blank title can enable Create Set during owned preparation", () => {
   });
 });
 
+test("whitespace-only native set titles cannot fill or submit", () => {
+  const page = fixture(false);
+  const input = { title: "  \t ", description: "Draft", private: false };
+  withPage(page.document, "https://dashboard.blooket.com/create", () => {
+    assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+    assert.equal(page.title.value, "");
+    assert.equal(page.description.value, "");
+    assert.equal(submitBlooketCreateSetForm(input).ok, false);
+    // Even a provider form already containing the same blank text must
+    // never authorize the independent submit action.
+    page.title.value = input.title;
+    page.description.value = input.description;
+    assert.equal(submitBlooketCreateSetForm(input).ok, false);
+    assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+  });
+});
+
 test("Create Set staying disabled after a title never submits", () => {
   const page = fixture(true);
   const submit = page.form.selectors["button"]![0]!;

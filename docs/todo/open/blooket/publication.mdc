@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a red-to-green synthetic Create Set regression found that the
+native browser page could prepare a whitespace-only title despite the
+canonical publishing preflight refusing it. Preparation now refuses before
+changing any controls, and the independent submit step rejects the same
+invalid title even in a matching prefilled form. No provider account state
+was changed; this is portable defensive coverage.
+
 On 2026-10-16, another native-form regression caught an image syntax marker
 in the question prompt: lowering and the exact provider-hidden-form adapter
 both accepted the marker while rejecting the same marker in text answers.
