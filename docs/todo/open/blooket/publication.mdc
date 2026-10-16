@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green Create Set receipt regressions found that
+post-submit observation could inspect stale Create controls while Chrome
+still reported an exact pending Edit redirect, or inspect a stale page
+while navigating to a foreign destination. The host now waits for only a
+valid pending Edit redirect to commit before reading page state, and refuses
+a foreign pending route without injecting scripts. This is synthetic
+compatibility and safety coverage, not a live publication receipt.
+
 On 2026-10-16, a red-to-green worker regression found that focusing an old
 committed Blooket tab could still activate a foreign pending navigation while
 a human challenge was being surfaced. The owned-tab foreground helper now
