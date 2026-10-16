@@ -157,10 +157,14 @@ test("Add Question bridge commands admit exact text-only semantics", () => {
     decodeBlooketBrowserBridgeRequest(request(valid)).ok,
     true,
   );
+  assert.equal(decodeBlooketBrowserBridgeRequest(request({
+    ...valid, number: 200,
+  })).ok, true);
   for (const command of [
     { ...valid, setId: "" },
     { ...valid, setId: "a\nb" },
     { ...valid, number: 0 },
+    { ...valid, number: 201 },
     { ...valid, question: "" },
     { ...valid, question: " \t " },
     { ...valid, question: "Math`*marker" },

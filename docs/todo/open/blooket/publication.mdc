@@ -73,6 +73,17 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green browser-bridge regressions found question
+position 201 could reach browser orchestration although its saved-card reader
+only verifies collections up to 200. The bridge now refuses positions beyond
+200 before any tab work and admits 200. The journaled command already rejects
+new oversized drafts.
+
+Standalone lowering retains its historical 10,000-slot
+compatibility bound so archived oversized snapshots remain inspectable and
+keep their established question-limit diagnostic. This is not a provider
+quota or a live publication receipt.
+
 On 2026-10-16, red-to-green bridge regressions showed that the versioned
 browser command decoder admitted native-editor text the canonical publisher
 could not preserve. CR in textarea content, CR/LF in single-line typing
