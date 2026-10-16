@@ -149,6 +149,14 @@ test(
   let expireWriteAtOpen = false;
   let slowWriteAtOpen = false;
   const realNow = Date.now;
+  const priorPerformanceNow =
+    Object.getOwnPropertyDescriptor(performance, "now");
+  let readClock = 0;
+  // The pacing policy has deterministic deadline tests of its own. Keep this
+  // transport fixture fast while preserving its real relay/deadline timers.
+  Object.defineProperty(performance, "now", {
+    configurable: true, value: () => { readClock += 5_000; return readClock; },
+  });
   let holdReadScript = false;
   let reportReadScript!: () => void;
   let releaseReadScript!: () => void;
@@ -2140,6 +2148,9 @@ test(
     assert.equal(scripts.length, beforeCompatibilityStop);
     assert.deepEqual(stored, {});
   } finally {
+    if (priorPerformanceNow)
+      Object.defineProperty(performance, "now", priorPerformanceNow);
+    else Reflect.deleteProperty(performance, "now");
     Date.now = realNow;
     releaseReadScript();
     releaseDetachedCreate();

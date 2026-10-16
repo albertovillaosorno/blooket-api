@@ -63,6 +63,7 @@ import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
 import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad } from
   "./read-navigation.ts";
+import { createDetailReadPacer } from "./detail-read-pacing.ts";
 import {
   inspectBlooketDocumentOrigin,
   inspectBlooketSessionDocumentOrigin,
@@ -192,6 +193,9 @@ function pairedBrowserLabel(): Promise<string> {
 }
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+const admitDetailRead = createDetailReadPacer({
+  now: () => performance.now(), wait: pause,
+});
 
 function exactWorkerKeys(value: unknown, expected: string): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -360,6 +364,24 @@ async function read(
 ) {
   // Leave room for the ten-second bridge deadline, including navigation.
   const readDeadline = Date.now() + 8_000;
+  if (operation.kind !== "sets.get")
+    return readPage(current, browser, operation, readDeadline);
+  // Edit Info performs a native server action even though we only read it.
+  // Pace complete read jobs without retrying an action or extending its budget.
+  const release = await admitDetailRead(() => readDeadline - Date.now());
+  if (!release) throw new Error("browser-details-unavailable");
+  try {
+    return await readPage(current, browser, operation, readDeadline);
+  } finally { release(); }
+}
+async function readPage(
+  current: Connection,
+  browser: ReturnType<typeof ownedBrowser>,
+  operation:
+    | PageReadOperation
+    | { readonly kind: "questions.list"; readonly setId: string },
+  readDeadline: number,
+) {
   const target =
     operation.kind === "questions.list"
       ? "https://dashboard.blooket.com/edit?id=" +
