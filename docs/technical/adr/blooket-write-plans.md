@@ -98,6 +98,12 @@ Native typing alternatives likewise use single-line
 and the independent Save guard. Multiple-choice answers use `textarea`
 controls, so their authored multiline text remains admissible and unchanged.
 
+The versioned local browser-bridge decoder applies the same native text
+limits before dispatching a write command. CR-containing textarea content,
+CR/LF typing answers, blank-only values and reserved provider markup markers
+cannot reach the tab/navigation host from an alternate transport, while
+LF-only multiline MC textarea answers remain valid.
+
 Textarea API values normalize CR/CRLF into LF under the
 [HTML Standard][textarea-newlines]. The canonical question writer,
 visible-controls preparation and independent Add Question Save guard refuse

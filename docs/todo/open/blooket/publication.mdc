@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green bridge regressions showed that the versioned
+browser command decoder admitted native-editor text the canonical publisher
+could not preserve. CR in textarea content, CR/LF in single-line typing
+answers, blank-only text and reserved editor markers now stop at the browser
+bridge before any Chrome tab or script work. Ordinary LF-only multiline
+multiple-choice text remains admissible, and direct host tests prove invalid
+native text cannot open an editor. This is synthetic admission evidence,
+not a live Blooket save or reconciliation receipt.
+
 On 2026-10-16, red-to-green credential-boundary regressions showed that
 an old or redirected `/login` page with arbitrary query or fragment data
 could still pass the host and native login form route checks. Both now

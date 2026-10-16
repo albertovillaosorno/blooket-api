@@ -124,10 +124,13 @@ test("Create Set bridge commands are exact bounded and text-only", () => {
   );
   for (const command of [
     { ...valid, title: "" },
+    { ...valid, title: " \t " },
     { ...valid, title: "x".repeat(1_001) },
     { ...valid, title: "bad\nline" },
     { ...valid, description: "x".repeat(10_001) },
     { ...valid, description: "bad\u0000value" },
+    { ...valid, description: "Line\rTwo" },
+    { ...valid, description: "Line\r\nTwo" },
     { ...valid, private: "true" },
     { ...valid, coverImage: "unexpected" },
     { ...valid, arbitrary: "script" },
@@ -159,6 +162,16 @@ test("Add Question bridge commands admit exact text-only semantics", () => {
     { ...valid, setId: "a\nb" },
     { ...valid, number: 0 },
     { ...valid, question: "" },
+    { ...valid, question: " \t " },
+    { ...valid, question: "Math`*marker" },
+    { ...valid, question: "Image`~`marker" },
+    { ...valid, answers: [{ text: " \t ", correct: true }] },
+    { ...valid, answers: [{ text: "sun`*moon", correct: true }] },
+    { ...valid, answers: [{ text: "sun`~`moon", correct: true }] },
+    { ...valid, question: "Type\rsun" },
+    { ...valid, question: "Type\r\nsun" },
+    { ...valid, answers: [{ text: "sun\nmoon", correct: true }] },
+    { ...valid, answers: [{ text: "sun\rmoon", correct: true }] },
     { ...valid, answers: [] },
     {
       ...valid,
@@ -199,6 +212,32 @@ test("Add Question bridge commands admit exact text-only semantics", () => {
     })).ok,
     true,
   );
+});
+
+test("multiple-choice textarea line feeds survive bridge admission", () => {
+  const result = decodeBlooketBrowserBridgeRequest(request({
+    kind: "questions.create", setId: "set-fixture", number: 1,
+    question: "Which star?\nChoose.",
+    answers: [{ text: "Sun\nStar", correct: true },
+      { text: "Moon", correct: false }],
+    qType: "mc", random: true, answerTypes: null, timeLimit: 20,
+  }));
+  assert.equal(result.ok, true);
+  if (result.ok && result.value.command.kind === "questions.create") {
+    assert.equal(result.value.command.question, "Which star?\nChoose.");
+    assert.equal(result.value.command.answers[0]?.text, "Sun\nStar");
+  }
+});
+
+test("multiple-choice CR in an answer cannot reach the browser host", () => {
+  for (const text of ["Sun\rStar", "Sun\r\nStar"]) {
+    assert.equal(decodeBlooketBrowserBridgeRequest(request({
+      kind: "questions.create", setId: "set-fixture", number: 1,
+      question: "Which star?", answers: [
+        { text, correct: true }, { text: "Moon", correct: false },
+      ], qType: "mc", random: true, answerTypes: null, timeLimit: 20,
+    })).ok, false);
+  }
 });
 
 test("Add Question command rejects sparse or decorated answer arrays", () => {
@@ -447,7 +486,7 @@ test("bridge text controls reject every forbidden literal byte", () => {
   }
   // Preserved multiline teacher descriptions remain valid.
   assert.equal(decodeBlooketBrowserBridgeRequest(request({
-    ...command, description: "Line one\nLine two\r\n\tIndented",
+    ...command, description: "Line one\nLine two\n\tIndented",
   })).ok, true);
 });
 
