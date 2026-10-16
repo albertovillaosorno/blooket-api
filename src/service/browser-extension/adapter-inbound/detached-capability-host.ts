@@ -34,10 +34,12 @@ import {
   type CapabilityInspectionChromePort,
   type ExtensionCapabilityInspectionResult,
 } from "./capability-inspection-host.ts";
+import { classifyBlooketReadTabLoad } from "./read-navigation.ts";
 
 interface BrowserTab {
   readonly id?: number;
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -78,8 +80,9 @@ export async function inspectDetachedBlooketCapabilities(
     let ready = false;
     for (let poll = 0; poll < 50 && now() - started < 3_000; poll++) {
       const tab = await chrome.tabs.get(tabId!);
-      if (tab.url !== MY_SETS) return failed();
-      if (tab.status === "complete") { ready = true; break; }
+      const load = classifyBlooketReadTabLoad(tab, MY_SETS);
+      if (load === "changed") return failed();
+      if (load === "ready") { ready = true; break; }
       await pause(50);
     }
     if (!ready || now() - started >= 3_000) return failed();

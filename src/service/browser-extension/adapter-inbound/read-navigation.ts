@@ -31,7 +31,24 @@
 //
 interface ReadTab {
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
+}
+
+// Chrome exposes a new tab's destination as pendingUrl until its first
+// navigation commits. Only that exact owned destination may keep loading;
+// a different pending URL also invalidates an otherwise matching old URL.
+export function classifyBlooketReadTabLoad(
+  tab: ReadTab, target: string,
+): "ready" | "loading" | "changed" {
+  if (tab.pendingUrl !== undefined && tab.pendingUrl !== target)
+    return "changed";
+  if (tab.url === target)
+    return tab.status === "complete" ? "ready"
+      : tab.status === "loading" ? "loading" : "changed";
+  return tab.status === "loading" && tab.pendingUrl === target &&
+      (tab.url === undefined || tab.url === "" || tab.url === "about:blank")
+    ? "loading" : "changed";
 }
 
 interface ReadTabsPort {
