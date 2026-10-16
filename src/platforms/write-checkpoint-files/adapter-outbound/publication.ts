@@ -95,7 +95,14 @@ export async function readPublicationSnapshot(
         pathname.mtimeMs !== metadata.mtimeMs ||
         pathname.ctimeMs !== metadata.ctimeMs)
       throw new Error("publication-snapshot-invalid");
-    return JSON.parse(bytes.subarray(0, size).toString("utf8")) as unknown;
+    // Replacement-character decoding could turn corrupted journal bytes
+    // into different, apparently valid teacher content. Reject that drift.
+    let text: string;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(
+        bytes.subarray(0, size));
+    } catch { throw new Error("publication-snapshot-invalid"); }
+    return JSON.parse(text) as unknown;
   } finally { await handle.close(); }
 }
 export async function createPublicationSnapshot(path: string, value: unknown) {

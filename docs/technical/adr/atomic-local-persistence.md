@@ -53,6 +53,13 @@ transaction marker form one persistence aggregate. The media vault uses one
 vault-level metadata lock for index mutations; a future operation may use a
 narrower per-asset lock only when it cannot change shared metadata.
 
+Durable publication snapshots are immutable recovery inputs. Readers open
+one no-follow descriptor, refuse hard-linked or group/world-writable files,
+verify the descriptor and pathname identities before accepting the bytes, and
+reject malformed UTF-8 without substituting replacement characters. An unsafe
+snapshot remains untouched for manual recovery and cannot authorize a browser
+write, while missing snapshots retain their explicit not-started meaning.
+
 The POSIX lock adapter publishes complete owner metadata with a same-directory
 hard link. A visible lock therefore never depends on a partially written owner
 record. A lock owned by a live PID is never stolen.

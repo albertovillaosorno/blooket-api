@@ -71,6 +71,17 @@ journal can start, detecting changes during intervening session/media awaits.
 Uncertain attempts require local recovery before another write.
 Final verification checks the entire desired quiz in two fresh observations.
 
+The current native question reader establishes no complete collection above
+200 saved cards. Canonical publication therefore refuses new creation or
+append snapshots above 200 questions before sending a mutation, rather than
+stranding an unverified question. Existing larger snapshots remain readable
+for status and reconciliation without granting another write start.
+
+Provider form limits are checked independently of project-document syntax.
+A later native-contract change cannot make an old attempting journal disappear:
+status and read-only reconciliation remain available even when a new write
+would fail today's provider-text preflight.
+
 This initial existing-set workflow only appends. It refuses replacements,
 deletions, reordering or metadata changes; in-place question editing remains
 pending in `blooket-11`. Portable transport coverage is not live acceptance.

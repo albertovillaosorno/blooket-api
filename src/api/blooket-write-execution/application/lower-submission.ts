@@ -46,6 +46,8 @@ import type {
 import type {
   BlooketWriteOperation,
 } from "../../../projects/blooket-write-plans/domain/write-plan.ts";
+import { decodeBlooketSetId } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
 import type { BlooketWriteTarget } from "../contract/write-execution.ts";
 
 export type LowerBlooketWriteSubmissionResult =
@@ -58,6 +60,8 @@ export type LowerBlooketWriteSubmissionResult =
       readonly code:
         | "unexpected-remote-set-binding"
         | "missing-remote-set-binding"
+        | "invalid-remote-set-binding"
+        | "invalid-set-content"
         | "invalid-question-number"
         | "invalid-question-content"
         | "invalid-answer-content"
@@ -72,6 +76,9 @@ export function lowerBlooketWriteSubmission(
     if (target.remoteSetId !== null) {
       return { ok: false, code: "unexpected-remote-set-binding" };
     }
+    if (operation.title.length < 1 || operation.title.length > 1_000 ||
+        operation.description.length > 10_000)
+      return { ok: false, code: "invalid-set-content" };
     return {
       ok: true,
       value: lowerSet(operation),
@@ -81,6 +88,8 @@ export function lowerBlooketWriteSubmission(
   if (target.remoteSetId === null) {
     return { ok: false, code: "missing-remote-set-binding" };
   }
+  if (!decodeBlooketSetId(target.remoteSetId).ok)
+    return { ok: false, code: "invalid-remote-set-binding" };
   if (
     !Number.isSafeInteger(operation.questionNumber)
     || operation.questionNumber < 1
