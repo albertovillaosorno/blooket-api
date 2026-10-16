@@ -355,6 +355,39 @@ test("drifted typing inputs cannot receive question text", async () => {
   }
 });
 
+test("changed MC answer controls cannot leave a partly filled editor",
+  async () => {
+  const mc: BlooketQuestionPageInput = {
+    ...input, qType: "mc", answerTypes: null,
+    answers: [{ text: "Sun", correct: true },
+      { text: "Moon", correct: false }],
+  };
+  for (const kind of ["answer-disabled", "answer-readonly",
+    "correct-missing", "correct-disabled", "correct-duplicate",
+    "shuffle-tag", "shuffle-type", "shuffle-disabled",
+    "shuffle-readonly"] as const) {
+    await withEditor(async page => {
+      const answer = page.form.selectors["textarea#answer-0"]![0]!;
+      const selector = 'button[aria-label="Mark Answer 1 as Correct"]';
+      const correct = page.form.selectors[selector]![0]!;
+      if (kind === "answer-disabled") answer.disabled = true;
+      if (kind === "answer-readonly") answer.readOnly = true;
+      if (kind === "correct-missing") page.form.selectors[selector] = [];
+      if (kind === "correct-disabled") correct.disabled = true;
+      if (kind === "correct-duplicate")
+        page.form.selectors[selector] = [correct, new Control()];
+      const shuffle = page.form.selectors["input#shuffle-toggle"]![0]!;
+      if (kind === "shuffle-tag") shuffle.tagName = "BUTTON";
+      if (kind === "shuffle-type") shuffle.type = "text";
+      if (kind === "shuffle-disabled") shuffle.disabled = true;
+      if (kind === "shuffle-readonly") shuffle.readOnly = true;
+      assert.equal(await prepareBlooketQuestionControls(mc), false, kind);
+      assert.equal(page.prompt.value, "", kind);
+      assert.equal(page.hiddenWrites(), 0);
+    }, "mc");
+  }
+});
+
 test("visible editor events generate typing state without hidden overrides",
   async () => withEditor(async page => {
     const serialized = Function("return (" +
