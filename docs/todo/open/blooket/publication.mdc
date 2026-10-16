@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green missing-snapshot regressions found that a
+surviving `checkpoint.json.bak` was ignored both for its own draft and by
+competing-draft scans. Checkpoint updates create this backup during atomic
+replacement, so its presence can indicate already-confirmed remote progress.
+The recovery guard now preserves and refuses this orphaned backup before a
+new write or a false `not-started` status. The tests did not contact Blooket
+or infer that any orphaned backup is safe to replay.
+
 On 2026-10-16, NUL-bearing set titles, descriptions and question prompts
 were found to pass native lowering and matching synthetic browser forms,
 despite the existing native answer NUL guard. The canonical preflight and

@@ -207,7 +207,7 @@ test("orphan journal evidence without a snapshot stops sibling reuse",
     await mkdir(dirname(orphan.snapshot), { recursive: true });
     assert.deepEqual(await readOtherPublicationSnapshots(root, "alpha"), []);
     for (const evidence of [orphan.attempt, orphan.checkpoint,
-      orphan.budget]) {
+      orphan.checkpoint + ".bak", orphan.budget]) {
       await writeFile(evidence, "{maybe-a-prior-write}");
       await assert.rejects(readOtherPublicationSnapshots(root, "alpha"),
         /publication-storage-unavailable/u);
