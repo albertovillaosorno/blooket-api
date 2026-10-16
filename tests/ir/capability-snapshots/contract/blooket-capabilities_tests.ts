@@ -361,6 +361,43 @@ test("capability arrays reject duplicate enum values", () => {
   assert.equal(result.ok, false);
 });
 
+test("capability decoding never runs accessor-backed evidence", () => {
+  for (const path of [
+    ["schemaVersion"], ["verifiedOn"], ["evidence", "0", "reference"],
+    ["questionTypes", "multipleChoice", "minAnswers"],
+    ["questionTypes", "typingAnswer", "availability"],
+    ["features", "questionImages"],
+    ["setMetadata", "titleMaxLength"], ["upload", "canvasWidth"],
+  ]) {
+    const candidate = JSON.parse(JSON.stringify(verified));
+    let target = candidate;
+    for (const part of path.slice(0, -1)) target = target[part]!;
+    const key = path.at(-1)!;
+    let calls = 0;
+    Object.defineProperty(target, key, { enumerable: true,
+      get() { calls++; throw new Error("accessor"); },
+    });
+    assert.equal(decodeBlooketCapabilitySnapshot(candidate).ok, false,
+      path.join("."));
+    assert.equal(calls, 0, path.join("."));
+  }
+});
+
+test("capability evidence arrays cannot execute custom iterators", () => {
+  for (const path of ["evidence", "matchModes", "visibility"] as const) {
+    const candidate = JSON.parse(JSON.stringify(verified));
+    const items: unknown[] = path === "evidence" ? candidate.evidence
+      : path === "matchModes" ? candidate.questionTypes.typingAnswer.matchModes
+        : candidate.setMetadata.visibility;
+    let calls = 0;
+    Object.defineProperty(items, "entries", { enumerable: false,
+      get() { calls++; throw new Error("untrusted iterator"); },
+    });
+    assert.equal(decodeBlooketCapabilitySnapshot(candidate).ok, false);
+    assert.equal(calls, 0, path);
+  }
+});
+
 test("capability evidence may use browser observations", () => {
   const result = decodeBlooketCapabilitySnapshot({
     ...verified,
