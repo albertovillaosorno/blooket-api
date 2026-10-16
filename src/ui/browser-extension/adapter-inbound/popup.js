@@ -1,8 +1,8 @@
 const words = {
   en: {
     explanation:
-      "Uses your local workspace and Blooket session automatically. " +
-      "Publishing is not available yet.",
+      "Connect your local workspace to Blooket. " +
+      "Open the workspace to publish and check your quizzes.",
     openWorkspace: "Open workspace",
     openBlooket: "Open Blooket",
     connected: "Ready",
@@ -12,14 +12,17 @@ const words = {
       "Update or reload Blooket API in your browser, disable older " +
       "copies, and restart the app.",
     "blooket-attention-required": "Blooket needs your attention. Open its tab.",
+    "blooket-tab-retained":
+      "Finish or close the existing Blooket tab to reconnect. " +
+      "Your saved drafts are kept.",
     "blooket-tab-unavailable":
       "The connected Blooket tab could not be focused. Reopen the workspace.",
     error: "The local service is unavailable.",
   },
   es: {
     explanation:
-      "Usa automáticamente tu espacio local y tu sesión de Blooket. " +
-      "La publicación aún no está disponible.",
+      "Conecta tu espacio local con Blooket. " +
+      "Abre el espacio para publicar y comprobar tus quizzes.",
     openWorkspace: "Abrir espacio",
     openBlooket: "Abrir Blooket",
     connected: "Listo",
@@ -30,6 +33,9 @@ const words = {
       "las copias antiguas y reinicia la aplicación.",
     "blooket-attention-required":
       "Blooket necesita tu atención. Abre su pestaña.",
+    "blooket-tab-retained":
+      "Termina o cierra la pestaña existente de Blooket para reconectar. " +
+      "Tus borradores guardados se conservan.",
     "blooket-tab-unavailable":
       "No se pudo mostrar la pestaña conectada. Reabre el espacio local.",
     error: "El servicio local no está disponible.",
@@ -48,6 +54,7 @@ function render() {
   ui("openBlooket").disabled = ![
     "connected",
     "blooket-attention-required",
+    "blooket-tab-retained",
   ].includes(connectionStatus);
 }
 async function message(value) {
