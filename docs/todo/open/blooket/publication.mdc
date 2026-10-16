@@ -142,6 +142,18 @@ constraint, not a confirmed Blooket account quota. The maximum can be
 raised after the reader and end-to-end verification prove a larger supported
 collection.
 
+Publication snapshot reads now check a single, non-writable inode before and
+after reading, including the original pathname, and reject malformed UTF-8
+rather than silently replacing invalid bytes in recovered lesson content.
+Hard-link, permission, sibling-snapshot and corrupted-byte regressions retain
+the original bytes and stop before remote work.
+
+A direct-lowering regression also found that the native Create Set editor
+rejects empty or overly long titles, overlong descriptions and malformed
+remote set IDs after provider submission admission. Shared lowering now
+rejects those forms before browser execution using the existing opaque-ID
+decoder; canonical verified capability limits remain stricter where observed.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses

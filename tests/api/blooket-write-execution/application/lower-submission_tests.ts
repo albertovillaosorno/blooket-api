@@ -204,6 +204,30 @@ test("provider text markers fail before browser lowering", () => {
   }
 });
 
+test("native set and remote identifier bounds fail before submission", () => {
+  const set: BlooketWriteOperation = { operationId: "plan:test:set:bounds",
+    kind: "set", title: "Quiz", description: "Description",
+    visibility: "private", coverMediaId: null };
+  for (const operation of [
+    { ...set, title: "" },
+    { ...set, title: "X".repeat(1_001) },
+    { ...set, description: "X".repeat(10_001) },
+  ]) assert.deepEqual(lowerBlooketWriteSubmission(operation,
+    { remoteSetId: null }), { ok: false, code: "invalid-set-content" });
+  const question: BlooketWriteOperation = {
+    operationId: "plan:test:q:remote", kind: "question",
+    localQuestionId: "q1", questionNumber: 1,
+    question: { type: "typing-answer", prompt: "Type sun",
+      timeLimitSeconds: 20, imageMediaId: null, matchMode: "exact",
+      answer: "sun" },
+  };
+  for (const remoteSetId of ["", "x".repeat(513), "wrong\0id"]) {
+    assert.deepEqual(lowerBlooketWriteSubmission(question,
+      { remoteSetId }), { ok: false,
+      code: "invalid-remote-set-binding" });
+  }
+});
+
 test("native question and answer bounds fail before browser lowering", () => {
   const base: BlooketWriteOperation = {
     operationId: "plan:test:q:bounds", kind: "question",

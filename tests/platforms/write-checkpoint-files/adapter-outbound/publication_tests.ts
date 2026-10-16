@@ -102,6 +102,20 @@ test("publication snapshots reject hard links and writable aliases", () =>
     }
   }));
 
+test("publication snapshot decoding refuses invalid UTF-8 bytes", () =>
+  fixture(async root => {
+    const paths = await publicationFiles(root, "draft-fixture");
+    await mkdir(dirname(paths.snapshot), { recursive: true });
+    const invalid = Buffer.concat([
+      Buffer.from('{"draftId":"fi'), Buffer.from([0xff]),
+      Buffer.from('xture"}'),
+    ]);
+    await writeFile(paths.snapshot, invalid, { mode: 0o600 });
+    await assert.rejects(readPublicationSnapshot(paths.snapshot),
+      /publication-snapshot-invalid/u);
+    assert.deepEqual(await readFile(paths.snapshot), invalid);
+  }));
+
 test("sibling publication refuses a hard-linked foreign snapshot", () =>
   fixture(async root => {
     const foreign = join(root, "foreign.json");
