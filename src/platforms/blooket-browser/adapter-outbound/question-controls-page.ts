@@ -156,6 +156,20 @@ export async function prepareBlooketQuestionControls(
         (input.qType === "mc" && input.answerTypes !== null) ||
         !Array.isArray(input.answers) || input.answers.length < 1 ||
         input.answers.length > (input.qType === "mc" ? 4 : 100)) return false;
+    // Refuse impossible provider answer layouts before opening a native
+    // picker or filling fields. The final Save also checks these invariants.
+    if (typeof input.random !== "boolean" ||
+        new Set(input.answers.map(answer => answer?.text)).size !==
+          input.answers.length) return false;
+    if (input.qType === "typing") {
+      if (input.random !== true || !Array.isArray(input.answerTypes) ||
+          input.answerTypes.length !== input.answers.length ||
+          input.answerTypes.some(mode =>
+            mode !== "exactly" && mode !== "contains") ||
+          input.answers.some(answer => answer?.correct !== true))
+        return false;
+    } else if (input.answers.length < 2 ||
+        !input.answers.some(answer => answer?.correct === true)) return false;
     // This step edits visible React controls before the final Save guard.
     // Refuse already-invalid provider text and timers *before* activating
     // the form watch or changing a question type, prompt, or answer field.
