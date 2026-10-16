@@ -123,6 +123,13 @@ before snapshot creation and browser execution; the domain document stays
 provider-neutral. Unit and canonical command fixtures prove refusal without
 a frozen snapshot, write-attempt journal, or remote mutation.
 
+A direct-lowering regression also found that Multiple Choice with one or
+five answers, no correct answer, or duplicate text could be sent to the
+browser despite the native writer refusing those slots. Shared lowering
+now refuses the same structural conflicts before submission. This defends
+secondary execution-port callers as well as canonical draft validation;
+it does not expand unsupported answer-image publication.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses
