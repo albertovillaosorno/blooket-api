@@ -73,6 +73,17 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, NUL-bearing set titles, descriptions and question prompts
+were found to pass native lowering and matching synthetic browser forms,
+despite the existing native answer NUL guard. The canonical preflight and
+both separate provider form actions now reject these values before a new
+journal or Save click. Tests cover an already-prefilled matching Create Set
+form and confirm unchanged authored text still passes. Blooket's current
+Help Center question-set guide describes editable text fields but does not
+establish a live NUL normalization contract.
+
+No remote mutation was attempted.
+
 On 2026-10-16, a red-to-green synthetic Create Set regression found that the
 native browser page could prepare a whitespace-only title despite the
 canonical publishing preflight refusing it. Preparation now refuses before

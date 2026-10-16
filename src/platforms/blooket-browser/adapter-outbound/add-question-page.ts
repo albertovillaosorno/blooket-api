@@ -204,7 +204,8 @@ export function runBlooketAddQuestionPageAction(
       input.number < 1 || input.number > 10_000 ||
       typeof input.question !== "string" ||
       !input.question.trim() || input.question.length > 20_000 ||
-      input.question.includes("`*") || input.question.includes("`~`") ||
+      input.question.includes("\0") || input.question.includes("`*") ||
+      input.question.includes("`~`") ||
       typeof input.random !== "boolean" ||
       !Number.isSafeInteger(input.timeLimit) ||
       input.timeLimit < 1 || input.timeLimit > 86_400 ||

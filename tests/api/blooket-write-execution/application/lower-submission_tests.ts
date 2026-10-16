@@ -67,6 +67,19 @@ test(
   },
 );
 
+test("native set metadata excludes NUL bytes", () => {
+  const set: BlooketWriteOperation = {
+    operationId: "plan:test:set:nul", kind: "set", title: "Title",
+    description: "Notes", visibility: "private", coverMediaId: null,
+  };
+  if (set.kind !== "set") return;
+  for (const modified of [
+    { ...set, title: "Bad\0Title" },
+    { ...set, description: "Bad\0Notes" },
+  ]) assert.deepEqual(lowerBlooketWriteSubmission(modified,
+    { remoteSetId: null }), { ok: false, code: "invalid-set-content" });
+});
+
 test(
   "multiple choice lowering keeps answer order correctness and media slots",
   () => {
@@ -243,6 +256,7 @@ test("native question and answer bounds fail before browser lowering", () => {
     { ...base.question, prompt: "x".repeat(20_001) },
     { ...base.question, prompt: "" },
     { ...base.question, prompt: " \t " },
+    { ...base.question, prompt: "Type\0sun" },
     { ...base.question, timeLimitSeconds: 86_401 },
     { ...base.question, timeLimitSeconds: 0 },
   ]) assert.deepEqual(lowerBlooketWriteSubmission(

@@ -97,9 +97,10 @@ export function prepareBlooketCreateSetForm(
       location.pathname !== "/create" || location.search || location.hash ||
       typeof input.title !== "string" ||
       !input.title.trim() ||
-      input.title.length > 1_000 ||
+      input.title.length > 1_000 || input.title.includes("\0") ||
       typeof input.description !== "string" ||
       input.description.length > 10_000 ||
+      input.description.includes("\0") ||
       typeof input.private !== "boolean"
     )
       return failed();
@@ -357,9 +358,10 @@ export function submitBlooketCreateSetForm(
       location.origin !== "https://dashboard.blooket.com" ||
       location.pathname !== "/create" || location.search || location.hash ||
       typeof expected.title !== "string" || !expected.title.trim() ||
-      expected.title.length > 1_000 ||
+      expected.title.length > 1_000 || expected.title.includes("\0") ||
       typeof expected.description !== "string" ||
       expected.description.length > 10_000 ||
+      expected.description.includes("\0") ||
       typeof expected.private !== "boolean"
     )
       return failed();
