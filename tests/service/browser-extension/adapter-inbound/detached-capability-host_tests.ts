@@ -61,6 +61,8 @@ function fixture(options: {
   readonly loadAfterMs?: number;
   readonly hydrateAfterMs?: number;
   readonly scriptLatencyMs?: number;
+  readonly uncommittedForMs?: number;
+  readonly pendingDestination?: string;
 } = {}) {
   const events: string[] = [];
   let url = MY_SETS, removed = false, now = 1_000, scans = 0;
@@ -77,6 +79,10 @@ function fixture(options: {
       get: async id => {
         assert.equal(id, 84);
         events.push("get");
+        if (options.uncommittedForMs !== undefined &&
+            now - 1_000 < options.uncommittedForMs)
+          return { id, pendingUrl: options.pendingDestination ?? MY_SETS,
+            status: "loading" };
         return { id, url: options.sourceRedirect ? "https://id.blooket.com/"
           : url, status: options.pending ||
           (options.loadAfterMs !== undefined &&
@@ -226,6 +232,21 @@ test("detached text capability waits for its fresh My Sets hydration",
   assert.equal(page.removed(), true);
   assert.equal(page.events.filter(name =>
     name === "inspectBlooketPage").length >= 5, true);
+});
+
+test("new capability tabs can have only pendingUrl before navigation commits",
+  async () => {
+    const page = fixture({ uncommittedForMs: 150 });
+    assert.equal((await page.inspect()).ok, true);
+    assert.equal(page.removed(), true);
+    assert.ok(page.elapsed() >= 150);
+  });
+
+test("a foreign pending capability navigation is never inspected", async () => {
+  const page = fixture({ uncommittedForMs: 150,
+    pendingDestination: "https://foreign.invalid/" });
+  assert.equal((await page.inspect()).ok, false);
+  assert.ok(!page.events.includes("inspectBlooketPage"));
 });
 
 test("detached media capability waits for a fresh Edit hydration",

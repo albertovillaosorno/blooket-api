@@ -75,6 +75,9 @@ test(
   let detachedCapabilityDrift = false;
   let detachedCapabilitySourceReload = false;
   let detachedCapabilityChallenge = false;
+  let capabilityPendingGets = 0;
+  let capabilityNeverCommits = false;
+  let capabilityPendingRedirect = false;
   let detachedUrl = "";
   let denyFinalReadGuard = false;
   let readGuardChecks = 0;
@@ -232,6 +235,13 @@ test(
       get: async (id) => {
         if (id === 84) {
           if (!detachedCapabilityUrl) throw Error("closed-capability-tab");
+          if (capabilityPendingRedirect)
+            return { id, url: detachedCapabilityUrl,
+              pendingUrl: "https://foreign.invalid/teacher-navigation",
+              status: "loading", active: false, windowId: 3 };
+          if (capabilityNeverCommits || capabilityPendingGets-- > 0)
+            return { id, pendingUrl: detachedCapabilityUrl,
+              status: "loading", active: false, windowId: 3 };
           return { id, url: detachedCapabilityUrl,
             status: "complete", windowId: 3 };
         }
@@ -1700,6 +1710,7 @@ test(
     const beforeTextTabs = capabilityTabsCreated;
     const beforeTextReloads = readReloads;
     const beforeTextUrl = tabUrl;
+    capabilityPendingGets = 2;
     const textCapability = await expectReply({
       kind: "capabilities.inspect-text",
     });
@@ -1713,6 +1724,23 @@ test(
     assert.deepEqual(scripts.slice(beforeText).filter(name =>
       name === "openBlooketCapabilityQuestionPanel" ||
       name === "openBlooketAudioCapabilityDrawer"), []);
+
+    capabilityNeverCommits = true;
+    const beforePendingCleanup = capabilityTabsClosed;
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(capabilityTabsClosed, beforePendingCleanup + 1,
+      "a still-pending owned tab must be cleaned up after its load deadline");
+    capabilityNeverCommits = false;
+    capabilityPendingRedirect = true;
+    const beforeAdoptedCleanup = capabilityTabsClosed;
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(capabilityTabsClosed, beforeAdoptedCleanup,
+      "a teacher's pending navigation must preserve the old matching tab");
+    capabilityPendingRedirect = false;
 
     questionPanelCloses = false;
     assert.equal(

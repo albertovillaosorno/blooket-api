@@ -44,13 +44,14 @@ type Behavior = "normal" | "redirect" | "challenge" | "drift" |
   "nested-frame" | "no-cleanup" | "not-ready" | "no-hydration" |
   "late-edit" | "never-edit" | "switch-origin" |
   "challenge-after-shell" | "accessor-state" | "challenge-after-scan" |
-  "hidden-ok-after-scan";
+  "hidden-ok-after-scan" | "uncommitted";
 
 function fixture(behavior: Behavior = "normal") {
   const events: string[] = [];
   let closed = false;
   let calls = 0;
   let stageReads = 0, originReads = 0;
+  let tabReads = 0;
   const temporaryTabId = 83;
   const chrome: DetachedQuestionReadChromePort = {
     tabs: {
@@ -63,6 +64,8 @@ function fixture(behavior: Behavior = "normal") {
         assert.equal(id, temporaryTabId);
         events.push("get");
         if (closed) throw Error("already-closed");
+        if (behavior === "uncommitted" && ++tabReads <= 2)
+          return { id, status: "loading", pendingUrl: TARGET };
         return {
           id, url: behavior === "redirect" ? "https://id.blooket.com/"
             : TARGET,
@@ -154,6 +157,14 @@ test("late provider Edit hydration can settle without a new tab or write",
   assert.equal(page.events.filter(name => name === "create").length, 1);
   assert.equal(page.events.filter(name => name === "remove").length, 1);
 });
+
+test("an initial pendingUrl can commit before a detached question scan",
+  async () => {
+    const page = fixture("uncommitted");
+    assert.deepEqual(await page.inspect(), { ok: true, value: [] });
+    assert.equal(page.closed(), true);
+    assert.equal(page.events.filter(event => event === "create").length, 1);
+  });
 
 test("never-hydrated and replaced detached documents do not become receipts",
   async () => {

@@ -73,6 +73,25 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a real Chrome background-tab diagnostic returned only the exact
+`pendingUrl`, `status: loading` and an inactive tab identity before navigation
+committed. The previous detached reader rejected this normal initial state.
+The diagnostic tab was closed without changing any quiz or original editor.
+
+Background capability, question and My Sets readers now wait for that exact
+pending destination within their original budgets, then require the committed
+document before executing inspection scripts. Cleanup can remove a still-loading
+owned tab, while a different pending URL preserves it even if its old committed
+URL matches. Portable regressions reproduce the missing-URL transition and
+refuse foreign pending navigation; live publication still needs verification.
+
+Chrome's official [Tabs API][pending-tab-doc], checked on 2026-10-16,
+distinguishes `pendingUrl` from the last committed `url`. The observed behavior
+is browser navigation evidence, not a Blooket write receipt.
+
+<!-- jig-ignore-next-line: Preserve the exact official Chrome API URL. -->
+[pending-tab-doc]: https://developer.chrome.com/docs/extensions/reference/api/tabs
+
 On 2026-10-16, Computer Use reached the authorized Chrome session, preserved
 its older pending question form, and exercised the new local saved-account
 connection control. A fresh login and My Sets read succeeded with fifteen

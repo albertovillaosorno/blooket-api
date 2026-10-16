@@ -61,7 +61,8 @@ import { canLeaveBlooketPageForRead } from
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
-import { confirmBlooketReadNavigation } from "./read-navigation.ts";
+import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad } from
+  "./read-navigation.ts";
 import {
   inspectBlooketDocumentOrigin,
   inspectBlooketSessionDocumentOrigin,
@@ -82,6 +83,7 @@ import {
 interface BrowserTab {
   id?: number;
   url?: string;
+  pendingUrl?: string;
   title?: string;
   status?: string;
   windowId?: number;
@@ -844,7 +846,8 @@ function ownedBrowser(
     const owned = temporaryTabs.get(id);
     if (!owned) throw Error("unowned-temporary-tab");
     const observed = await chrome.tabs.get(id);
-    if (observed.id !== id || observed.url !== owned.url ||
+    if (observed.id !== id ||
+        classifyBlooketReadTabLoad(observed, owned.url) === "changed" ||
         observed.active === true ||
         (owned.windowId !== undefined &&
          observed.windowId !== owned.windowId))
@@ -941,8 +944,9 @@ async function inspectDetachedBlooketSets(
     let ready = false;
     for (let i = 0; i < 30; i++) {
       const tab = await browser.tabs.get(tabId!);
-      if (tab.url !== url) return failed();
-      if (tab.status === "complete") { ready = true; break; }
+      const load = classifyBlooketReadTabLoad(tab, url);
+      if (load === "changed") return failed();
+      if (load === "ready") { ready = true; break; }
       await pause(100);
     }
     if (!ready) return failed();

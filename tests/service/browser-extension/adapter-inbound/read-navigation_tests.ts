@@ -32,12 +32,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { confirmBlooketReadNavigation } from
+import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad } from
   // jig-ignore-next-line: Keep the mirrored source import unaliased.
   "../../../../src/service/browser-extension/adapter-inbound/read-navigation.ts";
 
 const SETS = "https://dashboard.blooket.com/my-sets";
 const EDIT = "https://dashboard.blooket.com/edit?id=fixture";
+
+test("Chrome pendingUrl is load evidence, not a committed document", () => {
+  for (const url of [undefined, "", "about:blank"])
+    assert.equal(classifyBlooketReadTabLoad({ url, pendingUrl: SETS,
+      status: "loading" }, SETS), "loading");
+  assert.equal(classifyBlooketReadTabLoad({ url: SETS, status: "complete" },
+    SETS), "ready");
+  assert.equal(classifyBlooketReadTabLoad({ pendingUrl: SETS,
+    status: "complete" }, SETS), "changed");
+});
+
+test("pending foreign navigation invalidates the old expected URL", () => {
+  for (const url of [SETS, "about:blank", undefined])
+    assert.equal(classifyBlooketReadTabLoad({ url, status: "loading",
+      pendingUrl: "https://foreign.invalid/" }, SETS), "changed");
+  assert.equal(classifyBlooketReadTabLoad({ url: EDIT, pendingUrl: SETS,
+    status: "loading" }, SETS), "changed");
+});
 
 function fixture(options: {
   readonly initialUrl?: string;

@@ -13,7 +13,19 @@ record first. It does not declare quiz publication or automatic installation
 complete. The human's current instructions determine account-mutation and Git
 authority; this document cannot grant either to another session.
 
-## Current delivery checkpoint (2026-10-15)
+## Current delivery checkpoint (2026-10-16)
+
+The local Quizzes saved-account connection control completed a real login and
+read fifteen visible sets with unknown completeness in Chrome. Its separate
+readiness action remains read-only; credentials never enter tool results.
+
+Fresh Chrome tabs can initially expose only `pendingUrl` with `status: loading`.
+Detached readers must await the exact requested destination before inspecting a
+committed document; the initial absence of `url` is not a foreign navigation.
+A changed pending destination still stops the read and preserves the tab.
+See Chrome's [Tabs API][pending-tabs] and the shared read-navigation classifier.
+
+[pending-tabs]: https://developer.chrome.com/docs/extensions/reference/api/tabs
 
 Start with the unfinished `blooket-11` record. A real Create Set receipt and
 a reconciled typing-question publication exist, but the latest MC Save

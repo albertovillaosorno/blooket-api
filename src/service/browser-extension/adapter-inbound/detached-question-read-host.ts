@@ -37,10 +37,12 @@ import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
+import { classifyBlooketReadTabLoad } from "./read-navigation.ts";
 
 interface Tab {
   readonly id?: number;
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -92,8 +94,9 @@ export async function inspectDetachedBlooketQuestions(
     let loaded = false;
     for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
       const tab = await chrome.tabs.get(createdId!);
-      if (tab.url !== target) return failed();
-      if (tab.status === "complete") { loaded = true; break; }
+      const load = classifyBlooketReadTabLoad(tab, target);
+      if (load === "changed") return failed();
+      if (load === "ready") { loaded = true; break; }
       await pause(100);
     }
     if (!loaded || now() >= deadline) return failed();
