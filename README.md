@@ -450,6 +450,12 @@ tools. The local **Quizzes** view now shows the saved drafts' durable status
 and has explicit Publish, Stop, Reconcile, and Verify controls for the same
 canonical commands. Opening Quizzes never submits a Blooket write.
 
+Quizzes also offers **Sign in with the saved account**, using the email and
+password configured locally in Settings. This explicit action reuses a ready
+session or makes one normal login attempt, stopping for challenges, organization
+selection and provider waits. It does not publish quizzes or return credentials;
+the separate My Sets check remains read-only.
+
 Supply the saved draft ID and exact revision for each step; each call
 performs at most one journaled write. Final fresh verification alone reports
 `published: true`; local progress does not prove remote state.

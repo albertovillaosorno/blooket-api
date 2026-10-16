@@ -1155,6 +1155,103 @@ test("connected-tab focus acts only through the paired extension",
   },
 );
 
+test("explicit local connection uses saved credentials and preserves stops",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "blooket-connect-"));
+    const broker = createBlooketBrowserBridgeBroker();
+    let credentialReads = 0;
+    const service = await startBrowserService({ root, port: 0,
+      browserBridge: broker, secrets: {
+        read: async name => {
+          if (name !== "blooket.password")
+            return { ok: true, kind: "missing" };
+          credentialReads++;
+          return { ok: true, kind: "found", secret: "synthetic-password" };
+        },
+        write: async () => { throw new Error("No secret replacement."); },
+        delete: async () => { throw new Error("No secret deletion."); },
+      },
+    });
+    try {
+      const preferences = await loadPreferences(root);
+      await savePreferences(root, { ...preferences,
+        email: "teacher@example.test" });
+      const boot = await (await fetch(service.origin + "/api/bootstrap"))
+        .json() as { csrf: string };
+      credentialReads = 0;
+      const post = (body: unknown = {}, csrf = boot.csrf,
+        origin = service.origin) => fetch(service.origin +
+          "/api/blooket-connect", { method: "POST", headers: {
+            "Content-Type": "application/json", "X-CSRF-Token": csrf,
+            Origin: origin,
+          }, body: JSON.stringify(body) });
+      assert.equal((await post()).status, 409);
+      assert.equal((await post({}, "wrong")).status, 403);
+      assert.equal((await post({}, boot.csrf,
+        "https://foreign.invalid")).status, 403);
+      for (const bad of [null, [], { password: "not-admitted" },
+        { loginIdentifier: "other@example.test" }])
+        assert.equal((await post(bad)).status, 400);
+      const client = "chrome-extension://synthetic-connect/";
+      broker.next(broker.pairingToken(), client);
+      const next = async (kind: string, value: unknown) => {
+        let job = broker.next(broker.pairingToken(), client);
+        for (let attempt = 0; !job && attempt < 50; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          job = broker.next(broker.pairingToken(), client);
+        }
+        assert.ok(job);
+        assert.equal(job.command.kind, kind);
+        if (job.command.kind === "session.authenticate") {
+          assert.equal(job.command.loginIdentifier,
+            "teacher@example.test");
+          assert.equal(job.command.password, "synthetic-password");
+        }
+        assert.equal(broker.complete(broker.pairingToken(), {
+          schemaVersion: 1, id: job.id, ok: true, value,
+        }, client), true);
+      };
+      for (const state of ["security-challenge", "organization-prompt",
+        "rate-limited"] as const) {
+        const pending = post();
+        await next("session.observe", state);
+        const result = await (await pending).json();
+        assert.equal(result.state, state);
+        assert.equal(credentialReads, 0);
+        assert.equal(broker.next(broker.pairingToken(), client), null);
+      }
+      const pending = post();
+      const competing = await post();
+      assert.equal(competing.status, 409);
+      assert.deepEqual(await competing.json(),
+        { ok: false, code: "blooket-connect-busy" });
+      await next("session.observe", "signed-out");
+      await next("session.authenticate", null);
+      await next("session.observe", "my-sets");
+      const response = await pending;
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.deepEqual(result,
+        { ok: true, kind: "ready", state: "my-sets", reused: false });
+      assert.equal(credentialReads, 1);
+      assert.equal(JSON.stringify(result).includes("synthetic-password"),
+        false);
+      assert.equal(JSON.stringify(result).includes("teacher@example.test"),
+        false);
+      assert.equal(broker.next(broker.pairingToken(), client), null);
+      const reuse = post();
+      await next("session.observe", "my-sets");
+      assert.deepEqual(await (await reuse).json(),
+        { ok: true, kind: "ready", state: "my-sets", reused: true });
+      assert.equal(credentialReads, 1);
+    } finally {
+      service.server.close();
+      service.server.closeAllConnections();
+      broker.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
 test("readiness checks the paired session, then My Sets without writes",
   async () => {
     const root = await mkdtemp(join(tmpdir(), "blooket-readiness-"));
