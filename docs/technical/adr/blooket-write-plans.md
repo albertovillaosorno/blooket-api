@@ -79,7 +79,9 @@ for status and reconciliation without granting another write start.
 
 Provider form limits are checked independently of project-document syntax.
 Whitespace-only set titles are rejected before opening a write journal while
-valid teacher-authored title text remains unchanged. Similarly, native
+valid teacher-authored title text remains unchanged. The independent Create
+Set browser prepare/submit functions also reject whitespace-only titles, even
+when the observed form already contains that text. Similarly, native
 question/answer lowering and the browser form guard refuse whitespace-only
 prompts or text answers without changing meaningful authored text.
 
