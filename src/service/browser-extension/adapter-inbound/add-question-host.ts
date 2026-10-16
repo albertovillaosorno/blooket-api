@@ -71,6 +71,7 @@ import {
 
 interface BrowserTab {
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -191,7 +192,8 @@ export function createExtensionAddQuestionHost(
         // Do not replace a route the teacher selected after the first tab
         // observation. Reaching the correct edit page needs no second update.
         const current = await chrome.tabs.get(tabId);
-        if (current.status !== "complete" || current.url !== before.url)
+        if (current.status !== "complete" || current.url !== before.url ||
+            current.pendingUrl !== undefined)
           return browserFailure();
         let sourceOrigin: number | undefined;
         if (current.url !== editUrl) {
@@ -210,7 +212,8 @@ export function createExtensionAddQuestionHost(
           if (canLeave !== true) return browserFailure();
           const afterGuard = await chrome.tabs.get(tabId);
           if (afterGuard.status !== "complete" ||
-              afterGuard.url !== current.url) return browserFailure();
+              afterGuard.url !== current.url ||
+              afterGuard.pendingUrl !== undefined) return browserFailure();
           // A same-URL reload can install a new teacher-owned document after
           // the navigation guard. Never navigate away from that replacement.
           const unchanged = await script(
@@ -220,7 +223,9 @@ export function createExtensionAddQuestionHost(
           const beforeNavigation = await chrome.tabs.get(tabId);
           if (unchanged !== origin ||
               beforeNavigation.status !== "complete" ||
-              beforeNavigation.url !== current.url) return browserFailure();
+              beforeNavigation.url !== current.url ||
+              beforeNavigation.pendingUrl !== undefined)
+            return browserFailure();
           await chrome.tabs.update(tabId, { url: editUrl });
         }
 
@@ -240,14 +245,17 @@ export function createExtensionAddQuestionHost(
         const sameEditDocument = async (): Promise<boolean> => {
           const beforeOrigin = await chrome.tabs.get(tabId);
           if (beforeOrigin.status !== "complete" ||
-              beforeOrigin.url !== editUrl) return false;
+              beforeOrigin.url !== editUrl ||
+              beforeOrigin.pendingUrl !== undefined) return false;
           const current = await script(
             inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
             [editUrl],
           );
           const afterOrigin = await chrome.tabs.get(tabId);
           return afterOrigin.status === "complete" &&
-            afterOrigin.url === editUrl && current === ownedOrigin;
+            afterOrigin.url === editUrl &&
+            afterOrigin.pendingUrl === undefined &&
+            current === ownedOrigin;
         };
         if (!await sameEditDocument()) return browserFailure();
 
@@ -256,12 +264,16 @@ export function createExtensionAddQuestionHost(
         const ownedScript: Script = async (func, args) => {
           const beforeScript = await chrome.tabs.get(tabId);
           if (beforeScript.status !== "complete" ||
-              beforeScript.url !== editUrl || !await sameEditDocument())
+              beforeScript.url !== editUrl ||
+              beforeScript.pendingUrl !== undefined ||
+              !await sameEditDocument())
             throw new Error("browser-write-tab-changed");
           const result = await script(func, args);
           const afterScript = await chrome.tabs.get(tabId);
           if (afterScript.status !== "complete" ||
-              afterScript.url !== editUrl || !await sameEditDocument())
+              afterScript.url !== editUrl ||
+              afterScript.pendingUrl !== undefined ||
+              !await sameEditDocument())
             throw new Error("browser-write-tab-changed");
           return result;
         };
@@ -437,6 +449,9 @@ async function waitForEdit(
   let pendingNativeOrigin: number | undefined;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
+    if (tab.pendingUrl !== undefined &&
+        (tab.pendingUrl !== editUrl || tab.status === "complete"))
+      return browserFailure();
     if (tab.status === "complete") {
       if (tab.url !== editUrl) return browserFailure();
       const origin = await script(
@@ -464,7 +479,8 @@ async function waitForEdit(
             origin !== pendingNativeOrigin)) return browserFailure();
       const observed = await observe(script);
       const after = await chrome.tabs.get(tabId);
-      if (after.status !== "complete" || after.url !== editUrl)
+      if (after.status !== "complete" || after.url !== editUrl ||
+          after.pendingUrl !== undefined)
         return browserFailure();
       const confirmedOrigin = await script(
         inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
@@ -472,7 +488,8 @@ async function waitForEdit(
       );
       const stillThere = await chrome.tabs.get(tabId);
       if (confirmedOrigin !== origin || stillThere.status !== "complete" ||
-          stillThere.url !== editUrl) return browserFailure();
+          stillThere.url !== editUrl || stillThere.pendingUrl !== undefined)
+        return browserFailure();
       if (observed === "edit") return { ok: true, origin };
       if ((previousOrigin !== undefined || justNavigated) &&
           observed === "unexpected-page") {
@@ -506,7 +523,8 @@ async function observeQuestion(
   let pendingUnknown = false;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
     const tab = await chrome.tabs.get(tabId);
-    if (tab.url !== editUrl) return browserFailure();
+    if (tab.url !== editUrl || tab.pendingUrl !== undefined)
+      return browserFailure();
     if (tab.status !== "complete") {
       await pause(POLL_MS);
       continue;

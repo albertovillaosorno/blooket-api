@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green native mutation-host regressions found that an
+old committed dashboard or Edit URL could still authorize Create Set or Add
+Question interactions while Chrome had a foreign `pendingUrl`. Both hosts
+now reject that stale ownership before navigation, form writes, or Save and
+while observing target document changes.
+
+The Create Set host still accepts a *loading* exact pending Edit redirect
+after its single Save click, without treating that response as a confirmed
+remote set. The [Chrome Tabs API][pending-tab-doc] was checked on
+2026-10-16 for the distinction between committed `url` and uncommitted
+`pendingUrl`. No live account Save was performed by these tests.
+
 On 2026-10-16, a red-to-green worker regression queued a foreign Chrome
 navigation during `session.observe` after its initial native-document proof.
 The worker previously returned the old signed-in observation; it now checks

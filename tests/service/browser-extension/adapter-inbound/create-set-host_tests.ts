@@ -219,6 +219,86 @@ test(
   },
 );
 
+test("pending foreign navigation cannot own Create Set actions", async () => {
+  const pendingUrl = "https://foreign.invalid/next";
+  for (const phase of ["open", "prepare", "submit"] as const) {
+    const fake = fakeChrome({
+      initialUrl: phase === "open"
+        ? "https://dashboard.blooket.com/my-sets"
+        : "https://dashboard.blooket.com/create",
+      scripts: [prepared],
+    });
+    const get = fake.chrome.tabs.get;
+    fake.chrome.tabs.get = async id => ({ ...await get(id), pendingUrl });
+    const host = createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    );
+    const input = { title: "Synthetic", description: "", private: true };
+    const result = phase === "open" ? await host.openCreateSet()
+      : phase === "prepare" ? await host.prepareCreateSet(input)
+        : await host.submitCreateSet(input);
+    assert.equal(result.ok, false, phase);
+    assert.equal(fake.calls.some(call => call.startsWith("update:")),
+      false, phase);
+    assert.equal(fake.calls.includes("script"), false, phase);
+  }
+});
+
+test("a foreign pending redirect cannot acknowledge Create Set submit",
+  async () => {
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/create", scripts: [prepared] });
+  let submitted = false;
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    const reply = await execute(request);
+    if (request.func.name === "submitBlooketCreateSetForm")
+      submitted = true;
+    return reply;
+  };
+  const get = fake.chrome.tabs.get;
+  fake.chrome.tabs.get = async id => ({ ...await get(id),
+    ...(submitted ? { pendingUrl: "https://foreign.invalid/" } : {}),
+  });
+  const host = createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  );
+  const result = await host.submitCreateSet({
+    title: "Synthetic", description: "", private: true,
+  });
+  assert.equal(submitted, true);
+  assert.equal(result.ok, false);
+});
+
+test("an exact pending Edit redirect keeps a single Create Set ack",
+  async () => {
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/create", scripts: [prepared] });
+  let submitted = false;
+  const execute = fake.chrome.scripting.executeScript;
+  fake.chrome.scripting.executeScript = async request => {
+    const reply = await execute(request);
+    if (request.func.name === "submitBlooketCreateSetForm") {
+      submitted = true;
+      fake.setTab({ url: "https://dashboard.blooket.com/create",
+        status: "loading" });
+    }
+    return reply;
+  };
+  const get = fake.chrome.tabs.get;
+  fake.chrome.tabs.get = async id => ({ ...await get(id),
+    ...(submitted ? { pendingUrl:
+      "https://dashboard.blooket.com/edit?id=synthetic" } : {}),
+  });
+  const host = createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  );
+  assert.deepEqual(await host.submitCreateSet({
+    title: "Synthetic", description: "", private: true,
+  }), { ok: true });
+  assert.equal(submitted, true);
+});
+
 test("human and wait states propagate during create navigation", async () => {
   for (const state of [
     "security-challenge",

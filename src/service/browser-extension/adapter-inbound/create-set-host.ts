@@ -57,6 +57,7 @@ import { inspectBlooketDocumentOrigin } from
 
 interface BrowserTab {
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -175,19 +176,22 @@ export function createExtensionCreateSetHost(
 
   const createTabReady = async (): Promise<boolean> => {
     const tab = await chrome.tabs.get(tabId);
-    return tab.status === "complete" && tab.url === CREATE_URL;
+    return tab.status === "complete" && tab.url === CREATE_URL &&
+      tab.pendingUrl === undefined;
   };
   // A tab may replace its document while retaining /edit?id= and its title.
   // Pair every receipt/sidebar script with the same native document lifetime.
   const editDocumentOrigin = async (url: string): Promise<number | null> => {
     const tab = await chrome.tabs.get(tabId);
-    if (tab.status !== "complete" || tab.url !== url) return null;
+    if (tab.status !== "complete" || tab.url !== url ||
+        tab.pendingUrl !== undefined) return null;
     const observed = await script(
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
       [url],
     );
     const after = await chrome.tabs.get(tabId);
     return after.status === "complete" && after.url === url &&
+        after.pendingUrl === undefined &&
         typeof observed === "number" && Number.isFinite(observed) &&
         observed > 0 ? observed : null;
   };
@@ -311,6 +315,7 @@ export function createExtensionCreateSetHost(
         // A manual route selection between browser calls belongs to the user.
         const current = await chrome.tabs.get(tabId);
         if (current.status !== "complete" || current.url !== before.url ||
+            current.pendingUrl !== undefined ||
             typeof current.url !== "string") return browserFailure();
         // A form already on Create may contain unsaved teacher-authored work.
         // Only a freshly navigated product form may be populated and saved.
@@ -327,6 +332,7 @@ export function createExtensionCreateSetHost(
           const afterGuard = await chrome.tabs.get(tabId);
           if (afterGuard.status !== "complete" ||
               afterGuard.url !== current.url ||
+              afterGuard.pendingUrl !== undefined ||
               await editDocumentOrigin(current.url) !== origin)
             return browserFailure();
           // Do not discard an independently reloaded teacher document at
@@ -335,7 +341,10 @@ export function createExtensionCreateSetHost(
         }
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
-          if (tab.status === "complete") {
+          if (tab.pendingUrl !== undefined &&
+              tab.pendingUrl !== CREATE_URL) return browserFailure();
+          if (tab.status === "complete" &&
+              tab.pendingUrl === undefined) {
             // A page-level state alone cannot authorize writes on a different
             // route; a post-script tab check rejects late navigation as well.
             if (tab.url !== CREATE_URL) return browserFailure();
@@ -630,7 +639,7 @@ async function observe(
 }
 
 function dashboardTab(tab: BrowserTab): boolean {
-  if (!tab.url) return false;
+  if (!tab.url || tab.pendingUrl !== undefined) return false;
   try {
     return new URL(tab.url).origin === DASHBOARD_ORIGIN;
   } catch {
@@ -639,7 +648,8 @@ function dashboardTab(tab: BrowserTab): boolean {
 }
 
 function exactEditRoute(tab: BrowserTab): boolean {
-  if (tab.status !== "complete" && tab.status !== "loading") return false;
+  if (tab.pendingUrl !== undefined ||
+      (tab.status !== "complete" && tab.status !== "loading")) return false;
   if (!tab.url) return false;
   try {
     const url = new URL(tab.url);
@@ -687,6 +697,11 @@ function exactSavedSidebar(value: unknown, expected: {
 }
 
 function expectedSubmitRoute(tab: BrowserTab): boolean {
+  // A Save click may be navigating from Create to an exact Edit route.
+  // Chrome still reports the old committed URL until that redirect settles.
+  if (tab.pendingUrl !== undefined)
+    return tab.url === CREATE_URL && tab.status === "loading" &&
+      exactEditRoute({ url: tab.pendingUrl, status: "loading" });
   if (tab.url === CREATE_URL &&
       (tab.status === "complete" || tab.status === "loading"))
     return true;
