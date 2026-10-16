@@ -835,6 +835,27 @@ test("provider-generated unknown question fields never authorize Save", () => {
     });
 });
 
+test("provider-equivalent blank question fields cannot authorize Save", () => {
+  for (const field of ["question", "answers"] as const) {
+    const page = fixture();
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+        const value = JSON.parse(page.hidden.value);
+        if (field === "question") value.question = "  \t  ";
+        else { value.answers = ["  \t  "];
+          value.correctAnswers = ["  \t  "]; }
+        page.hidden.value = JSON.stringify(value);
+        const input = field === "question"
+          ? { ...typing, question: "  \t  " }
+          : { ...typing, answers: [
+            { text: "  \t  ", correct: true }] };
+        assert.equal(prepareBlooketAddQuestionForm(input).ok, false);
+        assert.equal(submitBlooketAddQuestionForm(input).ok, false);
+        assert.equal(page.submit.clicked, 0);
+      });
+  }
+});
+
 test("provider marker text never reaches the hidden question field", () => {
   const page = fixture();
   const before = page.hidden.value;

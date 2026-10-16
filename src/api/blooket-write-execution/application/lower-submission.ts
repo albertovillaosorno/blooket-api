@@ -122,7 +122,7 @@ function lowerQuestion(
   // Canonical publication preflights this lowering before journaling.
   const mathMarker = "`*";
   const imageMarker = "`~`";
-  if (question.prompt.length < 1 || question.prompt.length > 20_000 ||
+  if (!question.prompt.trim() || question.prompt.length > 20_000 ||
       !Number.isSafeInteger(question.timeLimitSeconds) ||
       question.timeLimitSeconds < 1 || question.timeLimitSeconds > 86_400)
     return { ok: false, code: "invalid-question-content" };
@@ -214,7 +214,7 @@ function lowerQuestion(
 // Mirror the native editor's exact answer size and NUL guard before any
 // durable attempt is opened. The local project decoder stays provider-neutral.
 function invalidNativeAnswer(text: string): boolean {
-  return text.length < 1 || text.length > 10_000 || text.includes("\0");
+  return !text.trim() || text.length > 10_000 || text.includes("\0");
 }
 
 function mediaSlot(mediaId: string | null): BlooketSubmissionMedia | null {
