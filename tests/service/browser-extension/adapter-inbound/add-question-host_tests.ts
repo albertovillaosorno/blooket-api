@@ -1588,6 +1588,56 @@ test("post-save hidden and symbol fields do not become question evidence",
   },
 );
 
+test("a proxy cannot turn a signed-out session into Add Question authority",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "inspectBlooketPage") return [{ result:
+      new Proxy({ ok: false, value: "signed-out" }, { get(target, key) {
+        if (key === "ok" || key === "value") {
+          reads++;
+          return key === "ok" ? true : "edit";
+        }
+        return Reflect.get(target, key);
+      } }),
+    }];
+    return await original(request);
+  };
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input)).ok, false);
+  assert.equal(reads, 0);
+  assert.equal(fake.calls.includes(
+    "runBlooketAddQuestionPageAction:open"), false);
+  },
+);
+
+test("a proxy cannot turn a failed prepared form into Save authority",
+  async () => {
+  const fake = fakeChrome({});
+  const original = fake.chrome.scripting.executeScript;
+  let reads = 0;
+  fake.chrome.scripting.executeScript = async request => {
+    if (request.func.name === "runBlooketAddQuestionPageAction" &&
+        request.args?.[0] === "prepare") return [{ result:
+      new Proxy({ ok: false }, { get(_target, key) {
+        if (key === "ok") { reads++; return true; }
+        return undefined;
+      } }),
+    }];
+    return await original(request);
+  };
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion(input)).ok, false);
+  assert.equal(reads, 0);
+  assert.equal(fake.calls.includes(
+    "runBlooketAddQuestionPageAction:submit"), false);
+  },
+);
+
 test("hidden and symbol fields cannot acknowledge Add Question preparation",
   async () => {
   for (const unexpected of [
@@ -1648,6 +1698,27 @@ test("image identity refuses hidden and symbol-owned success fields",
     assert.equal(fake.calls.includes("reload"), false);
     assert.equal(fake.calls.includes("closeBlooketQuestionPanel"), true);
   }
+  },
+);
+
+test("saved image proof uses owned descriptors, never proxy read traps",
+  async () => {
+  const digest = createHash("sha256").update(imageBytes).digest("hex");
+  let getterCalls = 0;
+  const changed = new Proxy({ byteLength: 1, sha256: "0".repeat(64) }, {
+    get(target, key, receiver) {
+      getterCalls++;
+      if (key === "byteLength") return imageBytes.length;
+      if (key === "sha256") return digest;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const fake = fakeChrome({ imageProbeReply: { ok: true, value: changed } });
+  assert.equal((await createExtensionAddQuestionHost(
+    fake.chrome, 7, async () => undefined,
+  ).addQuestion({ ...input, image })).ok, false);
+  assert.equal(getterCalls, 0);
+  assert.equal(fake.calls.includes("reload"), false);
   },
 );
 

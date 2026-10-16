@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green Add Question host regressions showed that
+property-read traps could spoof a prepared-form acknowledgment, signed-in
+Edit observation, or saved-image SHA-256 identity despite conflicting own
+data descriptors. The host now snapshots exact script-result fields before
+using them as navigation, preparation or media receipt authority. It refuses
+mismatched descriptors without replaying Save or skipping question read-back.
+These tests use synthetic transport replies, not an authenticated upload.
+
 On 2026-10-16, red-to-green prepared-image bridge regressions exposed that
 image envelopes with inherited `format` and `base64` fields could be accepted
 as if the byte identity were an exact owned request. The versioned decoder

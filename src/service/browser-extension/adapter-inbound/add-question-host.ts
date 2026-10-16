@@ -33,7 +33,9 @@ import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import { blooketPreparedImageBytes } from
   "../../../ir/blooket-browser-bridge/contract/prepared-image.ts";
-import { isRecord, ownDataField, snapshotExactDenseArray } from
+import {
+  exactOwnData, isRecord, ownDataField, snapshotExactDenseArray,
+} from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { decodeBlooketBrowserBridgeRequest } from
   "../../../ir/blooket-browser-bridge/contract/message.ts";
@@ -693,18 +695,11 @@ async function observe(script: Script): Promise<string | undefined> {
     inspectBlooketPage as (...args: never[]) => unknown,
     [{ kind: "session.observe" }],
   );
-  if (
-    !exactKeys(result, "ok,value") ||
-    !result ||
-    typeof result !== "object" ||
-    !("ok" in result) ||
-    result.ok !== true ||
-    !("value" in result) ||
-    typeof result.value !== "string" ||
-    !OBSERVED_STATES.has(result.value)
-  )
-    return undefined;
-  return result.value;
+  const observed = exactOwnData(result, ["ok", "value"]);
+  if (observed?.["ok"] !== true ||
+      typeof observed["value"] !== "string" ||
+      !OBSERVED_STATES.has(observed["value"])) return undefined;
+  return observed["value"];
 }
 
 function matchingQuestion(
@@ -737,16 +732,14 @@ function imageMatches(
   result: unknown,
   expected: { readonly byteLength: number; readonly sha256: string },
 ): boolean {
-  if (!result || typeof result !== "object" || Array.isArray(result) ||
-      !exactKeys(result, "ok,value") ||
-      !("ok" in result) || result.ok !== true || !("value" in result) ||
-      !result.value || typeof result.value !== "object" ||
-      Array.isArray(result.value) ||
-      !exactKeys(result.value, "byteLength,sha256"))
-    return false;
-  return "byteLength" in result.value && "sha256" in result.value &&
-    result.value.byteLength === expected.byteLength &&
-    result.value.sha256 === expected.sha256;
+  // Read only the exact own Chrome-result descriptors. A proxy can return
+  // invented property reads even after presenting genuine data descriptors.
+  const envelope = exactOwnData(result, ["ok", "value"]);
+  const identity = exactOwnData(envelope?.["value"],
+    ["byteLength", "sha256"]);
+  return envelope?.["ok"] === true &&
+    identity?.["byteLength"] === expected.byteLength &&
+    identity?.["sha256"] === expected.sha256;
 }
 
 function pageUnavailable(result: unknown): boolean {
@@ -813,8 +806,7 @@ function exactKeys(result: unknown, expected: string): boolean {
 }
 
 function exactOk(value: unknown): boolean {
-  return exactKeys(value, "ok") && !!value &&
-    typeof value === "object" && "ok" in value && value.ok === true;
+  return exactOwnData(value, ["ok"])?.["ok"] === true;
 }
 
 function dashboardTab(tab: BrowserTab): boolean {
