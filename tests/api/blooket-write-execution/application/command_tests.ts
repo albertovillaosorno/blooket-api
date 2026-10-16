@@ -241,6 +241,34 @@ test("invalid provider math text stops before freezing a write journal", () =>
     await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
   }));
 
+test("native field bounds stop publication before a frozen snapshot", () =>
+  fixture(async s => {
+    const badQuestions = [
+      { ...document.questions[0]!, prompt: "x".repeat(20_001) },
+      { ...document.questions[0]!, answer: "sun\0moon" },
+      { ...document.questions[0]!, timeLimitSeconds: 86_401 },
+    ];
+    for (const [index, question] of badQuestions.entries()) {
+      const draftId = "native-bound-" + String(index);
+      const saved = await executeLibraryCommand({ version: 1,
+        operationId: "cli:" + draftId, command: "drafts.put",
+        payload: { id: draftId, expectedRevision: null,
+          document: { ...document, questions: [question] } },
+      }, s.root);
+      assert.ok(saved.ok);
+      const revision = (saved.value as { revision: string }).revision;
+      const attempted = await executeBlooketPublicationCommand({
+        ...command("step", revision), payload: { draftId,
+          expectedRevision: revision },
+      }, s.host);
+      assert.equal(attempted.ok, false);
+      assert.equal(s.writes(), 0);
+      const files = await publicationFiles(s.root, draftId);
+      await assert.rejects(readFile(files.snapshot), { code: "ENOENT" });
+      await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+    }
+  }));
+
 test("canonical append preserves existing questions and creates no set", () =>
   fixture(async s => {
     const request = await appendFixture(s);

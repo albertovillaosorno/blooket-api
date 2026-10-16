@@ -204,6 +204,49 @@ test("provider text markers fail before browser lowering", () => {
   }
 });
 
+test("native question and answer bounds fail before browser lowering", () => {
+  const base: BlooketWriteOperation = {
+    operationId: "plan:test:q:bounds", kind: "question",
+    localQuestionId: "bounds", questionNumber: 1,
+    question: { type: "typing-answer", prompt: "Type sun.",
+      timeLimitSeconds: 10, imageMediaId: null, matchMode: "exact",
+      answer: "sun" },
+  };
+  if (base.kind !== "question") return;
+  for (const question of [
+    { ...base.question, prompt: "x".repeat(20_001) },
+    { ...base.question, prompt: "" },
+    { ...base.question, timeLimitSeconds: 86_401 },
+    { ...base.question, timeLimitSeconds: 0 },
+  ]) assert.deepEqual(lowerBlooketWriteSubmission(
+    { ...base, question }, { remoteSetId: "remote-set-1" },
+  ), { ok: false, code: "invalid-question-content" });
+  for (const answer of ["", "x".repeat(10_001), "sun\0moon"]) {
+    assert.deepEqual(lowerBlooketWriteSubmission({ ...base,
+      question: { ...base.question, answer },
+    }, { remoteSetId: "remote-set-1" }),
+    { ok: false, code: "invalid-answer-content" });
+  }
+  const mc: BlooketWriteOperation = { ...base, question: {
+    type: "multiple-choice", prompt: "Which star?", timeLimitSeconds: 10,
+    randomOrder: true, imageMediaId: null, answers: [
+      { text: "Sun", correct: true, imageMediaId: null },
+      { text: "Moon", correct: false, imageMediaId: null },
+    ],
+  } };
+  if (mc.kind !== "question" || mc.question.type !== "multiple-choice")
+    return;
+  for (const answer of ["", "x".repeat(10_001), "Sun\0Moon"]) {
+    assert.deepEqual(lowerBlooketWriteSubmission({ ...mc,
+      question: { ...mc.question, answers: [
+        { ...mc.question.answers[0]!, text: answer },
+        mc.question.answers[1]!,
+      ] },
+    }, { remoteSetId: "remote-set-1" }),
+    { ok: false, code: "invalid-answer-content" });
+  }
+});
+
 test(
   "target and impossible answer invariants fail before browser mechanics",
   () => {

@@ -59,6 +59,7 @@ export type LowerBlooketWriteSubmissionResult =
         | "unexpected-remote-set-binding"
         | "missing-remote-set-binding"
         | "invalid-question-number"
+        | "invalid-question-content"
         | "invalid-answer-content"
         | "ambiguous-provider-text";
     };
@@ -112,9 +113,15 @@ function lowerQuestion(
   // Canonical publication preflights this lowering before journaling.
   const mathMarker = "`*";
   const imageMarker = "`~`";
+  if (question.prompt.length < 1 || question.prompt.length > 20_000 ||
+      !Number.isSafeInteger(question.timeLimitSeconds) ||
+      question.timeLimitSeconds < 1 || question.timeLimitSeconds > 86_400)
+    return { ok: false, code: "invalid-question-content" };
   if (question.prompt.includes(mathMarker))
     return { ok: false, code: "ambiguous-provider-text" };
   if (question.type === "typing-answer") {
+    if (invalidNativeAnswer(question.answer))
+      return { ok: false, code: "invalid-answer-content" };
     if (
       question.answer.includes(mathMarker) ||
       question.answer.includes(imageMarker)
@@ -148,6 +155,8 @@ function lowerQuestion(
   const answers: BlooketQuestionAnswerSubmission[] = [];
   for (const answer of question.answers) {
     if (answer.text !== null && answer.imageMediaId === null) {
+      if (invalidNativeAnswer(answer.text))
+        return { ok: false, code: "invalid-answer-content" };
       if (answer.text.includes(mathMarker) || answer.text.includes(imageMarker))
         return { ok: false, code: "ambiguous-provider-text" };
       answers.push({
@@ -183,6 +192,12 @@ function lowerQuestion(
     timeLimit: question.timeLimitSeconds,
   };
   return { ok: true, value };
+}
+
+// Mirror the native editor's exact answer size and NUL guard before any
+// durable attempt is opened. The local project decoder stays provider-neutral.
+function invalidNativeAnswer(text: string): boolean {
+  return text.length < 1 || text.length > 10_000 || text.includes("\0");
 }
 
 function mediaSlot(mediaId: string | null): BlooketSubmissionMedia | null {
