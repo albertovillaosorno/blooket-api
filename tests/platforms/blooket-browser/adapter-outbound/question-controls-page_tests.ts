@@ -312,6 +312,49 @@ function editor(kind: "typing" | "mc" = "typing") {
     clearGenerated: () => { serialized = ""; } };
 }
 
+test("drifted prompt and timer controls never receive a preparatory write",
+  async () => {
+  for (const kind of ["prompt-tag", "timer-tag", "timer-type",
+    "timer-disabled", "timer-readonly"] as const) {
+    await withEditor(async page => {
+      if (kind === "prompt-tag") page.prompt.tagName = "INPUT";
+      if (kind === "timer-tag") page.time.tagName = "TEXTAREA";
+      if (kind === "timer-type") page.time.type = "password";
+      if (kind === "timer-disabled") page.time.disabled = true;
+      if (kind === "timer-readonly") page.time.readOnly = true;
+      assert.equal(await prepareBlooketQuestionControls(input), false, kind);
+      assert.equal(page.prompt.value, "", kind);
+      assert.equal(page.time.value, "20", kind);
+      assert.equal(page.picker.clicked, 0, kind);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+  }
+});
+
+test("drifted typing inputs cannot receive question text", async () => {
+  for (const variant of ["password", "checkbox", "wrong-tag",
+    "disabled", "readonly"] as const) {
+    await withEditor(async page => {
+      const typing = page.list.selectors['[role="option"]']![1]!;
+      const open = typing.onClick;
+      typing.onClick = () => {
+        open();
+        const accepted = page.form.selectors[
+          'input[name="accepted-answers"]']![0]!;
+        if (variant === "password" || variant === "checkbox")
+          accepted.type = variant;
+        if (variant === "wrong-tag") accepted.tagName = "TEXTAREA";
+        if (variant === "disabled") accepted.disabled = true;
+        if (variant === "readonly") accepted.readOnly = true;
+      };
+      assert.equal(await prepareBlooketQuestionControls(input), false,
+        variant);
+      assert.equal(page.prompt.value, "", variant);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+  }
+});
+
 test("visible editor events generate typing state without hidden overrides",
   async () => withEditor(async page => {
     const serialized = Function("return (" +

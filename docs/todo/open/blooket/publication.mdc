@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green provider-control regressions showed that
+replaced prompt, timer and typing-answer inputs could receive writes
+before the later Save checks found a changed control. Native preparation now
+requires a visible textarea prompt, a writable numeric timer, and an exact
+plain-text typing input before it fills the question. Follow-on typing
+alternatives are checked individually. No live provider form was changed.
+
 On 2026-10-16, red-to-green visible-controls regressions found that
 impossible native answer topology could change a question's prompt or picker
 before the final Save check rejected it. The separately injected controls

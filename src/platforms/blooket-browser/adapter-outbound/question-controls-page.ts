@@ -226,8 +226,12 @@ export async function prepareBlooketQuestionControls(
       HTMLTextAreaElement | null;
     const originalTime = unique("input#time-limit") as
       HTMLInputElement | null;
-    if (!originalPrompt || originalPrompt.value !== "" ||
-        raw()?.["question"] !== "" || !originalTime ||
+    if (!originalPrompt || originalPrompt.tagName !== "TEXTAREA" ||
+        originalPrompt.disabled || originalPrompt.readOnly ||
+        originalPrompt.value !== "" || raw()?.["question"] !== "" ||
+        !originalTime || originalTime.tagName !== "INPUT" ||
+        originalTime.type !== "number" || originalTime.disabled ||
+        originalTime.readOnly ||
         originalTime.value !== String(raw()?.["timeLimit"])) return false;
     const picker = unique('[role="combobox"]');
     if (!picker) return false;
@@ -273,13 +277,29 @@ export async function prepareBlooketQuestionControls(
     }
     if (!await wait(() => unique("textarea#question") !== null &&
         unique("input#time-limit") !== null)) return false;
+    // A changed single-line typing field could become a password or
+    // checkbox control. Establish its exact type before filling the prompt.
+    if (input.qType === "typing") {
+      if (!await wait(() => form!.querySelectorAll(
+        'input[name="accepted-answers"]',
+      ).length === 1)) return false;
+      const first = unique('input[name="accepted-answers"]') as
+        HTMLInputElement | null;
+      if (!first || first.tagName !== "INPUT" || first.type !== "text" ||
+          first.disabled || first.readOnly || first.value !== "")
+        return false;
+    }
     // Selecting a provider question type can replace the visible controls.
     // Recheck the teacher's text before any automated field mutation.
     const livePrompt = unique("textarea#question") as
       HTMLTextAreaElement | null;
     const liveTime = unique("input#time-limit") as HTMLInputElement | null;
-    if (!livePrompt || livePrompt.value !== "" ||
-        raw()?.["question"] !== "" || !liveTime ||
+    if (!livePrompt || livePrompt.tagName !== "TEXTAREA" ||
+        livePrompt.disabled || livePrompt.readOnly ||
+        livePrompt.value !== "" || raw()?.["question"] !== "" ||
+        !liveTime || liveTime.tagName !== "INPUT" ||
+        liveTime.type !== "number" || liveTime.disabled ||
+        liveTime.readOnly ||
         liveTime.value !== String(raw()?.["timeLimit"])) return false;
     if (!await setText(livePrompt, input.question) ||
         !await wait(() => raw()?.["question"] === input.question) ||
@@ -303,9 +323,11 @@ export async function prepareBlooketQuestionControls(
           'input[name="accepted-answers"]',
         ));
         const typed = input.answers[index]!.text;
-        if (fields.length !== index + 1 ||
-            (fields[index] as HTMLInputElement).value !== "" ||
-            !await setText(fields[index] as HTMLElement, typed) ||
+        const field = fields[index] as HTMLInputElement | undefined;
+        if (fields.length !== index + 1 || !field ||
+            field.tagName !== "INPUT" || field.type !== "text" ||
+            field.disabled || field.readOnly || field.value !== "" ||
+            !await setText(field, typed) ||
             !await wait(() => {
               const value = raw()?.["answers"];
               return Array.isArray(value) &&
