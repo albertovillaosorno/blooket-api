@@ -30,7 +30,7 @@
 // - Defaults:
 //   - Unexpected navigation and malformed script replies fail closed.
 //
-import { snapshotExactDenseArray } from
+import { exactOwnData, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
@@ -233,11 +233,10 @@ export function createExtensionCreateSetHost(
         );
         if (!await owns()) return { state: "conflict" };
         if (exactFailedSidebar(reply)) return { state: "pending" };
-        if (!exactKeys(reply, "ok,value") ||
-            !reply || typeof reply !== "object" ||
-            !("ok" in reply) || reply.ok !== true ||
-            !("value" in reply)) return { state: "conflict" };
-        const decoded = decodeBlooketSetDetail(reply.value);
+        const ownedReply = exactOwnData(reply, ["ok", "value"]);
+        if (ownedReply?.["ok"] !== true)
+          return { state: "conflict" };
+        const decoded = decodeBlooketSetDetail(ownedReply["value"]);
         if (!decoded.ok || decoded.value.id !== setId ||
             decoded.value.title !== expected.title ||
             decoded.value.description !== expected.description)
@@ -633,18 +632,11 @@ async function observe(
     inspectBlooketPage as (...args: never[]) => unknown,
     [{ kind: "session.observe" }],
   );
-  if (
-    !exactKeys(result, "ok,value") ||
-    !result ||
-    typeof result !== "object" ||
-    !("ok" in result) ||
-    result.ok !== true ||
-    !("value" in result) ||
-    typeof result.value !== "string" ||
-    !OBSERVED_STATES.has(result.value)
-  )
-    return undefined;
-  return result.value;
+  const observed = exactOwnData(result, ["ok", "value"]);
+  if (observed?.["ok"] !== true ||
+      typeof observed["value"] !== "string" ||
+      !OBSERVED_STATES.has(observed["value"])) return undefined;
+  return observed["value"];
 }
 
 function dashboardTab(tab: BrowserTab): boolean {
@@ -670,39 +662,21 @@ function exactEditRoute(tab: BrowserTab): boolean {
   } catch { return false; }
 }
 
-function exactKeys(value: unknown, expected: string): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return false;
-  const keys = Reflect.ownKeys(value);
-  const names = expected.split(",");
-  return keys.length === names.length && keys.every(key => {
-    if (typeof key !== "string" || !names.includes(key)) return false;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return !!descriptor && descriptor.enumerable && "value" in descriptor;
-  });
-}
-
 function exactFailedSidebar(value: unknown): boolean {
-  return !!value && typeof value === "object" && !Array.isArray(value) &&
-    exactKeys(value, "code,ok") &&
-    "ok" in value && value.ok === false && "code" in value &&
-    value.code === "blooket-browser-failed";
+  const reply = exactOwnData(value, ["code", "ok"]);
+  return reply?.["ok"] === false &&
+    reply["code"] === "blooket-browser-failed";
 }
 
 function exactSavedSidebar(value: unknown, expected: {
   readonly title: string;
   readonly description: string;
 }): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value) ||
-      !exactKeys(value, "ok,value") ||
-      !("ok" in value) || value.ok !== true ||
-      !("value" in value) || !value.value ||
-      typeof value.value !== "object" || Array.isArray(value.value) ||
-      !exactKeys(value.value, "description,title"))
-    return false;
-  const saved = value.value as { title?: unknown; description?: unknown };
-  return saved.title === expected.title &&
-    saved.description === expected.description;
+  const reply = exactOwnData(value, ["ok", "value"]);
+  const saved = exactOwnData(reply?.["value"], ["description", "title"]);
+  return reply?.["ok"] === true &&
+    saved?.["title"] === expected.title &&
+    saved["description"] === expected.description;
 }
 
 function expectedSubmitRoute(tab: BrowserTab): boolean {
@@ -717,25 +691,13 @@ function expectedSubmitRoute(tab: BrowserTab): boolean {
   return exactEditRoute(tab);
 }
 
-function exactRedirectReceipt(
-  value: unknown,
-  id: string,
-): value is { readonly ok: true; readonly remoteSetId: string } {
-  return !!value && typeof value === "object" &&
-    !Array.isArray(value) &&
-    exactKeys(value, "ok,remoteSetId") &&
-    "ok" in value && value.ok === true &&
-    "remoteSetId" in value && value.remoteSetId === id;
+function exactRedirectReceipt(value: unknown, id: string): boolean {
+  const reply = exactOwnData(value, ["ok", "remoteSetId"]);
+  return reply?.["ok"] === true && reply["remoteSetId"] === id;
 }
 
 function exactOk(value: unknown): boolean {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    exactKeys(value, "ok") &&
-    "ok" in value &&
-    value.ok === true
-  );
+  return exactOwnData(value, ["ok"])?.["ok"] === true;
 }
 
 function normalizeUnexpected(
