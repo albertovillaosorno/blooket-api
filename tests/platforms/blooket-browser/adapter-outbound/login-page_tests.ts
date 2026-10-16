@@ -231,6 +231,20 @@ test("unknown serialized login actions never submit", () => {
   });
 });
 
+test("query and fragment login routes cannot receive credentials", () => {
+  for (const suffix of ["?next=https://foreign.invalid/", "#redirect"]) {
+    const page = fixture();
+    withPage(page.document, "https://id.blooket.com/login" + suffix,
+      () => {
+      assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.identifier.value, "");
+      assert.equal(page.password.value, "");
+      assert.equal(submitBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+});
+
 test("login preparation fills exact controls without submitting", () => {
   const page = fixture();
   withPage(page.document, "https://id.blooket.com/login", () => {

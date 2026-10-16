@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, red-to-green credential-boundary regressions showed that
+an old or redirected `/login` page with arbitrary query or fragment data
+could still pass the host and native login form route checks. Both now
+require the exact canonical login URL before injected scripts can carry
+credentials, even when tab ownership and page controls otherwise match.
+No real login, credential transmission or account change was attempted.
+
 On 2026-10-16, red-to-green Create Set host regressions demonstrated
 that property-read traps could invent a successful preparation, a signed-in
 Create session, an exact Edit redirect receipt, matching saved-sidebar text,
