@@ -63,7 +63,7 @@ import { getBlooketSet, listBlooketQuestions, listBlooketSets } from
   "../../blooket-set-reads/application/read-sets.ts";
 import {
   publicationFiles, readPublicationSnapshot, createPublicationSnapshot,
-  readOtherPublicationSnapshots,
+  readOtherPublicationSnapshots, publicationRecoveryEvidencePresent,
 } from
   "../../../platforms/write-checkpoint-files/adapter-outbound/publication.ts";
 import { loadWriteCheckpointFile } from
@@ -182,6 +182,12 @@ export async function executeBlooketPublicationCommand(
     let snapshot = await readPublicationSnapshot(files.snapshot);
     let currentCapabilities: BlooketCapabilitySnapshot | undefined;
     if (snapshot === undefined) {
+      // Treat orphaned local evidence as an interrupted transaction, not a
+      // brand-new draft. A status read must not conceal an uncertain write.
+      let evidence: boolean;
+      try { evidence = await publicationRecoveryEvidencePresent(files); }
+      catch { return fail("publication-storage-unavailable"); }
+      if (evidence) return fail("blooket-publication-recovery-required");
       if (command.command !== "blooket.publication.step" &&
           command.command !== "blooket.publication.append")
         return success({ draftId, phase: "not-started", published: false });

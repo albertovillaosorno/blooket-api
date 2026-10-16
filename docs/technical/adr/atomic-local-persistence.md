@@ -58,7 +58,11 @@ one no-follow descriptor, refuse hard-linked or group/world-writable files,
 verify the descriptor and pathname identities before accepting the bytes, and
 reject malformed UTF-8 without substituting replacement characters. An unsafe
 snapshot remains untouched for manual recovery and cannot authorize a browser
-write, while missing snapshots retain their explicit not-started meaning.
+write.
+
+A missing snapshot means not-started only when the same draft has no attempt
+journal, checkpoint, or task budget. Orphaned evidence blocks every publication
+command without replacing those files.
 
 The POSIX lock adapter publishes complete owner metadata with a same-directory
 hard link. A visible lock therefore never depends on a partially written owner

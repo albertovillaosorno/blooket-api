@@ -969,13 +969,17 @@ test("configured task duration stops before journal after elapsed budget",
       maximumTaskDurationMs: 60_000,
     },
   };
-  const built = buildBlooketWritePlan(JSON.stringify(document), "",
-    capabilities);
-  assert.ok(built.ok);
-  if (!built.ok) return;
   const files = await publicationFiles(state.root, "fixture");
+  // A budget implies a frozen publisher. Keep the fixture's checkpoint
+  // authority intact so this test exercises the actual expired-budget gate.
+  const snapshot = { schemaVersion: 2, draftId: "fixture",
+    revision: state.revision, capabilities, document,
+    expectedMedia: { schemaVersion: 1, items: [] } };
+  const admitted = decodeBlooketPublicationSnapshot(snapshot, "fixture");
+  assert.ok(admitted);
+  await createPublicationSnapshot(files.snapshot, snapshot);
   const previous = await reserveMutationBudgetStart(files.budget,
-    built.value.planId, {
+    admitted.plan.planId, {
       maximumStarts: 10, maximumDurationMs: 86_400_000,
     }, Date.now() - 120_000);
   assert.equal(previous.ok, true);
@@ -987,7 +991,7 @@ test("configured task duration stops before journal after elapsed budget",
     "mutation-task-duration-exhausted");
   assert.equal(state.writes(), 0);
   assert.deepEqual(await loadMutationBudgetFile(files.budget,
-    built.value.planId), previous);
+    admitted.plan.planId), previous);
   await assert.rejects(readFile(files.attempt));
   }); },
 );
@@ -1927,6 +1931,32 @@ test("different questions cannot duplicate an already-started set payload",
     const copy = await publicationFiles(state.root,
       "different-questions-same-set");
     await assert.rejects(readFile(copy.attempt));
+  }); },
+);
+
+test("missing snapshot with its own recovery files never reports not-started",
+  async () => { await fixture(async state => {
+    const paths = await publicationFiles(state.root, "fixture");
+    await mkdir(dirname(paths.snapshot), { recursive: true });
+    for (const evidence of [paths.attempt, paths.checkpoint,
+      paths.budget]) {
+      const bytes = "{uncertain-prior-publication}";
+      await writeFile(evidence, bytes);
+      for (const action of ["status", "reconcile", "verify", "step"]) {
+        const stopped = await executeBlooketPublicationCommand(
+          command(action, action === "step" ? state.revision : undefined),
+          state.host,
+        );
+        assert.equal(stopped.ok, false, action + ": " +
+          JSON.stringify(stopped));
+        if (!stopped.ok) assert.equal(stopped.issues[0]?.code,
+          "blooket-publication-recovery-required");
+        assert.equal(state.writes(), 0);
+        await assert.rejects(readFile(paths.snapshot), { code: "ENOENT" });
+        assert.equal(await readFile(evidence, "utf8"), bytes);
+      }
+      await rm(evidence);
+    }
   }); },
 );
 
