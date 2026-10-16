@@ -108,6 +108,9 @@ declare const chrome: {
     };
   };
   tabs: {
+    onRemoved?: {
+      addListener(listener: (tabId: number) => void): void;
+    };
     onUpdated: {
       addListener(listener: (
         tabId: number,
@@ -155,6 +158,15 @@ let status = "waiting-for-workspace";
 let pendingUiAction = Promise.resolve();
 let humanWindowRaised = false;
 let browserClientLabel: Promise<string> | undefined;
+let retainedBlooketTabId: number | undefined;
+// One backend tab plus at most one auxiliary read tab. Keep a retained
+// auxiliary reservation across jobs; failed cleanup never grants a new one.
+const temporaryReadTabs = new Map<number, {
+  readonly owner: Connection;
+  readonly url: string;
+  readonly windowId?: number;
+}>();
+let temporaryReadCreationPending = false;
 class BrowserBridgeCompatibilityError extends Error {}
 
 function pairedBrowserLabel(): Promise<string> {
@@ -859,12 +871,11 @@ function ownedBrowser(
   };
   // Cleanup is allowed after a relay retires, but only for a tab this relay
   // actually created. No abandoned read can remove a teacher-owned tab.
-  const temporaryTabs = new Map<number, {
-    readonly url: string; readonly windowId?: number;
-  }>();
+  const temporaryTabs = temporaryReadTabs;
   const removeTemporary = async (id: number): Promise<void> => {
     const owned = temporaryTabs.get(id);
-    if (!owned) throw Error("unowned-temporary-tab");
+    if (!owned || owned.owner !== current)
+      throw Error("unowned-temporary-tab");
     const observed = await chrome.tabs.get(id);
     if (observed.id !== id ||
         classifyBlooketReadTabLoad(observed, owned.url) === "changed" ||
@@ -879,14 +890,22 @@ function ownedBrowser(
     tabs: {
       create: async (options: { url: string; active: false }) => {
         requireOwner();
+        if (temporaryReadCreationPending || temporaryTabs.size > 0)
+          throw Error("temporary-tab-limit");
+        temporaryReadCreationPending = true;
+        // A lost create acknowledgement can leave a real tab behind. Keep
+        // the reservation on an exception rather than creating another.
         const result = await chrome.tabs.create(options);
         if (Number.isSafeInteger(result.id) && result.id! > 0 &&
             result.id !== current.tabId)
           temporaryTabs.set(result.id!, {
+            owner: current,
             url: options.url,
             ...(result.windowId === undefined
               ? {} : { windowId: result.windowId }),
           });
+        if (temporaryTabs.has(result.id!))
+          temporaryReadCreationPending = false;
         try {
           requireOwner();
           if (!temporaryTabs.has(result.id!))
@@ -1397,8 +1416,16 @@ async function connectWorkspace(message: unknown) {
       if (typeof owned === "number" && Number.isSafeInteger(owned) &&
           owned > 0) {
         const previousTab = await chrome.tabs.get(owned);
-        if (previousTab.id === owned && reclaimableBlooketTab(previousTab))
-          tab = previousTab;
+        if (previousTab.id === owned && admittedBlooketTab(previousTab)) {
+          if (reclaimableBlooketTab(previousTab)) tab = previousTab;
+          else {
+            // Reload invalidates isolated-world editor ownership. Preserve
+            // that existing tab instead of accumulating replacement tabs.
+            retainedBlooketTabId = owned;
+            status = "blooket-tab-retained";
+            return { ok: false, status };
+          }
+        }
       }
     } catch { /* A remembered tab can be closed or unavailable. */ }
   }
@@ -1408,6 +1435,7 @@ async function connectWorkspace(message: unknown) {
       active: false,
     });
   if (!tab.id) return { ok: false, status: "browser-unavailable" };
+  retainedBlooketTabId = undefined;
   try {
     await chrome.storage.local?.set({ "blooket-owned-tab-id": tab.id });
   } catch { /* Continue with the ephemeral, owned tab. */ }
@@ -1447,6 +1475,14 @@ async function handlePopup(message: unknown) {
       active: true,
     });
     return { ok: true, status };
+  }
+  if (message.kind === "open-blooket" && !connection &&
+      retainedBlooketTabId !== undefined) {
+    const retained = retainedBlooketTabId;
+    const focused = await showHumanBlooketTab(retained,
+      () => !connection && retainedBlooketTabId === retained);
+    return focused ? { ok: true, status } :
+      { ok: false, status: "blooket-tab-unavailable" };
   }
   if (message.kind === "open-blooket" && connection) {
     const selected = connection;
@@ -1511,6 +1547,12 @@ chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
   humanWindowRaised = true;
   void showHumanBlooketTab(tabId, () => connection === owned)
     .catch(() => undefined);
+});
+
+// Only Chrome's confirmed closure releases a retained read slot. Do not
+// close a teacher-adopted tab or infer its disappearance from a failed get.
+chrome.tabs.onRemoved?.addListener(tabId => {
+  temporaryReadTabs.delete(tabId);
 });
 
 async function restoreConnection() {

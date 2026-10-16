@@ -47,6 +47,7 @@ test(
   let observedClientLabel;
   let listener;
   let onTabUpdated;
+  let onTabRemoved;
   let tabUrl = "https://dashboard.blooket.com/my-sets";
   let creates = 0;
   let documentOrigin = 1_000;
@@ -158,6 +159,7 @@ test(
     releaseReadScript = resolve;
   });
   let holdDetachedCreate = false;
+  let loseDetachedCreateAck = false;
   let signalDetachedCreate!: () => void;
   let releaseDetachedCreate!: () => void;
   const detachedCreateStarted = new Promise<void>(resolve => {
@@ -201,6 +203,7 @@ test(
       },
     },
     tabs: {
+      onRemoved: { addListener: callback => { onTabRemoved = callback; } },
       onUpdated: {
         addListener: callback => { onTabUpdated = callback; },
       },
@@ -210,6 +213,10 @@ test(
           "https://dashboard.blooket.com/edit?id=")) {
           detachedCreated++;
           detachedUrl = url;
+          if (loseDetachedCreateAck) {
+            loseDetachedCreateAck = false;
+            throw Error("lost-temporary-create-ack");
+          }
           if (holdDetachedCreate) {
             holdDetachedCreate = false;
             signalDetachedCreate();
@@ -1278,6 +1285,14 @@ test(
     assert.equal(detachedClosed, 4);
     assert.equal(detachedUrl,
       "https://untrusted.invalid/owner-navigation");
+    const beforeRetainedSlot = detachedCreated;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, beforeRetainedSlot,
+      "a retained auxiliary tab must prevent opening a third browser tab");
+    onTabRemoved(83);
+    detachedUrl = "";
     // If the teacher takes focus of the temporary tab, do not close it
     // under them, even if its URL and window identity are unchanged.
     detachedTabActivatedByUser = true;
@@ -1287,6 +1302,14 @@ test(
     assert.equal(focusedTemporary.ok, false);
     assert.equal(detachedCreated, 6);
     assert.equal(detachedClosed, 4);
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(detachedCreated, 6);
+    assert.equal(capabilityTabsCreated, beforeStaleSetList + 1,
+      "question and capability readers share the same auxiliary reservation");
+    onTabRemoved(83);
+    detachedUrl = "";
     detachedTabActivatedByUser = false;
     submittedReadOwner = false;
     assert.equal((await expectReply({
@@ -1815,6 +1838,13 @@ test(
     })).ok, false);
     assert.equal(capabilityTabsClosed, beforeAdoptedCleanup,
       "a teacher's pending navigation must preserve the old matching tab");
+    const beforeRetainedCapability = capabilityTabsCreated;
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(capabilityTabsCreated, beforeRetainedCapability);
+    onTabRemoved(84);
+    detachedCapabilityUrl = "";
     capabilityPendingRedirect = false;
 
     questionPanelCloses = false;
@@ -2078,6 +2108,20 @@ test(
       (name) => name === "runBlooketAddQuestionPageAction",
     ), ["runBlooketAddQuestionPageAction"]);
 
+    unsafeReadSource = true;
+    submittedReadOwner = true;
+    loseDetachedCreateAck = true;
+    const beforeLostCreate = detachedCreated;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, beforeLostCreate + 1);
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, beforeLostCreate + 1,
+      "a lost tab-create reply cannot authorize another allocation");
+
     const beforeCompatibilityStop = scripts.length;
     incompatiblePoll = true;
     const compatibilityDeadline = realNow() + 3000;
@@ -2301,7 +2345,7 @@ test("worker startup discards malformed stored connection bytes",
   },
 );
 
-test("a recycled saved tab ID cannot claim a teacher editor",
+test("extension reload preserves an editor without creating replacement tabs",
   async () => {
   const priorChrome = Object.getOwnPropertyDescriptor(globalThis, "chrome");
   const priorFetch = globalThis.fetch;
@@ -2363,13 +2407,18 @@ test("a recycled saved tab ID cannot claim a teacher editor",
         url: origin + "/", tab: { id: 99 },
       }, resolve), true);
     });
-    assert.deepEqual(reply, { ok: true, status: "connected" });
-    assert.deepEqual(created, [8]);
-    assert.equal(stored["blooket-owned-tab-id"], 8);
-    assert.equal((sessions.connection as { tabId: number }).tabId, 8);
-    // Let the synthetic 426 retire its relay before restoring global chrome.
-    for (let attempt = 0; "connection" in sessions && attempt < 50;
-      attempt++) await pause(10);
+    assert.deepEqual(reply, { ok: false,
+      status: "blooket-tab-retained" });
+    assert.deepEqual(created, []);
+    assert.equal(stored["blooket-owned-tab-id"], 7);
+    const again = await new Promise(resolve => {
+      listener({ kind: "workspace-ready", origin,
+        token: "a".repeat(43) }, {
+        url: origin + "/", tab: { id: 99 },
+      }, resolve);
+    });
+    assert.deepEqual(again, reply);
+    assert.deepEqual(created, []);
     assert.equal("connection" in sessions, false);
   } finally {
     if (priorChrome)
@@ -2411,7 +2460,7 @@ test("Cloudflare landing tabs survive reload without claiming editor tabs",
   ] as const;
   try {
     for (const [index, scenario] of cases.entries()) {
-      const [title, url, expectedCreated] = scenario;
+      const [title, url, expectedBlocked] = scenario;
       const extension = "chrome-extension://cf-tab-fixture/";
       let listener;
       let created = 0;
@@ -2464,10 +2513,13 @@ test("Cloudflare landing tabs survive reload without claiming editor tabs",
           token: "a".repeat(43) }, { url: origin + "/", tab: { id: 99 } },
         resolve), true);
       });
-      assert.deepEqual(result, { ok: true, status: "connected" });
-      assert.equal(created, expectedCreated, url.split("?")[0]);
-      assert.equal((session.connection as { tabId: number }).tabId,
-        expectedCreated === 0 ? 7 : 8);
+      assert.deepEqual(result, expectedBlocked === 0
+        ? { ok: true, status: "connected" }
+        : { ok: false, status: "blooket-tab-retained" });
+      assert.equal(created, 0, url.split("?")[0]);
+      if (expectedBlocked === 0)
+        assert.equal((session.connection as { tabId: number }).tabId, 7);
+      else assert.equal("connection" in session, false);
       for (let i = 0; "connection" in session && i < 50; i++)
         await pause(10);
       assert.equal("connection" in session, false);

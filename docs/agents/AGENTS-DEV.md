@@ -368,6 +368,17 @@ never block portable browser functionality solely on unavailable Apple hardware.
 Reuse existing account-mutation authorization within its stated test scope.
 Prefer a supported reload operation for the already installed extension and
 verify the loaded result; a compiled directory is not loaded-worker evidence.
+
+Keep one Blooket backend tab and at most one temporary read tab. Inspect the
+current inventory before every development reload and close session-owned test
+duplicates; invisible Chrome tabs still consume memory. Preserve durable drafts
+and journals, and never discard an unrelated teacher editor for this limit.
+
+An extension reload may retain an editor that cannot safely be reclaimed.
+Finish or close that owned test editor before reconnecting rather than opening
+replacement tabs repeatedly. A retained auxiliary read blocks another read tab
+until Chrome confirms its closure; do not bypass this resource stop.
+
 Browserless agents must use current official Web Search documentation and the
 development handoff while keeping real acceptance gaps explicit.
 

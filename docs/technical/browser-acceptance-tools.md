@@ -64,6 +64,13 @@ Inspect the installed CLI controller's status first:
 chrome-devtools status
 ```
 
+Keep one backend Blooket tab and at most one auxiliary read tab. Inspect and
+close only session-owned test duplicates before development reloads, retaining
+the canonical drafts and recovery journals; hidden tabs still consume RAM.
+The worker now retains an unsafe prior editor instead of creating replacement
+tabs on each reload, and an unclosed auxiliary read reserves its slot across
+jobs. Its popup can show that retained editor without adopting it for writes.
+
 Only after that confirms a running controller with the authorized existing
 browser attachment, inspect its actual pages and extensions:
 
