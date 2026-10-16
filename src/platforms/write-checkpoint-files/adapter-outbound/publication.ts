@@ -61,7 +61,13 @@ export async function readPublicationSnapshot(
   }
   try {
     const metadata = await handle.stat();
-    if (!metadata.isFile() || metadata.size > 1_500_000)
+    // The snapshot is a write-ahead authority, not arbitrary JSON. Match
+    // attempt and checkpoint ownership checks: a hard link would allow a
+    // second path to mutate the same bytes outside the publication lock.
+    if (!metadata.isFile() || metadata.nlink !== 1 ||
+        (metadata.mode & 0o022) !== 0 ||
+        !Number.isSafeInteger(metadata.size) ||
+        metadata.size > 1_500_000)
       throw new Error("publication-snapshot-invalid");
     const bytes = Buffer.alloc(1_500_001);
     let size = 0;
@@ -71,6 +77,24 @@ export async function readPublicationSnapshot(
       size += part.bytesRead;
       if (size > 1_500_000) throw new Error("publication-snapshot-invalid");
     }
+    // A same-size replacement or permission change during read cannot
+    // authorize a new remote write. Also reject a pathname swapped to a
+    // different inode after opening the no-follow descriptor.
+    const after = await handle.stat();
+    const pathname = await lstat(path);
+    if (size !== metadata.size || !after.isFile() ||
+        after.nlink !== 1 || (after.mode & 0o022) !== 0 ||
+        !pathname.isFile() || pathname.nlink !== 1 ||
+        (pathname.mode & 0o022) !== 0 ||
+        after.dev !== metadata.dev || after.ino !== metadata.ino ||
+        after.size !== metadata.size ||
+        after.mtimeMs !== metadata.mtimeMs ||
+        after.ctimeMs !== metadata.ctimeMs ||
+        pathname.dev !== metadata.dev || pathname.ino !== metadata.ino ||
+        pathname.size !== metadata.size ||
+        pathname.mtimeMs !== metadata.mtimeMs ||
+        pathname.ctimeMs !== metadata.ctimeMs)
+      throw new Error("publication-snapshot-invalid");
     return JSON.parse(bytes.subarray(0, size).toString("utf8")) as unknown;
   } finally { await handle.close(); }
 }

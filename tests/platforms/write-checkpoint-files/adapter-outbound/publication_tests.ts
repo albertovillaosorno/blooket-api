@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from
+import { chmod, link, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -76,6 +76,44 @@ test("snapshot reads reject symbolic files and oversized bytes",
       { fixture: "x".repeat(1_500_000) }));
     assert.equal(await readPublicationSnapshot(paths.snapshot), undefined);
   }); });
+
+test("publication snapshots reject hard links and writable aliases", () =>
+  fixture(async root => {
+    const paths = await publicationFiles(root, "draft-fixture");
+    await createPublicationSnapshot(paths.snapshot,
+      { draftId: "draft-fixture" });
+    const before = await readFile(paths.snapshot);
+    const alias = join(root, "untrusted-snapshot.json");
+    await link(paths.snapshot, alias);
+    await assert.rejects(readPublicationSnapshot(paths.snapshot),
+      /publication-snapshot-invalid/u);
+    assert.deepEqual(await readFile(paths.snapshot), before);
+    await rm(alias);
+    assert.deepEqual(await readPublicationSnapshot(paths.snapshot),
+      { draftId: "draft-fixture" });
+    if (process.platform !== "win32") {
+      await chmod(paths.snapshot, 0o622);
+      await assert.rejects(readPublicationSnapshot(paths.snapshot),
+        /publication-snapshot-invalid/u);
+      assert.deepEqual(await readFile(paths.snapshot), before);
+      await chmod(paths.snapshot, 0o600);
+      assert.deepEqual(await readPublicationSnapshot(paths.snapshot),
+        { draftId: "draft-fixture" });
+    }
+  }));
+
+test("sibling publication refuses a hard-linked foreign snapshot", () =>
+  fixture(async root => {
+    const foreign = join(root, "foreign.json");
+    await writeFile(foreign, '{"draftId":"beta"}');
+    const beta = await publicationFiles(root, "beta");
+    await mkdir(dirname(beta.snapshot), { recursive: true });
+    await link(foreign, beta.snapshot);
+    await assert.rejects(readOtherPublicationSnapshots(root, "alpha"),
+      /publication-snapshot-invalid/u);
+    assert.equal(await readFile(foreign, "utf8"),
+      '{"draftId":"beta"}');
+  }));
 
 test("sibling snapshot lookup skips its own snapshot and unrelated metadata",
   async () => { await fixture(async root => {

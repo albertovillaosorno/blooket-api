@@ -130,6 +130,18 @@ now refuses the same structural conflicts before submission. This defends
 secondary execution-port callers as well as canonical draft validation;
 it does not expand unsupported answer-image publication.
 
+A red-to-green regression found a publication size mismatch: the detached
+native saved-question reader currently refuses sets with more than 200 cards,
+while the application could begin writing a 201-question quiz. The canonical
+command now refuses such new drafts before freezing a snapshot or performing
+a remote mutation. Historical oversized snapshots remain inspectable and
+reconcilable; only their new write starts are blocked.
+
+EN/ES UI guidance explains the current read-back limit as a verifier
+constraint, not a confirmed Blooket account quota. The maximum can be
+raised after the reader and end-to-end verification prove a larger supported
+collection.
+
 Portable tests cover preserved questions, per-question time, sequential resume,
 retarget refusal, edits during preflight, edits between steps and reconciliation
 of a lost successful receipt without another Save. An integration fixture uses

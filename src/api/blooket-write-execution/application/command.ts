@@ -114,9 +114,15 @@ export interface BlooketPublicationDependencies {
 export async function executeBlooketPublicationCommand(
   command: CommandEnvelope, host?: BlooketPublicationDependencies,
 ) {
+  // The current detached native question reader refuses collections larger
+  // than 200. Do not initiate writes the verifier cannot read back.
+  const maximumVerifiableQuestions = 200;
   const fail = (code: string) => commandFailure(command.operationId, [{
     path: "$.publication", code,
-    message: code === "blooket-browser-companion-update-required"
+    message: code === "blooket-publication-question-limit"
+      ? "This quiz exceeds the current 200-question read-back limit. " +
+        "Keep the draft and publish a smaller quiz; no new write was sent."
+      : code === "blooket-browser-companion-update-required"
       ? "The connected browser companion does not declare the required " +
         "saved-state confirmation support. Update the installed companion " +
         "before starting this quiz. Your saved draft is retained."
@@ -189,6 +195,8 @@ export async function executeBlooketPublicationCommand(
       const document = decodeProjectDocument(draft.value["document"]);
       if (!document.ok)
         return fail("blooket-publication-invalid-draft");
+      if (document.value.questions.length > maximumVerifiableQuestions)
+        return fail("blooket-publication-question-limit");
       // Cover and answer images still lack exact remote identity evidence.
       // Only question images backed by current prepared bytes are admitted.
       const unsupported = document.value.coverImage !== null ||
@@ -274,7 +282,12 @@ export async function executeBlooketPublicationCommand(
     const prepared = decodeSnapshot(snapshot, draftId);
     if (!prepared) return fail("publication-snapshot-invalid");
     const { plan, desiredPlan, revision, expectedMedia } = prepared;
-    if (!providerTextCanBeSubmitted(plan.operations))
+    // Native form compatibility may change after an uncertain write. Keep
+    // historical snapshots readable for status, reconciliation and read-back;
+    // only a new step/append must satisfy today's submission contract.
+    if ((command.command === "blooket.publication.step" ||
+        command.command === "blooket.publication.append") &&
+        !providerTextCanBeSubmitted(plan.operations))
       return fail("blooket-publication-invalid-draft");
     if (requestedSetId !== undefined && (plan.schemaVersion !== 2 ||
         requestedSetId !== plan.target.remoteSetId))
@@ -301,6 +314,14 @@ export async function executeBlooketPublicationCommand(
             ? "baseline-unavailable" : "ambiguous-attempt",
         } : {}),
       });
+    // Existing oversized snapshots must remain inspectable and reconcilable.
+    // Only fresh mutations are denied; historical uncertain evidence survives.
+    if (command.command !== "blooket.publication.reconcile" &&
+        command.command !== "blooket.publication.verify" &&
+        attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex < plan.operations.length &&
+        prepared.document.questions.length > maximumVerifiableQuestions)
+      return fail("blooket-publication-question-limit");
     let expectedAppendBaseline: BlooketWriteVerificationBaseline | null = null;
     const baseVerifier = blooketSetReadWriteVerifier(
       blooket.sets, blooket.questions, expectedMedia,
