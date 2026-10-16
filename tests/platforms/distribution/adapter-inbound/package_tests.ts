@@ -65,7 +65,8 @@ test("package assembly preserves an existing archive before any build work",
   async () => {
     const name = "test-" + randomUUID();
     const directory = join(repo, ".temp/distributions", name);
-    await mkdir(directory);
+    // A fresh checkout need not contain ignored distribution artifacts.
+    await mkdir(directory, { recursive: true });
     const archive = join(directory, "linux-x64.tar.gz");
     const marker = Buffer.from("synthetic previous package bytes");
     try {
