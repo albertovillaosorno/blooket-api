@@ -277,6 +277,21 @@ test("whitespace-only native set titles cannot fill or submit", () => {
   });
 });
 
+test("line breaks in a single-line set title cannot fill or submit", () => {
+  for (const title of ["Sun\nMoon", "Sun\rMoon"]) {
+    const page = fixture(false);
+    const input = { title, description: "Draft", private: false };
+    withPage(page.document, "https://dashboard.blooket.com/create", () => {
+      assert.equal(prepareBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.title.value, "");
+      page.title.value = title;
+      page.description.value = input.description;
+      assert.equal(submitBlooketCreateSetForm(input).ok, false);
+      assert.equal(page.form.selectors["button"]![0]!.clicked, 0);
+    });
+  }
+});
+
 test("NUL-bearing Create Set metadata cannot fill or submit", () => {
   for (const input of [
     { title: "Bad\0Title", description: "Draft", private: false },

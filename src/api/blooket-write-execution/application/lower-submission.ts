@@ -77,6 +77,7 @@ export function lowerBlooketWriteSubmission(
       return { ok: false, code: "unexpected-remote-set-binding" };
     }
     if (!operation.title.trim() || operation.title.length > 1_000 ||
+        /[\r\n]/u.test(operation.title) ||
         operation.title.includes("\0") ||
         operation.description.length > 10_000 ||
         operation.description.includes("\0"))
