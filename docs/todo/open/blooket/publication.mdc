@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, a second red-to-green single-line input regression refused
+CR and LF in native typing-answer text. The recovered Blooket form uses
+`input[name="accepted-answers"]` for typing alternatives, unlike the
+multiple-choice `textarea[id^="answer-"]` controls.
+
+Both lowering and standalone native Save guards reject only typing line
+breaks; another test
+proves MC textarea answers still preserve meaningful newlines. Canonical
+publication stops before snapshot/journal creation for unsupported typing
+text, without changing an authored answer. These are synthetic tests and
+HTML value-sanitization semantics, not a live account receipt.
+
 On 2026-10-16, red-to-green native Create Set regressions rejected
 carriage returns and line feeds in single-line set titles. The canonical
 lowering and both independent browser form actions now refuse that content

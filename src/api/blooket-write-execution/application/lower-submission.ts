@@ -134,7 +134,8 @@ function lowerQuestion(
       question.prompt.includes(imageMarker))
     return { ok: false, code: "ambiguous-provider-text" };
   if (question.type === "typing-answer") {
-    if (invalidNativeAnswer(question.answer))
+    if (invalidNativeAnswer(question.answer) ||
+        /[\r\n]/u.test(question.answer))
       return { ok: false, code: "invalid-answer-content" };
     if (
       question.answer.includes(mathMarker) ||

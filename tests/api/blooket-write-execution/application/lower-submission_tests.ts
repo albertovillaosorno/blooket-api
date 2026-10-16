@@ -264,7 +264,8 @@ test("native question and answer bounds fail before browser lowering", () => {
   ]) assert.deepEqual(lowerBlooketWriteSubmission(
     { ...base, question }, { remoteSetId: "remote-set-1" },
   ), { ok: false, code: "invalid-question-content" });
-  for (const answer of ["", " \t ", "x".repeat(10_001), "sun\0moon"]) {
+  for (const answer of ["", " \t ", "x".repeat(10_001), "sun\0moon",
+    "sun\nmoon", "sun\rmoon"]) {
     assert.deepEqual(lowerBlooketWriteSubmission({ ...base,
       question: { ...base.question, answer },
     }, { remoteSetId: "remote-set-1" }),
@@ -288,6 +289,27 @@ test("native question and answer bounds fail before browser lowering", () => {
     }, { remoteSetId: "remote-set-1" }),
     { ok: false, code: "invalid-answer-content" });
   }
+});
+
+test("multiple-choice textarea answers retain authored line breaks", () => {
+  const question: BlooketWriteOperation = {
+    operationId: "plan:test:mc:multiline", kind: "question",
+    localQuestionId: "q1", questionNumber: 1,
+    question: { type: "multiple-choice", prompt: "Which star?",
+      timeLimitSeconds: 10, randomOrder: false, imageMediaId: null,
+      answers: [
+        { text: "Sun\nStar", correct: true, imageMediaId: null },
+        { text: "Moon", correct: false, imageMediaId: null },
+      ],
+    },
+  };
+  const result = lowerBlooketWriteSubmission(question,
+    { remoteSetId: "remote-set-1" });
+  assert.equal(result.ok, true);
+  if (result.ok && result.value.kind === "add-question")
+    assert.deepEqual(result.value.answers[0], {
+      kind: "text", text: "Sun\nStar", correct: true,
+    });
 });
 
 test("multiple-choice native slots reject ambiguous answer sets", () => {

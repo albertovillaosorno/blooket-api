@@ -237,7 +237,8 @@ export function runBlooketAddQuestionPageAction(
     if (correctAnswers.length < 1) return null;
     const matchTypes: ("exactly" | "contains")[] = [];
     if (input.qType === "typing") {
-      if (correctAnswers.length !== answers.length ||
+      if (answers.some(answer => /[\r\n]/u.test(answer)) ||
+          correctAnswers.length !== answers.length ||
           input.random !== true || !exactSlots(input.answerTypes) ||
           input.answerTypes.length !== answers.length) return null;
       for (let index = 0; index < input.answerTypes.length; index++) {

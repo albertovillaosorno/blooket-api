@@ -93,6 +93,11 @@ control's value. Canonical lowering and the independent prepare/submit
 functions therefore reject such titles without changing teacher-authored
 text or creating an unfinishable publication journal.
 
+Native typing alternatives likewise use single-line
+`input[name="accepted-answers"]` and reject CR/LF in both canonical lowering
+and the independent Save guard. Multiple-choice answers use `textarea`
+controls, so their authored multiline text remains admissible and unchanged.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even

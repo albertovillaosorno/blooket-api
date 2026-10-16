@@ -799,6 +799,28 @@ test(
   },
 );
 
+test("multiple-choice textarea text keeps meaningful line breaks", () => {
+  const page = fixture();
+  const input: BlooketTextQuestionPageInput = {
+    setId: "set-fixture", number: 1,
+    question: "Choose the star.", answers: [
+      { text: "Sun\nStar", correct: true },
+      { text: "Moon", correct: false },
+    ], qType: "mc", random: true, answerTypes: null, timeLimit: 20,
+  };
+  page.hidden.value = JSON.stringify({ number: 1,
+    question: input.question, answers: ["Sun\nStar", "Moon"],
+    correctAnswers: ["Sun\nStar"], image: "", audio: "",
+    qType: "mc", random: true, answerTypes: null, timeLimit: 20,
+  });
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+      assert.deepEqual(prepareBlooketAddQuestionForm(input), { ok: true });
+      assert.deepEqual(submitBlooketAddQuestionForm(input), { ok: true });
+      assert.equal(page.submit.clicked, 1);
+    });
+});
+
 test("provider JSON key order does not replace genuine editor state", () => {
   const page = fixture();
   withPage(page.document,
@@ -849,6 +871,22 @@ test("provider-equivalent blank question fields cannot authorize Save", () => {
           ? { ...typing, question: "  \t  " }
           : { ...typing, answers: [
             { text: "  \t  ", correct: true }] };
+        assert.equal(prepareBlooketAddQuestionForm(input).ok, false);
+        assert.equal(submitBlooketAddQuestionForm(input).ok, false);
+        assert.equal(page.submit.clicked, 0);
+      });
+  }
+});
+
+test("single-line typing answers never admit CR or LF through Save", () => {
+  for (const text of ["sun\nmoon", "sun\rmoon"]) {
+    const page = fixture();
+    const raw = JSON.parse(page.hidden.value);
+    page.hidden.value = JSON.stringify({ ...raw,
+      answers: [text], correctAnswers: [text] });
+    const input = { ...typing, answers: [{ text, correct: true }] };
+    withPage(page.document,
+      "https://dashboard.blooket.com/edit?id=set-fixture", () => {
         assert.equal(prepareBlooketAddQuestionForm(input).ok, false);
         assert.equal(submitBlooketAddQuestionForm(input).ok, false);
         assert.equal(page.submit.clicked, 0);

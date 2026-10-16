@@ -318,6 +318,8 @@ test("native field bounds stop publication before a frozen snapshot", () =>
       { ...document.questions[0]!, prompt: "Type\0sun" },
       { ...document.questions[0]!, answer: " \t " },
       { ...document.questions[0]!, answer: "sun\0moon" },
+      { ...document.questions[0]!, answer: "sun\nmoon" },
+      { ...document.questions[0]!, answer: "sun\rmoon" },
       { ...document.questions[0]!, timeLimitSeconds: 86_401 },
     ];
     for (const [index, question] of badQuestions.entries()) {
