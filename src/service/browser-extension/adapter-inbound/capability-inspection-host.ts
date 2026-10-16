@@ -57,6 +57,7 @@ import { decodeBlooketSetList } from
 
 interface BrowserTab {
   readonly url?: string;
+  readonly pendingUrl?: string;
   readonly status?: string;
 }
 
@@ -170,13 +171,14 @@ export function createExtensionCapabilityInspectionHost(
         if (now() >= deadline) return false;
         const before = await chrome.tabs.get(tabId);
         if (before.status !== "complete" || before.url !== url ||
-            now() >= deadline) return false;
+            before.pendingUrl !== undefined || now() >= deadline) return false;
         const observed = await script(
           inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
           [url],
         );
         const after = await chrome.tabs.get(tabId);
         if (after.status !== "complete" || after.url !== url ||
+            after.pendingUrl !== undefined ||
             now() >= deadline || typeof observed !== "number" ||
             !Number.isFinite(observed) || observed <= 0) return false;
         const prior = origins.get(url);
@@ -196,7 +198,8 @@ export function createExtensionCapabilityInspectionHost(
         const beforeScript = await chrome.tabs.get(tabId);
         if (
           now() >= probeDeadline || beforeScript.status !== "complete" ||
-          beforeScript.url !== expectedReadUrl
+          beforeScript.url !== expectedReadUrl ||
+          beforeScript.pendingUrl !== undefined
         ) throw new Error("browser-capability-tab-changed");
         if (!await ownsDocument(expectedReadUrl, probeDeadline, true))
           throw new Error("browser-capability-document-changed");
@@ -207,7 +210,8 @@ export function createExtensionCapabilityInspectionHost(
         const afterScript = await chrome.tabs.get(tabId);
         if (
           now() >= probeDeadline || afterScript.status !== "complete" ||
-          afterScript.url !== expectedReadUrl
+          afterScript.url !== expectedReadUrl ||
+          afterScript.pendingUrl !== undefined
         ) throw new Error("browser-capability-tab-changed");
         return result;
       };
@@ -243,7 +247,8 @@ export function createExtensionCapabilityInspectionHost(
         if (now() >= probeDeadline) return false;
         const tab = await chrome.tabs.get(tabId);
         return now() < probeDeadline && tab.status === "complete" &&
-          tab.url === url && await ownsDocument(url, probeDeadline);
+          tab.url === url && tab.pendingUrl === undefined &&
+          await ownsDocument(url, probeDeadline);
       };
       let originalUrl: string | undefined;
       let setId: string | undefined;
@@ -257,7 +262,8 @@ export function createExtensionCapabilityInspectionHost(
       let outcome: ExtensionCapabilityInspectionResult = browserFailure();
       try {
         const before = await chrome.tabs.get(tabId);
-        if (!before.url || !dashboardTab(before)) return browserFailure();
+        if (!before.url || before.pendingUrl !== undefined ||
+            !dashboardTab(before)) return browserFailure();
         originalUrl = before.url;
         const sourceUrl = before.url;
         // Before navigating to My Sets, reject a teacher-owned editor or
@@ -271,7 +277,7 @@ export function createExtensionCapabilityInspectionHost(
         );
         const checked = await chrome.tabs.get(tabId);
         if (safe !== true || checked.status !== "complete" ||
-            checked.url !== originalUrl ||
+            checked.url !== originalUrl || checked.pendingUrl !== undefined ||
             !await ownsDocument(originalUrl, probeDeadline))
           return browserFailure();
 
@@ -313,6 +319,7 @@ export function createExtensionCapabilityInspectionHost(
         if (
           now() >= probeDeadline ||
           beforeListConfirmation.status !== "complete" ||
+          beforeListConfirmation.pendingUrl !== undefined ||
           beforeListConfirmation.url !== MY_SETS_URL
         ) return browserFailure();
         const listedAgain = await readScript(
@@ -330,6 +337,7 @@ export function createExtensionCapabilityInspectionHost(
         if (
           now() >= probeDeadline ||
           afterListConfirmation.status !== "complete" ||
+          afterListConfirmation.pendingUrl !== undefined ||
           afterListConfirmation.url !== MY_SETS_URL
         ) return browserFailure();
 
@@ -353,6 +361,7 @@ export function createExtensionCapabilityInspectionHost(
           const priorEditOrigin = origins.get(editUrl);
           const entered = await chrome.tabs.get(tabId);
           if (entered.status !== "complete" || entered.url !== editUrl ||
+              entered.pendingUrl !== undefined ||
               now() >= probeDeadline) return browserFailure();
           const enteredOrigin = await script(
             inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
@@ -360,6 +369,7 @@ export function createExtensionCapabilityInspectionHost(
           );
           const afterEnter = await chrome.tabs.get(tabId);
           if (afterEnter.status !== "complete" || afterEnter.url !== editUrl ||
+              afterEnter.pendingUrl !== undefined ||
               now() >= probeDeadline ||
               typeof enteredOrigin !== "number" ||
               !Number.isFinite(enteredOrigin) || enteredOrigin <= 0 ||
@@ -415,6 +425,7 @@ export function createExtensionCapabilityInspectionHost(
           if (
             now() >= probeDeadline ||
             tabBeforeConfirmation.status !== "complete" ||
+          tabBeforeConfirmation.pendingUrl !== undefined ||
             tabBeforeConfirmation.url !== editUrl
           ) return browserFailure();
           const again = await readScript(
@@ -430,6 +441,7 @@ export function createExtensionCapabilityInspectionHost(
           if (
             now() >= probeDeadline ||
             tabAfterConfirmation.status !== "complete" ||
+          tabAfterConfirmation.pendingUrl !== undefined ||
             tabAfterConfirmation.url !== editUrl
           ) return browserFailure();
           accountMedia = inspected;
@@ -454,6 +466,7 @@ export function createExtensionCapabilityInspectionHost(
           .catch(() => undefined);
         const canClean = cleanupUrl !== undefined &&
           tabBeforeCleanup?.status === "complete" &&
+          tabBeforeCleanup.pendingUrl === undefined &&
           tabBeforeCleanup.url === cleanupUrl &&
           await ownsDocument(cleanupUrl, finishDeadline).catch(() => false);
         // Chrome serializes each cleanup helper independently. The initial
@@ -464,13 +477,15 @@ export function createExtensionCapabilityInspectionHost(
           args: unknown[] = [],
         ): Promise<unknown> => {
           const before = await chrome.tabs.get(tabId);
-          if (before.status !== "complete" || before.url !== cleanupUrl)
+          if (before.status !== "complete" || before.url !== cleanupUrl ||
+              before.pendingUrl !== undefined)
             throw new Error("browser-capability-tab-changed");
           if (!await ownsDocument(cleanupUrl!, finishDeadline))
             throw new Error("browser-capability-document-changed");
           const result = await script(func, args);
           const after = await chrome.tabs.get(tabId);
           if (after.status !== "complete" || after.url !== cleanupUrl ||
+              after.pendingUrl !== undefined ||
               !await ownsDocument(cleanupUrl!, finishDeadline))
             throw new Error("browser-capability-tab-changed");
           return result;
@@ -509,6 +524,7 @@ export function createExtensionCapabilityInspectionHost(
           // safely be left before any question editor or document was claimed.
           // Once evidence is collected, an unexpected reload is not ours.
           const unclaimedListing = current?.url === MY_SETS_URL &&
+            current.pendingUrl === undefined &&
             setId === undefined && !origins.has(MY_SETS_URL);
           const ownedRestoration = typeof current?.url === "string" &&
             await ownsDocument(current.url, finishDeadline)
@@ -550,12 +566,13 @@ async function navigate(
 ): Promise<boolean> {
   if (now() >= deadline) return false;
   const current = await chrome.tabs.get(tabId);
-  if (now() >= deadline ||
+  if (now() >= deadline || current.pendingUrl !== undefined ||
       (current.url !== url && current.url !== allowedPreviousUrl))
     return false;
   if (sourceDocument && !await sourceDocument()) return false;
   const checked = await chrome.tabs.get(tabId);
   if (now() >= deadline || checked.url !== current.url ||
+      checked.pendingUrl !== undefined ||
       (sourceDocument && checked.status !== "complete")) return false;
   const changingDocument = current.url !== url;
   const sourceOrigin = changingDocument && current.url
@@ -570,7 +587,10 @@ async function navigate(
     attempt++) {
     const tab = await chrome.tabs.get(tabId);
     if (now() >= deadline) return false;
-    if (tab.status === "complete" && tab.url === url) {
+    if (tab.pendingUrl !== undefined && tab.pendingUrl !== url)
+      return false;
+    if (tab.status === "complete" && tab.url === url &&
+        tab.pendingUrl === undefined) {
       // tabs.update/get may expose the destination URL while its previous
       // document is still complete. Wait for the actual destination document,
       // rather than failing the capability probe on that transitional reply.
@@ -580,7 +600,7 @@ async function navigate(
           (!changingDocument || origin !== sourceOrigin)) {
         const after = await chrome.tabs.get(tabId);
         return now() < deadline && after.status === "complete" &&
-          after.url === url;
+          after.pendingUrl === undefined && after.url === url;
       }
       if (origin !== null && origin !== sourceOrigin) return false;
     } else if (tab.url !== url && tab.url !== current.url) return false;
@@ -604,7 +624,8 @@ async function restore(
   // The user may have navigated the tab independently. An unfamiliar route,
   // even on the same provider origin, is no longer ours to overwrite.
   const current = await chrome.tabs.get(tabId);
-  if (current.url !== url && !ownedRoutes.includes(current.url ?? ""))
+  if (current.pendingUrl !== undefined ||
+      (current.url !== url && !ownedRoutes.includes(current.url ?? "")))
     return false;
   if (now() >= deadline) {
     // Only an unclaimed My Sets route can be restored after the deadline.

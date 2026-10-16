@@ -20,6 +20,11 @@ question reader now refuse any pending redirect before recognizing a complete
 document. This extends the existing Chrome Tabs API evidence; it is not a live
 publication receipt.
 
+The temporary capability-inspection host now also rechecks Chrome's
+`pendingUrl` across source admission, target navigation, read scripts, and
+modal cleanup. This prevents a foreign destination from inheriting the last
+committed My Sets or Edit read authority, without touching live quiz data.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and
