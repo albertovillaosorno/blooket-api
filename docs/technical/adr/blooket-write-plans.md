@@ -116,6 +116,11 @@ slots, required correctness toggles, and checkbox shuffle switch. A
 missing or changed control cannot leave an otherwise valid prompt partly
 prepared before the independent Save preflight.
 
+Observed native `maxLength` constraints are checked for all admitted
+visible controls before changing the prompt or timer. A provider-imposed
+shorter timer or answer limit cannot strand an otherwise unfinished form
+with partly written text.
+
 Whitespace-only set titles are rejected before opening a write journal while
 valid teacher-authored title text remains unchanged. The independent Create
 Set browser prepare/submit functions also reject whitespace-only titles, even

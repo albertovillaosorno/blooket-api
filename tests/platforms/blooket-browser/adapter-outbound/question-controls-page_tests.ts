@@ -390,6 +390,41 @@ test("changed MC answer controls cannot leave a partly filled editor",
   }
 });
 
+test("native input length limits fail before partially writing the form",
+  async () => {
+  for (const variant of ["prompt", "timer", "typing"] as const)
+    await withEditor(async page => {
+      if (variant === "prompt") page.prompt.maxLength = 2;
+      if (variant === "timer") page.time.maxLength = 1;
+      if (variant === "typing") {
+        const typing = page.list.selectors['[role="option"]']![1]!;
+        const original = typing.onClick;
+        typing.onClick = () => {
+          original();
+          page.form.selectors['input[name="accepted-answers"]']![0]!
+            .maxLength = 2;
+        };
+      }
+      assert.equal(await prepareBlooketQuestionControls(input), false,
+        variant);
+      assert.equal(page.prompt.value, "", variant);
+      assert.equal(page.time.value, "20", variant);
+      assert.equal(page.hiddenWrites(), 0);
+    });
+  const mc: BlooketQuestionPageInput = {
+    ...input, qType: "mc", answerTypes: null,
+    answers: [{ text: "Sun", correct: true },
+      { text: "Moon", correct: false }],
+  };
+  await withEditor(async page => {
+    page.form.selectors["textarea#answer-1"]![0]!.maxLength = 2;
+    assert.equal(await prepareBlooketQuestionControls(mc), false);
+    assert.equal(page.prompt.value, "");
+    assert.equal(page.time.value, "20");
+    assert.equal(page.hiddenWrites(), 0);
+  }, "mc");
+});
+
 test("visible editor events generate typing state without hidden overrides",
   async () => withEditor(async page => {
     const serialized = Function("return (" +
