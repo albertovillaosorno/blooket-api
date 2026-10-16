@@ -73,6 +73,29 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, an authorized canonical image append stopped during its
+verification baseline, before opening a question editor or uploading bytes.
+A native Edit Info read received HTTP 429 with a Cloudflare response, while
+an independently spaced native read succeeded with HTTP 200. The opener is
+a server action even though the product only reads metadata and cancels.
+
+The companion now serializes metadata read jobs and leaves five seconds
+between completed attempts within the original eight-second read budget.
+This is a conservative local pacing policy, not a verified provider limit;
+it neither retries failed actions nor changes mutation receipts.
+
+Deterministic
+regressions cover overlapping jobs, deadlines and interrupted waits. Live
+image acceptance remains pending.
+
+Cloudflare's [HTTP 429 reference][metadata-rate-doc], checked on 2026-10-16,
+confirms that this status represents rate limiting and that Retry-After may
+be supplied. The observed response did not supply that header; Cloudflare API
+quota numbers are unrelated to Blooket and were not adopted.
+
+<!-- jig-ignore-next-line: Official documentation URL is indivisible. -->
+[metadata-rate-doc]: https://developers.cloudflare.com/support/troubleshooting/http-status-codes/4xx-client-error/error-429/
+
 On 2026-10-16, the companion assembled from `85720eb` completed a new
 fictional private MC quiz through canonical CLI publication. Create Set and
 Add Question each advanced their durable checkpoint once, followed by a
