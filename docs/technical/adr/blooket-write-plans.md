@@ -16,6 +16,8 @@ do not change merely because unrelated local metadata changed.
 
 Capability evidence can be incomplete or account-dependent. A structurally valid
 project therefore is not automatically safe to execute against Blooket.
+Runtime capability decoding uses owned data fields and bounded dense arrays;
+accessors and custom iterators cannot become feature-admission authority.
 
 ## Decision
 

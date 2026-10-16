@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-16, runtime capability snapshots could invoke untrusted nested
+getters or array iterators while assessing provider and account support.
+Red-to-green tests now cover nested evidence, metadata, feature, and upload
+fields and malicious collection methods. Capability decoding accepts only
+owned data descriptors and bounded dense arrays. The saved capability schema
+is unchanged; no live account or feature entitlement was inferred.
+
 On 2026-10-16, two versioned publication recovery decoders were found to
 invoke getters on untrusted object fields: checkpoint progress and the
 collection verification baseline. Red-to-green synthetic tests now cover

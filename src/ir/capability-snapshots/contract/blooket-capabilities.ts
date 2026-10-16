@@ -37,7 +37,9 @@ import {
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
   isRecord,
+  ownDataField,
   requiredString,
+  snapshotExactDenseArray,
   unknownFieldIssues,
 } from "../../runtime-decoding/domain/exact-object.ts";
 
@@ -147,7 +149,7 @@ export function decodeBlooketCapabilitySnapshot(
   const issues: ValidationIssue[] = [
     ...unknownFieldIssues(value, ROOT_KEYS, "$"),
   ];
-  const inputVersion = value["schemaVersion"];
+  const inputVersion = ownDataField(value, "schemaVersion");
   if (
     inputVersion !== LEGACY_BLOOKET_CAPABILITIES_VERSION
     && inputVersion !== LEGACY_BLOOKET_CAPABILITIES_VERSION_2
@@ -160,17 +162,21 @@ export function decodeBlooketCapabilitySnapshot(
     });
   }
 
-  const verifiedOn = decodeIsoDate(value["verifiedOn"], "$.verifiedOn", issues);
-  const evidence = decodeEvidence(value["evidence"], issues);
-  const questionTypes = decodeQuestionTypes(value["questionTypes"], issues);
-  const features = decodeFeatures(value["features"], issues);
+  const verifiedOn = decodeIsoDate(
+    ownDataField(value, "verifiedOn"), "$.verifiedOn", issues,
+  );
+  const evidence = decodeEvidence(ownDataField(value, "evidence"), issues);
+  const questionTypes = decodeQuestionTypes(
+    ownDataField(value, "questionTypes"), issues,
+  );
+  const features = decodeFeatures(ownDataField(value, "features"), issues);
   const setMetadata = decodeSetMetadata(
-    value["setMetadata"],
+    ownDataField(value, "setMetadata"),
     inputVersion === BLOOKET_CAPABILITIES_VERSION ? 3 : 2,
     issues,
   );
   const upload = decodeUpload(
-    value["upload"],
+    ownDataField(value, "upload"),
     inputVersion === LEGACY_BLOOKET_CAPABILITIES_VERSION ? 1 : 2,
     issues,
   );
@@ -222,7 +228,8 @@ function decodeEvidence(
   value: unknown,
   issues: ValidationIssue[],
 ): readonly CapabilityEvidence[] | undefined {
-  if (!Array.isArray(value) || value.length === 0) {
+  const captured = snapshotExactDenseArray(value, 200);
+  if (!captured || captured.length === 0) {
     issues.push({
       path: "$.evidence",
       code: "expected-evidence",
@@ -232,7 +239,7 @@ function decodeEvidence(
   }
 
   const evidence: CapabilityEvidence[] = [];
-  for (const [index, candidate] of value.entries()) {
+  for (const [index, candidate] of captured.entries()) {
     const path = `$.evidence[${index}]`;
     if (!isRecord(candidate)) {
       issues.push({
@@ -243,9 +250,9 @@ function decodeEvidence(
       continue;
     }
     issues.push(...unknownFieldIssues(candidate, EVIDENCE_KEYS, path));
-    const kind = candidate["kind"];
+    const kind = ownDataField(candidate, "kind");
     const reference = requiredString(
-      candidate["reference"],
+      ownDataField(candidate, "reference"),
       `${path}.reference`,
       issues,
     );
@@ -282,8 +289,12 @@ function decodeQuestionTypes(
     ...unknownFieldIssues(value, QUESTION_TYPE_KEYS, "$.questionTypes"),
   );
 
-  const multipleChoice = decodeMultipleChoice(value["multipleChoice"], issues);
-  const typingAnswer = decodeTypingAnswer(value["typingAnswer"], issues);
+  const multipleChoice = decodeMultipleChoice(
+    ownDataField(value, "multipleChoice"), issues,
+  );
+  const typingAnswer = decodeTypingAnswer(
+    ownDataField(value, "typingAnswer"), issues,
+  );
   if (multipleChoice === undefined || typingAnswer === undefined) {
     return undefined;
   }
@@ -306,27 +317,27 @@ function decodeMultipleChoice(
   issues.push(...unknownFieldIssues(value, MULTIPLE_CHOICE_KEYS, path));
 
   const availability = decodeAvailability(
-    value["availability"],
+    ownDataField(value, "availability"),
     `${path}.availability`,
     issues,
   );
   const minAnswers = decodeNullablePositiveInteger(
-    value["minAnswers"],
+    ownDataField(value, "minAnswers"),
     `${path}.minAnswers`,
     issues,
   );
   const maxAnswers = decodeNullablePositiveInteger(
-    value["maxAnswers"],
+    ownDataField(value, "maxAnswers"),
     `${path}.maxAnswers`,
     issues,
   );
   const requiresQuestionText = decodeNullableBoolean(
-    value["requiresQuestionText"],
+    ownDataField(value, "requiresQuestionText"),
     `${path}.requiresQuestionText`,
     issues,
   );
   const allowsMultipleCorrect = decodeNullableBoolean(
-    value["allowsMultipleCorrect"],
+    ownDataField(value, "allowsMultipleCorrect"),
     `${path}.allowsMultipleCorrect`,
     issues,
   );
@@ -378,12 +389,12 @@ function decodeTypingAnswer(
   }
   issues.push(...unknownFieldIssues(value, TYPING_ANSWER_KEYS, path));
   const availability = decodeAvailability(
-    value["availability"],
+    ownDataField(value, "availability"),
     `${path}.availability`,
     issues,
   );
   const matchModes = decodeEnumArray(
-    value["matchModes"],
+    ownDataField(value, "matchModes"),
     `${path}.matchModes`,
     new Set(["exact", "contains"]),
     issues,
@@ -408,16 +419,18 @@ function decodeFeatures(
   }
   issues.push(...unknownFieldIssues(value, FEATURE_KEYS, "$.features"));
   const questionImages = decodeAvailability(
-    value["questionImages"],
+    ownDataField(value, "questionImages"),
     "$.features.questionImages",
     issues,
   );
   const answerImages = decodeAvailability(
-    value["answerImages"],
+    ownDataField(value, "answerImages"),
     "$.features.answerImages",
     issues,
   );
-  const audio = decodeAvailability(value["audio"], "$.features.audio", issues);
+  const audio = decodeAvailability(
+    ownDataField(value, "audio"), "$.features.audio", issues,
+  );
   if (
     questionImages === undefined
     || answerImages === undefined
@@ -449,36 +462,36 @@ function decodeSetMetadata(
     ),
   );
   const titleRequired = decodeNullableBoolean(
-    value["titleRequired"],
+    ownDataField(value, "titleRequired"),
     "$.setMetadata.titleRequired",
     issues,
   );
   const descriptionRequired = decodeNullableBoolean(
-    value["descriptionRequired"],
+    ownDataField(value, "descriptionRequired"),
     "$.setMetadata.descriptionRequired",
     issues,
   );
   const titleMaxLength = version === 3
     ? decodeNullablePositiveInteger(
-        value["titleMaxLength"],
+        ownDataField(value, "titleMaxLength"),
         "$.setMetadata.titleMaxLength",
         issues,
       )
     : null;
   const descriptionMaxLength = version === 3
     ? decodeNullablePositiveInteger(
-        value["descriptionMaxLength"],
+        ownDataField(value, "descriptionMaxLength"),
         "$.setMetadata.descriptionMaxLength",
         issues,
       )
     : null;
   const coverImageOptional = decodeNullableBoolean(
-    value["coverImageOptional"],
+    ownDataField(value, "coverImageOptional"),
     "$.setMetadata.coverImageOptional",
     issues,
   );
   const visibility = decodeEnumArray(
-    value["visibility"],
+    ownDataField(value, "visibility"),
     "$.setMetadata.visibility",
     new Set(["public", "private"]),
     issues,
@@ -524,7 +537,7 @@ function decodeUpload(
     ),
   );
   const maxBytes = decodeNullablePositiveInteger(
-    value["maxBytes"],
+    ownDataField(value, "maxBytes"),
     "$.upload.maxBytes",
     issues,
   );
@@ -540,17 +553,17 @@ function decodeUpload(
   }
 
   const canvasWidth = decodeNullablePositiveInteger(
-    value["canvasWidth"],
+    ownDataField(value, "canvasWidth"),
     "$.upload.canvasWidth",
     issues,
   );
   const canvasHeight = decodeNullablePositiveInteger(
-    value["canvasHeight"],
+    ownDataField(value, "canvasHeight"),
     "$.upload.canvasHeight",
     issues,
   );
   const maxPixels = decodeNullablePositiveInteger(
-    value["maxPixels"],
+    ownDataField(value, "maxPixels"),
     "$.upload.maxPixels",
     issues,
   );
@@ -652,7 +665,8 @@ function decodeEnumArray(
   admitted: ReadonlySet<string>,
   issues: ValidationIssue[],
 ): readonly string[] | undefined {
-  if (!Array.isArray(value)) {
+  const captured = snapshotExactDenseArray(value, admitted.size);
+  if (!captured) {
     issues.push({
       path,
       code: "expected-array",
@@ -661,7 +675,7 @@ function decodeEnumArray(
     return undefined;
   }
   const decoded: string[] = [];
-  for (const [index, candidate] of value.entries()) {
+  for (const [index, candidate] of captured.entries()) {
     if (typeof candidate !== "string" || !admitted.has(candidate)) {
       issues.push({
         path: `${path}[${index}]`,
