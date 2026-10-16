@@ -106,6 +106,8 @@ Question source document. Both browser mutation hosts recheck their exact
 committed route before touching form controls or invoking Save. A Create
 Set Save acknowledgment may acknowledge an exact *loading* pending Edit
 redirect, but this never replaces the separately required durable read-back.
+Post-submit observation waits for that exact redirect to commit rather than
+reading the stale Create document, and refuses a foreign pending destination.
 
 A later native-contract change cannot make an old attempting journal disappear:
 status and read-only reconciliation remain available even when a new write

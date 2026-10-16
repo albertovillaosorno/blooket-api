@@ -458,6 +458,15 @@ export function createExtensionCreateSetHost(
         let pendingUnknown = false;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           const tab = await chrome.tabs.get(tabId);
+          if (tab.pendingUrl !== undefined) {
+            // An exact Edit redirect may still be loading. Never inspect
+            // the old Create document or adopt a foreign pending route.
+            if (tab.url !== CREATE_URL ||
+                !exactEditRoute({ url: tab.pendingUrl, status: "loading" }))
+              return browserFailure();
+            await pause(POLL_MS);
+            continue;
+          }
           if (tab.status === "complete" && tab.url) {
             const url = new URL(tab.url);
             if (

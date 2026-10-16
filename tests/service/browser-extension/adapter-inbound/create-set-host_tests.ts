@@ -299,6 +299,38 @@ test("an exact pending Edit redirect keeps a single Create Set ack",
   assert.equal(submitted, true);
 });
 
+test("Create Set waits for a committed pending Edit redirect", async () => {
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/create",
+    scripts: [observed, observed],
+  });
+  const target = "https://dashboard.blooket.com/edit?id=remote-set-1";
+  let loading = true;
+  const get = fake.chrome.tabs.get;
+  fake.chrome.tabs.get = async id => ({ ...await get(id),
+    ...(loading ? { pendingUrl: target } : {}),
+  });
+  const host = createExtensionCreateSetHost(fake.chrome, 7, async () => {
+    loading = false;
+    fake.setTab({ url: target, status: "complete" });
+  });
+  assert.deepEqual(await host.observeCreateSet(), observed);
+  assert.equal(fake.calls.filter(call => call === "script").length, 2);
+});
+
+test("Create Set rejects a foreign pending post-submit route", async () => {
+  const fake = fakeChrome({ initialUrl:
+    "https://dashboard.blooket.com/create", scripts: [observed] });
+  const get = fake.chrome.tabs.get;
+  fake.chrome.tabs.get = async id => ({ ...await get(id),
+    pendingUrl: "https://foreign.invalid/" });
+  const host = createExtensionCreateSetHost(
+    fake.chrome, 7, async () => undefined,
+  );
+  assert.equal((await host.observeCreateSet()).ok, false);
+  assert.equal(fake.calls.includes("script"), false);
+});
+
 test("human and wait states propagate during create navigation", async () => {
   for (const state of [
     "security-challenge",
