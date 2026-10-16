@@ -25,6 +25,12 @@ The temporary capability-inspection host now also rechecks Chrome's
 modal cleanup. This prevents a foreign destination from inheriting the last
 committed My Sets or Edit read authority, without touching live quiz data.
 
+The browser-extension worker now refuses a `pendingUrl` on its original
+submitted editor before authorizing detached question or capability reads,
+and rechecks the source after temporary background scans. Portable worker
+regressions cover both already-pending and newly-pending foreign navigation;
+the unchanged editor URL alone never certifies live saved state.
+
 ## Current delivery checkpoint (2026-10-16)
 
 The local Quizzes saved-account connection control completed a real login and

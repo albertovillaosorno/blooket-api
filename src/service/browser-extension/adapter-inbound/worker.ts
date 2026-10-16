@@ -354,6 +354,8 @@ async function read(
         encodeURIComponent(operation.setId)
       : blooketReadUrl(operation);
   let tab = await browser.tabs.get(current.tabId);
+  if (tab.pendingUrl !== undefined)
+    throw new Error("browser-navigation-unsafe");
   if (!tab.url) throw new Error("manual-blooket-sign-in-required");
   const origin = new URL(tab.url).origin;
   if (
@@ -403,6 +405,7 @@ async function read(
         inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
         [tab.url]);
       if (verified.status !== "complete" || verified.url !== tab.url ||
+          verified.pendingUrl !== undefined ||
           sourceOrigin !== originAgain || Date.now() >= readDeadline)
         throw new Error("browser-navigation-unsafe");
       const detached = await inspectDetachedBlooketQuestions(
@@ -422,6 +425,7 @@ async function read(
         inspectBlooketPage as (...args: never[]) => unknown,
         [{ kind: "session.observe" }]);
       if (finalTab.status !== "complete" || finalTab.url !== tab.url ||
+          finalTab.pendingUrl !== undefined ||
           finalOrigin !== sourceOrigin || finalBinding !== true ||
           !exactSessionObservation(finalState) ||
           (finalState as { value?: unknown }).value !== "edit" ||
@@ -434,7 +438,7 @@ async function read(
   if (target !== null) {
     // The teacher may be editing a question, metadata, or a fresh set in
     // the current tab. Refuse navigation or a same-route reload first.
-    if (tab.status !== "complete")
+    if (tab.status !== "complete" || tab.pendingUrl !== undefined)
       throw new Error("browser-navigation-unsafe");
     const nativeSource = await script(current, browser,
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
@@ -450,7 +454,8 @@ async function read(
     );
     const checked = await browser.tabs.get(current.tabId);
     if (safe !== true || checked.status !== "complete" ||
-        checked.url !== tab.url || Date.now() >= readDeadline)
+        checked.url !== tab.url || checked.pendingUrl !== undefined ||
+        Date.now() >= readDeadline)
       throw new Error("browser-navigation-unsafe");
     const afterGuardOrigin = await script(current, browser,
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
@@ -974,6 +979,7 @@ async function detachedEditRead(
 ): Promise<unknown | undefined> {
   const failed = () => ({ ok: false, code: "blooket-browser-failed" });
   const tab = await browser.tabs.get(current.tabId);
+  if (tab.pendingUrl !== undefined) return failed();
   if (tab.status !== "complete" || !tab.url) return undefined;
   const url = new URL(tab.url);
   const setId = url.searchParams.get("id");
@@ -1013,6 +1019,7 @@ async function detachedEditRead(
     inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
     [tab.url]);
   if (before.url !== tab.url || before.status !== "complete" ||
+      before.pendingUrl !== undefined ||
       beforeOrigin !== sourceOrigin) return failed();
   const detached = operation === "sets.list"
     ? await inspectDetachedBlooketSets(current, browser)
@@ -1028,7 +1035,8 @@ async function detachedEditRead(
     inspectBlooketPage as (...args: never[]) => unknown,
     [{ kind: "session.observe" }]);
   if (after.url !== tab.url || after.status !== "complete" ||
-      afterOrigin !== sourceOrigin || (submitted && afterBound !== true) ||
+      after.pendingUrl !== undefined || afterOrigin !== sourceOrigin ||
+      (submitted && afterBound !== true) ||
       !exactSessionObservation(afterState) ||
       (afterState as { value?: unknown }).value !== "edit")
     return failed();
