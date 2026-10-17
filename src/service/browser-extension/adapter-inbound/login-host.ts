@@ -118,15 +118,16 @@ export function createExtensionSessionAuthenticationHost(
         const readyTab = async () => {
           if (now() >= deadline) return false;
           const tab = await chrome.tabs.get(tabId);
-          if (now() >= deadline || !exactLoginTab(tab)) return false;
+          const loginUrl = exactLoginTabUrl(tab);
+          if (now() >= deadline || !loginUrl) return false;
           const observed = await script(
             inspectBlooketSessionDocumentOrigin as
               (...args: never[]) => unknown,
-            [tab.url],
+            [loginUrl],
           );
           const after = await chrome.tabs.get(tabId);
-          if (now() >= deadline || !exactLoginTab(after) ||
-              after.url !== tab.url || typeof observed !== "number" ||
+          if (now() >= deadline || exactLoginTabUrl(after) !== loginUrl ||
+              typeof observed !== "number" ||
               !Number.isFinite(observed) || observed <= 0) return false;
           if (loginOrigin === null) loginOrigin = observed;
           return loginOrigin === observed;
@@ -170,17 +171,24 @@ export function createExtensionSessionAuthenticationHost(
   };
 }
 
-function exactLoginTab(tab: BrowserTab): boolean {
-  if (!tab.url || tab.status !== "complete" ||
-      tab.pendingUrl !== undefined) return false;
+function exactLoginTabUrl(tab: BrowserTab): string | undefined {
+  if (!tab || typeof tab !== "object") return undefined;
+  const urlField = Object.getOwnPropertyDescriptor(tab, "url");
+  const statusField = Object.getOwnPropertyDescriptor(tab, "status");
+  const pending = Object.getOwnPropertyDescriptor(tab, "pendingUrl");
+  if (!urlField || !statusField || !urlField.enumerable ||
+      !statusField.enumerable || !("value" in urlField) ||
+      !("value" in statusField) ||
+      typeof urlField.value !== "string" ||
+      statusField.value !== "complete" ||
+      (pending && (!pending.enumerable || !("value" in pending) ||
+        pending.value !== undefined))) return undefined;
   try {
-    const url = new URL(tab.url);
+    const url = new URL(urlField.value);
     return url.origin === LOGIN_ORIGIN && url.pathname === "/login" &&
       url.search === "" && url.hash === "" &&
-      url.href === LOGIN_ORIGIN + "/login";
-  } catch {
-    return false;
-  }
+      url.href === LOGIN_ORIGIN + "/login" ? url.href : undefined;
+  } catch { return undefined; }
 }
 
 function exactOk(value: unknown): boolean {
