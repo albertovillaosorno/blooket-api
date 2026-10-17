@@ -411,6 +411,69 @@ test("malformed or extra browser stop fields cannot escape the adapter",
   },
 );
 
+test("browser adapter refuses proxy-spoofed durable write receipts",
+  async () => {
+  let reads = 0;
+  const forged = <T extends object>(value: T) => new Proxy(value, {
+    get(target, key, receiver) {
+      if (key === "ok" || key === "remoteSetId") {
+        reads++;
+        return key === "ok" ? true : "remote-set-1";
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const surface = blooketBrowserWriteExecutionPort({
+    createSet: async () => forged({ ok: false as const,
+      remoteSetId: "unrelated-set" }) as never,
+    addQuestion: async () => forged({ ok: false as const }) as never,
+  });
+  for (const [operation, target] of [
+    [setOperation, { remoteSetId: null }],
+    [questionOperation, { remoteSetId: "remote-set-1" }],
+  ] as const) {
+    assert.deepEqual(await surface.execute(operation, target,
+      { preparedMedia: [] }),
+    { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  }
+  assert.equal(reads, 0);
+  },
+);
+
+test("browser adapter preserves owned stops rather than proxy claims",
+  async () => {
+  const cases = [
+    { own: { ok: false, kind: "navigation", state: "signed-out" },
+      expected: { ok: false, kind: "navigation", state: "signed-out" } },
+    { own: { ok: false, kind: "browser",
+      code: "blooket-browser-unavailable" },
+      expected: { ok: false, kind: "browser",
+        code: "blooket-browser-unavailable" } },
+  ];
+  let reads = 0;
+  for (const candidate of cases) {
+    const reply = new Proxy(candidate.own, { get(target, key, receiver) {
+      if (key === "state" || key === "code" || key === "kind" ||
+          key === "ok") reads++;
+      if (key === "state") return "security-challenge";
+      if (key === "code") return "blooket-browser-failed";
+      return Reflect.get(target, key, receiver);
+    } });
+    const surface = blooketBrowserWriteExecutionPort({
+      createSet: async () => reply as never,
+      addQuestion: async () => reply as never,
+    });
+    for (const [operation, target] of [
+      [setOperation, { remoteSetId: null }],
+      [questionOperation, { remoteSetId: "remote-set-1" }],
+    ] as const)
+      assert.deepEqual(await surface.execute(operation, target,
+        { preparedMedia: [] }), candidate.expected);
+  }
+  assert.equal(reads, 0);
+  },
+);
+
 test("browser write adapter never invokes accessor-backed acknowledgements",
   async () => {
   let getterCalls = 0;

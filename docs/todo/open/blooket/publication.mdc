@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, a red-to-green canonical browser-write adapter regression
+showed that proxy property reads could turn a failed provider Create Set
+response into a successful durable set-created receipt with an unrelated ID.
+The shared write adapter now snapshots exact own-data fields for Create Set,
+Add Question and browser/navigation stops. Synthetic mismatched descriptors
+cannot confirm publication or override an observed signed-out state, and
+these fixtures do not establish real account writes.
+
 On 2026-10-17, red-to-green saved-image stream regressions showed that a
 ReadableStream can recycle an earlier Uint8Array buffer before the final
 SHA-256 computation, changing the apparent full response bytes. Other
