@@ -315,14 +315,13 @@ export function createExtensionQuestionInspectionHost(
                   (...args: never[]) => unknown,
                 [setId, number, Math.min(5_000, deadline - now())],
               );
-              if (!await ready(url, deadline) || !evidence ||
-                  typeof evidence !== "object" || Array.isArray(evidence) ||
+              if (!await ready(url, deadline) ||
+                  !isRecord(evidence) ||
                   !exactKeys(evidence, "ok,value") ||
-                  !("ok" in evidence) || evidence.ok !== true ||
-                  !("value" in evidence)) invalid = true;
+                  ownDataField(evidence, "ok") !== true) invalid = true;
               else {
                 const image = decodeBlooketQuestionImageEvidence(
-                  evidence.value,
+                  ownDataField(evidence, "value"),
                 );
                 if (!image.ok) invalid = true;
                 else {
