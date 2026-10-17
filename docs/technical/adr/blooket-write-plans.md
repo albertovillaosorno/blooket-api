@@ -438,6 +438,10 @@ A restored extension bridge connection uses copied own-data descriptors;
 validated localhost origins and bearer tokens cannot change through a
 later property-read trap on the stored record.
 
+The login host requires owned Chrome tab URL and status descriptors and no
+pending navigation before injecting credential-bearing scripts. A getter
+must not create apparent login-route or readiness evidence.
+
 A newly announced workspace similarly binds one exact owned origin and token
 to the Chrome sender URL. The worker does not re-read untrusted message
 properties between sender authorization and creating the browser bridge.

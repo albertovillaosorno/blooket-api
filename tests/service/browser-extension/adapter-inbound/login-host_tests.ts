@@ -167,6 +167,46 @@ test("login refuses query or fragment redirects before credential scripts",
   }
 });
 
+test("login never trusts tab URL getters with credentials", async () => {
+  const page = fixture({});
+  let reads = 0;
+  const get = page.chrome.tabs.get;
+  page.chrome.tabs.get = async () => {
+    const tab = { ...await get() };
+    Object.defineProperty(tab, "url", { enumerable: true,
+      get() { reads++; return "https://id.blooket.com/login"; },
+    });
+    return tab;
+  };
+  const result = await createExtensionSessionAuthenticationHost(
+    page.chrome, 7, async () => undefined,
+  ).authenticate(credentials);
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  assert.deepEqual(page.argumentsSeen, []);
+});
+
+test("tab accessors cannot authorize credentials", async () => {
+  for (const key of ["status", "pendingUrl"] as const) {
+    const page = fixture({});
+    let reads = 0;
+    const get = page.chrome.tabs.get;
+    page.chrome.tabs.get = async () => {
+      const tab = { ...await get() };
+      Object.defineProperty(tab, key, { enumerable: true,
+        get() { reads++; return key === "status" ? "complete" : undefined; },
+      });
+      return tab;
+    };
+    const response = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => undefined,
+    ).authenticate(credentials);
+    assert.equal(response.ok, false, key);
+    assert.equal(reads, 0, key);
+    assert.deepEqual(page.argumentsSeen, [], key);
+  }
+});
+
 test("login never sends credentials to a pending foreign page", async () => {
   for (const phase of ["initial", "after-prepare", "after-poll"] as const) {
     const page = fixture({});

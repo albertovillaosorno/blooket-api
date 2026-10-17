@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, red-to-green login-host regressions showed that accessor
+properties on a Chrome tab could invent an exact login URL or complete
+status during credential admission. The authentication host now snapshots
+own URL/status data descriptors, and rejects accessor-backed pending
+navigation, before passing credentials to any browser script. Existing
+exact-route, document-origin and single-submit gates remain intact.
+No live credentials were submitted during these checks.
+
 On 2026-10-17, a red-to-green browser pairing regression showed that a
 script-origin message getter could claim one localhost origin during sender
 admission and another before the worker connects. The workspace listener now
