@@ -57,6 +57,8 @@ test(
   let closed = false;
   let switchAfterActivate = false;
   let validStatus = true;
+  let reuseBridgeResponseChunks = false;
+  let recycledBridgeChunks = 0;
   let incompatibleStatus = false;
   let incompatiblePoll = false;
   let unsafeReadSource = false;
@@ -976,6 +978,23 @@ test(
       replies.push(JSON.parse(options.body));
       value = { ok: true };
     }
+    if (reuseBridgeResponseChunks && url.endsWith("/next") &&
+        value.job !== null) {
+      reuseBridgeResponseChunks = false;
+      const encoded = new TextEncoder().encode(JSON.stringify(value));
+      const shared = new Uint8Array(Math.ceil(encoded.length / 2));
+      let offset = 0;
+      return new Response(new ReadableStream({
+        pull(controller) {
+          if (offset >= encoded.length) { controller.close(); return; }
+          const size = Math.min(shared.length, encoded.length - offset);
+          shared.set(encoded.subarray(offset, offset + size));
+          controller.enqueue(shared.subarray(0, size));
+          offset += size;
+          recycledBridgeChunks++;
+        },
+      }, { highWaterMark: 0 }));
+    }
     return Response.json(value);
   };
   const popup = root + "src/ui/browser-extension/adapter-inbound/popup.html";
@@ -1115,6 +1134,10 @@ test(
     assert.equal(persistentProfile["blooket-owned-tab-id"], 7);
     foregroundedTabs.length = 0;
     focusedWindows.length = 0;
+    reuseBridgeResponseChunks = true;
+    const fromReusedChunks = await expectReply({ kind: "session.observe" });
+    assert.equal(fromReusedChunks.ok, true);
+    assert.ok(recycledBridgeChunks >= 2);
     const firstSets = await expectReply({ kind: "sets.list" });
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
