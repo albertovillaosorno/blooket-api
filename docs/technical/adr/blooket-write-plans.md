@@ -419,6 +419,11 @@ response without Content-Range. RFC 9110 defines 206 as a range response,
 whose body cannot establish the full remote representation. Partial or
 non-200 responses stay unconfirmed, preserving the uncertain Save journal.
 
+The saved-image verifier owns every streamed Uint8Array chunk as soon as it
+is received: reusing a source backing buffer cannot rewrite prior bytes
+before SHA-256. Lengths come from native typed-array byte slots rather than
+subclass getter overrides. Chunk and total-byte bounds remain enforced.
+
 The Add Question host likewise snapshots script-result envelopes before
 accepting form preparation, session observations and saved-image byte
 identities. An accessor or proxy property read cannot substitute an apparent

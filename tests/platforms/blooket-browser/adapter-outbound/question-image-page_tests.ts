@@ -276,6 +276,57 @@ test("partial HTTP image reads cannot prove full saved media identity",
   });
 });
 
+test("reused streamed media buffers cannot rewrite prior digest bytes",
+  async () => fixture(async state => {
+  const shared = new Uint8Array(5);
+  let index = 0;
+  state.response = async () => new Response(new ReadableStream({
+    pull(controller) {
+      if (index === 0) {
+        shared.set(png.subarray(0, 4));
+        controller.enqueue(shared.subarray(0, 4));
+      } else if (index === 1) {
+        shared.set(png.subarray(4));
+        controller.enqueue(shared);
+      } else controller.close();
+      index++;
+    },
+  }, { highWaterMark: 0 }));
+  assert.deepEqual(await serialized("fixture", 1, 1_000), {
+    ok: true, value: {
+      byteLength: png.length,
+      sha256: createHash("sha256").update(png).digest("hex"),
+    },
+  });
+  assert.equal(index, 3);
+  }),
+);
+
+test("media chunk length ignores subclass property accessors",
+  async () => fixture(async state => {
+  let getterCalls = 0;
+  class MaskedLength extends Uint8Array {
+    override get byteLength(): number {
+      getterCalls++;
+      throw new Error("untrusted byte length");
+    }
+  }
+  state.response = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new MaskedLength(png));
+      controller.close();
+    },
+  }));
+  assert.deepEqual(await serialized("fixture", 1, 1_000), {
+    ok: true, value: {
+      byteLength: png.length,
+      sha256: createHash("sha256").update(png).digest("hex"),
+    },
+  });
+  assert.equal(getterCalls, 0);
+  }),
+);
+
 test("response stream interaction stops evidence and cancels the stream",
   async () => fixture(async state => {
     let canceled = 0;

@@ -163,6 +163,10 @@ export async function inspectOpenedBlooketQuestionImage(
       if (length !== null && (!/^[1-9][0-9]*$/u.test(length) ||
           Number(length) >= 2_500_000)) return unknown();
       reader = response.body.getReader();
+      const nativeLength = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(Uint8Array.prototype), "byteLength",
+      )?.get;
+      if (!nativeLength) return unknown();
       const chunks: Uint8Array[] = [];
       let byteLength = 0;
       for (;;) {
@@ -170,11 +174,17 @@ export async function inspectOpenedBlooketQuestionImage(
         if (!stillOwned()) return failed();
         if (chunk.done) break;
         if (!(chunk.value instanceof Uint8Array) ||
-            chunk.value.byteLength === 0 || chunks.length >= 2_048)
+            chunks.length >= 2_048) return unknown();
+        // Consult the built-in byte slots, not subclass property accessors.
+        const chunkLength = nativeLength.call(chunk.value) as number;
+        if (chunkLength === 0 || byteLength + chunkLength >= 2_500_000)
           return unknown();
-        byteLength += chunk.value.byteLength;
-        if (byteLength >= 2_500_000) return unknown();
-        chunks.push(chunk.value);
+        byteLength += chunkLength;
+        // A stream source can recycle an underlying chunk buffer after a
+        // read. Own each slice now, before requesting another chunk.
+        const ownedChunk = new Uint8Array(chunkLength);
+        Uint8Array.prototype.set.call(ownedChunk, chunk.value);
+        chunks.push(ownedChunk);
       }
       if (byteLength === 0 ||
           (length !== null && Number(length) !== byteLength))

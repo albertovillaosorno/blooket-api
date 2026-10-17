@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, red-to-green saved-image stream regressions showed that a
+ReadableStream can recycle an earlier Uint8Array buffer before the final
+SHA-256 computation, changing the apparent full response bytes. Other
+synthetic chunks exposed accessor-backed `byteLength` values unrelated to the
+native typed-array storage. The credential-free reader now snapshots each
+chunk before requesting another and uses native byte-length slots; no
+real provider image was fetched or certified by these portable fixtures.
+
 On 2026-10-16, a red-to-green saved-question image regression showed a
 synthetic HTTP 206 Partial Content response could prove the prepared-image
 digest even though its bytes need not represent the complete provider file.
