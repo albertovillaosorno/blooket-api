@@ -438,6 +438,11 @@ A restored extension bridge connection uses copied own-data descriptors;
 validated localhost origins and bearer tokens cannot change through a
 later property-read trap on the stored record.
 
+Restoring or reclaiming a previously owned Blooket tab additionally requires
+no pending Chrome navigation: its committed URL alone cannot prove ownership
+while a new destination is loading. A foreign pending destination stops
+restoration without activating the teacher's tab.
+
 The browser-bridge HTTP reader requires HTTP 200 with no Content-Range and
 no redirect before parsing a returned job. A partial representation never
 confers Chrome script or provider mutation authority, even if the body is

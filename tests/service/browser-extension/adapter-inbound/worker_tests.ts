@@ -2289,6 +2289,7 @@ test("worker startup rejects a stored tab moved outside Blooket",
   let listener;
   let removed = 0;
   let created = 0;
+  let inspectedTab = { id: 7, url: "https://untrusted.invalid" };
   const mocked = {
     runtime: {
       getURL: path => root + path,
@@ -2297,7 +2298,7 @@ test("worker startup rejects a stored tab moved outside Blooket",
     tabs: {
       onUpdated: { addListener: () => {} },
       query: async () => [],
-      get: async () => ({ id: 7, url: "https://untrusted.invalid" }),
+      get: async () => inspectedTab,
       create: async () => { created++; throw Error("unexpected-create"); },
     },
     storage: {
@@ -2319,18 +2320,25 @@ test("worker startup rejects a stored tab moved outside Blooket",
     throw Error("stale-connection-must-not-poll");
   };
   try {
-    await import(
-      "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
-      "?stale-stored-tab-recovery"
-    );
-    const result = await new Promise(resolve => {
-      assert.equal(listener({ kind: "status" }, {
-        url: root + "src/ui/browser-extension/adapter-inbound/popup.html",
-      }, resolve), true);
-    });
-    assert.deepEqual(result, { ok: true, status: "waiting-for-workspace" });
-    assert.equal(removed, 1);
-    assert.equal(created, 0);
+    for (const [index, tab] of [
+      { id: 7, url: "https://untrusted.invalid" },
+      { id: 7, url: "https://dashboard.blooket.com/my-sets",
+        pendingUrl: "https://untrusted.invalid/teacher-navigation" },
+    ].entries()) {
+      inspectedTab = tab;
+      await import(
+        "../../../../src/service/browser-extension/adapter-inbound/worker.ts" +
+        "?stale-stored-tab-recovery-" + index
+      );
+      const result = await new Promise(resolve => {
+        assert.equal(listener({ kind: "status" }, {
+          url: root + "src/ui/browser-extension/adapter-inbound/popup.html",
+        }, resolve), true);
+      });
+      assert.deepEqual(result, { ok: true, status: "waiting-for-workspace" });
+      assert.equal(removed, index + 1);
+      assert.equal(created, 0);
+    }
   } finally {
     if (priorChrome)
       Object.defineProperty(globalThis, "chrome", priorChrome);

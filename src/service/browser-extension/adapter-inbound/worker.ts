@@ -1321,7 +1321,8 @@ async function disconnect() {
   await chrome.storage.session?.remove("connection");
 }
 function admittedBlooketTab(tab: BrowserTab | undefined): boolean {
-  if (!tab?.id || !tab.url) return false;
+  // A committed Blooket URL is stale if Chrome has started navigating away.
+  if (!tab?.id || !tab.url || tab.pendingUrl !== undefined) return false;
   try {
     return ["https://dashboard.blooket.com", "https://id.blooket.com"]
       .includes(new URL(tab.url).origin);
