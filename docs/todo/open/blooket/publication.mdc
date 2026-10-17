@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, a red-to-green browser pairing regression showed that a
+script-origin message getter could claim one localhost origin during sender
+admission and another before the worker connects. The workspace listener now
+snapshots exact owned `kind`, `origin` and `token` fields once, then uses the
+same data for sender validation and paired connection setup. A mismatching
+synthetic message is rejected without reading its proxy trap or sharing tokens.
+
 On 2026-10-17, red-to-green Chrome restoration tests showed that an old
 committed Blooket URL could incorrectly restore a paired browser session
 while its tab had `pendingUrl` pointing to a foreign page. Tab restoration,

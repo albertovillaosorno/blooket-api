@@ -1054,6 +1054,21 @@ test(
       false,
     );
     assert.equal((await message({ kind: "connect", origin, token })).ok, false);
+    let workspaceOriginReads = 0;
+    const spoofedWorkspace = new Proxy({ kind: "workspace-ready",
+      origin: "http://127.0.0.2:4567", token }, {
+      get(target, key, receiver) {
+        if (key === "origin") {
+          workspaceOriginReads++;
+          return origin;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    assert.equal(listener(spoofedWorkspace, {
+      url: origin + "/", tab: { id: 99 },
+    }, () => { assert.fail("spoofed workspace paired"); }), false);
+    assert.equal(workspaceOriginReads, 0);
     const announce = (value) =>
       new Promise((resolve) => {
         assert.equal(

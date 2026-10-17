@@ -1509,29 +1509,28 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       "src/ui/browser-extension/adapter-inbound/popup.html",
     );
   let workspace = false;
+  let workspaceMessage: Record<string, unknown> | undefined;
   try {
-    if (
-      sender.url &&
-      sender.tab?.id &&
-      message &&
-      typeof message === "object" &&
-      "kind" in message &&
-      message.kind === "workspace-ready" &&
-      "origin" in message
-    ) {
-      const page = new URL(sender.url);
-      workspace =
-        page.origin === message.origin &&
-        page.pathname === "/" &&
-        page.protocol === "http:" &&
-        ["127.0.0.1", "127.0.0.2"].includes(page.hostname);
+    if (sender.url && sender.tab?.id) {
+      // Bind the claimed origin to the sender from one owned descriptor
+      // snapshot. A getter must not change it between origin admission and
+      // the subsequent connection setup.
+      const owned = exactOwnData(message, ["kind", "origin", "token"]);
+      if (owned?.["kind"] === "workspace-ready" &&
+          typeof owned["origin"] === "string") {
+        const page = new URL(sender.url);
+        workspace = page.origin === owned["origin"] &&
+          page.pathname === "/" && page.protocol === "http:" &&
+          ["127.0.0.1", "127.0.0.2"].includes(page.hostname);
+        if (workspace) workspaceMessage = owned;
+      }
     }
   } catch {
-    /* Untrusted sender URL. */
+    /* Untrusted sender URL or payload. */
   }
   if (!popup && !workspace) return false;
   const result = pendingUiAction.then(() =>
-    workspace ? connectWorkspace(message) : handlePopup(message),
+    workspace ? connectWorkspace(workspaceMessage) : handlePopup(message),
   );
   pendingUiAction = result.then(
     () => undefined,
