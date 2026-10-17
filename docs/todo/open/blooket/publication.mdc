@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, a red-to-green local bridge transport regression showed that
+reusing a response ReadableStream buffer could corrupt a delivered browser
+job before its JSON was parsed, losing the scheduled observation. The worker
+now copies each bounded Uint8Array chunk immediately using native byte
+lengths before awaiting another read. This preserves exact job bytes even
+when the source reuses a buffer. No provider Save was retried or observed.
+
 On 2026-10-17, synthetic worker regressions reproduced false confirmations
 from browser script-result property traps: a signed-out page was reported as
 `my-sets`, an invalid nonempty library completeness marker was accepted,

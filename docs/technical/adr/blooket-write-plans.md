@@ -434,6 +434,11 @@ observation, saved set-list completeness, and Edit Info metadata evidence.
 Two matching proxy getter values must not turn a signed-out page, unknown
 collection, or failed sidebar/panel read into a verified remote state.
 
+The browser-bridge HTTP reader also owns every received JSON response chunk
+before awaiting the next one. Recycling a stream buffer cannot corrupt a
+prepared job or its browser result, and transport failures never confer
+remote Save authority.
+
 The Create Set host makes the same descriptor-backed decisions for
 preparation, session state, redirect receipts and independently verified
 saved metadata. The Edit Info visibility read uses a copied reply rather

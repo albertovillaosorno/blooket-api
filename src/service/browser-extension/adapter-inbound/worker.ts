@@ -286,13 +286,25 @@ async function jsonResponse(
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
+    const length = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(Uint8Array.prototype), "byteLength",
+    )?.get;
+    if (!length) throw new Error("bridge-response-unavailable");
     while (true) {
       const part = await reader.read();
       if (part.done) break;
-      size += part.value.length;
-      if (size > maxBytes || chunks.length >= 2_048 || part.value.length === 0)
+      if (!(part.value instanceof Uint8Array))
+        throw new Error("bridge-response-invalid-chunk");
+      const count = length.call(part.value) as number;
+      if (count < 1 || count > maxBytes - size ||
+          chunks.length >= 2_048)
         throw new Error("bridge-response-too-large");
-      chunks.push(part.value);
+      size += count;
+      // A ReadableStream may reuse its backing buffer for the next chunk.
+      // Own the exact received bytes before awaiting another read.
+      const owned = new Uint8Array(count);
+      Uint8Array.prototype.set.call(owned, part.value);
+      chunks.push(owned);
     }
   } finally {
     await reader.cancel();
