@@ -341,6 +341,60 @@ test(
 );
 
 
+test("media list proxy cannot hide a foreign payload before upload",
+  async () => {
+  const operation = { ...setOperation, coverMediaId: "cover" };
+  const admitted = { mediaId: "cover", revision: 1,
+    format: "png" as const, bytes: new Uint8Array([1, 2, 3]) };
+  let dispatched = 0;
+  const surface = blooketBrowserWriteExecutionPort({
+    createSet: async () => {
+      dispatched++;
+      return { ok: true, remoteSetId: "remote-set-1" };
+    },
+    addQuestion: async () => ({ ok: true }),
+  });
+  const hidden = new Proxy([admitted, { ...admitted, mediaId: "foreign" }], {
+    get(target, key, receiver) {
+      if (key === "length") return 1;
+      if (key === "some") return () => false;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  assert.deepEqual(await surface.execute(operation,
+    { remoteSetId: null }, { preparedMedia: hidden }),
+  { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  assert.equal(dispatched, 0);
+  },
+);
+
+test("media object property traps cannot impersonate the required ID",
+  async () => {
+  let reads = 0;
+  let uploads = 0;
+  const item = new Proxy({ mediaId: "foreign", revision: 1,
+    format: "png" as const, bytes: new Uint8Array([1, 2, 3]) }, {
+    get(target, key, receiver) {
+      if (key === "mediaId") { reads++; return "cover"; }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const surface = blooketBrowserWriteExecutionPort({
+    createSet: async () => {
+      uploads++;
+      return { ok: true, remoteSetId: "remote-set-1" };
+    },
+    addQuestion: async () => ({ ok: true }),
+  });
+  assert.deepEqual(await surface.execute({ ...setOperation,
+    coverMediaId: "cover" }, { remoteSetId: null },
+  { preparedMedia: [item] }),
+  { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  assert.equal(reads, 0);
+  assert.equal(uploads, 0);
+  },
+);
+
 test("only exact browser write acknowledgements become durable receipts",
   async () => {
   const malformedCreate: unknown[] = [

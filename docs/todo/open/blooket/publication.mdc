@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, red-to-green transport regressions showed that a prepared
+media array proxy could conceal an extra or foreign upload payload from the
+browser-write adapter's stable-ID check. The adapter now snapshots exact
+dense array slots and the admitted media's own ID, revision, format and
+bounded byte view before calling the browser write surface. Proxy getters
+cannot substitute a matching ID or hide additional slots. The fixtures do
+not claim a live upload or a new publication receipt.
+
 On 2026-10-17, a red-to-green canonical browser-write adapter regression
 showed that proxy property reads could turn a failed provider Create Set
 response into a successful durable set-created receipt with an unrelated ID.
