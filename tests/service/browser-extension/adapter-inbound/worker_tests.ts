@@ -57,6 +57,8 @@ test(
   let closed = false;
   let switchAfterActivate = false;
   let validStatus = true;
+  let partialJobResponse = false;
+  let partialJobDelivered = false;
   let reuseBridgeResponseChunks = false;
   let recycledBridgeChunks = 0;
   let incompatibleStatus = false;
@@ -995,6 +997,12 @@ test(
         },
       }, { highWaterMark: 0 }));
     }
+    if (partialJobResponse && url.endsWith("/next") && value.job) {
+      partialJobResponse = false;
+      partialJobDelivered = true;
+      return new Response(JSON.stringify(value), { status: 206,
+        headers: { "Content-Range": "bytes 0-100/300" } });
+    }
     return Response.json(value);
   };
   const popup = root + "src/ui/browser-extension/adapter-inbound/popup.html";
@@ -1138,6 +1146,19 @@ test(
     const fromReusedChunks = await expectReply({ kind: "session.observe" });
     assert.equal(fromReusedChunks.ok, true);
     assert.ok(recycledBridgeChunks >= 2);
+    partialJobResponse = true;
+    const partialJob = job({ kind: "session.observe" });
+    const scriptsBeforePartial = scripts.length;
+    jobs.push(partialJob);
+    const partialDeadline = realNow() + 2500;
+    while (!partialJobDelivered) {
+      assert.ok(realNow() < partialDeadline, "partial job was not fetched");
+      await pause(20);
+    }
+    await pause(250);
+    assert.equal(replies.some(reply => reply.id === partialJob.id), false);
+    assert.equal(scripts.length, scriptsBeforePartial,
+      "partial response must never enter native browser scripts");
     const firstSets = await expectReply({ kind: "sets.list" });
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
@@ -2331,6 +2352,16 @@ test("worker startup only restores a live, admitted Blooket tab",
   let creates = 0;
   let documentOrigin = 1_000;
   let readReloads = 0;
+  let connectionGetterReads = 0;
+  const saved = new Proxy({ origin, token: "a".repeat(43), tabId: 7 }, {
+    get(target, key, receiver) {
+      if (key === "origin") {
+        connectionGetterReads++;
+        return "http://127.0.0.2:4567";
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
   Object.defineProperty(globalThis, "chrome", {
     configurable: true,
     value: {
@@ -2349,9 +2380,7 @@ test("worker startup only restores a live, admitted Blooket tab",
       },
       storage: {
         session: {
-          get: async () => ({ connection: {
-            origin, token: "a".repeat(43), tabId: 7,
-          } }),
+          get: async () => ({ connection: saved }),
           remove: async () => { removed++; },
         },
       },
@@ -2375,6 +2404,8 @@ test("worker startup only restores a live, admitted Blooket tab",
       }, resolve), true);
     });
     assert.deepEqual(await popup(), { ok: true, status: "connected" });
+    assert.equal(connectionGetterReads, 0,
+      "restored connection must not consult property-read traps");
     releaseFetch();
     await pause(30);
     assert.deepEqual(await popup(),

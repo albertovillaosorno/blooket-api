@@ -250,38 +250,32 @@ function admittedLibraryRead(value: unknown): {
 }
 
 function configured(value: unknown): Connection | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const record = value as Record<string, unknown>;
-  if (
-    !exactWorkerKeys(record, "origin,tabId,token") ||
-    typeof record["origin"] !== "string" ||
-    typeof record["token"] !== "string" ||
-    !/^[a-zA-Z0-9_-]{43}$/u.test(record["token"]) ||
-    typeof record["tabId"] !== "number" ||
-    !Number.isSafeInteger(record["tabId"]) ||
-    record["tabId"] < 1
-  )
-    return undefined;
+  const owned = exactOwnData(value, ["origin", "tabId", "token"]);
+  const origin = owned?.["origin"];
+  const token = owned?.["token"];
+  const tabId = owned?.["tabId"];
+  if (typeof origin !== "string" || typeof token !== "string" ||
+      !/^[a-zA-Z0-9_-]{43}$/u.test(token) ||
+      typeof tabId !== "number" || !Number.isSafeInteger(tabId) ||
+      tabId < 1) return undefined;
   try {
-    const url = new URL(record["origin"]);
-    if (
-      url.protocol !== "http:" ||
-      !url.port ||
-      !["127.0.0.1", "127.0.0.2"].includes(url.hostname) ||
-      url.origin !== record["origin"]
-    )
-      return undefined;
-    return record as unknown as Connection;
-  } catch {
-    return undefined;
-  }
+    const url = new URL(origin);
+    if (url.protocol !== "http:" || !url.port ||
+        !["127.0.0.1", "127.0.0.2"].includes(url.hostname) ||
+        url.origin !== origin) return undefined;
+    return Object.freeze({ origin, token, tabId });
+  } catch { return undefined; }
 }
 
 async function jsonResponse(
   response: Response,
   maxBytes = 1_000_000,
 ): Promise<unknown> {
-  if (!response.ok || !response.body) throw new Error("bridge-unavailable");
+  // Only an entire canonical 200 response can authorize a browser job.
+  // A partial 206 is not a complete command, even if its JSON parses.
+  if (response.status !== 200 || response.redirected ||
+      response.headers.has("content-range") || !response.body)
+    throw new Error("bridge-unavailable");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
