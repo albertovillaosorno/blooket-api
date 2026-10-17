@@ -445,3 +445,7 @@ bounded exact dense array and copies the typed metadata descriptors for every
 expected stable media ID. A decorated or proxied array cannot hide an extra
 upload or substitute a matching ID through property getters. The service's
 prepared-media admission still owns format and revision verification.
+
+The adapter also owns a fresh byte copy before starting an asynchronous
+browser write. A caller cannot mutate a previously admitted Uint8Array and
+thereby change what the downstream provider surface uploads mid-attempt.

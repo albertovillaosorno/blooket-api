@@ -293,7 +293,37 @@ test(
   assert.equal(result.ok, true);
   assert.equal(snapshots.length, 1);
   const snapshot = snapshots[0] as Array<{ bytes: Uint8Array }>;
-  assert.equal(snapshot[0]?.bytes, bytes);
+  assert.notEqual(snapshot[0]?.bytes, bytes);
+  assert.deepEqual([...snapshot[0]!.bytes], [1, 2, 3, 4]);
+  bytes[0] = 200;
+  assert.deepEqual([...snapshot[0]!.bytes], [1, 2, 3, 4]);
+  },
+);
+
+test("admitted image bytes remain stable during an asynchronous upload",
+  async () => {
+  const bytes = new Uint8Array([11, 22, 33, 44]);
+  let observed: Uint8Array | undefined;
+  let release: (() => void) | undefined;
+  const writes = blooketBrowserWriteExecutionPort({
+    createSet: async (_submission, media) => {
+      observed = media[0]?.bytes;
+      await new Promise<void>(resolve => { release = resolve; });
+      assert.deepEqual([...observed!], [11, 22, 33, 44]);
+      return { ok: true, remoteSetId: "remote-set-1" };
+    },
+    addQuestion: async () => ({ ok: true }),
+  });
+  const pending = writes.execute({ ...setOperation, coverMediaId: "cover" },
+    { remoteSetId: null }, { preparedMedia: [{
+      mediaId: "cover", revision: 1, format: "png", bytes,
+    }] });
+  assert.ok(release);
+  bytes.set([9, 9, 9, 9]);
+  release!();
+  assert.deepEqual(await pending, {
+    ok: true, receipt: { kind: "set-created", remoteSetId: "remote-set-1" },
+  });
   },
 );
 

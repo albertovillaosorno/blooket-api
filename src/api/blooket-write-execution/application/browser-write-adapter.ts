@@ -127,11 +127,15 @@ function ownMediaArguments(
           !(bytes instanceof Uint8Array)) return undefined;
       const byteCount = length.call(bytes) as number;
       if (byteCount < 1 || byteCount >= 2_500_000) return undefined;
+      // A caller can retain and mutate its admitted byte view while the
+      // browser write is awaiting. Own the exact payload before dispatch.
+      const copied = new Uint8Array(byteCount);
+      Uint8Array.prototype.set.call(copied, bytes);
       captured.push(Object.freeze({
         mediaId: owned["mediaId"] as string,
         revision: owned["revision"] as number,
         format: owned["format"] as BlooketPreparedMedia["format"],
-        bytes,
+        bytes: copied,
       }));
     }
   } catch { return undefined; }

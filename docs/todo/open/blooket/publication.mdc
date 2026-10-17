@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, red-to-green asynchronous media tests showed that the
+canonical browser-write adapter copied admitted media IDs and metadata but
+passed the source Uint8Array through unchanged. A caller retaining that
+view could mutate its bytes while the browser surface was awaiting Save.
+The adapter now copies the bounded native byte view before delegation;
+subsequent source mutations cannot alter the in-flight upload payload.
+These synthetic checks do not establish remote media acceptance.
+
 On 2026-10-17, red-to-green transport regressions showed that a prepared
 media array proxy could conceal an extra or foreign upload payload from the
 browser-write adapter's stable-ID check. The adapter now snapshots exact
