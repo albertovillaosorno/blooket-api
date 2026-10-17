@@ -98,9 +98,13 @@ test(
   let detailSidebarFailuresRemaining = 0;
   let detailSidebarFailureAtRead = 0;
   let detailSidebarMalformed = false;
+  let detailSidebarProxy = false;
+  let detailSidebarProxyReads = 0;
   let detailCancelSucceeds = true;
   let detailClosedSucceeds = true;
   let detailMalformedReply = false;
+  let detailPanelProxy = false;
+  let detailPanelProxyReads = 0;
   let detailDrifts = false;
   let detailReadCount = 0;
   let detailSecondReadHasHiddenField = false;
@@ -127,8 +131,12 @@ test(
   let listSecondNonEnumerableField = false;
   let listSecondHiddenRow = false;
   let listPrototypeSerialization = false;
+  let listProxyCompleteness = false;
+  let listProxyReads = 0;
   let detailPrototypeSerialization = false;
   let sessionPrototypeSerialization = false;
+  let sessionProxyState = false;
+  let sessionProxyReads = 0;
   let inheritedSerializerCalls = 0;
   let listFirstInvalidRow = false;
   let listModelSource: string | null = null;
@@ -510,6 +518,13 @@ test(
               throw new Error("untrusted-sidebar-serializer");
             } },
           );
+          if (detailSidebarProxy) {
+            return [{ result: new Proxy({ ok: false,
+              value: sidebar.value }, { get(target, key) {
+              if (key === "ok") { detailSidebarProxyReads++; return true; }
+              return Reflect.get(target, key);
+            } }) }];
+          }
           return [{ result: sidebar }];
         }
         if (func.name === "closeBlooketDetailPanel") {
@@ -705,6 +720,16 @@ test(
           pendingDuringSessionScript = false;
           pendingSourceRedirect = true;
         }
+        if (operation.kind === "session.observe" && sessionProxyState) {
+          const state = { ok: true, value: "signed-out" };
+          return [{ result: new Proxy(state, { get(target, key) {
+            if (key === "value") {
+              sessionProxyReads++;
+              return "my-sets";
+            }
+            return Reflect.get(target, key);
+          } }) }];
+        }
         if (operation.kind === "session.observe" &&
             sessionSecondHasHiddenField) {
           sessionReadProbeCount++;
@@ -803,6 +828,16 @@ test(
                   (!listEmptyDrifts || setListReads % 2 !== 0))
                 ? "complete" : "unknown",
             } };
+          if (listProxyCompleteness) {
+            reply.value.completeness = "complete";
+            reply.value = new Proxy(reply.value, { get(target, key) {
+              if (key === "completeness") {
+                listProxyReads++;
+                return "unknown";
+              }
+              return Reflect.get(target, key);
+            } });
+          }
           if (listPrototypeSerialization) {
             const unexpected = { toJSON() {
               inheritedSerializerCalls++;
@@ -879,6 +914,15 @@ test(
             inheritedSerializerCalls++;
             throw new Error("untrusted-session-serializer");
           } });
+        if (operation.kind === "sets.get" && detailPanelProxy) {
+          const original = reply[0]!.result;
+          reply[0]!.result = new Proxy({ ...original, ok: false }, {
+            get(target, key) {
+              if (key === "ok") { detailPanelProxyReads++; return true; }
+              return Reflect.get(target, key);
+            },
+          });
+        }
         if (operation.kind === "sets.get" &&
             detailPrototypeSerialization)
           Object.setPrototypeOf(reply[0]!.result.value, { toJSON() {
@@ -1091,6 +1135,11 @@ test(
       assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
       assert.equal(listModelFrameAccessorReads, 0);
     }
+    listProxyCompleteness = true;
+    setListReads = 0;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal(listProxyReads, 0);
+    listProxyCompleteness = false;
     listPrototypeSerialization = true;
     setListReads = 0;
     const inheritedList = await expectReply({ kind: "sets.list" });
@@ -1466,6 +1515,22 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    detailSidebarProxy = true;
+    const beforeProxyPanel = scripts.length;
+    assert.equal((await expectReply({ kind: "sets.get",
+      setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(detailSidebarProxyReads, 0);
+    assert.equal(scripts.slice(beforeProxyPanel).includes(
+      "openBlooketDetailPanel"), false);
+    detailSidebarProxy = false;
+    detailPanelProxy = true;
+    const falsePanel = await expectReply({ kind: "sets.get",
+      setId: "opaque id/with spaces",
+    });
+    assert.equal(falsePanel.ok, false);
+    assert.equal(detailPanelProxyReads, 0);
+    detailPanelProxy = false;
     // A pending redirect after a saved sidebar observation is not proof
     // of the old exact Edit route, and cannot authorize the next click.
     pendingAfterDetailSidebar = true;
@@ -1907,6 +1972,12 @@ test(
     assert.equal((await expectReply({ kind: "session.observe" })).ok, true);
     assert.equal(inheritedSerializerCalls, 0);
     sessionPrototypeSerialization = false;
+    sessionProxyState = true;
+    const proxiedSession = await expectReply({ kind: "session.observe" });
+    assert.equal(proxiedSession.ok, true);
+    assert.equal(proxiedSession.value, "signed-out");
+    assert.equal(sessionProxyReads, 0);
+    sessionProxyState = false;
     sessionSecondHasHiddenField = true;
     sessionReadProbeCount = 0;
     assert.equal((await expectReply({ kind: "session.observe" })).ok, false);

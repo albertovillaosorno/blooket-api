@@ -31,7 +31,7 @@
 // - Defaults:
 //   - Restart invalidates service tokens; disconnect stops the owned relay.
 //
-import { snapshotExactDenseArray } from
+import { exactOwnData, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import {
   inspectBlooketPage,
@@ -215,11 +215,11 @@ const OBSERVED_SESSION_STATES: ReadonlySet<string> = new Set(
     state !== "human-action-required"),
 );
 
-function exactSessionObservation(value: unknown): boolean {
-  return exactWorkerKeys(value, "ok,value") && !!value &&
-    typeof value === "object" && "ok" in value && value.ok === true &&
-    "value" in value && typeof value.value === "string" &&
-    OBSERVED_SESSION_STATES.has(value.value);
+function exactSessionObservation(value: unknown): string | undefined {
+  const reply = exactOwnData(value, ["ok", "value"]);
+  const state = reply?.["value"];
+  return reply?.["ok"] === true && typeof state === "string" &&
+      OBSERVED_SESSION_STATES.has(state) ? state : undefined;
 }
 
 function admittedLibraryRead(value: unknown): {
@@ -231,20 +231,19 @@ function admittedLibraryRead(value: unknown): {
     }[];
   };
 } | undefined {
-  if (!exactWorkerKeys(value, "ok,value") || !value ||
-      typeof value !== "object" || !("ok" in value) ||
-      value.ok !== true || !("value" in value) ||
-      !exactWorkerKeys(value.value, "completeness,items") ||
-      !value.value || typeof value.value !== "object" ||
-      !("completeness" in value.value) ||
-      !("items" in value.value) ||
-      !Array.isArray(value.value.items) ||
-      (value.value.items.length === 0
-        ? value.value.completeness !== "complete"
-        : value.value.completeness !== "unknown")) return undefined;
-  const decoded = decodeBlooketSetList(value.value.items);
+  const envelope = exactOwnData(value, ["ok", "value"]);
+  if (envelope?.["ok"] !== true) return undefined;
+  const inner = exactOwnData(envelope["value"],
+    ["completeness", "items"]);
+  if (!inner) return undefined;
+  const decoded = decodeBlooketSetList(inner["items"]);
   if (!decoded.ok) return undefined;
-  const completeness = value.value.completeness as "complete" | "unknown";
+  const completeness = inner["completeness"];
+  if (completeness !== "complete" && completeness !== "unknown")
+    return undefined;
+  if ((decoded.value.length === 0 && completeness !== "complete") ||
+      (decoded.value.length !== 0 && completeness !== "unknown"))
+    return undefined;
   // Return locally owned decoded fields. A foreign prototype `toJSON`
   // must not run during stability comparisons or bridge serialization.
   return { ok: true, value: { items: decoded.value, completeness } };
@@ -431,8 +430,7 @@ async function readPage(
           (stage as { kind?: unknown }).kind !==
             "blooket-question-write-stage" ||
           (stage as { stage?: unknown }).stage !== "submit-attempted" ||
-          !exactSessionObservation(state) ||
-          (state as { value?: unknown }).value !== "edit")
+          exactSessionObservation(state) !== "edit")
         throw new Error("browser-navigation-unsafe");
       const verified = await browser.tabs.get(current.tabId);
       const originAgain = await script(current, browser,
@@ -461,8 +459,7 @@ async function readPage(
       if (finalTab.status !== "complete" || finalTab.url !== tab.url ||
           finalTab.pendingUrl !== undefined ||
           finalOrigin !== sourceOrigin || finalBinding !== true ||
-          !exactSessionObservation(finalState) ||
-          (finalState as { value?: unknown }).value !== "edit" ||
+          exactSessionObservation(finalState) !== "edit" ||
           Date.now() >= readDeadline)
         throw new Error("browser-navigation-unsafe");
       return detached;
@@ -634,26 +631,18 @@ async function readPage(
       );
       if (!await ownsDetailRoute())
         throw new Error("browser-details-unavailable");
-      if (exactWorkerKeys(reply, "code,ok") && reply &&
-          typeof reply === "object" && "ok" in reply && reply.ok === false &&
-          "code" in reply && reply.code === "blooket-browser-failed")
+      const failure = exactOwnData(reply, ["code", "ok"]);
+      if (failure?.["ok"] === false &&
+          failure["code"] === "blooket-browser-failed")
         return undefined;
-      if (!reply ||
-          typeof reply !== "object" || Array.isArray(reply) ||
-          !exactWorkerKeys(reply, "ok,value") ||
-          !("ok" in reply) || reply.ok !== true ||
-          !("value" in reply) || !reply.value ||
-          typeof reply.value !== "object" ||
-          Array.isArray(reply.value) ||
-          !exactWorkerKeys(reply.value, "description,title") ||
-          !("title" in reply.value) ||
-          typeof reply.value.title !== "string" ||
-          !("description" in reply.value) ||
-          typeof reply.value.description !== "string")
+      const envelope = exactOwnData(reply, ["ok", "value"]);
+      const saved = exactOwnData(envelope?.["value"],
+        ["description", "title"]);
+      if (envelope?.["ok"] !== true || !saved ||
+          typeof saved["title"] !== "string" ||
+          typeof saved["description"] !== "string")
         throw new Error("browser-details-unavailable");
-      // Copy each descriptor-admitted scalar: comparison and Cancel must not
-      // invoke a prototype method supplied by the injected browser result.
-      return { title: reply.value.title, description: reply.value.description };
+      return { title: saved["title"], description: saved["description"] };
     };
     // Chrome's complete event can precede hydration of the saved sidebar.
     // Retry only its first unavailable read, bound to this native lifetime.
@@ -713,16 +702,13 @@ async function readPage(
         );
         if (!await ownsDetailRoute())
           throw new Error("browser-details-unavailable");
-        if (
-          result && typeof result === "object" && !Array.isArray(result) &&
-          exactWorkerKeys(result, "ok,value") &&
-          "ok" in result && result.ok === true && "value" in result
-        ) {
+        const panel = exactOwnData(result, ["ok", "value"]);
+        if (panel?.["ok"] === true) {
           // One decoded, matching panel snapshot is sufficient only to
           // identify an owned Cancel target, never to confirm a remote read.
           // If the second read conflicts, cleanup still checks this snapshot
           // against the live panel instead of abandoning a safe close.
-          const decoded = decodeBlooketSetDetail(result.value);
+          const decoded = decodeBlooketSetDetail(panel["value"]);
           if (!decoded.ok || decoded.value.id !== operation.setId ||
               decoded.value.title !== baseline.title ||
               decoded.value.description !== baseline.description)
@@ -747,12 +733,10 @@ async function readPage(
             inspectBlooketPage as (...args: never[]) => unknown,
             [operation],
           );
-          if (!again || typeof again !== "object" ||
-              !exactWorkerKeys(again, "ok,value") ||
-              !("ok" in again) || again.ok !== true ||
-              ! ("value" in again))
+          const secondPanel = exactOwnData(again, ["ok", "value"]);
+          if (secondPanel?.["ok"] !== true)
             throw new Error("browser-details-unavailable");
-          const againDecoded = decodeBlooketSetDetail(again.value);
+          const againDecoded = decodeBlooketSetDetail(secondPanel["value"]);
           if (!againDecoded.ok ||
               JSON.stringify(decoded.value) !==
                 JSON.stringify(againDecoded.value))
@@ -765,12 +749,10 @@ async function readPage(
           savedDetail = { ok: true, value: decoded.value };
           break;
         }
-        if (
-          !result || typeof result !== "object" || Array.isArray(result) ||
-          !exactWorkerKeys(result, "code,ok") ||
-          !("ok" in result) || result.ok !== false ||
-          !("code" in result) || result.code !== "blooket-browser-failed"
-        ) throw new Error("browser-details-unavailable");
+        const failedPanel = exactOwnData(result, ["code", "ok"]);
+        if (failedPanel?.["ok"] !== false ||
+            failedPanel["code"] !== "blooket-browser-failed")
+          throw new Error("browser-details-unavailable");
         await pause(100);
       }
       if (!savedDetail) throw new Error("browser-details-unavailable");
@@ -874,11 +856,11 @@ async function readPage(
       afterAgain.url !== tab.url || afterAgain.pendingUrl !== undefined ||
       finalOrigin !== sessionOrigin ||
       !exactSessionObservation(again) ||
-      observed.value !== again.value
+      exactSessionObservation(observed) !== exactSessionObservation(again)
     ) throw new Error("browser-session-changed");
   }
   return operation.kind === "session.observe"
-    ? { ok: true, value: (observed as { value: string }).value }
+    ? { ok: true, value: exactSessionObservation(observed) }
     : observed;
 }
 function ownedBrowser(
@@ -1068,8 +1050,7 @@ async function detachedEditRead(
         (stage as { kind?: unknown }).kind !==
           "blooket-question-write-stage" ||
         (stage as { stage?: unknown }).stage !== "submit-attempted")) ||
-      !exactSessionObservation(observed) ||
-      (observed as { value?: unknown }).value !== "edit") return failed();
+      exactSessionObservation(observed) !== "edit") return failed();
   const before = await browser.tabs.get(current.tabId);
   const beforeOrigin = await script(current, browser,
     inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
@@ -1093,8 +1074,7 @@ async function detachedEditRead(
   if (after.url !== tab.url || after.status !== "complete" ||
       after.pendingUrl !== undefined || afterOrigin !== sourceOrigin ||
       (submitted && afterBound !== true) ||
-      !exactSessionObservation(afterState) ||
-      (afterState as { value?: unknown }).value !== "edit")
+      exactSessionObservation(afterState) !== "edit")
     return failed();
   return detached;
 }

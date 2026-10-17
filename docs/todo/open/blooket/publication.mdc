@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, synthetic worker regressions reproduced false confirmations
+from browser script-result property traps: a signed-out page was reported as
+`my-sets`, an invalid nonempty library completeness marker was accepted,
+and failed saved-sidebar or Edit Info panel replies were interpreted as
+success. The worker now snapshots exact own-data envelopes and copies the
+native state before comparing two independent reads or permitting any Edit
+Info interaction. All checks are local; live provider reads remain separate.
+
 On 2026-10-17, red-to-green asynchronous media tests showed that the
 canonical browser-write adapter copied admitted media IDs and metadata but
 passed the source Uint8Array through unchanged. A caller retaining that
