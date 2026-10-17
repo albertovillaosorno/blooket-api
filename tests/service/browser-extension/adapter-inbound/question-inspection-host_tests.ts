@@ -261,6 +261,23 @@ test("question scans attach validated saved-image evidence within the budget",
   },
 );
 
+test("saved image proof cannot use a proxy-spoofed success field",
+  async () => {
+  let reads = 0;
+  const evidence = new Proxy({ ok: false, value: {
+    byteLength: 42, sha256: "a".repeat(64),
+  } }, { get(target, key, receiver) {
+    if (key === "ok") { reads++; return true; }
+    return Reflect.get(target, key, receiver);
+  } });
+  const page = synthetic({
+    inspected: { ok: true, value: { ...validQuestion, hasImage: true } },
+    imageEvidence: evidence,
+  });
+  assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), failed);
+  assert.equal(reads, 0);
+});
+
 test("bad image evidence, deadline expiry, and image-route drift fail closed",
   async () => {
     for (const scenario of [

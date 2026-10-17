@@ -443,6 +443,10 @@ status and pending-navigation descriptors before opening a question panel
 or attempting modal cancellation. An untrusted property getter cannot
 substitute a matching Edit route or ready document.
 
+The saved-question image sub-read also relies on owned script-result fields.
+Property-read traps cannot upgrade a failed image fetch to a confirmed
+byte-length and SHA-256 identity, even when the nested digest looks valid.
+
 The login host requires owned Chrome tab URL and status descriptors and no
 pending navigation before injecting credential-bearing scripts. A getter
 must not create apparent login-route or readiness evidence.

@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, a red-to-green saved-image read-back regression showed a
+browser script-result proxy could claim `ok: true` through property reads
+while its exact owned descriptor remained false. The saved-question scan
+now uses the owned response envelope before decoding byte-length and SHA-256
+evidence. A false success cannot become verified image identity or a
+publication checkpoint. This was synthetic only, not a provider upload.
+
 On 2026-10-17, red-to-green saved-question scan regressions showed that
 an accessor-backed Chrome tab URL could authorize opening provider question
 panels despite missing owned route evidence. The inspection host now checks
