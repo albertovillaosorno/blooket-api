@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, a red-to-green extension startup test demonstrated that
+stored connection objects could pass exact-key checks while proxy getters
+redirected the localhost origin after restoration. The worker now copies
+validated origin, token and tab ID into a new immutable connection record.
+No live browser pairing or credentials were used by this synthetic test.
+
+On 2026-10-17, a separate red-to-green transport test showed that a partial
+HTTP 206 bridge response containing parseable JSON could dispatch a browser
+job. The worker now requires an entire HTTP 200 reply without Content-Range
+or a redirect before any returned command receives Chrome authority. The
+synthetic partial job was rejected without a page script or result receipt.
+
 On 2026-10-17, a red-to-green local bridge transport regression showed that
 reusing a response ReadableStream buffer could corrupt a delivered browser
 job before its JSON was parsed, losing the scheduled observation. The worker
