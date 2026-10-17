@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, red-to-green Chrome restoration tests showed that an old
+committed Blooket URL could incorrectly restore a paired browser session
+while its tab had `pendingUrl` pointing to a foreign page. Tab restoration,
+reclamation, and workspace re-connection now refuse pending navigation
+rather than treating that stale URL as an owned authenticated tab. The
+synthetic extension did not navigate a live teacher tab.
+
 On 2026-10-17, a red-to-green extension startup test demonstrated that
 stored connection objects could pass exact-key checks while proxy getters
 redirected the localhost origin after restoration. The worker now copies
