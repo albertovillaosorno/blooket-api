@@ -218,6 +218,29 @@ function synthetic(options: Scenario = {}) {
 
 const failed = { ok: false, code: "blooket-browser-failed" };
 
+test("question scans reject accessor-backed Chrome route fields",
+  async () => {
+  for (const field of ["url", "status", "pendingUrl"] as const) {
+    const page = synthetic();
+    let reads = 0;
+    const get = page.port.tabs.get;
+    page.port.tabs.get = async id => {
+      const tab = { ...await get(id) };
+      Object.defineProperty(tab, field, { enumerable: true,
+        get() {
+          reads++;
+          return field === "url" ? EDIT_URL
+            : field === "status" ? "complete" : undefined;
+        },
+      });
+      return tab;
+    };
+    assert.deepEqual(await page.host.inspect(FIXTURE_SET, 1_000), failed);
+    assert.equal(reads, 0);
+    assert.deepEqual(page.calls, []);
+  }
+});
+
 test("question scans attach validated saved-image evidence within the budget",
   async () => {
     const imageEvidence = { byteLength: 42, sha256: "a".repeat(64) };

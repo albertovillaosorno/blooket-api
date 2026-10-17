@@ -438,6 +438,11 @@ A restored extension bridge connection uses copied own-data descriptors;
 validated localhost origins and bearer tokens cannot change through a
 later property-read trap on the stored record.
 
+The saved-question scan host likewise requires owned Chrome tab URL,
+status and pending-navigation descriptors before opening a question panel
+or attempting modal cancellation. An untrusted property getter cannot
+substitute a matching Edit route or ready document.
+
 The login host requires owned Chrome tab URL and status descriptors and no
 pending navigation before injecting credential-bearing scripts. A getter
 must not create apparent login-route or readiness evidence.
