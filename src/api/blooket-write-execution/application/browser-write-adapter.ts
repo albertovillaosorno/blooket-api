@@ -31,13 +31,15 @@
 //
 import { decodeBlooketSetId } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
-import { exactOwnData } from
+import { exactOwnData, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 import type {
   BlooketAddQuestionSubmission,
   BlooketCreateSetSubmission,
 } from "../../../ir/blooket-write-submissions/contract/write-submission.ts";
+import type { BlooketPreparedMedia } from
+  "../contract/prepared-media.ts";
 import { blooketWriteOperationMediaIds } from
   "./admit-prepared-media.ts";
 import type {
@@ -78,28 +80,16 @@ export function blooketBrowserWriteExecutionPort(
         return browserFailure();
       }
       const expectedMediaIds = blooketWriteOperationMediaIds(operation);
-      if (
-        context.preparedMedia.length !== expectedMediaIds.length
-        || context.preparedMedia.some(
-          (item, index) => item.mediaId !== expectedMediaIds[index],
-        )
-      ) {
-        return browserFailure();
-      }
+      const admitted = ownMediaArguments(
+        context.preparedMedia, expectedMediaIds,
+      );
+      if (!admitted) return browserFailure();
 
       try {
         if (lowered.value.kind === "create-set") {
-          return await executeCreateSet(
-            surface,
-            lowered.value,
-            context.preparedMedia,
-          );
+          return await executeCreateSet(surface, lowered.value, admitted);
         }
-        return await executeAddQuestion(
-          surface,
-          lowered.value,
-          context.preparedMedia,
-        );
+        return await executeAddQuestion(surface, lowered.value, admitted);
       } catch {
         return browserFailure();
       }
@@ -112,6 +102,40 @@ export function blooketBrowserWriteExecutionPort(
       typeof probe.value === "function")
     confirmationProbes.set(port, () => probe.value.call(surface));
   return Object.freeze(port);
+}
+
+function ownMediaArguments(
+  provided: unknown, expectedIds: readonly string[],
+): readonly BlooketPreparedMedia[] | undefined {
+  const items = snapshotExactDenseArray(provided, expectedIds.length);
+  if (!items || items.length !== expectedIds.length) return undefined;
+  const captured: BlooketPreparedMedia[] = [];
+  try {
+    const length = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(Uint8Array.prototype), "byteLength",
+    )?.get;
+    if (!length) return undefined;
+    for (let index = 0; index < items.length; index++) {
+      const owned = exactOwnData(items[index],
+        ["bytes", "format", "mediaId", "revision"]);
+      const bytes = owned?.["bytes"];
+      if (!owned || owned["mediaId"] !== expectedIds[index] ||
+          !Number.isSafeInteger(owned["revision"]) ||
+          (owned["revision"] as number) < 1 ||
+          (owned["format"] !== "png" && owned["format"] !== "jpeg" &&
+           owned["format"] !== "gif") ||
+          !(bytes instanceof Uint8Array)) return undefined;
+      const byteCount = length.call(bytes) as number;
+      if (byteCount < 1 || byteCount >= 2_500_000) return undefined;
+      captured.push(Object.freeze({
+        mediaId: owned["mediaId"] as string,
+        revision: owned["revision"] as number,
+        format: owned["format"] as BlooketPreparedMedia["format"],
+        bytes,
+      }));
+    }
+  } catch { return undefined; }
+  return Object.freeze(captured);
 }
 
 async function executeCreateSet(

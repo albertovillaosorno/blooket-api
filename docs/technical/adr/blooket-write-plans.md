@@ -439,3 +439,9 @@ The canonical browser-write adapter also snapshots the owned response
 instead of consulting proxied `ok`, remote set IDs, or stop fields after
 checking descriptors. An apparent success that conflicts with its data
 cannot become a durable set-created receipt or advance a checkpoint.
+
+Before delegating media bytes, the browser-write adapter also snapshots a
+bounded exact dense array and copies the typed metadata descriptors for every
+expected stable media ID. A decorated or proxied array cannot hide an extra
+upload or substitute a matching ID through property getters. The service's
+prepared-media admission still owns format and revision verification.
