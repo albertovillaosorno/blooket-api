@@ -438,6 +438,10 @@ A restored extension bridge connection uses copied own-data descriptors;
 validated localhost origins and bearer tokens cannot change through a
 later property-read trap on the stored record.
 
+A newly announced workspace similarly binds one exact owned origin and token
+to the Chrome sender URL. The worker does not re-read untrusted message
+properties between sender authorization and creating the browser bridge.
+
 Restoring or reclaiming a previously owned Blooket tab additionally requires
 no pending Chrome navigation: its committed URL alone cannot prove ownership
 while a new destination is loading. A foreign pending destination stops
