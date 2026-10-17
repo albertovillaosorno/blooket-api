@@ -98,6 +98,9 @@ HTTP 206 bridge response containing parseable JSON could dispatch a browser
 job. The worker now requires an entire HTTP 200 reply without Content-Range
 or a redirect before any returned command receives Chrome authority. The
 synthetic partial job was rejected without a page script or result receipt.
+A second portable fixture also confirms that an HTTP 200 job carrying a
+Content-Range header is denied, rather than treating the status alone as
+proof of a complete trusted command.
 
 On 2026-10-17, a red-to-green local bridge transport regression showed that
 reusing a response ReadableStream buffer could corrupt a delivered browser

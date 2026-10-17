@@ -57,7 +57,7 @@ test(
   let closed = false;
   let switchAfterActivate = false;
   let validStatus = true;
-  let partialJobResponse = false;
+  let partialJobResponse: false | "partial" | "ranged-200" = false;
   let partialJobDelivered = false;
   let reuseBridgeResponseChunks = false;
   let recycledBridgeChunks = 0;
@@ -998,9 +998,10 @@ test(
       }, { highWaterMark: 0 }));
     }
     if (partialJobResponse && url.endsWith("/next") && value.job) {
+      const statusCode = partialJobResponse === "partial" ? 206 : 200;
       partialJobResponse = false;
       partialJobDelivered = true;
-      return new Response(JSON.stringify(value), { status: 206,
+      return new Response(JSON.stringify(value), { status: statusCode,
         headers: { "Content-Range": "bytes 0-100/300" } });
     }
     return Response.json(value);
@@ -1161,19 +1162,23 @@ test(
     const fromReusedChunks = await expectReply({ kind: "session.observe" });
     assert.equal(fromReusedChunks.ok, true);
     assert.ok(recycledBridgeChunks >= 2);
-    partialJobResponse = true;
-    const partialJob = job({ kind: "session.observe" });
-    const scriptsBeforePartial = scripts.length;
-    jobs.push(partialJob);
-    const partialDeadline = realNow() + 2500;
-    while (!partialJobDelivered) {
-      assert.ok(realNow() < partialDeadline, "partial job was not fetched");
-      await pause(20);
+    for (const mode of ["partial", "ranged-200"] as const) {
+      partialJobResponse = mode;
+      partialJobDelivered = false;
+      const partialJob = job({ kind: "session.observe" });
+      const scriptsBeforePartial = scripts.length;
+      jobs.push(partialJob);
+      const partialDeadline = realNow() + 2500;
+      while (!partialJobDelivered) {
+        assert.ok(realNow() < partialDeadline,
+          "ranged browser job was not fetched");
+        await pause(20);
+      }
+      await pause(250);
+      assert.equal(replies.some(reply => reply.id === partialJob.id), false);
+      assert.equal(scripts.length, scriptsBeforePartial,
+        "ranged response must never enter native browser scripts");
     }
-    await pause(250);
-    assert.equal(replies.some(reply => reply.id === partialJob.id), false);
-    assert.equal(scripts.length, scriptsBeforePartial,
-      "partial response must never enter native browser scripts");
     const firstSets = await expectReply({ kind: "sets.list" });
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
