@@ -429,6 +429,11 @@ accepting form preparation, session observations and saved-image byte
 identities. An accessor or proxy property read cannot substitute an apparent
 success for a mismatching own-data result or a signed-out provider state.
 
+The extension worker now also owns the script replies for session
+observation, saved set-list completeness, and Edit Info metadata evidence.
+Two matching proxy getter values must not turn a signed-out page, unknown
+collection, or failed sidebar/panel read into a verified remote state.
+
 The Create Set host makes the same descriptor-backed decisions for
 preparation, session state, redirect receipts and independently verified
 saved metadata. The Edit Info visibility read uses a copied reply rather
