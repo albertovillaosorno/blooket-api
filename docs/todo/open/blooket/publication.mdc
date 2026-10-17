@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-17, red-to-green saved-question scan regressions showed that
+an accessor-backed Chrome tab URL could authorize opening provider question
+panels despite missing owned route evidence. The inspection host now checks
+owned URL, status and pending-navigation descriptors before scanning or
+canceling a panel. Its read deadline and document lifetime checks remain
+unchanged. The tests never open a real saved question.
+
 On 2026-10-17, red-to-green login-host regressions showed that accessor
 properties on a Chrome tab could invent an exact login URL or complete
 status during credential admission. The authentication host now snapshots
