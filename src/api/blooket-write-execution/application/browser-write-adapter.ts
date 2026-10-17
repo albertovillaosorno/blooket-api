@@ -31,6 +31,8 @@
 //
 import { decodeBlooketSetId } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
+import { exactOwnData } from
+  "../../../ir/runtime-decoding/domain/exact-object.ts";
 
 import type {
   BlooketAddQuestionSubmission,
@@ -118,10 +120,12 @@ async function executeCreateSet(
   media: Parameters<BlooketBrowserWriteSurfacePort["createSet"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
   const result = await surface.createSet(submission, media);
-  if (!exactKeys(result, "ok,remoteSetId") || result.ok !== true)
-    return preserveFailure(result);
+  const acknowledged = exactOwnData(result, ["ok", "remoteSetId"]);
+  if (acknowledged?.["ok"] !== true) return preserveFailure(result);
 
-  const decoded = decodeBlooketSetId(result.remoteSetId, "$.remoteSetId");
+  const decoded = decodeBlooketSetId(
+    acknowledged["remoteSetId"], "$.remoteSetId",
+  );
   if (!decoded.ok) {
     return browserFailure();
   }
@@ -140,7 +144,7 @@ async function executeAddQuestion(
   media: Parameters<BlooketBrowserWriteSurfacePort["addQuestion"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
   const result = await surface.addQuestion(submission, media);
-  if (exactKeys(result, "ok") && result.ok === true)
+  if (exactOwnData(result, ["ok"])?.["ok"] === true)
     return { ok: true, receipt: null };
   return preserveFailure(result);
 }
@@ -148,31 +152,20 @@ async function executeAddQuestion(
 function preserveFailure(
   result: BlooketCreateSetSurfaceResult | BlooketAddQuestionSurfaceResult,
 ): BlooketWriteAttemptResult {
-  if (!result || typeof result !== "object") return browserFailure();
-  if (exactKeys(result, "code,kind,ok") && result.ok === false &&
-      result.kind === "browser" &&
-      (result.code === "blooket-browser-unavailable" ||
-       result.code === "blooket-browser-failed"))
-    return { ok: false, kind: "browser", code: result.code };
-  if (exactKeys(result, "kind,ok,state") && result.ok === false &&
-      result.kind === "navigation" &&
-      ["signed-out", "organization-prompt", "expired-session",
-       "rate-limited", "security-challenge", "unexpected-page"]
-        .some(state => state === result.state))
-    return { ok: false, kind: "navigation", state: result.state };
+  const browser = exactOwnData(result, ["code", "kind", "ok"]);
+  if (browser?.["ok"] === false && browser["kind"] === "browser" &&
+      (browser["code"] === "blooket-browser-unavailable" ||
+       browser["code"] === "blooket-browser-failed"))
+    return { ok: false, kind: "browser", code: browser["code"] };
+  const navigation = exactOwnData(result, ["kind", "ok", "state"]);
+  const state = navigation?.["state"];
+  if (navigation?.["ok"] === false &&
+      navigation["kind"] === "navigation" &&
+      (state === "signed-out" || state === "organization-prompt" ||
+       state === "expired-session" || state === "rate-limited" ||
+       state === "security-challenge" || state === "unexpected-page"))
+    return { ok: false, kind: "navigation", state };
   return browserFailure();
-}
-
-function exactKeys(value: unknown, keys: string): boolean {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return false;
-  const own = Reflect.ownKeys(value);
-  const allowed = keys.split(",");
-  return own.length === allowed.length && own.every(key => {
-    if (typeof key !== "string" || !allowed.includes(key)) return false;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return !!descriptor && descriptor.enumerable && "value" in descriptor;
-  });
 }
 
 function browserFailure(): BlooketWriteAttemptResult {

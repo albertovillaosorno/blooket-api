@@ -434,3 +434,8 @@ preparation, session state, redirect receipts and independently verified
 saved metadata. The Edit Info visibility read uses a copied reply rather
 than trusting accessors after its field-key check. Neither host is allowed
 to turn an unconfirmed browser response into a duplicate Save attempt.
+
+The canonical browser-write adapter also snapshots the owned response
+instead of consulting proxied `ok`, remote set IDs, or stop fields after
+checking descriptors. An apparent success that conflicts with its data
+cannot become a durable set-created receipt or advance a checkpoint.
