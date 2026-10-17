@@ -35,8 +35,8 @@ scope = ["package"]
 version = "26.6.5"
 
 [authority.pnpm]
-current = "12.11.2"
-stable = "12.11.2"
+current = "12.14.0"
+stable = "12.14.0"
 
 [authority.pnpm.freshness]
 integrity_kind = "provider-response-sha256"
