@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green native Create Set host regressions exposed
+accessor-backed Chrome tab route fields during navigation and pre-Save
+observation. The host now snapshots owned URL, status and pending navigation
+for each Chrome tab read, rather than consulting property-read traps during
+form preparation, Edit Info confirmation or uncertain redirect observation.
+These synthetic tests do not establish a live Save receipt.
+
 On 2026-10-17, a red-to-green saved-image read-back regression showed a
 browser script-result proxy could claim `ok: true` through property reads
 while its exact owned descriptor remained false. The saved-question scan

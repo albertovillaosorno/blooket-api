@@ -174,22 +174,43 @@ export function createExtensionCreateSetHost(
     return descriptor.value;
   };
 
-  const createTabReady = async (): Promise<boolean> => {
+  // Chrome tab properties cannot be consulted through untrusted accessors.
+  // Copy the route and navigation snapshot once for each async observation.
+  const readTab = async (): Promise<BrowserTab> => {
     const tab = await chrome.tabs.get(tabId);
+    if (!tab || typeof tab !== "object")
+      throw new Error("browser-tab-unavailable");
+    const url = Object.getOwnPropertyDescriptor(tab, "url");
+    const status = Object.getOwnPropertyDescriptor(tab, "status");
+    const pending = Object.getOwnPropertyDescriptor(tab, "pendingUrl");
+    if (!url || !status || !url.enumerable || !status.enumerable ||
+        !("value" in url) || !("value" in status) ||
+        typeof url.value !== "string" ||
+        (status.value !== "loading" && status.value !== "complete") ||
+        (pending && (!pending.enumerable || !("value" in pending) ||
+          (pending.value !== undefined &&
+           typeof pending.value !== "string"))))
+      throw new Error("browser-tab-unavailable");
+    return { url: url.value, status: status.value,
+      ...(pending ? { pendingUrl: pending.value } : {}) };
+  };
+
+  const createTabReady = async (): Promise<boolean> => {
+    const tab = await readTab();
     return tab.status === "complete" && tab.url === CREATE_URL &&
       tab.pendingUrl === undefined;
   };
   // A tab may replace its document while retaining /edit?id= and its title.
   // Pair every receipt/sidebar script with the same native document lifetime.
   const editDocumentOrigin = async (url: string): Promise<number | null> => {
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await readTab();
     if (tab.status !== "complete" || tab.url !== url ||
         tab.pendingUrl !== undefined) return null;
     const observed = await script(
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
       [url],
     );
-    const after = await chrome.tabs.get(tabId);
+    const after = await readTab();
     return after.status === "complete" && after.url === url &&
         after.pendingUrl === undefined &&
         typeof observed === "number" && Number.isFinite(observed) &&
@@ -308,11 +329,11 @@ export function createExtensionCreateSetHost(
   return {
     openCreateSet: async () => {
       try {
-        const before = await chrome.tabs.get(tabId);
+        const before = await readTab();
         if (!dashboardTab(before) || before.status !== "complete")
           return browserFailure();
         // A manual route selection between browser calls belongs to the user.
-        const current = await chrome.tabs.get(tabId);
+        const current = await readTab();
         if (current.status !== "complete" || current.url !== before.url ||
             current.pendingUrl !== undefined ||
             typeof current.url !== "string") return browserFailure();
@@ -328,7 +349,7 @@ export function createExtensionCreateSetHost(
             canLeaveBlooketPageForRead as (...args: never[]) => unknown,
           );
           if (canLeave !== true) return browserFailure();
-          const afterGuard = await chrome.tabs.get(tabId);
+          const afterGuard = await readTab();
           if (afterGuard.status !== "complete" ||
               afterGuard.url !== current.url ||
               afterGuard.pendingUrl !== undefined ||
@@ -339,7 +360,7 @@ export function createExtensionCreateSetHost(
           await chrome.tabs.update(tabId, { url: CREATE_URL });
         }
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-          const tab = await chrome.tabs.get(tabId);
+          const tab = await readTab();
           if (tab.pendingUrl !== undefined &&
               tab.pendingUrl !== CREATE_URL) return browserFailure();
           if (tab.status === "complete" &&
@@ -423,7 +444,7 @@ export function createExtensionCreateSetHost(
         );
         // Submission may immediately redirect to /edit. An acknowledgment
         // from an unrelated route cannot authorize subsequent read-back.
-        const after = await chrome.tabs.get(tabId);
+        const after = await readTab();
         return exactOk(result) && expectedSubmitRoute(after)
           ? { ok: true } : browserFailure();
       } catch {
@@ -437,7 +458,7 @@ export function createExtensionCreateSetHost(
           // after the scripting context was destroyed by the submit click.
           // Poll tab state only; never inject or click the form again.
           for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-            const tab = await chrome.tabs.get(tabId);
+            const tab = await readTab();
             if (exactEditRoute(tab))
               return { ok: true, requireMetadataConfirmation: true };
             if (tab.url !== CREATE_URL ||
@@ -456,7 +477,7 @@ export function createExtensionCreateSetHost(
           return browserFailure();
         let pendingUnknown = false;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-          const tab = await chrome.tabs.get(tabId);
+          const tab = await readTab();
           if (tab.pendingUrl !== undefined) {
             // An exact Edit redirect may still be loading. Never inspect
             // the old Create document or adopt a foreign pending route.
@@ -489,7 +510,7 @@ export function createExtensionCreateSetHost(
                 observeBlooketCreateSetSuccess as
                   (...args: never[]) => unknown,
               );
-              const after = await chrome.tabs.get(tabId);
+              const after = await readTab();
               if (after.status !== "complete" || after.url !== tab.url ||
                   !exactRedirectReceipt(result, ids[0]) ||
                   await editDocumentOrigin(tab.url) !== origin)
@@ -497,7 +518,7 @@ export function createExtensionCreateSetHost(
               // An edit redirect can hydrate after the first complete page
               // event. One claim is not a stable persisted read-back.
               await pause(0);
-              const beforeAgain = await chrome.tabs.get(tabId);
+              const beforeAgain = await readTab();
               if (beforeAgain.status !== "complete" ||
                   beforeAgain.url !== tab.url)
                 return browserFailure();
@@ -505,7 +526,7 @@ export function createExtensionCreateSetHost(
                 observeBlooketCreateSetSuccess as
                   (...args: never[]) => unknown,
               );
-              const afterAgain = await chrome.tabs.get(tabId);
+              const afterAgain = await readTab();
               if (afterAgain.status !== "complete" ||
                   afterAgain.url !== tab.url ||
                   !exactRedirectReceipt(again, ids[0]) ||
@@ -520,7 +541,7 @@ export function createExtensionCreateSetHost(
                       (...args: never[]) => unknown,
                     [ids[0]],
                   );
-                  const post = await chrome.tabs.get(tabId);
+                  const post = await readTab();
                   if (post.status !== "complete" || post.url !== tab.url ||
                       await editDocumentOrigin(tab.url) !== origin)
                     return browserFailure();
@@ -552,7 +573,7 @@ export function createExtensionCreateSetHost(
                 await chrome.tabs.reload(tabId, { bypassCache: true });
                 let freshOrigin: number | null = null;
                 for (let poll = 0; poll < MAX_POLLS; poll++) {
-                  const current = await chrome.tabs.get(tabId);
+                  const current = await readTab();
                   if (current.url !== tab.url) return browserFailure();
                   if (current.status === "complete") {
                     const candidate = await editDocumentOrigin(tab.url);
