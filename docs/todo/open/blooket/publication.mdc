@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green extension restoration tests showed a Chrome
+property-read trap could present a Blooket landing URL while the tab's own
+route pointed to an unrelated site. Restored and reclaimable tab admission
+now reads owned ID, URL, pending navigation and challenge-title descriptors
+before trusting a remembered connection. The synthetic worker refused the
+foreign tab; no live teacher session was resumed or changed.
+
 On 2026-10-19, red-to-green detached-question read fixtures showed a
 synthetic Chrome `active` getter could report an unattended temporary tab
 while the teacher had adopted the same tab. The worker now snapshots owned

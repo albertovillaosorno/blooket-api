@@ -1361,10 +1361,19 @@ async function disconnect() {
 }
 function admittedBlooketTab(tab: BrowserTab | undefined): boolean {
   // A committed Blooket URL is stale if Chrome has started navigating away.
-  if (!tab?.id || !tab.url || tab.pendingUrl !== undefined) return false;
+  if (!tab || typeof tab !== "object") return false;
+  const id = Object.getOwnPropertyDescriptor(tab, "id");
+  const url = Object.getOwnPropertyDescriptor(tab, "url");
+  const pending = Object.getOwnPropertyDescriptor(tab, "pendingUrl");
+  if (!id?.enumerable || !("value" in id) ||
+      !Number.isSafeInteger(id.value) || id.value < 1 ||
+      !url?.enumerable || !("value" in url) ||
+      typeof url.value !== "string" ||
+      (pending && (!pending.enumerable || !("value" in pending) ||
+        pending.value !== undefined))) return false;
   try {
     return ["https://dashboard.blooket.com", "https://id.blooket.com"]
-      .includes(new URL(tab.url).origin);
+      .includes(new URL(url.value).origin);
   } catch { return false; }
 }
 
@@ -1373,7 +1382,9 @@ function reclaimableBlooketTab(tab: BrowserTab | undefined): boolean {
   // tab ID at /edit or /create may contain a teacher's unfinished work.
   // Reclaim only our previous landing route, never an editor or modal route.
   if (!admittedBlooketTab(tab)) return false;
-  const url = new URL(tab!.url!);
+  const route = Object.getOwnPropertyDescriptor(tab, "url");
+  if (!route?.enumerable || !("value" in route)) return false;
+  const url = new URL(route.value);
   const landing = url.origin === "https://dashboard.blooket.com" &&
     url.pathname === "/my-sets" ||
     url.origin === "https://id.blooket.com" &&
@@ -1383,7 +1394,9 @@ function reclaimableBlooketTab(tab: BrowserTab | undefined): boolean {
   // Cloudflare can append this provider-owned one-time query while showing
   // its challenge. Preserve the *same* tab through an extension reload, but
   // never reclaim an arbitrary editor, search, or foreign query.
-  return tab?.title === "Just a moment..." &&
+  const title = Object.getOwnPropertyDescriptor(tab, "title");
+  return title?.enumerable === true && "value" in title &&
+    title.value === "Just a moment..." &&
     url.searchParams.size === 1 &&
     url.searchParams.getAll("__cf_chl_rt_tk").length === 1 &&
     (url.searchParams.get("__cf_chl_rt_tk")?.length ?? 0) <= 1_024 &&
