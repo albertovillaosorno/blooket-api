@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green extension focus regressions showed that Chrome
+tab URL getter reads could authorize tab activation despite missing owned
+route evidence. The worker now snapshots main-tab ID, URL, window and
+pending-navigation descriptors before activation, on the activation reply,
+and again before window focus. Tests include getter-backed window identities
+and pending destinations. No actual browser challenge was triggered.
+
 On 2026-10-19, a red-to-green read-only capability regression showed that
 accessor-backed Chrome tab URLs could impersonate the original dashboard
 route before provider capability inspection. Each tab observation now uses

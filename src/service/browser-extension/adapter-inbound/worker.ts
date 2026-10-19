@@ -1087,33 +1087,52 @@ async function detachedEditRead(
 
 // A verified human challenge is shown in the real browser's existing tab.
 // Never launch an automated solver, change the User-Agent, or copy cookies.
+function exactHumanBlooketTab(value: unknown, expectedId: number): {
+  readonly id: number;
+  readonly url: string;
+  readonly windowId: number;
+} | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const data = (name: string) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, name);
+    return descriptor?.enumerable && "value" in descriptor
+      ? descriptor.value : undefined;
+  };
+  const id = data("id");
+  const url = data("url");
+  const windowId = data("windowId");
+  const pending = Object.getOwnPropertyDescriptor(value, "pendingUrl");
+  if (id !== expectedId || typeof url !== "string" ||
+      !Number.isSafeInteger(windowId) || windowId < 0 ||
+      (pending && (!pending.enumerable || !("value" in pending) ||
+        pending.value !== undefined))) return undefined;
+  try {
+    if (!["https://dashboard.blooket.com", "https://id.blooket.com"]
+      .includes(new URL(url).origin)) return undefined;
+  } catch { return undefined; }
+  return { id, url, windowId };
+}
+
+// A verified human challenge is shown in the real browser's existing tab.
+// Never launch an automated solver, change the User-Agent, or copy cookies.
 async function showHumanBlooketTab(
   tabId: number,
   stillOwned: () => boolean = () => true,
 ): Promise<boolean> {
   if (!stillOwned()) return false;
-  const tab = await chrome.tabs.get(tabId!);
-  if (tab.id !== tabId || !tab.url ||
-      tab.pendingUrl !== undefined || !stillOwned() ||
-      !["https://dashboard.blooket.com", "https://id.blooket.com"]
-        .includes(new URL(tab.url).origin)) return false;
-  if (typeof tab.windowId !== "number" ||
-      !Number.isSafeInteger(tab.windowId) || tab.windowId < 0)
-    return false;
-  const active = await chrome.tabs.update(tabId, { active: true });
-  if (!stillOwned() || active.id !== tabId || active.url !== tab.url ||
-      active.pendingUrl !== undefined ||
-      active.windowId !== tab.windowId) return false;
+  const original = exactHumanBlooketTab(await chrome.tabs.get(tabId), tabId);
+  if (!original || !stillOwned()) return false;
+  const active = exactHumanBlooketTab(
+    await chrome.tabs.update(tabId, { active: true }), tabId,
+  );
+  if (!active || !stillOwned() || active.url !== original.url ||
+      active.windowId !== original.windowId) return false;
   // A manual tab switch may finish while activation is pending. Never focus
   // the remembered window if the active tab has become foreign or replaced.
-  const checked = await chrome.tabs.get(tabId!);
-  if (!stillOwned() || checked.id !== tabId ||
-      checked.url !== tab.url || checked.pendingUrl !== undefined ||
-      checked.windowId !== tab.windowId ||
-      !checked.url ||
-      !["https://dashboard.blooket.com", "https://id.blooket.com"]
-        .includes(new URL(checked.url).origin)) return false;
-  await chrome.windows.update(tab.windowId, { focused: true });
+  const checked = exactHumanBlooketTab(await chrome.tabs.get(tabId), tabId);
+  if (!checked || !stillOwned() || checked.url !== original.url ||
+      checked.windowId !== original.windowId) return false;
+  await chrome.windows.update(original.windowId, { focused: true });
   return stillOwned();
 }
 
