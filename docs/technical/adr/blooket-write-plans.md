@@ -451,6 +451,11 @@ The login host requires owned Chrome tab URL and status descriptors and no
 pending navigation before injecting credential-bearing scripts. A getter
 must not create apparent login-route or readiness evidence.
 
+Temporary detached-read tabs similarly require own Chrome tab identity,
+route, window and active-state descriptors before reuse or disposal.
+An accessor-backed inactive claim cannot authorize closing a tab a teacher
+may have adopted.
+
 Human challenge focus also requires native own-data tab and window
 identities before activating a tab, after activation and before focusing the
 window. Chrome property getters cannot upgrade a foreign/stale tab to a

@@ -80,6 +80,8 @@ test(
   let pendingDuringSessionScript = false;
   let detachedTabNavigatedByUser = false;
   let detachedTabActivatedByUser = false;
+  let detachedTabActiveGetter = false;
+  let detachedTabGetterReads = 0;
   let detachedCreated = 0;
   let detachedClosed = 0;
   let capabilityTabsCreated = 0;
@@ -285,8 +287,15 @@ test(
         if (id === 83) {
           if (!detachedUrl) throw Error("closed-detached-tab");
           if (pendingSourceAfterRead) pendingSourceRedirect = true;
-          return { id, url: detachedUrl, status: "complete", windowId: 3,
+          const tab = { id, url: detachedUrl, status: "complete", windowId: 3,
             active: detachedTabActivatedByUser };
+          if (detachedTabActiveGetter) Object.defineProperty(tab, "active", {
+            enumerable: true, get() {
+              detachedTabGetterReads++;
+              return false;
+            },
+          });
+          return tab;
         }
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
@@ -1456,16 +1465,28 @@ test(
     // If the teacher takes focus of the temporary tab, do not close it
     // under them, even if its URL and window identity are unchanged.
     detachedTabActivatedByUser = true;
+    detachedTabActiveGetter = true;
+    const forgedTemporary = await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    });
+    assert.equal(forgedTemporary.ok, false);
+    assert.equal(detachedTabGetterReads, 0);
+    assert.equal(detachedCreated, 6);
+    assert.equal(detachedClosed, 4,
+      "a getter cannot authorize closing an adopted background tab");
+    onTabRemoved(83);
+    detachedTabActiveGetter = false;
+    detachedUrl = "";
     const focusedTemporary = await expectReply({
       kind: "questions.list", setId: "set-fixture",
     });
     assert.equal(focusedTemporary.ok, false);
-    assert.equal(detachedCreated, 6);
+    assert.equal(detachedCreated, 7);
     assert.equal(detachedClosed, 4);
     assert.equal((await expectReply({
       kind: "capabilities.inspect-text",
     })).ok, false);
-    assert.equal(detachedCreated, 6);
+    assert.equal(detachedCreated, 7);
     assert.equal(capabilityTabsCreated, beforeStaleSetList + 1,
       "question and capability readers share the same auxiliary reservation");
     onTabRemoved(83);
@@ -1475,7 +1496,7 @@ test(
     assert.equal((await expectReply({
       kind: "questions.list", setId: "set-fixture",
     })).ok, false);
-    assert.equal(detachedCreated, 6);
+    assert.equal(detachedCreated, 7);
     detachedTabNavigatedByUser = false;
     submittedReadOwner = true;
     // The original submitted owner can begin a foreign navigation during
