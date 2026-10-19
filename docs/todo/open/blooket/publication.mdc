@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green Add Question host tests showed Chrome
+tab route, readiness and pending-navigation getters could substitute
+apparently valid page evidence during form preparation or saved read-back.
+The host now snapshots owned tab fields on every Chrome read, including
+post-submit and reload checks. No Save was replayed or accepted remotely.
+
 On 2026-10-19, red-to-green native Create Set host regressions exposed
 accessor-backed Chrome tab route fields during navigation and pre-Save
 observation. The host now snapshots owned URL, status and pending navigation

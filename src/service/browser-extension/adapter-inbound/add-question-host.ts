@@ -96,6 +96,27 @@ export interface AddQuestionChromePort {
   };
 }
 
+async function readOwnedTab(
+  chrome: AddQuestionChromePort, tabId: number,
+): Promise<BrowserTab> {
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab || typeof tab !== "object")
+    throw new Error("browser-tab-unavailable");
+  const url = Object.getOwnPropertyDescriptor(tab, "url");
+  const status = Object.getOwnPropertyDescriptor(tab, "status");
+  const pending = Object.getOwnPropertyDescriptor(tab, "pendingUrl");
+  if (!url || !status || !url.enumerable || !status.enumerable ||
+      !("value" in url) || !("value" in status) ||
+      typeof url.value !== "string" ||
+      (status.value !== "loading" && status.value !== "complete") ||
+      (pending && (!pending.enumerable || !("value" in pending) ||
+        (pending.value !== undefined &&
+         typeof pending.value !== "string"))))
+    throw new Error("browser-tab-unavailable");
+  return { url: url.value, status: status.value,
+    ...(pending ? { pendingUrl: pending.value } : {}) };
+}
+
 export type ExtensionAddQuestionResult =
   | { readonly ok: true }
   | {
@@ -188,12 +209,12 @@ export function createExtensionAddQuestionHost(
         }
         const editUrl = DASHBOARD_ORIGIN + "/edit?id=" +
           encodeURIComponent(input.setId);
-        const before = await chrome.tabs.get(tabId);
+        const before = await readOwnedTab(chrome, tabId);
         if (!dashboardTab(before) || before.status !== "complete")
           return browserFailure();
         // Do not replace a route the teacher selected after the first tab
         // observation. Reaching the correct edit page needs no second update.
-        const current = await chrome.tabs.get(tabId);
+        const current = await readOwnedTab(chrome, tabId);
         if (current.status !== "complete" || current.url !== before.url ||
             current.pendingUrl !== undefined)
           return browserFailure();
@@ -212,7 +233,7 @@ export function createExtensionAddQuestionHost(
             canLeaveBlooketPageForRead as (...args: never[]) => unknown,
           );
           if (canLeave !== true) return browserFailure();
-          const afterGuard = await chrome.tabs.get(tabId);
+          const afterGuard = await readOwnedTab(chrome, tabId);
           if (afterGuard.status !== "complete" ||
               afterGuard.url !== current.url ||
               afterGuard.pendingUrl !== undefined) return browserFailure();
@@ -222,7 +243,7 @@ export function createExtensionAddQuestionHost(
             inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
             [current.url],
           );
-          const beforeNavigation = await chrome.tabs.get(tabId);
+          const beforeNavigation = await readOwnedTab(chrome, tabId);
           if (unchanged !== origin ||
               beforeNavigation.status !== "complete" ||
               beforeNavigation.url !== current.url ||
@@ -245,7 +266,7 @@ export function createExtensionAddQuestionHost(
             nativeOrigin === sourceOrigin) return browserFailure();
         let ownedOrigin = nativeOrigin;
         const sameEditDocument = async (): Promise<boolean> => {
-          const beforeOrigin = await chrome.tabs.get(tabId);
+          const beforeOrigin = await readOwnedTab(chrome, tabId);
           if (beforeOrigin.status !== "complete" ||
               beforeOrigin.url !== editUrl ||
               beforeOrigin.pendingUrl !== undefined) return false;
@@ -253,7 +274,7 @@ export function createExtensionAddQuestionHost(
             inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
             [editUrl],
           );
-          const afterOrigin = await chrome.tabs.get(tabId);
+          const afterOrigin = await readOwnedTab(chrome, tabId);
           return afterOrigin.status === "complete" &&
             afterOrigin.url === editUrl &&
             afterOrigin.pendingUrl === undefined &&
@@ -264,14 +285,14 @@ export function createExtensionAddQuestionHost(
         // An acknowledged injected function may finish on a different route.
         // Confirm ownership around *every* subsequent browser interaction.
         const ownedScript: Script = async (func, args) => {
-          const beforeScript = await chrome.tabs.get(tabId);
+          const beforeScript = await readOwnedTab(chrome, tabId);
           if (beforeScript.status !== "complete" ||
               beforeScript.url !== editUrl ||
               beforeScript.pendingUrl !== undefined ||
               !await sameEditDocument())
             throw new Error("browser-write-tab-changed");
           const result = await script(func, args);
-          const afterScript = await chrome.tabs.get(tabId);
+          const afterScript = await readOwnedTab(chrome, tabId);
           if (afterScript.status !== "complete" ||
               afterScript.url !== editUrl ||
               afterScript.pendingUrl !== undefined ||
@@ -450,7 +471,7 @@ async function waitForEdit(
   let pendingUnknown = false;
   let pendingNativeOrigin: number | undefined;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await readOwnedTab(chrome, tabId);
     if (tab.pendingUrl !== undefined &&
         (tab.pendingUrl !== editUrl || tab.status === "complete"))
       return browserFailure();
@@ -480,7 +501,7 @@ async function waitForEdit(
           origin <= 0 || (pendingNativeOrigin !== undefined &&
             origin !== pendingNativeOrigin)) return browserFailure();
       const observed = await observe(script);
-      const after = await chrome.tabs.get(tabId);
+      const after = await readOwnedTab(chrome, tabId);
       if (after.status !== "complete" || after.url !== editUrl ||
           after.pendingUrl !== undefined)
         return browserFailure();
@@ -488,7 +509,7 @@ async function waitForEdit(
         inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
         [editUrl],
       );
-      const stillThere = await chrome.tabs.get(tabId);
+      const stillThere = await readOwnedTab(chrome, tabId);
       if (confirmedOrigin !== origin || stillThere.status !== "complete" ||
           stillThere.url !== editUrl || stillThere.pendingUrl !== undefined)
         return browserFailure();
@@ -524,7 +545,7 @@ async function observeQuestion(
     encodeURIComponent(input.setId);
   let pendingUnknown = false;
   for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await readOwnedTab(chrome, tabId);
     if (tab.url !== editUrl || tab.pendingUrl !== undefined)
       return browserFailure();
     if (tab.status !== "complete") {

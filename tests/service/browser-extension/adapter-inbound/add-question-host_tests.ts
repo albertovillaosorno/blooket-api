@@ -626,6 +626,33 @@ test("post-submit mismatch fails without a second submit", async () => {
   assert.ok(fake.calls.includes("closeBlooketQuestionPanel"));
 });
 
+test("Add Question rejects accessor-backed Chrome tab route fields",
+  async () => {
+  for (const field of ["url", "status", "pendingUrl"] as const) {
+    const fake = fakeChrome({});
+    const get = fake.chrome.tabs.get;
+    let reads = 0;
+    fake.chrome.tabs.get = async id => {
+      const tab = { ...await get(id) };
+      Object.defineProperty(tab, field, { enumerable: true,
+        get() {
+          reads++;
+          return field === "url"
+            ? "https://dashboard.blooket.com/my-sets"
+            : field === "status" ? "complete" : undefined;
+        },
+      });
+      return tab;
+    };
+    const result = await createExtensionAddQuestionHost(
+      fake.chrome, 7, async () => undefined,
+    ).addQuestion(input);
+    assert.equal(result.ok, false, field);
+    assert.equal(reads, 0, field);
+    assert.equal(fake.calls.some(v => v.startsWith("update:")), false);
+  }
+});
+
 test("foreign starting tabs fail before navigation", async () => {
   const fake = fakeChrome({ initialUrl: "https://example.invalid/" });
   const host = createExtensionAddQuestionHost(
