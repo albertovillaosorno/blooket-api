@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green read-navigation regressions showed that a
+synthetic Chrome `tabs.get` URL getter could impersonate an owned dashboard
+route and trigger an otherwise authorized page reload. A shared owned route
+snapshot now protects read navigation, detached question scans, and detached
+capability scans. Accessor-backed URL/status/pending-navigation fields stop
+before script execution or page mutation. No live provider read was certified.
+
 On 2026-10-19, red-to-green detached question and capability regressions
 showed that a browser Create acknowledgement with an accessor-backed tab ID
 could authorize inspection and cleanup of a different existing Chrome tab.

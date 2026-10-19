@@ -451,6 +451,11 @@ The login host requires owned Chrome tab URL and status descriptors and no
 pending navigation before injecting credential-bearing scripts. A getter
 must not create apparent login-route or readiness evidence.
 
+The shared Chrome read-navigation and detached-read hosts also use
+snapshotted own route, readiness and pending-navigation data. A getter
+cannot authorize reloading a teacher document or claiming a detached
+provider document has committed while the native route remains unverified.
+
 An auxiliary Chrome tabs.create acknowledgement must contain an owned,
 enumerable positive tab ID before it can grant read or cleanup authority.
 An accessor claiming another ID is not proof that the extension created

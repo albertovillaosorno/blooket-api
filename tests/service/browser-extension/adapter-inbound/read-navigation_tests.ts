@@ -54,6 +54,18 @@ test("created Chrome tab IDs require an exact own data descriptor", () => {
   assert.equal(reads, 0);
 });
 
+test("read navigation rejects accessor-backed Chrome route evidence", () => {
+  let reads = 0;
+  const tab = { status: "complete" } as {
+    readonly url?: string; readonly status: string;
+  };
+  Object.defineProperty(tab, "url", { enumerable: true,
+    get() { reads++; return SETS; },
+  });
+  assert.equal(classifyBlooketReadTabLoad(tab, SETS), "changed");
+  assert.equal(reads, 0);
+});
+
 test("Chrome pendingUrl is load evidence, not a committed document", () => {
   for (const url of [undefined, "", "about:blank"])
     assert.equal(classifyBlooketReadTabLoad({ url, pendingUrl: SETS,
@@ -134,6 +146,28 @@ function fixture(options: {
     reloads: () => reloads,
   };
 }
+
+test("navigation does not reload a getter-supplied previous route",
+  async () => {
+  const page = fixture();
+  const originalGet = page.tabs.get;
+  let reads = 0;
+  page.tabs.get = async id => {
+    const tab = { ...await originalGet(id) };
+    Object.defineProperty(tab, "url", { enumerable: true,
+      get() { reads++; return SETS; },
+    });
+    return tab;
+  };
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, SETS, 8_000,
+    page.pause, page.documentOrigin, page.now,
+  );
+  assert.equal(result, undefined);
+  assert.equal(reads, 0);
+  assert.equal(page.reloads(), 0);
+  assert.equal(page.updates(), 0);
+});
 
 test("an already loaded route reloads before a fresh read", async () => {
   const page = fixture();

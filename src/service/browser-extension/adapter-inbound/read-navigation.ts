@@ -48,12 +48,34 @@ export function exactCreatedBlooketReadTabId(value: unknown):
 }
 
 
+// Copy Chrome's route fields before using a tab to authorize page scripts.
+// Property getters are not a committed browser document observation.
+export function snapshotBlooketReadTab(value: unknown):
+  ReadTab | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const copied: Record<string, string | undefined> = {};
+  try {
+    for (const key of ["url", "status", "pendingUrl"]) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor) continue;
+      if (!descriptor.enumerable || !("value" in descriptor) ||
+          (descriptor.value !== undefined &&
+           typeof descriptor.value !== "string")) return undefined;
+      copied[key] = descriptor.value;
+    }
+  } catch { return undefined; }
+  return copied;
+}
+
 // Chrome exposes a new tab's destination as pendingUrl until its first
 // navigation commits. Only that exact owned destination may keep loading;
 // a different pending URL also invalidates an otherwise matching old URL.
 export function classifyBlooketReadTabLoad(
   tab: ReadTab, target: string,
 ): "ready" | "loading" | "changed" {
+  const owned = snapshotBlooketReadTab(tab);
+  if (!owned) return "changed";
+  tab = owned;
   if (tab.pendingUrl !== undefined)
     return tab.pendingUrl === target && tab.status === "loading" &&
       (tab.url === undefined || tab.url === "" ||
@@ -89,12 +111,13 @@ export async function confirmBlooketReadNavigation(
 ): Promise<ReadTab | undefined> {
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (now() >= deadline) return undefined;
+  previous = snapshotBlooketReadTab(previous) ?? {};
   let previousOrigin: number | undefined;
   if (target) {
     // The caller's previous tab snapshot may be obsolete if the user moved.
     // Re-check its exact route before allowing a navigation request.
-    const current = await tabs.get(tabId);
-    if (now() >= deadline || !current.url ||
+    const current = snapshotBlooketReadTab(await tabs.get(tabId));
+    if (now() >= deadline || !current?.url ||
         current.url !== previous.url || current.status !== "complete" ||
         current.pendingUrl !== undefined)
       return undefined;
@@ -103,8 +126,8 @@ export async function confirmBlooketReadNavigation(
         (approvedSourceOrigin !== undefined &&
          origin !== approvedSourceOrigin)) return undefined;
     previousOrigin = origin;
-    const checked = await tabs.get(tabId);
-    if (now() >= deadline || checked.url !== current.url ||
+    const checked = snapshotBlooketReadTab(await tabs.get(tabId));
+    if (now() >= deadline || checked?.url !== current.url ||
         checked.status !== "complete" || checked.pendingUrl !== undefined)
       return undefined;
     // A same-URL document replacement after the first origin script may
@@ -118,8 +141,8 @@ export async function confirmBlooketReadNavigation(
     if (safeBeforeNavigation) {
       if (!await safeBeforeNavigation() || now() >= deadline)
         return undefined;
-      const last = await tabs.get(tabId);
-      if (now() >= deadline || last.url !== current.url ||
+      const last = snapshotBlooketReadTab(await tabs.get(tabId));
+      if (now() >= deadline || last?.url !== current.url ||
           last.status !== "complete" || last.pendingUrl !== undefined)
         return undefined;
       const lastOrigin = await documentOrigin(current.url);
@@ -134,11 +157,11 @@ export async function confirmBlooketReadNavigation(
     if (now() >= deadline) return undefined;
   }
   while (now() < deadline) {
-    const tab = await tabs.get(tabId);
+    const tab = snapshotBlooketReadTab(await tabs.get(tabId));
     // A delayed tabs.get result cannot prove that the budget was respected.
     if (now() >= deadline) return undefined;
-    if (tab.pendingUrl !== undefined &&
-        (target === null || tab.pendingUrl !== target)) return undefined;
+    if (!tab || (tab.pendingUrl !== undefined &&
+        (target === null || tab.pendingUrl !== target))) return undefined;
     if (tab.status === "complete" && tab.pendingUrl === undefined &&
         (!target || tab.url === target)) {
       if (!target) return tab;
@@ -149,8 +172,8 @@ export async function confirmBlooketReadNavigation(
       catch { origin = null; }
       if (now() >= deadline) return undefined;
       if (validOrigin(origin) && origin !== previousOrigin) {
-        const checked = await tabs.get(tabId);
-        if (now() >= deadline || checked.url !== target ||
+        const checked = snapshotBlooketReadTab(await tabs.get(tabId));
+        if (now() >= deadline || checked?.url !== target ||
             checked.status !== "complete" ||
             checked.pendingUrl !== undefined) return undefined;
         // A native document can be replaced at the exact same URL while
@@ -160,8 +183,8 @@ export async function confirmBlooketReadNavigation(
         try { again = await documentOrigin(target); }
         catch { return undefined; }
         if (now() >= deadline || again !== origin) return undefined;
-        const finalTab = await tabs.get(tabId);
-        if (now() >= deadline || finalTab.url !== target ||
+        const finalTab = snapshotBlooketReadTab(await tabs.get(tabId));
+        if (now() >= deadline || finalTab?.url !== target ||
             finalTab.status !== "complete" ||
             finalTab.pendingUrl !== undefined) return undefined;
         onConfirmedTargetOrigin?.(origin);

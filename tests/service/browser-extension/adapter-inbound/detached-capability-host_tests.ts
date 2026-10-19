@@ -44,6 +44,7 @@ const MY_SETS = "https://dashboard.blooket.com/my-sets";
 
 function fixture(options: {
   readonly createAccessor?: boolean;
+  readonly getAccessor?: boolean;
   readonly sourceRedirect?: boolean;
   readonly unstableLists?: boolean;
   readonly failedCleanup?: boolean;
@@ -93,11 +94,17 @@ function fixture(options: {
             now - 1_000 < options.uncommittedForMs)
           return { id, pendingUrl: options.pendingDestination ?? MY_SETS,
             status: "loading" };
-        return { id, url: options.sourceRedirect ? "https://id.blooket.com/"
-          : url, status: options.pending ||
+        const tab = { id,
+          url: options.sourceRedirect ? "https://id.blooket.com/" : url,
+          status: options.pending ||
           (options.loadAfterMs !== undefined &&
             now - 1_000 < options.loadAfterMs)
             ? "loading" : "complete" };
+        if (options.getAccessor) Object.defineProperty(tab, "url", {
+          enumerable: true, get() { events.push("read-getter-url");
+            return MY_SETS; },
+        });
+        return tab;
       },
       update: async (id, input) => {
         assert.equal(id, 84);
@@ -213,6 +220,17 @@ function fixture(options: {
   return { events, inspect, removed: () => removed,
     elapsed: () => now - 1_000 };
 }
+
+test("getter-supplied detached capability route cannot authorize scripts",
+  async () => {
+  const page = fixture({ getAccessor: true });
+  assert.deepEqual(await page.inspect(), {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.events.includes("read-getter-url"), false);
+  assert.equal(page.events.includes("inspectBlooketDocumentOrigin"), false);
+  assert.equal(page.removed(), true);
+});
 
 test("accessor-supplied capability tab IDs never authorize reads or cleanup",
   async () => {
