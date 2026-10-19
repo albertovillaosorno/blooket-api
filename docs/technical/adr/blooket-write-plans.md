@@ -465,6 +465,10 @@ A newly announced workspace similarly binds one exact owned origin and token
 to the Chrome sender URL. The worker does not re-read untrusted message
 properties between sender authorization and creating the browser bridge.
 
+Restored session admission also checks Chrome's own tab ID, URL, and
+pending-navigation fields. A getter claiming a trusted Blooket landing page
+cannot turn a foreign stored tab into a valid paired account connection.
+
 Restoring or reclaiming a previously owned Blooket tab additionally requires
 no pending Chrome navigation: its committed URL alone cannot prove ownership
 while a new destination is loading. A foreign pending destination stops

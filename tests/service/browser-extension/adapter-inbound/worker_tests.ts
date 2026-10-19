@@ -2370,6 +2370,16 @@ test("worker startup rejects a stored tab moved outside Blooket",
   let removed = 0;
   let created = 0;
   let inspectedTab = { id: 7, url: "https://untrusted.invalid" };
+  let tabGetterReads = 0;
+  const spoofedTab = new Proxy({ id: 7, url: "https://untrusted.invalid" }, {
+    get(target, key, receiver) {
+      if (key === "url") {
+        tabGetterReads++;
+        return "https://dashboard.blooket.com/my-sets";
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
   const mocked = {
     runtime: {
       getURL: path => root + path,
@@ -2404,6 +2414,7 @@ test("worker startup rejects a stored tab moved outside Blooket",
       { id: 7, url: "https://untrusted.invalid" },
       { id: 7, url: "https://dashboard.blooket.com/my-sets",
         pendingUrl: "https://untrusted.invalid/teacher-navigation" },
+      spoofedTab,
     ].entries()) {
       inspectedTab = tab;
       await import(
@@ -2419,6 +2430,7 @@ test("worker startup rejects a stored tab moved outside Blooket",
       assert.equal(removed, index + 1);
       assert.equal(created, 0);
     }
+    assert.equal(tabGetterReads, 0);
   } finally {
     if (priorChrome)
       Object.defineProperty(globalThis, "chrome", priorChrome);
