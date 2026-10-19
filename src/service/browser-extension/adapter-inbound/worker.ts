@@ -869,6 +869,25 @@ async function readPage(
     ? { ok: true, value: exactSessionObservation(observed) }
     : observed;
 }
+function exactTemporaryReadTab(value: unknown): BrowserTab {
+  if (!value || typeof value !== "object")
+    throw Error("temporary-tab-unavailable");
+  const copied: Record<string, unknown> = {};
+  for (const key of ["id", "url", "pendingUrl", "status",
+    "windowId", "active", "title"]) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor && (!descriptor.enumerable || !("value" in descriptor)))
+      throw Error("temporary-tab-untrusted-field");
+    if (descriptor) copied[key] = descriptor.value;
+  }
+  if (!Number.isSafeInteger(copied["id"]) ||
+      (copied["id"] as number) < 1 ||
+      (copied["active"] !== undefined &&
+       typeof copied["active"] !== "boolean"))
+    throw Error("temporary-tab-untrusted-field");
+  return copied as BrowserTab;
+}
+
 function ownedBrowser(
   current: Connection,
   activeGeneration: number,
@@ -886,7 +905,7 @@ function ownedBrowser(
     const owned = temporaryTabs.get(id);
     if (!owned || owned.owner !== current)
       throw Error("unowned-temporary-tab");
-    const observed = await chrome.tabs.get(id);
+    const observed = exactTemporaryReadTab(await chrome.tabs.get(id));
     if (observed.id !== id ||
         classifyBlooketReadTabLoad(observed, owned.url) === "changed" ||
         observed.active === true ||
@@ -936,11 +955,12 @@ function ownedBrowser(
         requireOwner();
         const result = await chrome.tabs.get(id);
         requireOwner();
+        if (!temporaryTabs.has(id)) return result;
+        const observed = exactTemporaryReadTab(result);
         // Once the user activates a background read tab, it is no longer
         // disposable automation state. Stop the read and preserve that tab.
-        if (temporaryTabs.has(id) && result.active === true)
-          throw Error("temporary-tab-activated");
-        return result;
+        if (observed.active === true) throw Error("temporary-tab-activated");
+        return observed;
       },
       update: async (
         id: number,

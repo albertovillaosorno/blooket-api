@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green detached-question read fixtures showed a
+synthetic Chrome `active` getter could report an unattended temporary tab
+while the teacher had adopted the same tab. The worker now snapshots owned
+temporary-tab identity, URL, status, window and active state before reading
+or releasing a reserved tab. An accessor-backed active flag fails closed and
+retains the tab instead of quietly deleting it. No real tabs were removed.
+
 On 2026-10-19, red-to-green extension focus regressions showed that Chrome
 tab URL getter reads could authorize tab activation despite missing owned
 route evidence. The worker now snapshots main-tab ID, URL, window and
