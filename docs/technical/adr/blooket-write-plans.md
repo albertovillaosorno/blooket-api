@@ -451,6 +451,11 @@ The login host requires owned Chrome tab URL and status descriptors and no
 pending navigation before injecting credential-bearing scripts. A getter
 must not create apparent login-route or readiness evidence.
 
+Human challenge focus also requires native own-data tab and window
+identities before activating a tab, after activation and before focusing the
+window. Chrome property getters cannot upgrade a foreign/stale tab to a
+trusted teacher attention destination.
+
 A newly announced workspace similarly binds one exact owned origin and token
 to the Chrome sender URL. The worker does not re-read untrusted message
 properties between sender authorization and creating the browser bridge.

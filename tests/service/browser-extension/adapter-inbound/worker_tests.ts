@@ -56,6 +56,9 @@ test(
   const focusedWindows: number[] = [];
   let closed = false;
   let switchAfterActivate = false;
+  let humanTabGetter: "url" | "windowId" | "pendingUrl" | null = null;
+  let humanActivationGetter = false;
+  let humanTabGetterReads = 0;
   let validStatus = true;
   let partialJobResponse: false | "partial" | "ranged-200" = false;
   let partialJobDelivered = false;
@@ -287,6 +290,17 @@ test(
         }
         if (closed) throw new Error("closed-tab");
         assert.equal(id, 7);
+        if (humanTabGetter) {
+          const tab = { id, url: tabUrl, status: "complete", windowId: 3 };
+          Object.defineProperty(tab, humanTabGetter, { enumerable: true,
+            get() {
+              humanTabGetterReads++;
+              return humanTabGetter === "url" ? tabUrl
+                : humanTabGetter === "windowId" ? 3 : undefined;
+            },
+          });
+          return tab;
+        }
         return { id, url: tabUrl, status: "complete", windowId: 3,
           ...(pendingSourceRedirect ||
               (pendingAfterSetObservation && setListReads > 0) ||
@@ -318,6 +332,14 @@ test(
             switchAfterActivate = false;
             tabUrl = "https://untrusted.invalid/after-activation";
           }
+        }
+        if (humanActivationGetter && active === true) {
+          humanActivationGetter = false;
+          const result = { id, url: tabUrl, status: "complete", windowId: 3 };
+          Object.defineProperty(result, "windowId", { enumerable: true,
+            get() { humanTabGetterReads++; return 3; },
+          });
+          return result;
         }
         return { id, url: tabUrl, status: "complete", windowId: 3 };
       },
@@ -1124,6 +1146,23 @@ test(
     });
     assert.equal(scripts.length, scriptsBeforeConfirmation);
     assert.equal(foregroundedTabs.length, 0);
+    for (const field of ["url", "windowId", "pendingUrl"] as const) {
+      humanTabGetter = field;
+      const beforeGetterFocus = focusedWindows.length;
+      const beforeGetterActivation = foregroundedTabs.length;
+      assert.equal((await expectReply({ kind: "browser.activate" })).ok,
+        false, field);
+      assert.equal(humanTabGetterReads, 0);
+      assert.equal(foregroundedTabs.length, beforeGetterActivation);
+      assert.equal(focusedWindows.length, beforeGetterFocus);
+    }
+    humanTabGetter = null;
+    humanActivationGetter = true;
+    assert.equal((await expectReply({ kind: "browser.activate" })).ok,
+      false);
+    assert.equal(humanTabGetterReads, 0);
+    assert.deepEqual(focusedWindows, []);
+    foregroundedTabs.length = 0;
     const focused = await expectReply({ kind: "browser.activate" });
     assert.deepEqual(focused, {
       schemaVersion: 1, id: focused.id,
