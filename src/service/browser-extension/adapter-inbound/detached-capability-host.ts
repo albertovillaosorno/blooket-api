@@ -34,7 +34,8 @@ import {
   type CapabilityInspectionChromePort,
   type ExtensionCapabilityInspectionResult,
 } from "./capability-inspection-host.ts";
-import { classifyBlooketReadTabLoad } from "./read-navigation.ts";
+import { classifyBlooketReadTabLoad,
+  exactCreatedBlooketReadTabId } from "./read-navigation.ts";
 
 interface BrowserTab {
   readonly id?: number;
@@ -72,9 +73,8 @@ export async function inspectDetachedBlooketCapabilities(
   let result: ExtensionCapabilityInspectionResult = failed();
   try {
     const created = await chrome.tabs.create({ url: MY_SETS, active: false });
-    if (!Number.isSafeInteger(created.id) || created.id! < 1)
-      return failed();
-    tabId = created.id;
+    tabId = exactCreatedBlooketReadTabId(created);
+    if (tabId === undefined) return failed();
     // The capability host still performs its own native document checks;
     // this outer probe never assumes a complete tab means hydrated content.
     let ready = false;

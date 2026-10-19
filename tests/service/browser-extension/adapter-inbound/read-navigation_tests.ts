@@ -32,12 +32,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad } from
+import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad,
+  exactCreatedBlooketReadTabId } from
   // jig-ignore-next-line: Keep the mirrored source import unaliased.
   "../../../../src/service/browser-extension/adapter-inbound/read-navigation.ts";
 
 const SETS = "https://dashboard.blooket.com/my-sets";
 const EDIT = "https://dashboard.blooket.com/edit?id=fixture";
+
+test("created Chrome tab IDs require an exact own data descriptor", () => {
+  assert.equal(exactCreatedBlooketReadTabId({ id: 84 }), 84);
+  for (const value of [null, [], { id: 0 }, { id: 4.5 },
+    Object.create({ id: 84 }),
+    Object.defineProperty({}, "id", { value: 84, enumerable: false })])
+    assert.equal(exactCreatedBlooketReadTabId(value), undefined);
+  let reads = 0;
+  const forged = Object.defineProperty({}, "id", { enumerable: true,
+    get() { reads++; return 84; },
+  });
+  assert.equal(exactCreatedBlooketReadTabId(forged), undefined);
+  assert.equal(reads, 0);
+});
 
 test("Chrome pendingUrl is load evidence, not a committed document", () => {
   for (const url of [undefined, "", "about:blank"])

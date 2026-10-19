@@ -61,8 +61,8 @@ import { canLeaveBlooketPageForRead } from
 import { createExtensionCreateSetHost } from "./create-set-host.ts";
 import { createExtensionSessionAuthenticationHost } from
   "./login-host.ts";
-import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad } from
-  "./read-navigation.ts";
+import { confirmBlooketReadNavigation, classifyBlooketReadTabLoad,
+  exactCreatedBlooketReadTabId } from "./read-navigation.ts";
 import { createDetailReadPacer } from "./detail-read-pacing.ts";
 import {
   inspectBlooketDocumentOrigin,
@@ -924,24 +924,27 @@ function ownedBrowser(
         temporaryReadCreationPending = true;
         // A lost create acknowledgement can leave a real tab behind. Keep
         // the reservation on an exception rather than creating another.
-        const result = await chrome.tabs.create(options);
-        if (Number.isSafeInteger(result.id) && result.id! > 0 &&
-            result.id !== current.tabId)
-          temporaryTabs.set(result.id!, {
-            owner: current,
-            url: options.url,
-            ...(result.windowId === undefined
-              ? {} : { windowId: result.windowId }),
-          });
-        if (temporaryTabs.has(result.id!))
-          temporaryReadCreationPending = false;
+        const rawResult = await chrome.tabs.create(options);
+        // A forged ID would give cleanup authority over somebody else's tab.
+        // Keep the reservation if the Create receipt cannot be owned.
+        const createdId = exactCreatedBlooketReadTabId(rawResult);
+        if (createdId === undefined || createdId === current.tabId)
+          throw Error("unowned-temporary-tab");
+        const result = exactTemporaryReadTab(rawResult);
+        temporaryTabs.set(createdId, {
+          owner: current,
+          url: options.url,
+          ...(result.windowId === undefined
+            ? {} : { windowId: result.windowId }),
+        });
+        temporaryReadCreationPending = false;
         try {
           requireOwner();
-          if (!temporaryTabs.has(result.id!))
+          if (!temporaryTabs.has(createdId))
             throw Error("unowned-temporary-tab");
         } catch (error) {
-          if (temporaryTabs.has(result.id!))
-            await removeTemporary(result.id!).catch(() => undefined);
+          if (temporaryTabs.has(createdId))
+            await removeTemporary(createdId).catch(() => undefined);
           throw error;
         }
         return result;
