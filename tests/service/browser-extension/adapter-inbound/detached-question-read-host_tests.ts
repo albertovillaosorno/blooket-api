@@ -45,7 +45,7 @@ type Behavior = "normal" | "redirect" | "challenge" | "drift" |
   "late-edit" | "never-edit" | "switch-origin" |
   "challenge-after-shell" | "accessor-state" | "challenge-after-scan" |
   "hidden-ok-after-scan" | "uncommitted" |
-  "pending-after-shell" | "pending-after-scan";
+  "pending-after-shell" | "pending-after-scan" | "create-accessor";
 
 function fixture(behavior: Behavior = "normal") {
   const events: string[] = [];
@@ -59,6 +59,16 @@ function fixture(behavior: Behavior = "normal") {
       create: async options => {
         events.push("create");
         assert.deepEqual(options, { url: TARGET, active: false });
+        if (behavior === "create-accessor") {
+          const response = { url: TARGET, status: "loading" } as {
+            id?: number; url: string; status: string;
+          };
+          Object.defineProperty(response, "id", {
+            enumerable: true, get() { events.push("read-create-id-getter");
+              return temporaryTabId; },
+          });
+          return response;
+        }
         return { id: temporaryTabId, url: TARGET, status: "loading" };
       },
       get: async id => {
@@ -140,6 +150,16 @@ function fixture(behavior: Behavior = "normal") {
   );
   return { events, inspect, closed: () => closed };
 }
+
+test("accessor-supplied create ID cannot authorize reading or deleting tabs",
+  async () => {
+  const page = fixture("create-accessor");
+  assert.deepEqual(await page.inspect(), {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.deepEqual(page.events, ["create"]);
+  assert.equal(page.closed(), false);
+});
 
 test("fresh detached empty read is complete and closes only its own tab",
   async () => {

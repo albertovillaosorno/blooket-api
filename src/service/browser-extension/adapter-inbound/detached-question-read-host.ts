@@ -37,7 +37,8 @@ import { inspectBlooketPage } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
-import { classifyBlooketReadTabLoad } from "./read-navigation.ts";
+import { classifyBlooketReadTabLoad,
+  exactCreatedBlooketReadTabId } from "./read-navigation.ts";
 
 interface Tab {
   readonly id?: number;
@@ -86,9 +87,8 @@ export async function inspectDetachedBlooketQuestions(
   let closed = false;
   try {
     const created = await chrome.tabs.create({ url: target, active: false });
-    if (!Number.isSafeInteger(created.id) || created.id! < 1)
-      return failed();
-    createdId = created.id;
+    createdId = exactCreatedBlooketReadTabId(created);
+    if (createdId === undefined) return failed();
     // A newly opened background tab can still be hydrating after Chrome
     // reports complete. The existing reader owns further bounded retries.
     let loaded = false;

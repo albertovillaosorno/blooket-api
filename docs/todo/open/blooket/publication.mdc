@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green detached question and capability regressions
+showed that a browser Create acknowledgement with an accessor-backed tab ID
+could authorize inspection and cleanup of a different existing Chrome tab.
+Both detached hosts now require an enumerable own-data ID before reading or
+closing any tab. The worker also requires that admission before reserving
+or disposing a temporary tab, retaining its no-retry rule for ambiguous
+Create acknowledgements. All observations used synthetic tab fixtures.
+
 On 2026-10-19, red-to-green extension restoration tests showed a Chrome
 property-read trap could present a Blooket landing URL while the tab's own
 route pointed to an unrelated site. Restored and reclaimable tab admission

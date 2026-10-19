@@ -43,6 +43,7 @@ import {
 const MY_SETS = "https://dashboard.blooket.com/my-sets";
 
 function fixture(options: {
+  readonly createAccessor?: boolean;
   readonly sourceRedirect?: boolean;
   readonly unstableLists?: boolean;
   readonly failedCleanup?: boolean;
@@ -74,6 +75,15 @@ function fixture(options: {
         events.push("create");
         assert.deepEqual({ url: newUrl, active },
           { url: MY_SETS, active: false });
+        if (options.createAccessor) {
+          const response = { url: newUrl, status: "loading" } as {
+            id?: number; url: string; status: string;
+          };
+          Object.defineProperty(response, "id", { enumerable: true,
+            get() { events.push("read-create-id-getter"); return 84; },
+          });
+          return response;
+        }
         return { id: 84, url: newUrl, status: "loading" };
       },
       get: async id => {
@@ -203,6 +213,16 @@ function fixture(options: {
   return { events, inspect, removed: () => removed,
     elapsed: () => now - 1_000 };
 }
+
+test("accessor-supplied capability tab IDs never authorize reads or cleanup",
+  async () => {
+  const page = fixture({ createAccessor: true });
+  assert.deepEqual(await page.inspect(), {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.deepEqual(page.events, ["create"]);
+  assert.equal(page.removed(), false);
+});
 
 test("detached text capabilities admit stable read and close only own tab",
   async () => {

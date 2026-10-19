@@ -35,6 +35,19 @@ interface ReadTab {
   readonly status?: string;
 }
 
+// A tab Create acknowledgement is authority to manage exactly one Chrome ID.
+// An accessor cannot substitute a different existing teacher-owned tab.
+export function exactCreatedBlooketReadTabId(value: unknown):
+  number | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, "id");
+  if (!descriptor?.enumerable || !("value" in descriptor) ||
+      !Number.isSafeInteger(descriptor.value) || descriptor.value < 1)
+    return undefined;
+  return descriptor.value;
+}
+
+
 // Chrome exposes a new tab's destination as pendingUrl until its first
 // navigation commits. Only that exact owned destination may keep loading;
 // a different pending URL also invalidates an otherwise matching old URL.

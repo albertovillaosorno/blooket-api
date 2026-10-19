@@ -451,6 +451,11 @@ The login host requires owned Chrome tab URL and status descriptors and no
 pending navigation before injecting credential-bearing scripts. A getter
 must not create apparent login-route or readiness evidence.
 
+An auxiliary Chrome tabs.create acknowledgement must contain an owned,
+enumerable positive tab ID before it can grant read or cleanup authority.
+An accessor claiming another ID is not proof that the extension created
+that tab; an ambiguous creation keeps the no-duplicate-allocation guard.
+
 Temporary detached-read tabs similarly require own Chrome tab identity,
 route, window and active-state descriptors before reuse or disposal.
 An accessor-backed inactive claim cannot authorize closing a tab a teacher
