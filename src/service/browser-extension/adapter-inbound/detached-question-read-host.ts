@@ -38,7 +38,8 @@ import { inspectBlooketPage } from
 import { snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import { classifyBlooketReadTabLoad,
-  exactCreatedBlooketReadTabId } from "./read-navigation.ts";
+  exactCreatedBlooketReadTabId, snapshotBlooketReadTab } from
+  "./read-navigation.ts";
 
 interface Tab {
   readonly id?: number;
@@ -93,7 +94,10 @@ export async function inspectDetachedBlooketQuestions(
     // reports complete. The existing reader owns further bounded retries.
     let loaded = false;
     for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
-      const tab = await chrome.tabs.get(createdId!);
+      const tab = snapshotBlooketReadTab(
+        await chrome.tabs.get(createdId!),
+      );
+      if (!tab) return failed();
       const load = classifyBlooketReadTabLoad(tab, target);
       if (load === "changed") return failed();
       if (load === "ready") { loaded = true; break; }
@@ -130,7 +134,10 @@ export async function inspectDetachedBlooketQuestions(
     // document. Login, challenges and malformed replies stop immediately.
     let ready = false;
     for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
-      const tab = await chrome.tabs.get(createdId!);
+      const tab = snapshotBlooketReadTab(
+        await chrome.tabs.get(createdId!),
+      );
+      if (!tab) return failed();
       if (tab.url !== target || tab.status !== "complete" ||
           tab.pendingUrl !== undefined ||
           await script(inspectBlooketDocumentOrigin as
@@ -149,7 +156,10 @@ export async function inspectDetachedBlooketQuestions(
       const status = Object.getOwnPropertyDescriptor(state, "value");
       if (!status || !status.enumerable || !("value" in status))
         return failed();
-      const afterTab = await chrome.tabs.get(createdId!);
+      const afterTab = snapshotBlooketReadTab(
+        await chrome.tabs.get(createdId!),
+      );
+      if (!afterTab) return failed();
       if (afterTab.url !== target || afterTab.status !== "complete" ||
           afterTab.pendingUrl !== undefined ||
           await script(inspectBlooketDocumentOrigin as
@@ -187,7 +197,10 @@ export async function inspectDetachedBlooketQuestions(
     if (!finalStatus || !finalStatus.enumerable ||
         !("value" in finalStatus) || finalStatus.value !== "edit")
       return failed();
-    const check = await chrome.tabs.get(createdId!);
+    const check = snapshotBlooketReadTab(
+      await chrome.tabs.get(createdId!),
+    );
+    if (!check) return failed();
     const finalOrigin = await script(
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
       [target],

@@ -45,7 +45,8 @@ type Behavior = "normal" | "redirect" | "challenge" | "drift" |
   "late-edit" | "never-edit" | "switch-origin" |
   "challenge-after-shell" | "accessor-state" | "challenge-after-scan" |
   "hidden-ok-after-scan" | "uncommitted" |
-  "pending-after-shell" | "pending-after-scan" | "create-accessor";
+  "pending-after-shell" | "pending-after-scan" |
+  "create-accessor" | "get-accessor";
 
 function fixture(behavior: Behavior = "normal") {
   const events: string[] = [];
@@ -82,11 +83,16 @@ function fixture(behavior: Behavior = "normal") {
             pendingUrl: "https://foreign.invalid/" };
         if (behavior === "uncommitted" && tabReads <= 2)
           return { id, status: "loading", pendingUrl: TARGET };
-        return {
+        const tab = {
           id, url: behavior === "redirect" ? "https://id.blooket.com/"
             : TARGET,
           status: behavior === "not-ready" ? "loading" : "complete",
         };
+        if (behavior === "get-accessor") Object.defineProperty(tab, "url", {
+          enumerable: true, get() { events.push("read-getter-url");
+            return TARGET; },
+        });
+        return tab;
       },
       remove: async id => {
         assert.equal(id, temporaryTabId);
@@ -150,6 +156,17 @@ function fixture(behavior: Behavior = "normal") {
   );
   return { events, inspect, closed: () => closed };
 }
+
+test("getter-supplied detached route cannot authorize saved-card scripts",
+  async () => {
+  const page = fixture("get-accessor");
+  assert.deepEqual(await page.inspect(), {
+    ok: false, code: "blooket-browser-failed",
+  });
+  assert.equal(page.events.includes("read-getter-url"), false);
+  assert.equal(page.events.includes("inspectBlooketDocumentOrigin"), false);
+  assert.equal(page.closed(), true);
+});
 
 test("accessor-supplied create ID cannot authorize reading or deleting tabs",
   async () => {
