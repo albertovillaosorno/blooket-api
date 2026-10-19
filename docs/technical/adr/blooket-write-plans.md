@@ -470,6 +470,10 @@ before awaiting the next one. Recycling a stream buffer cannot corrupt a
 prepared job or its browser result, and transport failures never confer
 remote Save authority.
 
+Add Question likewise snapshots owned Chrome tab route fields at each
+navigation, form, Save, reload and read-back checkpoint. A tab getter cannot
+confer write authority merely by returning an admitted Edit route.
+
 The Create Set host also snapshots each Chrome tab's owned URL, readiness
 and pending navigation before using that route as form or read-back authority.
 A tab accessor cannot impersonate the expected Create or Edit route.
