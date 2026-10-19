@@ -73,6 +73,13 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, a red-to-green read-only capability regression showed that
+accessor-backed Chrome tab URLs could impersonate the original dashboard
+route before provider capability inspection. Each tab observation now uses
+copied own URL, status and pending-navigation data before inspecting or
+restoring provider UI controls. This is a synthetic compatibility guard,
+not a fresh provider acceptance or a published set.
+
 On 2026-10-19, red-to-green Add Question host tests showed Chrome
 tab route, readiness and pending-navigation getters could substitute
 apparently valid page evidence during form preparation or saved read-back.

@@ -248,6 +248,25 @@ test("invalid upstream capability deadline stops before tab access",
   }
 });
 
+test("capability probe rejects getter-backed Chrome source URL", async () => {
+  const page = fixture();
+  let reads = 0;
+  const get = page.chrome.tabs.get;
+  page.chrome.tabs.get = async id => {
+    const tab = { ...await get(id) };
+    Object.defineProperty(tab, "url", { enumerable: true,
+      get() { reads++; return page.originalUrl; },
+    });
+    return tab;
+  };
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause,
+  ).inspect({ textOnly: true });
+  assert.equal(result.ok, false);
+  assert.equal(reads, 0);
+  assert.deepEqual(page.navigations, []);
+});
+
 test("a source tab pending foreign navigation cannot start probing",
   async () => {
   const page = fixture();

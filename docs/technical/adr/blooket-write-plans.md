@@ -470,6 +470,10 @@ before awaiting the next one. Recycling a stream buffer cannot corrupt a
 prepared job or its browser result, and transport failures never confer
 remote Save authority.
 
+The read-only capability host similarly owns Chrome tab URL, readiness
+and pending navigation snapshots before inspecting UI capabilities or
+restoring a prior teacher-owned document.
+
 Add Question likewise snapshots owned Chrome tab route fields at each
 navigation, form, Save, reload and read-back checkpoint. A tab getter cannot
 confer write authority merely by returning an admitted Edit route.
