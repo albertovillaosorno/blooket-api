@@ -318,6 +318,33 @@ test("a proxy cannot spoof saved metadata before opening Edit Info",
   },
 );
 
+test("Create Set rejects accessor-backed Chrome tab route fields",
+  async () => {
+  for (const field of ["url", "status", "pendingUrl"] as const) {
+    const fake = fakeChrome({});
+    let reads = 0;
+    const original = fake.chrome.tabs.get;
+    fake.chrome.tabs.get = async id => {
+      const tab = { ...await original(id) };
+      Object.defineProperty(tab, field, { enumerable: true,
+        get() {
+          reads++;
+          return field === "url"
+            ? "https://dashboard.blooket.com/my-sets"
+            : field === "status" ? "complete" : undefined;
+        },
+      });
+      return tab;
+    };
+    const response = await createExtensionCreateSetHost(
+      fake.chrome, 7, async () => undefined,
+    ).openCreateSet();
+    assert.equal(response.ok, false, field);
+    assert.equal(reads, 0, field);
+    assert.equal(fake.calls.some(v => v.startsWith("update:")), false);
+  }
+});
+
 test("pending foreign navigation cannot own Create Set actions", async () => {
   const pendingUrl = "https://foreign.invalid/next";
   for (const phase of ["open", "prepare", "submit"] as const) {

@@ -470,6 +470,10 @@ before awaiting the next one. Recycling a stream buffer cannot corrupt a
 prepared job or its browser result, and transport failures never confer
 remote Save authority.
 
+The Create Set host also snapshots each Chrome tab's owned URL, readiness
+and pending navigation before using that route as form or read-back authority.
+A tab accessor cannot impersonate the expected Create or Edit route.
+
 The Create Set host makes the same descriptor-backed decisions for
 preparation, session state, redirect receipts and independently verified
 saved metadata. The Edit Info visibility read uses a copied reply rather
