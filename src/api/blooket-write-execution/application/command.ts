@@ -394,7 +394,8 @@ export async function executeBlooketPublicationCommand(
           blooket.session, blooket.secrets, blooket.sets,
           checkpoint.remoteSetId, { readOnly: true },
         );
-        if (!detail.ok) return fail(detail.code);
+        if (!detail.ok) return fail(detail.code === "set-id-mismatch"
+          ? "blooket-publication-remote-conflict" : detail.code);
         if (detail.kind !== "set")
           return success({ ...progress, phase: detail.kind,
             state: detail.state });
