@@ -1,12 +1,12 @@
 ---
 schema_version: 1
 id: blooket-17
-status: active
+status: completed
 priority: p2
 horizon: delivery
 order: 145
 area: delivery
-task: TODO - Safe automatic application updates
+task: TODO - SHA-verified personal GitHub updates
 legacy_task: TODO 17
 depends_on:
   - blooket-03
@@ -42,41 +42,47 @@ validation:
   - npm run package:verify -- darwin-arm64 --release
 ---
 
-# TODO - Safe automatic application updates
+# TODO - SHA-verified personal GitHub updates
 
 ## Objective
 
-Offer opt-in public GitHub updates with trusted compatible artifacts, safe
-staging, visible status, and recoverable installation. Keep startup usable
-offline and preserve teacher data and current access boundaries.
+Allow a teacher on Linux x64 to check and download a newer release from the
+fixed GitHub repository with a verified SHA-256, then install it manually
+without a paid account, Apple tooling or automatic background changes.
 
 ## Acceptance
 
-**IT WORKS -- release-critical.** The product must remain usable for
-personal manual installation on Linux x64 and macOS ARM64 without Apple
-Developer membership. Compatible update workflows must authenticate the
-publisher and bytes, stage changes safely, apply at a safe restart boundary,
-and return to a usable app without losing data, secrets, settings or drafts.
-Manual checks must work independently; unattended install is disabled until a
-specific target's trust, permission and rollback gates are implemented.
+**IT WORKS for the owner-approved personal update scope.** The Settings page
+checks public GitHub Releases on demand, distinguishes errors from no update,
+and downloads only the expected Linux archive from the fixed release/tag.
+It verifies GitHub's published upload-time SHA-256 and exact byte count,
+stages a private archive, and reports where to find it. Missing hashes, bad
+bytes and redirects outside the admitted asset authority must fail closed.
 
-A network failure, corrupt/foreign package, denied OS permission, interrupted
-install, or failed startup must NEVER silently destroy the only usable app,
-reset user data, claim a false success, or repeatedly attempt the same broken
-installation. Keep/recover the previous usable version, report an actionable
-failure, and allow controlled retry or manual recovery. Avoid installation
-during active/ambiguous Blooket writes. The practical guarantee is **safe
-failure and recovery**, not an impossible promise that no update error can
-occur.
+Installation is intentionally manual: stop the owned launcher, keep the
+previous app as a backup, unpack the verified archive to a new directory and
+switch the shortcut only when the new app launches. No automatic replacement,
+restart, native Mac installation, separate signed manifest, or Apple Developer
+ID is required by this narrowed personal scope. Those remain optional future
+improvements, not incomplete acceptance for this completed task.
 
-Demonstrate each supported update mode through trusted signed fixtures
-covering install, restart, interrupted install/rollback, persistence, and the
-EN/ES user controls. Pin a
-real production publisher trust root and produce/release trustworthy artifacts;
-a mock signature alone does not make shipping updates safe. Native Mac/Safari
-execution and Apple/hardware-specific acceptance belong to the final ongoing
-record and lack of those hosts must not prevent functional completion here.
-The updater implementation, trust, safe failure, and recovery remain required.
+## Evidence
+
+On 2026-10-20, `npm run package -- linux-x64 --output firefox-linux` and
+`npm run package:verify -- linux-x64 --output firefox-linux` passed, including
+Chrome/Firefox bundle resources and a Linux runnable archive. The Linux CI
+job and `release.yml` publish `linux-x64.tar.gz` without waiting for Mac CI.
+The local Settings update check and authenticated same-origin download endpoint
+use exact GitHub repository/tag/asset selection, GitHub's `sha256:` digest,
+exclusive private archive staging and fail-closed size/redirect tests.
+
+The focused `github_tests.ts` tests validate the downloaded archive bytes and
+failure outcomes without touching installed applications. The localhost server
+synthetic integration tests exercise the update action and CSRF protection.
+Native GitHub public-release publication has not been exercised here, and no
+Linux package has been automatically replaced. This scope does not claim
+independent publisher authentication from GitHub's checksum: the repository
+account is the publisher trust source for personal use.
 
 ## Implementation notes
 
@@ -126,7 +132,7 @@ Cancellation/timeout cannot clean the directory before the copy writer closes.
 This is program preparation only: independent startup/ownership transfer,
 production trust and UI installation remain pending, not blocked on Mac access.
 
-### Detailed update reliability and security requirements
+### Deferred historical automatic-installer design (non-blocking)
 
 ### Independent preferences and ownership
 
