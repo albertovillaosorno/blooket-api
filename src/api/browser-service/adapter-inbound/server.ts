@@ -54,6 +54,8 @@ import {
   createApplicationUpdateChecker,
   type ApplicationUpdateChecker,
 } from "../../application-updates/application/checker.ts";
+import { downloadGithubAsset } from
+  "../../../platforms/update-downloads/adapter-outbound/github.ts";
 import type { OnlineConnectionController } from
   "../../online-connection/contract/controller.ts";
 import {
@@ -161,6 +163,7 @@ export async function startBrowserService(
     stop?: () => Promise<void>;
     browserBridge?: BlooketBrowserBridgeBroker;
     updates?: ApplicationUpdateChecker;
+    downloadUpdate?: typeof downloadGithubAsset;
     loginItem?: LoginItemControl;
     openBlooketBrowser?: () => Promise<void>;
     safariExtension?: {
@@ -195,6 +198,7 @@ export async function startBrowserService(
   const browserBridge =
     options.browserBridge ?? createBlooketBrowserBridgeBroker();
   const updates = options.updates ?? createApplicationUpdateChecker();
+  const downloadUpdate = options.downloadUpdate ?? downloadGithubAsset;
   const blooket = {
     ...createBlooketRuntimePorts(browserBridge, root),
     secrets,
@@ -682,6 +686,30 @@ export async function startBrowserService(
         )
           throw new Error("invalid-update-check-request");
         json(response, 200, await updates.check());
+        return;
+      }
+      if (url.pathname === "/api/update-download") {
+        if (!body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).length !== 0) {
+          json(response, 400, { status: "invalid-request" });
+          return;
+        }
+        const selection = updates.status().result;
+        if (!selection || selection.status !== "available" ||
+            !/^sha256:[0-9a-f]{64}$/u.test(selection.asset.digest ?? "")) {
+          json(response, 409, { status: "verification-unavailable" });
+          return;
+        }
+        const target = `${process.platform}-${process.arch}`;
+        if (target !== "linux-x64" && target !== "darwin-arm64") {
+          json(response, 409, { status: "unsupported-platform" });
+          return;
+        }
+        const result = await downloadUpdate({
+          directory: join(root, "updates", "downloads"),
+          selection, target,
+        });
+        json(response, result.status === "downloaded" ? 200 : 409, result);
         return;
       }
       if (url.pathname === "/api/safari-extension-open") {

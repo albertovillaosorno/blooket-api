@@ -70,6 +70,7 @@ const release = (revision: string, id = 1) => ({
       size: 1234,
       state: "uploaded",
       browser_download_url: releaseAssetUrl("v" + revision, "darwin-arm64.zip"),
+      digest: "sha256:" + "3".repeat(64),
     },
   ],
 });
@@ -94,6 +95,8 @@ test(
     request: fixture.request,
   });
   assert.equal(result.status, "available");
+  if (result.status === "available")
+    assert.equal(result.asset.digest, "sha256:" + "3".repeat(64));
   assert.equal(
     fixture.seen[0]!.url,
     `${PUBLIC_RELEASES_API}?per_page=50&page=1`,
@@ -274,14 +277,21 @@ test(
     },
   );
   assert.equal(cancelled, true);
+  const linux = requests([json([{
+    ...release("26.4.1"),
+    assets: [{ id: 10, name: "linux-x64.tar.gz", size: 1234,
+      state: "uploaded",
+      browser_download_url: releaseAssetUrl("v26.4.1",
+        "linux-x64.tar.gz") }],
+  }])]);
+  const linuxResult = await checkPublicUpdates({
+    ...options, target: "linux-x64", request: linux.request,
+  });
+  assert.equal(linuxResult.status, "available");
+  assert.equal(linux.seen.length, 1);
   const unsupported = requests([]);
-  assert.deepEqual(
-    await checkPublicUpdates({
-      ...options,
-      target: "linux-x64",
-      request: unsupported.request,
-    }),
-    { status: "unsupported-platform" },
-  );
+  assert.deepEqual(await checkPublicUpdates({
+    ...options, target: "windows-x64", request: unsupported.request,
+  }), { status: "unsupported-platform" });
   assert.equal(unsupported.seen.length, 0);
 });

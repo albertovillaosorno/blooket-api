@@ -53,6 +53,7 @@ export interface UpdateAsset {
   readonly size: number;
   readonly state: "uploaded";
   readonly url: string;
+  readonly digest?: string;
 }
 export interface UpdateRelease {
   readonly schemaVersion: 1;
@@ -74,7 +75,9 @@ const RELEASE_KEYS = new Set([
   "prerelease",
   "assets",
 ]);
-const ASSET_KEYS = new Set(["id", "name", "size", "state", "url"]);
+const ASSET_KEYS = new Set([
+  "id", "name", "size", "state", "url", "digest",
+]);
 const positiveInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 
@@ -135,7 +138,10 @@ export function decodeUpdateRelease(
       !positiveInteger(asset["size"]) ||
       asset["size"] > MAX_UPDATE_ARCHIVE_BYTES ||
       asset["state"] !== "uploaded" ||
-      asset["url"] !== releaseAssetUrl(value["tag"], asset["name"])
+      asset["url"] !== releaseAssetUrl(value["tag"], asset["name"]) ||
+      (asset["digest"] !== undefined &&
+        (typeof asset["digest"] !== "string" ||
+          !/^sha256:[0-9a-f]{64}$/u.test(asset["digest"])))
     )
       return failure();
     ids.add(asset["id"]);
@@ -145,6 +151,7 @@ export function decodeUpdateRelease(
       size: asset["size"],
       state: "uploaded",
       url: asset["url"],
+      ...(asset["digest"] === undefined ? {} : { digest: asset["digest"] }),
     });
   }
   return {
