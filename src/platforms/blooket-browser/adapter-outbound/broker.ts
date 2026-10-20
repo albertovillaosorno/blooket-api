@@ -203,7 +203,8 @@ export function createBlooketBrowserBridgeBroker(
         (resolve) => {
           const startedAt = now();
           const write = request.command.kind === "sets.create" ||
-            request.command.kind === "questions.create";
+            request.command.kind === "questions.create" ||
+            request.command.kind === "questions.replace";
           const lifetimeMs = write ? writeTimeoutMs : timeoutMs;
           const timer = setTimeout(() => {
             settle(id, {
@@ -255,7 +256,8 @@ export function createBlooketBrowserBridgeBroker(
           : kind === "capabilities.inspect" ||
             kind === "capabilities.inspect-text"
             ? MIN_CAPABILITY_DISPATCH_MS
-            : kind === "sets.create" || kind === "questions.create"
+            : kind === "sets.create" || kind === "questions.create" ||
+                kind === "questions.replace"
               ? Math.max(MIN_WRITE_DISPATCH_MS, writeTimeoutMs - 500)
               : kind === "session.observe" || kind === "sets.list" ||
                 kind === "sets.get" || kind === "questions.list"

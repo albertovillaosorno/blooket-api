@@ -68,7 +68,7 @@ export function buildBlooketReplacementPlan(desired: BlooketWritePlan,
     desiredStateSha256: digest, target: binding, operations: [{
       ...selected, question: structuredClone(selected.question),
       kind: "replace-question", operationId: planId + ":replace:0",
-      previous: previous.value,
+      previous: previous.value, questionCount: baseline.value.itemCount,
     }] };
   function freeze(value: unknown) {
     if (value && typeof value === "object") {

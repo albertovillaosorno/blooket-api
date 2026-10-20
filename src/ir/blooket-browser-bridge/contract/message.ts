@@ -35,6 +35,7 @@ import type {
   ValidationIssue,
 } from "../../runtime-decoding/domain/decode-result.ts";
 import {
+  exactOwnData,
   snapshotExactDenseArray,
   isRecord,
   ownDataField,
@@ -81,12 +82,14 @@ export type BlooketBrowserBridgeOperation =
   | "session.authenticate"
   | "capabilities.inspect"
   | "capabilities.inspect-text"
+  | "writes.inspect-replacement"
   | "writes.inspect"
   | "sets.list"
   | "sets.get"
   | "questions.list"
   | "sets.create"
-  | "questions.create";
+  | "questions.create"
+  | "questions.replace";
 
 export type BlooketBrowserBridgeCommand =
   | { readonly kind: "browser.activate" }
@@ -98,6 +101,7 @@ export type BlooketBrowserBridgeCommand =
     }
   | { readonly kind: "capabilities.inspect" }
   | { readonly kind: "capabilities.inspect-text" }
+  | { readonly kind: "writes.inspect-replacement" }
   | { readonly kind: "writes.inspect" }
   | { readonly kind: "sets.list" }
   | { readonly kind: "sets.get"; readonly setId: string }
@@ -109,7 +113,7 @@ export type BlooketBrowserBridgeCommand =
       readonly private: boolean;
     }
   | {
-      readonly kind: "questions.create";
+      readonly kind: "questions.create" | "questions.replace";
       readonly setId: string;
       readonly number: number;
       readonly question: string;
@@ -122,6 +126,11 @@ export type BlooketBrowserBridgeCommand =
       readonly answerTypes: readonly ("exactly" | "contains")[] | null;
       readonly timeLimit: number;
       readonly image?: BlooketPreparedImage;
+      readonly replacement?: {
+        readonly questionCount: number;
+        readonly previous: Omit<Extract<BlooketBrowserBridgeCommand,
+          { readonly question: string }>, "kind" | "replacement">;
+      };
     };
 
 export interface BlooketBrowserBridgeRequest {
@@ -188,6 +197,7 @@ export function decodeBlooketBrowserBridgeRequest(
     kind === "capabilities.inspect" ||
     kind === "capabilities.inspect-text" ||
     kind === "writes.inspect" ||
+    kind === "writes.inspect-replacement" ||
     kind === "sets.list"
   )
     command = { kind };
@@ -234,7 +244,7 @@ export function decodeBlooketBrowserBridgeRequest(
         message: "Expected bounded text-only Create Set fields.",
       });
     }
-  } else if (kind === "questions.create") {
+  } else if (kind === "questions.create" || kind === "questions.replace") {
     keys = [
       "kind",
       "setId",
@@ -247,6 +257,36 @@ export function decodeBlooketBrowserBridgeRequest(
       "timeLimit",
       "image",
     ];
+    let replacement: Extract<BlooketBrowserBridgeCommand,
+      { readonly question: string }>["replacement"];
+    if (kind === "questions.replace") {
+      keys.push("replacement");
+      const owned = exactOwnData(ownDataField(candidate, "replacement"),
+        ["questionCount", "previous"]);
+      const count = owned?.["questionCount"];
+      const prior = exactOwnData(owned?.["previous"],
+        ["setId", "number", "question", "answers", "qType", "random",
+          "answerTypes", "timeLimit"]);
+      const decoded = prior ? decodeBlooketBrowserBridgeRequest({
+        schemaVersion: 1, id: "00000000-0000-0000-0000-000000000000",
+        command: { ...prior, kind: "questions.create" },
+      }) : undefined;
+      if (decoded?.ok && decoded.value.command.kind === "questions.create" &&
+          !decoded.value.command.image &&
+          !Object.hasOwn(candidate, "image") &&
+          Number.isSafeInteger(count) && (count as number) <= 200 &&
+          (count as number) >= decoded.value.command.number &&
+          decoded.value.command.number === ownDataField(candidate, "number") &&
+          decoded.value.command.setId === ownDataField(candidate, "setId") &&
+          decoded.value.command.qType === ownDataField(candidate, "qType") &&
+          snapshotExactDenseArray(ownDataField(candidate, "answers"), 100)
+            ?.length === decoded.value.command.answers.length) {
+        const { kind: _kind, ...previous } = decoded.value.command;
+        replacement = { questionCount: count as number, previous };
+      } else issues.push({ path: "$.command.replacement",
+        code: "invalid-replacement-question-input",
+        message: "Expected an exact saved text row and unchanged layout." });
+    }
     const setId = requiredString(
       ownDataField(candidate, "setId"), "$.command.setId", issues,
     );
@@ -376,6 +416,7 @@ export function decodeBlooketBrowserBridgeRequest(
           readonly ("exactly" | "contains")[] | null,
         timeLimit: timeLimit as number,
         ...(image?.ok ? { image: image.value } : {}),
+        ...(replacement ? { replacement } : {}),
       };
     } else {
       issues.push({

@@ -156,6 +156,7 @@ export interface BlooketReplaceQuestionOperation extends
   Omit<BlooketQuestionOperation, "kind"> {
   readonly kind: "replace-question";
   readonly previous: BlooketQuestionRead;
+  readonly questionCount: number;
 }
 
 export type BlooketQuestionWriteOperation = BlooketQuestionOperation

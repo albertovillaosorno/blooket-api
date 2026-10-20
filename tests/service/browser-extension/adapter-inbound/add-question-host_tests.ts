@@ -148,6 +148,10 @@ function fakeChrome(options: {
           case "inspectBlooketPostSubmitRateLimit":
             return [{ result: options.postSubmit429 === true }];
           case "runBlooketAddQuestionPageAction":
+            if (args?.[0] === "open-replacement") {
+              modalOpen = JSON.parse(String(args[1])).setId === "set-fixture";
+              return [{ result: modalOpen }];
+            }
             if (args?.[0] === "open" || args?.[0] === "open-image") {
               modalOpen = args?.[1] === "set-fixture";
               return [{ result: modalOpen }];
@@ -2158,3 +2162,24 @@ test("invalid Save frame cannot confirm an unsaved question or retry it",
   assert.equal(fake.calls.includes("reload"), true);
   },
 );
+
+
+test("replacement host saves once and verifies the unchanged full row count",
+  async () => {
+  const page = fakeChrome({
+    priorListReply: { ok: true, value: [1, 2] },
+    listReply: { ok: true, value: [1, 2] },
+  });
+  const result = await createExtensionAddQuestionHost(page.chrome, 7,
+    async () => undefined).addQuestion({ ...input, replacement: {
+      questionCount: 2, previous: { ...input, question: "Old prompt." },
+    } });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(page.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(page.calls.includes(
+    "runBlooketAddQuestionPageAction:open-replacement"), true);
+  assert.equal(page.calls.includes(
+    "runBlooketAddQuestionPageAction:open"), false);
+  assert.equal(page.calls.includes("reload"), true);
+});

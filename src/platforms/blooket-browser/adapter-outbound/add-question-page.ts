@@ -46,6 +46,10 @@ export interface BlooketQuestionPageInput {
   readonly answerTypes: readonly ("exactly" | "contains")[] | null;
   readonly timeLimit: number;
   readonly image?: BlooketPreparedImage;
+  readonly replacement?: {
+    readonly questionCount: number;
+    readonly previous: BlooketQuestionPageInput;
+  };
 }
 
 export type BlooketTextQuestionPageInput = BlooketQuestionPageInput;
@@ -55,6 +59,7 @@ export type BlooketAddQuestionPageResult =
   | { readonly ok: false; readonly code: "blooket-browser-failed" };
 
 export type BlooketAddQuestionPageAction =
+  | "open-replacement"
   | "open"
   | "open-image"
   | "cancel-image"
@@ -73,7 +78,8 @@ export function runBlooketAddQuestionPageAction(
     ok: false,
     code: "blooket-browser-failed",
   });
-  const opens = action === "open" || action === "open-image";
+  const opens = action === "open" || action === "open-image" ||
+    action === "open-replacement";
   const probes = action === "is-ready" || action === "is-image-ready";
   const world = globalThis as typeof globalThis & {
     __blooketAddQuestionFormWatch?: {
@@ -89,6 +95,8 @@ export function runBlooketAddQuestionPageAction(
       file?: File;
       number?: number;
       expectedNumber?: number;
+      questionCount?: number;
+      providerExtras?: string;
       image?: BlooketPreparedImage;
       url?: string;
       controlChangeTarget?: Element;
@@ -113,13 +121,15 @@ export function runBlooketAddQuestionPageAction(
       url.searchParams.get("id") === setId
     );
   };
-  const exactPriorCards = (number: number): boolean => {
+  const exactPriorCards = (number: number, itemCount =
+    world.__blooketAddQuestionFormWatch?.questionCount ?? number - 1,
+  ): boolean => {
     if (!Number.isSafeInteger(number) || number < 1 || number > 200)
       return false;
     const cards = Array.from(document.querySelectorAll(
       '[role="button"][aria-label^="Edit question "]',
     ));
-    if (cards.length !== number - 1 || !cards.every((card, index) => {
+    if (cards.length !== itemCount || !cards.every((card, index) => {
       const bounds = card.getBoundingClientRect();
       const style = getComputedStyle(card);
       return bounds.width > 0 && bounds.height > 0 &&
@@ -278,7 +288,12 @@ export function runBlooketAddQuestionPageAction(
       if (JSON.stringify(actual) !== text) return false;
       const prepared = expected as Record<string, unknown>;
       const keys = Object.keys(prepared);
-      if (Object.keys(actual).length !== keys.length) return false;
+      const extras = Object.fromEntries(Object.entries(actual)
+        .filter(([key]) => !keys.includes(key)));
+      const ownedExtras = world.__blooketAddQuestionFormWatch?.providerExtras;
+      if (ownedExtras === undefined
+        ? Object.keys(actual).length !== keys.length
+        : JSON.stringify(extras) !== ownedExtras) return false;
       return keys.every(key => {
         if (!Object.hasOwn(actual, key)) return false;
         const left = actual[key], right = prepared[key];
@@ -336,6 +351,7 @@ export function runBlooketAddQuestionPageAction(
         challenge || organizationPrompt)
       return opens || probes ? false : failed();
     if (
+      action !== "open-replacement" &&
       action !== "open" &&
       action !== "open-image" &&
       action !== "cancel-image" &&
@@ -346,6 +362,22 @@ export function runBlooketAddQuestionPageAction(
       action !== "submit"
     ) return failed();
     if (opens) {
+      const replacement: BlooketQuestionPageInput | undefined =
+        action === "open-replacement" && typeof value === "string"
+          ? JSON.parse(value) : undefined;
+      if (action === "open-replacement") {
+        if (!replacement?.replacement || replacement.image ||
+            replacement.replacement.previous.image ||
+            !serializedQuestion(replacement) ||
+            !serializedQuestion(replacement.replacement.previous) ||
+            replacement.replacement.previous.number !== replacement.number ||
+            replacement.replacement.previous.setId !== replacement.setId ||
+            !Number.isSafeInteger(replacement.replacement.questionCount) ||
+            replacement.replacement.questionCount < replacement.number ||
+            replacement.replacement.questionCount > 200) return false;
+        value = replacement.setId;
+        expectedNumber = replacement.number;
+      }
       if (typeof value !== "string" || !editRoute(value) ||
           !Number.isSafeInteger(expectedNumber) || expectedNumber < 1 ||
           expectedNumber > 200) return false;
@@ -354,7 +386,9 @@ export function runBlooketAddQuestionPageAction(
       // One final DOM-local preflight shares the same synchronous function
       // as the Add Question click. A late manually added card cannot
       // overtake the host's earlier two collection reads.
-      if (!exactPriorCards(expectedNumber)) return false;
+      if (!exactPriorCards(expectedNumber, replacement
+          ? replacement.replacement!.questionCount : expectedNumber - 1))
+        return false;
       const dialogs = Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"]',
       ));
@@ -365,12 +399,18 @@ export function runBlooketAddQuestionPageAction(
         return style.display !== "none" && style.visibility !== "hidden" &&
           style.visibility !== "collapse";
       })) return false;
-      let buttons = Array.from(document.querySelectorAll("button")).filter(
-        (button) => normalizedText(button) === "Add Question",
-      );
+      let buttons = replacement
+        ? Array.from(document.querySelectorAll(
+            '[role="button"][aria-label="Edit question ' +
+              String(expectedNumber) + '"]',
+          )).flatMap(card => Array.from(card.querySelectorAll("button")))
+            .filter(button => normalizedText(button) === "Edit")
+        : Array.from(document.querySelectorAll("button")).filter(
+            button => normalizedText(button) === "Add Question",
+          );
       // The live Edit page repeats Add Question in its header and list.
       // Resolve the observed list toolbar instead of choosing by DOM order.
-      if (buttons.length === 2) {
+      if (!replacement && buttons.length === 2) {
         buttons = buttons.filter(button => {
           const peers = Array.from(
             button.parentElement?.querySelectorAll("button") ?? [],
@@ -404,6 +444,8 @@ export function runBlooketAddQuestionPageAction(
           typeof world.__blooketAddQuestionFormWatch
         > = {
           document, setId: value, expectedNumber, dirty: false,
+          ...(replacement ? { questionCount:
+            replacement.replacement!.questionCount } : {}),
           prepared: false, finalized: false,
           submitted: false, dispose: () => {},
         };

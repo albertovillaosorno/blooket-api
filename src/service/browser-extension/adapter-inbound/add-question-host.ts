@@ -191,9 +191,11 @@ export function createExtensionAddQuestionHost(
         const decoded = decodeBlooketBrowserBridgeRequest({
           schemaVersion: 1,
           id: "00000000-0000-0000-0000-000000000000",
-          command: { ...candidate, kind: "questions.create" },
+          command: { ...candidate, kind: candidate.replacement
+            ? "questions.replace" : "questions.create" },
         });
-        if (!decoded.ok || decoded.value.command.kind !== "questions.create")
+        if (!decoded.ok || (decoded.value.command.kind !== "questions.create" &&
+            decoded.value.command.kind !== "questions.replace"))
           return browserFailure();
         const input = decoded.value.command;
         let imageIdentity: { byteLength: number; sha256: string } | undefined;
@@ -313,7 +315,9 @@ export function createExtensionAddQuestionHost(
           listBlooketQuestionNumbers as (...args: never[]) => unknown,
           [input.setId],
         );
-        if (!exactPreviousQuestionNumbers(prior, input.number))
+        const priorBound = input.replacement
+          ? input.replacement.questionCount + 1 : input.number;
+        if (!exactPreviousQuestionNumbers(prior, priorBound))
           return browserFailure();
         // The teacher or provider may append a question between preflight
         // and modal acquisition. Two exact independent reads are required.
@@ -324,11 +328,13 @@ export function createExtensionAddQuestionHost(
         );
         // Both replies already prove the same bounded contiguous 1..n-1
         // slots; never stringify a browser-owned prototype to compare them.
-        if (!exactPreviousQuestionNumbers(priorAgain, input.number))
+        if (!exactPreviousQuestionNumbers(priorAgain, priorBound))
           return browserFailure();
         const opened = await ownedScript(
           runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-          [input.image ? "open-image" : "open", input.setId,
+          [input.replacement ? "open-replacement"
+            : input.image ? "open-image" : "open",
+            input.replacement ? JSON.stringify(input) : input.setId,
             input.number],
         );
         if (opened !== true) return browserFailure();
@@ -591,7 +597,8 @@ async function observeQuestion(
       listBlooketQuestionNumbers as (...args: never[]) => unknown,
       [input.setId],
     );
-    const rows = postSaveQuestionRows(listed, input.number);
+    const savedCount = input.replacement?.questionCount ?? input.number;
+    const rows = postSaveQuestionRows(listed, savedCount);
     if (rows === "conflict") return browserFailure();
     if (rows === "pending") {
       await pause(POLL_MS);
@@ -670,14 +677,14 @@ async function observeQuestion(
             listBlooketQuestionNumbers as (...args: never[]) => unknown,
             [input.setId],
           ).catch(() => null);
-          if (questionNumberPresent(finalList, input.number)) break;
+          if (questionNumberPresent(finalList, savedCount)) break;
           // React may remount cards just after closing an inspected modal.
           // Only an exact unavailable page shape can wait; a readable but
           // incomplete or conflicting set of cards stops immediately.
           if (!pageUnavailable(finalList)) return browserFailure();
           await pause(POLL_MS);
         }
-        if (!questionNumberPresent(finalList, input.number))
+        if (!questionNumberPresent(finalList, savedCount))
           return browserFailure();
         // Closing a read-owned panel can trigger a delayed card rerender.
         // A single final list is not stable provider evidence.
@@ -694,7 +701,7 @@ async function observeQuestion(
           [input.setId],
         ).catch(() => false);
         return stillClosed === true &&
-            questionNumberPresent(finalAgain, input.number)
+            questionNumberPresent(finalAgain, savedCount)
           ? { ok: true } : browserFailure();
       }
       if (isClosed !== false) return browserFailure();

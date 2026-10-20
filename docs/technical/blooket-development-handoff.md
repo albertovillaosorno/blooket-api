@@ -1452,3 +1452,37 @@ existing authenticated Chrome window was unavailable during this
 session, so live loaded-extension acceptance and native Safari remain
 unverified. The final guard narrows a race but cannot make separate
 Chrome commands an atomic transaction with arbitrary human input.
+
+
+### Existing-question native route (2026-10-20)
+
+The replacement bridge now has a distinct `questions.replace` command and a
+loaded `single-row-reload-v1` declaration. It opens the exact existing card's
+inner Edit button, preserves the collection count and checks the saved prior
+text before changing visible React controls. It retains provider-owned extra
+JSON fields internally without returning their values or writing hidden JSON.
+
+One latched Save still requires matching read-back after a native reload.
+The initial admitted replacement layout keeps the question type and answer
+count unchanged and refuses images/audio on the selected row; other questions
+can retain verified images. Public replacement command admission and live
+replacement acceptance remain pending at this checkpoint.
+
+Reference evidence is captured build
+`86784c3d4c38fcd559c92f38fbadd7a160947de2`, module 35211 (`ea`, `ei`, inner
+Edit within `aria-label="Edit question N"`) and module 89770 (`eF`, initial
+`currentQuestion` spread and provider-generated `name="question"` JSON).
+Both manifest entries have no alternative factory. Recovery syntax/hash checks
+passed; these references do not recover the server actions or establish their
+private contract.
+
+The owner's real Chrome observation separately opened the
+second typing question's Edit form and cancelled it without saving. Native
+replacement publication has not yet been claimed.
+
+The official [question-set creation guide][native-question-guide],
+checked on 2026-10-20, documents the visible question editor and Save step;
+it does not establish our browser selectors or the remote outcome.
+
+<!-- jig-ignore-next-line: Official source URL is indivisible. -->
+[native-question-guide]: https://help.blooket.com/hc/en-us/articles/16289513807383-Creating-a-Question-Set

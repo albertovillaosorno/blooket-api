@@ -660,3 +660,22 @@ test("bridge adapters never invoke getters in transport or write replies",
   assert.equal(getterCalls, 0);
   },
 );
+
+
+test("replacement declaration refuses an old or malformed loaded companion",
+  async () => {
+  for (const value of [{}, { questionReplacement: true },
+    { questionReplacement: "callback-v0" },
+    { questionReplacement: "single-row-reload-v1", extra: true }]) {
+    const commands: BlooketBrowserBridgeCommand[] = [];
+    const adapters = createBlooketBrowserBridgeAdapters(transport([
+      { ok: true, value },
+    ], commands));
+    assert.equal(await adapters.writes.inspectQuestionReplacement!(), false);
+    assert.deepEqual(commands, [{ kind: "writes.inspect-replacement" }]);
+  }
+  const adapters = createBlooketBrowserBridgeAdapters(transport([
+    { ok: true, value: { questionReplacement: "single-row-reload-v1" } },
+  ], []));
+  assert.equal(await adapters.writes.inspectQuestionReplacement!(), true);
+});

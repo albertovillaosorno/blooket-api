@@ -78,6 +78,7 @@ export interface BlooketReplaceQuestionSubmission extends
   Omit<BlooketAddQuestionSubmission, "kind"> {
   readonly kind: "replace-question";
   readonly previous: BlooketQuestionRead;
+  readonly questionCount: number;
 }
 
 export type BlooketWriteSubmission =

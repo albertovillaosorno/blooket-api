@@ -52,9 +52,15 @@ export async function prepareBlooketQuestionControls(
       controlChangeTarget?: Element;
       controlsStarted?: boolean;
       controlsPrepared?: boolean;
+      questionCount?: number;
+      providerExtras?: string;
     };
   };
+  const previous = input.replacement?.previous;
   const watch = world.__blooketAddQuestionFormWatch;
+  const priorAnswer = (index: number): string =>
+    previous?.answers[index]?.text ?? "";
+  const priorPrompt = previous?.question ?? "";
   const form = watch?.form;
   const hidden = watch?.question;
   const visible = (element: Element): boolean => {
@@ -147,9 +153,15 @@ export async function prepareBlooketQuestionControls(
       const record = value as Record<string, unknown>;
       const keys = ["number", "question", "answers", "correctAnswers",
         "image", "audio", "qType", "random", "answerTypes", "timeLimit"];
-      if (Object.keys(record).length !== keys.length ||
+      const extras = JSON.stringify(Object.fromEntries(Object.entries(record)
+        .filter(([key]) => !keys.includes(key))));
+      if ((!previous && Object.keys(record).length !== keys.length) ||
+          (previous && watch!.providerExtras !== undefined &&
+            watch!.providerExtras !== extras) ||
           keys.some(key => !Object.hasOwn(record, key)) ||
           JSON.stringify(record) !== hidden!.value) return null;
+      if (previous && watch!.providerExtras === undefined)
+        watch!.providerExtras = extras;
       return record;
     } catch { return null; }
   };
@@ -193,6 +205,11 @@ export async function prepareBlooketQuestionControls(
     if (input.qType === "typing" && input.answers.some(answer =>
       !answer || typeof answer.text !== "string" ||
       /[\r\n]/u.test(answer.text))) return false;
+    if (previous && (watch!.questionCount !==
+        input.replacement!.questionCount || previous.image || input.image ||
+        previous.replacement || previous.setId !== input.setId ||
+        previous.number !== input.number || previous.qType !== input.qType ||
+        previous.answers.length !== input.answers.length)) return false;
     watch!.controlsStarted = true;
     if (!await wait(() => raw() !== null)) return false;
     // Before picking a type or changing native fields, require the exact
@@ -205,11 +222,23 @@ export async function prepareBlooketQuestionControls(
     // A provider modal may already contain a teacher's unsaved text before
     // this isolated watch was admitted. Never change its type or overwrite
     // the prompt and answers of a nonempty editor.
-    if (initial["question"] !== "" ||
+    if (previous && (initial["qType"] !== previous.qType ||
+        initial["random"] !== previous.random ||
+        initial["timeLimit"] !== previous.timeLimit ||
+        JSON.stringify(initial["answers"]) !== JSON.stringify(
+          previous.answers.map(answer => answer.text)) ||
+        JSON.stringify(initial["correctAnswers"]) !== JSON.stringify(
+          previous.answers.filter(answer => answer.correct)
+            .map(answer => answer.text)) ||
+        (previous.qType === "typing" &&
+          JSON.stringify(initial["answerTypes"]) !==
+            JSON.stringify(previous.answerTypes)))) return false;
+    if (initial["question"] !== priorPrompt ||
         !Array.isArray(initial["answers"]) ||
-        initial["answers"].some(answer => answer !== "") ||
+        initial["answers"].some((answer, index) =>
+          answer !== priorAnswer(index)) ||
         !Array.isArray(initial["correctAnswers"]) ||
-        initial["correctAnswers"].some(answer => answer !== ""))
+        (!previous && initial["correctAnswers"].some(answer => answer !== "")))
       return false;
     // Visible React controls can contain unsaved text even while the hidden
     // serializer has not registered a first MC answer input event.
@@ -219,7 +248,8 @@ export async function prepareBlooketQuestionControls(
         'input[name="accepted-answers"]',
       )),
     ] as (HTMLTextAreaElement | HTMLInputElement)[];
-    if (nativeAnswers.some(control => control.value !== "")) return false;
+    if (nativeAnswers.some((control, index) =>
+      control.value !== priorAnswer(index))) return false;
     // React may publish the hidden state before the visible picker mounts.
     // Waiting only for unique provider controls cannot cause another write.
     if (!await wait(() => unique('[role="combobox"]') !== null &&
@@ -233,7 +263,8 @@ export async function prepareBlooketQuestionControls(
       HTMLInputElement | null;
     if (!originalPrompt || originalPrompt.tagName !== "TEXTAREA" ||
         originalPrompt.disabled || originalPrompt.readOnly ||
-        originalPrompt.value !== "" || raw()?.["question"] !== "" ||
+        originalPrompt.value !== priorPrompt ||
+        raw()?.["question"] !== priorPrompt ||
         !originalTime || originalTime.tagName !== "INPUT" ||
         originalTime.type !== "number" || originalTime.disabled ||
         originalTime.readOnly ||
@@ -262,7 +293,8 @@ export async function prepareBlooketQuestionControls(
       ...Array.from(form!.querySelectorAll('textarea[id^="answer-"]')),
       ...Array.from(form!.querySelectorAll('input[name="accepted-answers"]')),
     ] as (HTMLTextAreaElement | HTMLInputElement)[];
-    if (liveAnswers.some(answer => answer.value !== "")) return false;
+    if (liveAnswers.some((answer, index) =>
+      answer.value !== priorAnswer(index))) return false;
     // Before changing the prompt or timer, refuse a provider editor already
     // containing unowned MC answer text in a slot this plan will not use.
     // Otherwise a partially prepared form would retain teacher data after
@@ -290,7 +322,8 @@ export async function prepareBlooketQuestionControls(
         const control = unique("textarea#answer-" + index) as
           HTMLTextAreaElement | null;
         if (!control || control.tagName !== "TEXTAREA" ||
-            control.disabled || control.readOnly || control.value !== "" ||
+            control.disabled || control.readOnly ||
+            control.value !== priorAnswer(index) ||
             (index < input.answers.length &&
               !withinControlLimit(control, input.answers[index]!.text)))
           return false;
@@ -309,11 +342,11 @@ export async function prepareBlooketQuestionControls(
     if (input.qType === "typing") {
       if (!await wait(() => form!.querySelectorAll(
         'input[name="accepted-answers"]',
-      ).length === 1)) return false;
-      const first = unique('input[name="accepted-answers"]') as
+      ).length === (previous?.answers.length ?? 1))) return false;
+      const first = form!.querySelector('input[name="accepted-answers"]') as
         HTMLInputElement | null;
       if (!first || first.tagName !== "INPUT" || first.type !== "text" ||
-          first.disabled || first.readOnly || first.value !== "" ||
+          first.disabled || first.readOnly || first.value !== priorAnswer(0) ||
           !withinControlLimit(first, input.answers[0]!.text))
         return false;
     }
@@ -324,7 +357,8 @@ export async function prepareBlooketQuestionControls(
     const liveTime = unique("input#time-limit") as HTMLInputElement | null;
     if (!livePrompt || livePrompt.tagName !== "TEXTAREA" ||
         livePrompt.disabled || livePrompt.readOnly ||
-        livePrompt.value !== "" || raw()?.["question"] !== "" ||
+        livePrompt.value !== priorPrompt ||
+        raw()?.["question"] !== priorPrompt ||
         !liveTime || liveTime.tagName !== "INPUT" ||
         liveTime.type !== "number" || liveTime.disabled ||
         liveTime.readOnly ||
@@ -340,7 +374,7 @@ export async function prepareBlooketQuestionControls(
       if (!input.answerTypes ||
           input.answerTypes.length !== input.answers.length) return false;
       for (let index = 0; index < input.answers.length; index++) {
-        if (index > 0) {
+        if (index > 0 && !previous) {
           const buttons = Array.from(form!.querySelectorAll("button"))
             .filter(button => button.textContent?.trim() ===
               "Add Alternative Answer");
@@ -354,9 +388,11 @@ export async function prepareBlooketQuestionControls(
         ));
         const typed = input.answers[index]!.text;
         const field = fields[index] as HTMLInputElement | undefined;
-        if (fields.length !== index + 1 || !field ||
+        if (fields.length !== (previous?.answers.length ?? index + 1) ||
+            !field ||
             field.tagName !== "INPUT" || field.type !== "text" ||
-            field.disabled || field.readOnly || field.value !== "" ||
+            field.disabled || field.readOnly ||
+            field.value !== priorAnswer(index) ||
             !await setText(field, typed) ||
             !await wait(() => {
               const value = raw()?.["answers"];
@@ -389,7 +425,7 @@ export async function prepareBlooketQuestionControls(
         const control = unique("textarea#answer-" + index);
         if (!control || control.tagName !== "TEXTAREA") return false;
         if (answer) {
-          if ((control as HTMLTextAreaElement).value !== "" ||
+          if ((control as HTMLTextAreaElement).value !== priorAnswer(index) ||
               !await setText(control, answer.text) || !await wait(() => {
             const serialized = raw()?.["answers"];
             return Array.isArray(serialized) &&
