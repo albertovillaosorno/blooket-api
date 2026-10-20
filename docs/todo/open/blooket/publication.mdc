@@ -73,6 +73,19 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, the owner supplied screenshots of a private two-question
+set with its saved image and Typing row, and no open question form.
+The browser DOM exposed an off-viewport `aria-modal` node with computed
+`visibility: hidden`; a bounding rectangle alone had incorrectly suggested
+that a visible dialog blocked reading. This is not a human-stop condition.
+
+A red-to-green worker regression found the earlier `about:blank` compatibility
+fix was missing from detached My Sets navigation and temporary-tab cleanup.
+Both now accept only an owner-created, bounded initial blank state; foreign
+routes and adopted tabs are still refused. Synthetic worker, TypeScript and
+Jig validation passed. A newly loaded companion and actual replacement
+remain subject to separate authenticated browser read-back.
+
 On 2026-10-20, canonical `publication replace` and registered
 `blooket_publication_replace` were connected to version-four snapshots and the
 single-row replacement executor. Portable tests demonstrate one changed row,

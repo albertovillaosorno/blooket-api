@@ -92,6 +92,8 @@ test(
   let detachedCapabilitySourceReload = false;
   let detachedCapabilityChallenge = false;
   let capabilityPendingGets = 0;
+  let capabilityBlankGets = 0;
+  let detachedBlankGets = 0;
   let capabilityNeverCommits = false;
   let capabilityPendingRedirect = false;
   let detachedUrl = "";
@@ -283,6 +285,9 @@ test(
             return { id, url: detachedCapabilityUrl,
               pendingUrl: "https://foreign.invalid/teacher-navigation",
               status: "loading", active: false, windowId: 3 };
+          if (capabilityBlankGets-- > 0)
+            return { id, url: "about:blank", status: "complete",
+              active: false, windowId: 3 };
           if (capabilityNeverCommits || capabilityPendingGets-- > 0)
             return { id, pendingUrl: detachedCapabilityUrl,
               status: "loading", active: false, windowId: 3 };
@@ -292,6 +297,9 @@ test(
         if (id === 83) {
           if (!detachedUrl) throw Error("closed-detached-tab");
           if (pendingSourceAfterRead) pendingSourceRedirect = true;
+          if (detachedBlankGets-- > 0)
+            return { id, url: "about:blank", status: "complete",
+              active: false, windowId: 3 };
           const tab = { id, url: detachedUrl, status: "complete", windowId: 3,
             active: detachedTabActivatedByUser };
           if (detachedTabActiveGetter) Object.defineProperty(tab, "active", {
@@ -1378,6 +1386,7 @@ test(
     submittedReadOwner = true;
     questionSaved = false;
     const beforeDetachedReloads = readReloads;
+    detachedBlankGets = 2;
     const detachedQuestions = await expectReply({
       kind: "questions.list", setId: "set-fixture",
     });
@@ -1391,6 +1400,7 @@ test(
     // Text capability admission is also non-mutating, but must inspect in
     // a temporary tab rather than navigating away from a submitted editor.
     const beforeDetachedCapabilities = readReloads;
+    capabilityBlankGets = 2;
     const sourceListing = await expectReply({ kind: "sets.list" });
     assert.equal(sourceListing.ok, true);
     assert.equal(sourceListing.value.items.length, 1);
