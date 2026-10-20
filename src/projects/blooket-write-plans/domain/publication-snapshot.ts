@@ -40,6 +40,7 @@ import { decodeBlooketCapabilitySnapshot } from
 import { decodePreparedMediaIdentities } from "./prepared-media-identities.ts";
 import { buildBlooketWritePlan, buildPreparedBlooketWritePlan } from
   "./write-plan.ts";
+import { buildBlooketReplacementPlan } from "./replacement-plan.ts";
 import { buildBlooketAppendPlan } from "./write-plan.ts";
 import { decodeBlooketSetId } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
@@ -62,7 +63,7 @@ export function decodeBlooketPublicationSnapshot(
   if (!owned || owned["draftId"] !== draftId ||
       typeof owned["revision"] !== "string" ||
       !/^[a-f0-9]{64}$/u.test(owned["revision"]) ||
-      (append ? owned["schemaVersion"] !== 3 :
+      (append ? owned["schemaVersion"] !== 3 && owned["schemaVersion"] !== 4 :
         current ? owned["schemaVersion"] !== 2 :
         owned["schemaVersion"] !== 1)) return undefined;
   const version = owned["schemaVersion"];
@@ -95,17 +96,30 @@ export function decodeBlooketPublicationSnapshot(
   if (!built.ok) return undefined;
   let plan = built.value;
   if (append) {
-    const target = exactOwnData(owned["target"], ["remoteSetId", "baseline"]);
+    const target = exactOwnData(owned["target"], version === 4
+      ? ["remoteSetId", "baseline", "previous"]
+      : ["remoteSetId", "baseline"]);
     if (!target) return undefined;
     const id = decodeBlooketSetId(target["remoteSetId"]);
     const baseline = decodeBlooketWriteVerificationBaseline(
       target["baseline"], "question-list",
     );
     if (!id.ok || !baseline.ok) return undefined;
-    const bound = buildBlooketAppendPlan(plan, {
-      remoteSetId: id.value, baseline: baseline.value,
-    });
+    const binding = { remoteSetId: id.value, baseline: baseline.value };
+    const bound = version === 4
+      ? buildBlooketReplacementPlan(plan, binding, target["previous"])
+      : buildBlooketAppendPlan(plan, binding);
     if (!bound) return undefined;
+    if (bound.schemaVersion === 3) {
+      const operation = bound.operations[0];
+      const previous = operation.previous, desired = operation.question;
+      if (previous.hasImage || previous.hasAudio ||
+          previous.equation !== null || desired.imageMediaId !== null ||
+          previous.qType !== (desired.type === "multiple-choice"
+            ? "mc" : "typing") || previous.answers.length !==
+            (desired.type === "multiple-choice" ? desired.answers.length : 1))
+        return undefined;
+    }
     plan = bound;
   }
   return { document: document.value, revision: owned["revision"],

@@ -237,7 +237,8 @@ const tools = [
     { id, document: { type: "object" }, expectedRevision: revision },
     false,
   ),
-  ...["step", "append", "status", "verify", "reconcile"].map(action => tool(
+  ...["step", "append", "replace", "status", "verify", "reconcile"]
+    .map(action => tool(
     "blooket_publication_" + action,
     "blooket.publication." + action,
     action === "step"
@@ -246,6 +247,13 @@ const tools = [
         "Inspect progress; never retry an uncertain write blindly. " +
         "Prepared question images use stable library IDs. Resume append " +
         "work here after its initial append call."
+      : action === "replace"
+        ? "Edit exactly one existing text question without changing its type " +
+          "or answer count. Supply the exact set ID and saved full desired " +
+          "quiz; all other questions and metadata must remain unchanged. " +
+          "Selected-row images/audio, deletion and reordering are refused. " +
+          "Use a new logical draft for each edit, then separately verify. " +
+          "Reconcile uncertain writes without resubmission."
       : action === "append"
         ? "Extend an existing Blooket set with new questions, one journaled " +
           "write per call. Supply its exact set ID and a saved full desired " +
@@ -261,14 +269,16 @@ const tools = [
             "another remote write. Inconclusive results retain recovery."
           : "Read local publication progress. Completed writes do not " +
             "prove the current remote quiz; use publication verify.",
-    action === "step" || action === "append" ? {
+    ["step", "append", "replace"].includes(action) ? {
       draftId: id, expectedRevision: {
       type: "string", pattern: "^[a-f0-9]{64}$",
       description: "The exact revision returned by drafts_get or drafts_put.",
-    }, ...(action === "append" ? { remoteSetId: id } : {}) }
+    }, ...(["append", "replace"].includes(action)
+      ? { remoteSetId: id } : {}) }
       : { draftId: id },
     action === "status" || action === "verify",
-    action === "append" ? ["draftId", "expectedRevision", "remoteSetId"]
+    action === "append" || action === "replace"
+      ? ["draftId", "expectedRevision", "remoteSetId"]
       : action === "step" ? ["draftId", "expectedRevision"] : ["draftId"],
     action !== "status",
   )),

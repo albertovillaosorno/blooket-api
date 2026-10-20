@@ -152,13 +152,15 @@ async function state(root: string) {
           remoteSetId: remote.id } };
       }
       const lowered = lowerBlooketWriteSubmission(operation, target);
-      assert.ok(lowered.ok && lowered.value.kind === "add-question");
-      if (!lowered.ok || lowered.value.kind !== "add-question")
+      assert.ok(lowered.ok &&
+        lowered.value.kind !== "create-set");
+      if (!lowered.ok || lowered.value.kind === "create-set")
         throw new Error("fixture lowering failed");
       const expected = lowered.value;
       const preparedImage = context.preparedMedia[0];
       const image = preparedImage && identifyPreparedMedia(preparedImage);
-      questions.push({ ...(image ? { schemaVersion: 4 as const,
+      const row: BlooketQuestionRead = {
+        ...(image ? { schemaVersion: 4 as const,
           imageEvidence: { byteLength: image.byteLength,
             sha256: image.sha256 } } : { schemaVersion: 3 as const }),
         number: expected.number,
@@ -171,7 +173,10 @@ async function state(root: string) {
             match: expected.answerTypes?.[index] ?? null };
         }),
         hasImage: image !== undefined, hasAudio: false,
-      });
+      };
+      if (operation.kind === "replace-question")
+        questions[expected.number - 1] = row;
+      else questions.push(row);
       return { ok: true, receipt: null };
     } },
   };
@@ -2455,3 +2460,137 @@ test("uncertain image writes remain reconcilable without current media bytes",
     assert.equal(await readFile(files.attempt, "utf8"), journal);
     assert.equal(state.writes(), 2);
   }); });
+
+
+async function replacementFixture(s: Awaited<ReturnType<typeof state>>,
+  change: "one" | "none" | "two" = "one") {
+  const append = await appendFixture(s);
+  value(await executeBlooketPublicationCommand(append, s.host));
+  const saved = await executeLibraryCommand({ version: 1,
+    operationId: "cli:read-fixture", command: "drafts.get",
+    payload: { id: "extension" },
+  }, s.root);
+  const desired = structuredClone((value(saved) as {
+    document: typeof document;
+  }).document);
+  if (change !== "none") desired.questions[1]!.prompt = "Type planet.";
+  if (change === "two") desired.questions[0]!.prompt = "Also change sun.";
+  desired.questions[1]!.timeLimitSeconds = change === "none" ? 25 : 35;
+  const next = await executeLibraryCommand({ version: 1,
+    operationId: "cli:replacement-fixture", command: "drafts.put",
+    payload: { id: "replacement", expectedRevision: null, document: desired },
+  }, s.root);
+  return { version: 1 as const, operationId: "cli:replacement-fixture",
+    command: "blooket.publication.replace", payload: {
+      draftId: "replacement", expectedRevision: value(next)["revision"],
+      remoteSetId: "synthetic-remote",
+    } };
+}
+
+test("canonical replacement changes one row without creating a question", () =>
+  fixture(async s => {
+    const request = await replacementFixture(s);
+    const before = structuredClone(s.questions);
+    const result = value(await executeBlooketPublicationCommand(request,
+      s.host));
+    assert.equal(result["phase"], "advanced");
+    assert.equal(result["completedOperations"], 1);
+    assert.equal(result["totalOperations"], 1);
+    assert.equal(s.questions.length, 2);
+    assert.deepEqual(s.questions[0], before[0]);
+    assert.equal(s.questions[1]?.question, "Type planet.");
+    assert.equal(s.questions[1]?.timeLimit, 35);
+    const verified = value(await executeBlooketPublicationCommand({
+      ...request, command: "blooket.publication.verify",
+      payload: { draftId: "replacement" },
+    }, s.host));
+    assert.equal(verified["published"], true);
+    const writes = s.writes();
+    assert.equal(value(await executeBlooketPublicationCommand(request,
+      s.host))["phase"], "complete");
+    assert.equal(s.writes(), writes);
+  }));
+
+test("no-op and multiple changed rows cannot freeze a replacement", () =>
+  Promise.all(["none", "two"].map(change => fixture(async s => {
+    const request = await replacementFixture(s, change as "none" | "two");
+    const writes = s.writes();
+    const result = await executeBlooketPublicationCommand(request, s.host);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues[0]?.code,
+      "blooket-publication-single-edit-required");
+    assert.equal(s.writes(), writes);
+    const paths = await publicationFiles(s.root, "replacement");
+    await assert.rejects(readFile(paths.snapshot), { code: "ENOENT" });
+  }))));
+
+test("a lost replacement reply reconciles without a second Save", () =>
+  fixture(async s => {
+    const request = await replacementFixture(s);
+    let writes = 0;
+    const host = { ...s.host, writes: { execute: async (...args:
+      Parameters<typeof s.host.writes.execute>) => {
+      writes++;
+      await s.host.writes.execute(...args);
+      return { ok: false as const, kind: "browser" as const,
+        code: "blooket-browser-failed" as const };
+    } } };
+    const first = await executeBlooketPublicationCommand(request, host);
+    assert.equal(value(first)["phase"], "reconciliation-required");
+    const again = value(await executeBlooketPublicationCommand(request, host));
+    assert.equal(again["phase"], "reconciliation-required");
+    assert.equal(writes, 1);
+    assert.equal(s.questions.length, 2);
+    const recovered = value(await executeBlooketPublicationCommand({
+      ...request, command: "blooket.publication.reconcile",
+      payload: { draftId: "replacement" },
+    }, host));
+    assert.equal(recovered["completedOperations"], 1);
+    assert.equal(writes, 1);
+  }));
+
+
+test("replacement requires the loaded companion declaration before journaling",
+  () => fixture(async s => {
+    const request = await replacementFixture(s);
+    let submitted = 0;
+    const refusal = async () => {
+      submitted++;
+      return { ok: false as const, kind: "browser" as const,
+        code: "blooket-browser-failed" as const };
+    };
+    const host = { ...s.host, writes: blooketBrowserWriteExecutionPort({
+      createSet: refusal, addQuestion: refusal, replaceQuestion: refusal,
+      inspectQuestionReplacement: async () => false,
+    }) };
+    const result = await executeBlooketPublicationCommand(request, host);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues[0]?.code,
+      "blooket-browser-companion-update-required");
+    assert.equal(submitted, 0);
+    const paths = await publicationFiles(s.root, "replacement");
+    await assert.rejects(readFile(paths.attempt), { code: "ENOENT" });
+  }));
+
+test("replacement checks metadata before opening its write journal", () =>
+  fixture(async s => {
+    const request = await replacementFixture(s);
+    const writes = s.writes();
+    const host = { ...s.host, blooket: { ...s.host.blooket, sets: {
+      ...s.host.blooket.sets, get: async (...args:
+        Parameters<typeof s.host.blooket.sets.get>) => {
+        const actual = await s.host.blooket.sets.get(...args);
+        assert.ok(actual.ok);
+        return { ok: true as const, value: {
+          ...(actual.value as object), title: "Concurrent metadata change",
+        } };
+      },
+    } } };
+    const result = await executeBlooketPublicationCommand(request, host);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.issues[0]?.code,
+      "blooket-publication-remote-conflict");
+    assert.equal(s.writes(), writes);
+    const paths = await publicationFiles(s.root, "replacement");
+    await assert.rejects(readFile(paths.attempt), { code: "ENOENT" });
+  }));

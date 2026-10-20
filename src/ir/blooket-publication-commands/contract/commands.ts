@@ -38,7 +38,7 @@ import { decodeBlooketSetId } from
 export const BLOOKET_PUBLICATION_COMMANDS = [
   "blooket.publication.step", "blooket.publication.status",
   "blooket.publication.verify", "blooket.publication.reconcile",
-  "blooket.publication.append",
+  "blooket.publication.append", "blooket.publication.replace",
 ] as const;
 export type BlooketPublicationCommandName =
   (typeof BLOOKET_PUBLICATION_COMMANDS)[number];
@@ -55,7 +55,8 @@ export function isBlooketPublicationCommand(
 export function decodeBlooketPublicationCommand(
   name: BlooketPublicationCommandName, value: unknown,
 ): DecodeResult<BlooketPublicationPayload> {
-  const append = name === "blooket.publication.append";
+  const append = name === "blooket.publication.append" ||
+    name === "blooket.publication.replace";
   const step = name === "blooket.publication.step" || append;
   const invalid = (): DecodeResult<BlooketPublicationPayload> => ({
     ok: false, issues: [{

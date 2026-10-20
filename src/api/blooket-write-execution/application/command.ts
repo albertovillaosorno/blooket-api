@@ -99,7 +99,8 @@ import { admitPreparedPublicationIdentities } from
 import { samePreparedMediaIdentity, type PreparedMediaIdentities } from
   "../../../projects/blooket-write-plans/domain/prepared-media-identities.ts";
 import { isBrowserWriteExecutionPort,
-  browserCreateSetConfirmationSupported } from "./browser-write-adapter.ts";
+  browserCreateSetConfirmationSupported,
+  browserQuestionReplacementSupported } from "./browser-write-adapter.ts";
 
 export interface BlooketPublicationDependencies {
   readonly root: string;
@@ -132,6 +133,13 @@ export async function executeBlooketPublicationCommand(
         "prefix, or another active publication conflicts with this plan. " +
         "Inspect the remote quiz and retained publication journal " +
         "before initiating another write."
+      : code === "blooket-publication-single-edit-required"
+        ? "Save a new draft with exactly one changed existing question. " +
+          "Keep all other questions and metadata unchanged; no write was sent."
+      : code === "blooket-publication-edit-unsupported"
+        ? "This edit supports text questions with the same type and answer " +
+          "count. Keep images/audio on the selected row unchanged through " +
+          "manual editing instead; no write was sent."
       : code === "publication-storage-unavailable"
         ? "Publication stopped: local journal evidence could not be " +
           "safely inspected. Preserve it and repair storage before retrying."
@@ -190,7 +198,8 @@ export async function executeBlooketPublicationCommand(
       catch { return fail("publication-storage-unavailable"); }
       if (evidence) return fail("blooket-publication-recovery-required");
       if (command.command !== "blooket.publication.step" &&
-          command.command !== "blooket.publication.append")
+          command.command !== "blooket.publication.append" &&
+          command.command !== "blooket.publication.replace")
         return success({ draftId, phase: "not-started", published: false });
       const draft = await executeLibraryCommand({
         ...command, command: "drafts.get", payload: { id: draftId },
@@ -252,18 +261,45 @@ export async function executeBlooketPublicationCommand(
             state: existing.state, published: false });
         // Planning only freezes the prior questions. Metadata is checked
         // once, after pacing/media admission and before the attempt journal.
-        if (existing.value.length >= document.value.questions.length ||
-            !matchesQuestions(existing.value,
-              admitted.plan.operations.slice(1, existing.value.length + 1),
-              requestedSetId, expectedMedia))
-          return fail("blooket-publication-remote-conflict");
+        const replacement = command.command === "blooket.publication.replace";
         const baseline = questionBaselineFor(existing.value);
         if (baseline === null)
           return fail("blooket-write-baseline-not-captured");
-        candidate = { schemaVersion: 3, draftId, revision: expectedRevision,
-          expectedMedia, document: document.value,
-          capabilities: capabilities.value,
-          target: { remoteSetId: requestedSetId, baseline } };
+        if (replacement) {
+          if (existing.value.length !== document.value.questions.length)
+            return fail("blooket-publication-remote-conflict");
+          const changed = existing.value.filter((row, index) =>
+            !matchesQuestions([row],
+              admitted.plan.operations.slice(index + 1, index + 2),
+              requestedSetId, expectedMedia));
+          if (changed.length !== 1)
+            return fail("blooket-publication-single-edit-required");
+          const previous = changed[0]!;
+          const desired = lowerBlooketWriteSubmission(
+            admitted.plan.operations[previous.number]!,
+            { remoteSetId: requestedSetId });
+          if (!desired.ok || desired.value.kind !== "add-question" ||
+              previous.hasImage || previous.hasAudio ||
+              previous.equation !== null || desired.value.image !== null ||
+              previous.answers.some(answer => answer.kind !== "text") ||
+              previous.qType !== desired.value.qType ||
+              previous.answers.length !== desired.value.answers.length)
+            return fail("blooket-publication-edit-unsupported");
+          candidate = { schemaVersion: 4, draftId, revision: expectedRevision,
+            expectedMedia, document: document.value,
+            capabilities: capabilities.value,
+            target: { remoteSetId: requestedSetId, baseline, previous } };
+        } else {
+          if (existing.value.length >= document.value.questions.length ||
+              !matchesQuestions(existing.value,
+                admitted.plan.operations.slice(1, existing.value.length + 1),
+                requestedSetId, expectedMedia))
+            return fail("blooket-publication-remote-conflict");
+          candidate = { schemaVersion: 3, draftId, revision: expectedRevision,
+            expectedMedia, document: document.value,
+            capabilities: capabilities.value,
+            target: { remoteSetId: requestedSetId, baseline } };
+        }
         if (!decodeSnapshot(candidate, draftId))
           return fail("blooket-publication-invalid-draft");
         // Refuse a competing active publisher before freezing this new
@@ -285,11 +321,17 @@ export async function executeBlooketPublicationCommand(
     // historical snapshots readable for status, reconciliation and read-back;
     // only a new step/append must satisfy today's submission contract.
     if ((command.command === "blooket.publication.step" ||
-        command.command === "blooket.publication.append") &&
+        command.command === "blooket.publication.append" ||
+        command.command === "blooket.publication.replace") &&
         !providerTextCanBeSubmitted(plan.operations))
       return fail("blooket-publication-invalid-draft");
-    if (requestedSetId !== undefined && (plan.schemaVersion !== 2 ||
+    if (requestedSetId !== undefined && (plan.schemaVersion === 1 ||
         requestedSetId !== plan.target.remoteSetId))
+      return fail("blooket-publication-remote-conflict");
+    if ((command.command === "blooket.publication.replace" &&
+        plan.schemaVersion !== 3) ||
+        (command.command === "blooket.publication.append" &&
+          plan.schemaVersion !== 2))
       return fail("blooket-publication-remote-conflict");
     if (expectedRevision !== undefined && expectedRevision !== revision)
       return fail("blooket-publication-draft-conflict");
@@ -335,7 +377,7 @@ export async function executeBlooketPublicationCommand(
         // Native Edit Info performs a provider request. Avoid redundant
         // early requests, but always check fresh metadata after pacing and
         // media admission, before capturing the final question collection.
-        if (operation.kind === "question" && phase !== "before-pacing") {
+        if (operation.kind !== "set" && phase !== "before-pacing") {
           if (target.remoteSetId === null)
             return { ok: true as const, baseline: null };
           const detail = await getBlooketSet(blooket.session, blooket.secrets,
@@ -362,9 +404,11 @@ export async function executeBlooketPublicationCommand(
         if (!captured.ok || plan.schemaVersion === 1) return captured;
         // The append target includes all prior questions, not just the
         // prefix frozen when its snapshot was first created.
-        return expectedAppendBaseline &&
+        const expectedBaseline = plan.schemaVersion === 3
+          ? plan.target.baseline : expectedAppendBaseline;
+        return expectedBaseline &&
           sameBlooketWriteVerificationBaseline(captured.baseline,
-            expectedAppendBaseline)
+            expectedBaseline)
           ? captured : { ok: true as const, baseline: null };
       },
     };
@@ -450,6 +494,11 @@ export async function executeBlooketPublicationCommand(
         isBrowserWriteExecutionPort(writes) &&
         !await browserCreateSetConfirmationSupported(writes))
       return fail("blooket-browser-companion-update-required");
+    if (plan.schemaVersion === 3 && attempt.kind === "missing" &&
+        checkpoint.nextOperationIndex === 0 &&
+        isBrowserWriteExecutionPort(writes) &&
+        !await browserQuestionReplacementSupported(writes))
+      return fail("blooket-browser-companion-update-required");
     // Admission is fresh for each new mutation. Already journaled attempts
     // need local recovery first and cannot create another remote write.
     if (attempt.kind === "missing" &&
@@ -486,7 +535,7 @@ export async function executeBlooketPublicationCommand(
         const candidate = decodeSnapshot(other.data, other.draftId);
         if (!candidate)
           return fail("publication-storage-unavailable");
-        if (candidate.plan.schemaVersion === 2) continue;
+        if (candidate.plan.schemaVersion !== 1) continue;
         const ownSet = plan.operations[0];
         const otherSet = candidate.plan.operations[0];
         if (!ownSet || !otherSet || ownSet.kind !== "set" ||
@@ -550,7 +599,7 @@ export async function executeBlooketPublicationCommand(
     // Check prior questions here. The final baseline capture checks exact
     // remote metadata after pacing/media; an unknown route grants no write.
     if (attempt.kind === "missing" &&
-        (checkpoint.nextOperationIndex > 0 || plan.schemaVersion === 2) &&
+        (checkpoint.nextOperationIndex > 0 || plan.schemaVersion !== 1) &&
         checkpoint.nextOperationIndex < plan.operations.length) {
       const expected = desiredPlan.operations[0];
       if (!expected || expected.kind !== "set" ||
@@ -565,21 +614,27 @@ export async function executeBlooketPublicationCommand(
         if (existing.kind !== "questions")
           return success({ ...progress, phase: existing.kind,
             state: existing.state });
-        const completed = plan.schemaVersion === 2
-          ? plan.target.baseline.itemCount + checkpoint.nextOperationIndex
-          : checkpoint.nextOperationIndex - 1;
-        const prior = desiredPlan.operations.slice(1, completed + 1);
-        if (!matchesQuestions(existing.value, prior, checkpoint.remoteSetId,
-              expectedMedia) || (plan.schemaVersion === 2 &&
-              !sameBlooketWriteVerificationBaseline(plan.target.baseline,
-                questionBaselineFor(existing.value.slice(0,
-                  plan.target.baseline.itemCount)))))
-          return fail("blooket-publication-remote-conflict");
-        if (plan.schemaVersion === 2)
-          expectedAppendBaseline = questionBaselineFor(existing.value);
+        if (plan.schemaVersion === 3) {
+          if (!sameBlooketWriteVerificationBaseline(plan.target.baseline,
+              questionBaselineFor(existing.value)))
+            return fail("blooket-publication-remote-conflict");
+        } else {
+          const completed = plan.schemaVersion === 2
+            ? plan.target.baseline.itemCount + checkpoint.nextOperationIndex
+            : checkpoint.nextOperationIndex - 1;
+          const prior = desiredPlan.operations.slice(1, completed + 1);
+          if (!matchesQuestions(existing.value, prior, checkpoint.remoteSetId,
+                expectedMedia) || (plan.schemaVersion === 2 &&
+                !sameBlooketWriteVerificationBaseline(plan.target.baseline,
+                  questionBaselineFor(existing.value.slice(0,
+                    plan.target.baseline.itemCount)))))
+            return fail("blooket-publication-remote-conflict");
+          if (plan.schemaVersion === 2)
+            expectedAppendBaseline = questionBaselineFor(existing.value);
+        }
       }
     }
-    if (plan.schemaVersion === 2 && attempt.kind === "missing" &&
+    if (plan.schemaVersion !== 1 && attempt.kind === "missing" &&
         checkpoint.nextOperationIndex < plan.operations.length) {
       const collision = await competingAppendState(root, draftId,
         plan.target.remoteSetId);
