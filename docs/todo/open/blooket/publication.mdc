@@ -73,6 +73,24 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A later 2026-10-20 owner-authorized Chrome continuation loaded the fixed
+companion, restored the existing My Sets session, and completed canonical
+reads of 17 sets and exactly two saved questions, retaining the first image.
+The previous blocked question-read preflight was therefore overcome without
+creating a new account profile or duplicating a set.
+
+A single canonical `publication replace` call for the saved edit draft then
+returned `reconciliation-required` with zero completed operations.
+Read-only reconciliation reported `verification-inconclusive`; a subsequent
+fresh read still returned two questions and the desired replacement was not
+confirmed. The browser showed an open question form afterward.
+
+The attempting journal and form remain intact; no second Save, forced modal
+Cancel, journal overwrite or duplicate write was attempted. This is a real
+negative/ambiguous acceptance result, not proof that replacement works.
+Next diagnose the native form stage using content-free same-isolated-world
+evidence without sacrificing the uncertain write or changing browser owners.
+
 On 2026-10-20, the owner supplied screenshots of a private two-question
 set with its saved image and Typing row, and no open question form.
 The browser DOM exposed an off-viewport `aria-modal` node with computed
