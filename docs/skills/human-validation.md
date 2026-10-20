@@ -6,7 +6,7 @@ and remote-state evidence. A redirect alone never confirms authentication or
 publication.
 
 When the product still reports a human-action-required state, preserve the
-checkpoint and explain the exact legitimate local action. Interactive
+checkpoint and explain the exact legitimate local action. Interactive CAPTCHA
 verification follows the active controller's confirmation rules. Unfamiliar
 login, organization selection, consent and browser permission retain their
 actual human boundaries.
