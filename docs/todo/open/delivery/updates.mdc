@@ -52,12 +52,13 @@ offline and preserve teacher data and current access boundaries.
 
 ## Acceptance
 
-**IT WORKS -- release-critical.** The product update workflow targeting a
-supported ARM64 Mac can find a newer trusted release, authenticate its
-publisher and bytes, stage it, apply it at a safe restart boundary, and return
-to a usable application with the teacher's data, secrets, settings, and drafts
-intact. Manual checking must work without enabling automatic updates; automatic
-checking/installing is opt-in, visible, and reversible.
+**IT WORKS -- release-critical.** The product must remain usable for
+personal manual installation on Linux x64 and macOS ARM64 without Apple
+Developer membership. Compatible update workflows must authenticate the
+publisher and bytes, stage changes safely, apply at a safe restart boundary,
+and return to a usable app without losing data, secrets, settings or drafts.
+Manual checks must work independently; unattended install is disabled until a
+specific target's trust, permission and rollback gates are implemented.
 
 A network failure, corrupt/foreign package, denied OS permission, interrupted
 install, or failed startup must NEVER silently destroy the only usable app,
@@ -68,9 +69,9 @@ during active/ambiguous Blooket writes. The practical guarantee is **safe
 failure and recovery**, not an impossible promise that no update error can
 occur.
 
-Demonstrate the product updater through a trusted signed ARM64 release fixture
-covering install, restart,
-interrupted install/rollback, persistence, and the EN/ES user controls. Pin a
+Demonstrate each supported update mode through trusted signed fixtures
+covering install, restart, interrupted install/rollback, persistence, and the
+EN/ES user controls. Pin a
 real production publisher trust root and produce/release trustworthy artifacts;
 a mock signature alone does not make shipping updates safe. Native Mac/Safari
 execution and Apple/hardware-specific acceptance belong to the final ongoing
@@ -78,6 +79,27 @@ record and lack of those hosts must not prevent functional completion here.
 The updater implementation, trust, safe failure, and recovery remain required.
 
 ## Implementation notes
+
+On 2026-10-20, the personal-Mac/manual-install alternative was documented in
+`README.md`: Apple Developer membership or a Team ID is not required to build
+and personally approve a locally trusted ARM64 app. The Mac owner must
+explicitly authorize Gatekeeper's per-app exception; no automatic bypass is
+part of the product. The current native updater still requires a notarized
+Developer ID publisher and cannot silently install an unsigned release.
+
+**Personal-Mac delivery decision:** This product must remain usable without
+Apple Developer enrollment; do not request a Team ID or block manual testing
+on a paid developer account. The current notarized Developer ID verifier is
+one strict public-release mode, not the only acceptable future trust policy.
+
+Implement a separate, explicit no-Developer-ID personal update path only when
+it can authenticate a locally pinned Ed25519 publisher key and exact package
+bytes, validate the actual bundle, request any required macOS human approval,
+retain installation fences, prove restart health, and preserve rollback.
+It may check/download by opt-in, but must not silently install an app that
+macOS has not authorized. Never weaken the existing notarized verifier or
+mistake a Gatekeeper exception or downloaded checksum for publisher trust.
+
 
 On 2026-10-20, independent installer program preparation was added under
 `platforms/update-extraction`. A captured prepared installation may copy its
@@ -157,7 +179,8 @@ malformed. A higher patch must remain monotonic within its quarter.
 Select exactly one `darwin-arm64.zip` on the supported ARM64 Mac target. The
 archive must contain exactly the expected `Blooket API.app` bundle identity;
 missing, duplicate, foreign, or incompatible assets have explicit outcomes.
-Linux is a development package and is never an automatic-update target.
+Linux is a supported manual-install target. Its automatic updater remains
+unavailable until an independently verified Linux transaction passes.
 
 ### Trust and release pipeline
 
@@ -168,11 +191,16 @@ target, minimum OS, asset name, byte size, and SHA-256 after
 signing/notarization. Validate it against tested archives and publish only those
 exact artifacts after the release gate and CI succeed.
 
-Require publisher authenticity through a signed manifest with an admitted key or
-verified CI provenance, with specified trust-key rotation. Preserve Apple
-signing, designated requirement/Team ID, Gatekeeper, and notarization checks.
-Checksums alone do not authenticate the publisher; HTTPS alone does not trust a
-ZIP. Do not weaken signing or bypass legitimate OS authorization.
+Require publisher authenticity through a signed manifest with an admitted
+pinned key or verified CI provenance, with specified trust-key rotation.
+Apple Developer ID, Team ID and notarization must NOT be prerequisites for
+the personal Mac or Linux path. For a Mac build, require explicit per-app
+macOS approval where needed; never globally disable Gatekeeper.
+
+Keep the legacy notarized verifier optional and fail closed, not a dependency
+of the new independently trusted personal delivery mode. Checksums alone
+cannot identify the publisher; HTTPS alone does not authenticate a release
+archive.
 
 Validate asset URLs and bounded redirects against the exact repository, tag, and
 expected GitHub release asset authority. Reject foreign URLs, extraction path

@@ -46,8 +46,9 @@ validation:
 
 ## Objective
 
-Continuously find and fix product defects and improve usability, tests, Linux
-stubs, and theoretical macOS/Safari/ChatGPT compatibility without blocking
+Continuously find and fix product defects and improve usability, tests,
+working Linux/Firefox personal delivery, and macOS/Safari/ChatGPT compatibility
+without blocking
 functional delivery. Keep this record open until explicitly closed by Alberto.
 
 ## Acceptance
@@ -96,10 +97,11 @@ compatibility-focused commit. This is ongoing intensive maintenance, not a
 finite box to check or a requirement to block safe feature delivery.
 
 Focus on bugs, missing tests, correctness, recovery, edge cases, performance,
-behavior, EN/ES UX, accessibility, UI polish, Safari/ChatGPT compatibility,
-**theoretical macOS ARM64 compatibility assurance** from official docs,
-contracts, portable tests and opt-in native CI, and reliable Linux development
-stubs/adapters. Keep Mac-only concerns here; never claim a real recipient-Mac
+behavior, EN/ES UX, accessibility, UI polish, Firefox/Safari/ChatGPT
+compatibility, **theoretical macOS ARM64 compatibility assurance** from
+official docs, contracts, portable tests and opt-in native CI, and reliable
+Linux x64 user installations and native checks. Keep Mac-only concerns here;
+never claim a real recipient-Mac
 or native behavior was tested when it was only inferred.
 
 **Manual closure gate:** do NOT mark this record completed, move it to

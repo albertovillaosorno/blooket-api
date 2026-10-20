@@ -4,12 +4,13 @@ A local-first TypeScript toolkit for a teacher who wants AI to help create
 Blooket quizzes without spending the afternoon uploading and formatting media.
 
 The intended workflow is simple: ask an AI for a quiz, review it in the browser,
-and publish it to Blooket. A background service on the teacher's Mac owns the
-files, credentials, media preparation, and execution. An optional Cloudflare
-Tunnel connects online AI clients to its authenticated MCP gateway.
+and publish it to Blooket. A background service on each teacher's Mac or
+Linux computer owns files, credentials, media preparation, and execution.
+An optional Cloudflare Tunnel connects online AI clients to its authenticated
+MCP gateway.
 
 **This is a working development prototype. Automatic Blooket publication,
-Safari integration, signed macOS delivery, and acceptance with the recipient's
+Safari integration, production updates, and acceptance with the recipient's
 ChatGPT account remain unfinished.** It is independent of Blooket and is neither
 affiliated with nor
 endorsed by the platform.
@@ -39,13 +40,15 @@ Current MCP tools retrieve teacher instructions, search/read/enrich media, and
 list/read/write skills and drafts. Media search returns bounded pages and a
 continuation cursor. **Saving a draft does not publish a quiz.**
 
-The Linux package has passed local startup, native media preparation, the
-packaged CLI, repeated launch, and shutdown. The macOS product target is ARM64;
+Linux x64 and macOS ARM64 are both intended personal-use targets. The Linux
+package has passed local startup, native media preparation, packaged CLI,
+repeated launch and shutdown. The macOS target is ARM64;
 CI is configured to build its Safari WebExtension companion into `Blooket
 API.app`. Native Mac acceptance and signing/notarization remain in ongoing
 platform hardening; safe application replacement remains unfinished.
 
-The Chrome extension can be assembled locally. Authenticated set summaries,
+Chrome and Firefox extensions can be assembled locally. Authenticated set
+summaries,
 private details, saved questions with bounded image evidence, and capabilities
 have passed real service and CLI reads in the authorized Chrome session.
 Ordinary automatic quiz publication still requires live acceptance.
@@ -55,9 +58,10 @@ unsupported media variants remain unknown or pending. Keep these limits
 explicit when using the observed account capabilities.
 
 See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
-cannot establish Keychain or native macOS compatibility. Chrome is the initial
-directly testable browser and extension target. The ARM64 macOS CI stage
-builds and embeds the Safari companion; native acceptance remains pending.
+cannot establish Keychain or native macOS compatibility. Chrome retains live
+provider-read evidence; Firefox has portable build and bridge tests. The
+ARM64 macOS CI stage builds and embeds the Safari companion; native
+acceptance remains pending.
 
 ## Run the development workspace
 
@@ -101,7 +105,8 @@ This explicit launcher action returns bounded diagnostic JSON and refreshes its
 local log without starting the service or opening a browser. A failed check
 produces a nonzero exit status; portable success does not prove Mac acceptance.
 
-The repository pins pnpm 12.11.2 and keeps its package store under
+The repository pins the pnpm version in `package.json` and keeps its
+package store under
 `.dependencies/`. On 2026-10-11, the workstation's pnpm launcher passed
 `pnpm run check` and a frozen lockfile-only install. Use npm scripts when pnpm
 is unavailable; do not install a second project package store. Read the
@@ -135,15 +140,15 @@ challenge during the read remains an interrupted read, never a success.
 
 If no extension is connected, **Open Blooket in my browser** opens the ordinary
 system browser. Enable Blooket API in that browser and open the local workspace
-there. Separate Chrome profiles have separate sessions; verification in one
+there. Separate browsers/profiles have separate sessions; verification in one
 profile does not authenticate another. When multiple profiles connect, the app
 stops and asks you to close the extra profiles before trying again.
 
 For browser and firewall diagnostics, open the
 [Blooket system debugger](https://debug.blooket.com/) in a **new tab of the
-same regular Chrome profile** that runs the connected extension. A result
-copied from Firefox, a different profile, or an isolated automated Chrome
-browser is not proof of this session's readiness. `IP not Geoblocked` alone
+same regular browser/profile** that runs the connected extension (Firefox or
+Chrome). A result copied from another browser, profile, or isolated automation
+session is not proof of this session's readiness. `IP not Geoblocked` alone
 is also not proof that all browser checks or a provider challenge passed.
 
 If any debugger checks fail, follow Blooket's school IT guidance; if they
@@ -298,6 +303,107 @@ installation. No VM or Metal requirement is part of the initial plan.
 
 Package assembly uses the system C compiler for its small native update helper.
 
+## Install on a trusted personal Mac without Apple Developer
+
+**An Apple Developer account or Team ID is not needed to build, run, or
+manually approve this app on a Mac you control with the owner's consent.**
+The ARM64 Mac must run macOS 13.5 or newer. This is an explicit, personal
+installation/test route, **not** a notarized public release or a working
+automatic updater. The bundled Safari extension and native Mac acceptance
+still need testing on the actual machine.
+
+On that Mac, open **Terminal**. First check the host:
+
+```sh
+uname -m
+sw_vers -productVersion
+```
+
+`uname -m` must print `arm64`. A local build also needs Apple's free
+Xcode Command Line Tools (`xcode-select --install` if `cc` is unavailable),
+not an Apple Developer Program subscription. If you are building from your
+trusted source rather than installing a separately authenticated release,
+use Node.js 24, the pinned pnpm version, and the packaging commands:
+
+```sh
+git clone https://github.com/albertovillaosorno/blooket-api.git
+cd blooket-api
+pnpm install --frozen-lockfile
+npm run check
+npm run package -- darwin-arm64
+```
+
+This produces `.temp/distributions/darwin-arm64.zip` on the Mac. This local
+command packages the base app and Chrome extension; the native Safari companion
+is embedded only by the separate macOS CI process, not this build command.
+
+Package assembly is not Apple notarization. If you received an archive, first
+verify its provenance through a trusted channel; `shasum` below displays its
+SHA-256 but **a checksum supplied with an untrusted download is not publisher
+authentication**. Do not install a ZIP you have not independently trusted.
+
+To install the *first* personally trusted build for the logged-in Mac user,
+run the following from the cloned repository. Change `ARCHIVE` if your
+verified ZIP is elsewhere. The commands refuse to replace an existing app:
+
+```sh
+set -eu
+ARCHIVE="$PWD/.temp/distributions/darwin-arm64.zip"
+APP="$HOME/Applications/Blooket API.app"
+[ "$(uname -m)" = arm64 ] && [ -f "$ARCHIVE" ]
+shasum -a 256 "$ARCHIVE"
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/blooket-api-install.XXXXXXXX")"
+ditto -x -k "$ARCHIVE" "$STAGE"
+BUNDLE="$STAGE/Blooket API.app"
+[ -f "$BUNDLE/Contents/Info.plist" ]
+INFO="$BUNDLE/Contents/Info.plist"
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO")"
+[ "$BUNDLE_ID" = com.albertovilla.blooket-api ]
+if [ -e "$APP" ]; then
+  echo 'Already installed: stop; do not overwrite.' >&2
+  exit 1
+fi
+mkdir -p "$HOME/Applications"
+ditto --rsrc --extattr "$BUNDLE" "$APP"
+open "$APP"
+```
+
+If Gatekeeper blocks the app and you personally trust the exact build,
+choose **System Settings → Privacy & Security → Open Anyway** after the first
+launch attempt, then confirm **Open**. This is Apple's recommended per-app
+manual exception; it does not require a Developer ID. Do not proceed if macOS
+reports that the app contains malware or has been damaged.
+
+If you deliberately prefer Terminal and have independently verified the
+personal build, this **optional, per-app** command removes the downloaded
+quarantine attribute before retrying. It bypasses a macOS security check;
+never apply it to an untrusted download or run it automatically:
+
+```sh
+xattr -dr com.apple.quarantine "$HOME/Applications/Blooket API.app"
+open "$HOME/Applications/Blooket API.app"
+```
+
+Do **not** disable Gatekeeper globally, change permissions to `777`, or run
+these commands with `sudo`. Use the Mac owner's account and permission; the
+app needs no Apple Developer credentials or Team ID to launch manually.
+
+An installed copy, data, media, passwords, and drafts must not be removed as
+part of a later update. **Do not overwrite a running copy to upgrade it**: the
+transactional installer and rollback are not enabled yet. The private data
+root remains `~/Library/Application Support/blooket-api/`.
+
+Automatic installation is a different trust boundary: the current updater
+refuses unsigned/unnotarized candidates and still requires a verified Apple
+publisher Team ID **as currently implemented**. A future no-Developer-ID
+personal-update path would need pinned publisher signatures, exact byte
+verification, explicit macOS approval, safe process shutdown, rollback and
+recovery before enabling installation. Manual macOS permission does not by
+itself satisfy those checks.
+
+See [Apple's instructions](https://support.apple.com/en-us/102445)
+and the [update decision](docs/technical/adr/product-update-lifecycle.md).
+
 ## Packages and releases
 
 Remote CI is deliberately opt-in so ordinary pushes and pull requests do not
@@ -390,16 +496,32 @@ versions, and integrity scope.
 
 An unsigned local build is a development artifact.
 
-To assemble the unpacked Chrome development extension:
+To assemble the unpacked Chrome and Firefox extensions:
 
 ```sh
 npm run package -- --extension
+npm run package -- --firefox-extension
 ```
 
-In Chrome 110 or newer, open the Extensions page, enable Developer mode, and
-choose **Load unpacked** with `.temp/distributions/browser-extension/`.
-Native packages include the same directory under `extensions/chrome/` in their
-resources. This is a manual development installation, not a store installer.
+In Chrome 110 or newer, open `chrome://extensions`, enable Developer mode,
+and select **Load unpacked** at `.temp/distributions/browser-extension/`.
+
+In desktop Firefox, open `about:debugging#/runtime/this-firefox`, select
+**Load Temporary Add-on**, and pick `manifest.json` inside
+`.temp/distributions/firefox-extension/`. Open the Blooket API workspace
+**in that same Firefox profile** to connect it.
+
+Temporary Firefox add-ons are removed when Firefox restarts; reload them
+through `about:debugging` for local use. Permanent installation on ordinary
+Firefox requires a Mozilla-signed add-on; that signing is separate from Apple
+Developer membership, which is never needed here. A locally produced
+unsigned `.xpi` is not a permanent-install workaround.
+
+Native packages include both folders under `extensions/chrome/` and
+`extensions/firefox/` in their resources. On macOS those paths are within
+`Blooket API.app/Contents/Resources/`; on Linux they are under the extracted
+package's `extensions/` directory. These are manual, opt-in browser installs,
+not browser-store or Mozilla-signed distribution claims.
 
 The extension requests scripting/storage and access only to the Blooket
 dashboard, Blooket identity login, and the two admitted IPv4 loopback addresses.
@@ -538,15 +660,37 @@ The ARM64 CI stage separately converts/compiles the Safari host and exercises
 the packaged workspace through Safari WebDriver. Remaining Apple trust and
 platform-specific hardening belongs to the final platform record.
 
-Extract the Linux archive and run `./blooket-api` to open the workspace.
-`--no-open` starts without opening a browser, `--status` reports the service,
-and `--stop` stops that instance. Reopening reuses the running service.
-Replacing the extracted package retains user data; deleting the package does
-not remove settings, media, or host-store secrets.
+For a personal Linux x64 installation, ensure `xdg-open` and a usable
+Secret Service keyring (`secret-tool`) are installed and your login session
+unlocks the keyring. Build and verify the package on Linux:
 
-macOS platform-only installation/trust hardening remains in the final platform
-record rather than blocking completed packaging work.
-pending; do not present an unsigned archive as a ready-to-install release.
+```sh
+npm run package -- linux-x64 --output personal-linux
+npm run package:verify -- linux-x64 --output personal-linux
+mkdir -p "$HOME/Applications/blooket-api"
+tar -xzf .temp/distributions/personal-linux/linux-x64.tar.gz \
+  -C "$HOME/Applications/blooket-api"
+"$HOME/Applications/blooket-api/blooket-api" --no-open
+```
+
+Then open the local workspace shown by the launcher in your Firefox profile,
+with the Firefox add-on loaded from
+`$HOME/Applications/blooket-api/extensions/firefox/manifest.json`.
+Use `--status` to inspect the local service and `--stop` for clean shutdown.
+Running the launcher without `--no-open` uses your system default browser.
+
+Keep one service and one browser profile per computer; your Linux data and
+her macOS data, passwords, drafts and Blooket sessions stay on their own
+machines. The Linux data root is user-owned and separate from the package.
+
+For a later manual Linux upgrade, stop the managed instance first and preserve
+its existing package as a backup. Never overwrite a running executable.
+Replacing a stopped extracted package retains the user data root; deleting
+the package does not remove saved settings, media or host-store secrets.
+Automated Linux updates and rollback are not enabled yet.
+
+Native Mac testing and the no-Apple-ID update path remain open. Do not
+present an unsigned archive as a trusted public automatic-update release.
 
 ## Develop and verify
 
@@ -615,8 +759,8 @@ removes the index entry. See [the record workflow](docs/todo/README.md).
 Configuration includes a manual “Check for updates” action with current
 version, last-check time, and EN/ES status. It uses anonymous public metadata
 with bounded requests, runs only when requested, and distinguishes unavailable
-GitHub from “no new version”. Linux remains a developer package and has no
-automatic update installer.
+GitHub from “no new version”. Linux supports personal manual installation,
+but does not yet have an automatic update installer.
 
 [Automatic updates](docs/todo/open/delivery/updates.mdc) are planned, not
 implemented. They will use final public GitHub Releases without a teacher GitHub

@@ -106,9 +106,19 @@ Release does not rebuild or re-test; it publishes CI artifacts. Release notes
 are handwritten later in the GitHub UI, with no automated changelog or generated
 notes.
 
-The Mac product target is ARM64. Linux packaging/tests remain useful for
-portable validation, but Linux is never a release asset. Release publishes only
-`darwin-arm64.zip`; its `Blooket API.app` contains the Safari companion.
+Personal-use product targets are Linux x64 and macOS ARM64. Chrome and
+Firefox need their own working extension artifacts; native Safari acceptance
+is independent. Linux archive assembly/startup checks are user-facing delivery
+evidence, not just test stubs. The current release workflow still only
+publishes `darwin-arm64.zip`; adding a Linux public asset needs its own exact
+verification and publication gate, not an unreviewed CI bypass.
+
+Do not require Apple Developer Program enrollment, a Team ID, or notarization
+for personally approved Mac installations. A notarized Developer ID verifier
+is legacy optional public-distribution infrastructure and must not become a
+mandatory blocker for the no-Apple-ID personal workflow. New update modes
+must still authenticate publisher keys and bytes, preserve rollback, and honor
+explicit native OS permission; never silently bypass Gatekeeper.
 
 ## Architecture rules
 
@@ -414,10 +424,10 @@ and online MCP ADR for scope.
 
 ## Platform priority
 
-macOS is the teacher product target. Linux x64 packaging and host checks are
-required so the developer can test the same service locally. The user interface
-is a localhost web page with shared extension behavior; Chrome is the directly
-testable browser target.
+Linux x64 and macOS ARM64 are both personal-use product targets. Linux and
+Firefox need native package/browser acceptance; Chrome retains its existing
+real provider-read evidence. The shared web UI must not single out Chrome
+when the same session can instead be paired through Firefox.
 
 Safari packaging uses a GitHub Actions macOS runner, as authorized on
 2026-10-06. A local background service owns files, settings, secrets, and
@@ -437,9 +447,9 @@ local failure log, plus manual rerun.
 Do not replace it with the full test suite or a Blooket mutation. Metal
 acceleration is outside the initial requirements.
 
-Linux x64 must have a runnable package for development acceptance of the shared
-service, browser UI, and Chrome extension. This does not make Linux a substitute
-for macOS Keychain, signing, or target-host acceptance.
+Linux x64 must have a runnable user-installable package including the shared
+service, browser UI and Chrome/Firefox extensions. A working Linux release
+does not substitute for native Mac Keychain or hardware acceptance.
 
 Keep existing useful tests and adapters; do not delete working coverage merely
 to reduce the supported product scope. Windows is out of scope. macOS adapters
