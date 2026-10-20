@@ -51,6 +51,10 @@ test("an uncertain throttled Save has a distinct waiting label", async () => {
     "publicationUncertain");
   assert.equal(label({ phase: "wait", state: "rate-limited" }),
     "publicationRateLimited");
+  assert.equal(label({ phase: "session-required", state: "signed-out" }),
+    "readSignedOut");
+  assert.equal(label({ phase: "session-required",
+    state: "expired-session" }), "readSignedOut");
 });
 
 class Element {
