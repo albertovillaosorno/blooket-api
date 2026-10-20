@@ -36,6 +36,7 @@ import { exactOwnData, snapshotExactDenseArray } from
 
 import type {
   BlooketAddQuestionSubmission,
+  BlooketReplaceQuestionSubmission,
   BlooketCreateSetSubmission,
 } from "../../../ir/blooket-write-submissions/contract/write-submission.ts";
 import type { BlooketPreparedMedia } from
@@ -89,7 +90,7 @@ export function blooketBrowserWriteExecutionPort(
         if (lowered.value.kind === "create-set") {
           return await executeCreateSet(surface, lowered.value, admitted);
         }
-        return await executeAddQuestion(surface, lowered.value, admitted);
+        return await executeQuestion(surface, lowered.value, admitted);
       } catch {
         return browserFailure();
       }
@@ -166,12 +167,16 @@ async function executeCreateSet(
   };
 }
 
-async function executeAddQuestion(
+async function executeQuestion(
   surface: BlooketBrowserWriteSurfacePort,
-  submission: BlooketAddQuestionSubmission,
+  submission: BlooketAddQuestionSubmission | BlooketReplaceQuestionSubmission,
   media: Parameters<BlooketBrowserWriteSurfacePort["addQuestion"]>[1],
 ): Promise<BlooketWriteAttemptResult> {
-  const result = await surface.addQuestion(submission, media);
+  if (submission.kind === "replace-question" &&
+      typeof surface.replaceQuestion !== "function") return browserFailure();
+  const result = submission.kind === "replace-question"
+    ? await surface.replaceQuestion!(submission, media)
+    : await surface.addQuestion(submission, media);
   if (exactOwnData(result, ["ok"])?.["ok"] === true)
     return { ok: true, receipt: null };
   return preserveFailure(result);

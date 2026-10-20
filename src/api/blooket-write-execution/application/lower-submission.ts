@@ -40,7 +40,7 @@ import {
 } from
   "../../../ir/blooket-write-submissions/contract/write-submission.ts";
 import type {
-  BlooketQuestionOperation,
+  BlooketQuestionWriteOperation,
   BlooketSetOperation,
 } from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type {
@@ -48,6 +48,8 @@ import type {
 } from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import { decodeBlooketSetId } from
   "../../../ir/blooket-set-reads/contract/set-read.ts";
+import { decodeBlooketQuestionRead } from
+  "../../../ir/blooket-question-reads/contract/question-read.ts";
 import type { BlooketWriteTarget } from "../contract/write-execution.ts";
 
 export type LowerBlooketWriteSubmissionResult =
@@ -101,7 +103,18 @@ export function lowerBlooketWriteSubmission(
   ) {
     return { ok: false, code: "invalid-question-number" };
   }
-  return lowerQuestion(operation, target.remoteSetId);
+  const lowered = lowerQuestion(operation, target.remoteSetId);
+  if (!lowered.ok || operation.kind !== "replace-question") return lowered;
+  const previous = decodeBlooketQuestionRead(operation.previous);
+  if (!previous.ok || previous.value.number !== operation.questionNumber ||
+      previous.value.hasAudio || previous.value.answers.some(answer =>
+        answer.kind !== "text") || (previous.value.hasImage &&
+        (previous.value.schemaVersion !== 4 ||
+          previous.value.imageEvidence === null)) ||
+      lowered.value.kind !== "add-question")
+    return { ok: false, code: "invalid-question-content" };
+  return { ok: true, value: { ...lowered.value, kind: "replace-question",
+    previous: previous.value } };
 }
 
 function lowerSet(
@@ -118,7 +131,7 @@ function lowerSet(
 }
 
 function lowerQuestion(
-  operation: BlooketQuestionOperation,
+  operation: BlooketQuestionWriteOperation,
   remoteSetId: string,
 ): LowerBlooketWriteSubmissionResult {
   const question = operation.question;

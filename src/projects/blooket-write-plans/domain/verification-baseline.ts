@@ -165,7 +165,7 @@ export function decodeBlooketWriteVerificationBaseline(
 }
 
 export function verificationBaselineKindForOperation(
-  operationKind: "set" | "question",
+  operationKind: "set" | "question" | "replace-question",
 ): BlooketWriteVerificationBaselineKind {
   return operationKind === "set"
     ? "set-list"
@@ -175,7 +175,7 @@ export function verificationBaselineKindForOperation(
 // Observed rows are a precondition only. Their count/digest cannot establish
 // global absence or reconcile uncertain creation. Persist that distinction.
 export function verificationBaselineKindsForOperation(
-  operationKind: "set" | "question",
+  operationKind: "set" | "question" | "replace-question",
 ): readonly BlooketWriteVerificationBaselineKind[] {
   return operationKind === "set"
     ? ["set-list", "set-observation"] : ["question-list"];

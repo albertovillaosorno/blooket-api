@@ -604,3 +604,40 @@ test("browser write adapter never invokes accessor-backed acknowledgements",
   assert.equal(getterCalls, 0);
   },
 );
+
+
+for (const supported of [false, true]) {
+  test(`replacement ${supported ? "uses its dedicated surface" :
+    "never falls back to append"}`, async () => {
+    const { replacementFixture } = await import(
+      "../../../projects/blooket-write-plans/domain/replacement-fixtures.ts");
+    const { buildBlooketReplacementPlan } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+      "../../../../src/projects/blooket-write-plans/domain/replacement-plan.ts");
+    const f = replacementFixture();
+    const replacement = buildBlooketReplacementPlan(f.desired, {
+      remoteSetId: "fixture", baseline: { schemaVersion: 1,
+        kind: "question-list", itemCount: 2, sha256: "a".repeat(64) },
+    }, f.previous)!;
+    let appends = 0, replacements = 0;
+    const surface: BlooketBrowserWriteSurfacePort = {
+      createSet: async () => { throw Error("never create during edit"); },
+      addQuestion: async () => { appends++; return { ok: true }; },
+      ...(supported ? { replaceQuestion: async submission => {
+        replacements++;
+        assert.equal(submission.kind, "replace-question");
+        assert.equal(submission.number, 2);
+        assert.equal(submission.previous.question, "Old second question.");
+        assert.equal(submission.timeLimit, 20);
+        return { ok: true as const };
+      } } : {}),
+    };
+    const result = await blooketBrowserWriteExecutionPort(surface).execute(
+      replacement.operations[0], { remoteSetId: "fixture" },
+      { preparedMedia: [] });
+    assert.equal(appends, 0);
+    assert.equal(replacements, supported ? 1 : 0);
+    assert.deepEqual(result, supported ? { ok: true, receipt: null }
+      : { ok: false, kind: "browser", code: "blooket-browser-failed" });
+  });
+}

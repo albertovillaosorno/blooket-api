@@ -629,6 +629,12 @@ async function executePersistedBlooketWriteLocked(
   if (!baseline.ok) {
     return baseline.result;
   }
+  if (plan.schemaVersion === 3 &&
+      !sameBlooketWriteVerificationBaseline(baseline.value,
+        plan.target.baseline))
+    return { ok: false, stage: "remote-precondition",
+      code: "blooket-remote-state-changed",
+      operationId: prepared.operation.operationId };
   if (options.signal?.aborted)
     return { ok: false, stage: "mutation-pacing",
       code: "mutation-pacing-cancelled" };

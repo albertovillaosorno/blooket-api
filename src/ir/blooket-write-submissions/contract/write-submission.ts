@@ -29,6 +29,9 @@
 // - Defaults:
 //   - Question media slots never invent URLs or local filesystem locations.
 //
+import type { BlooketQuestionRead } from
+  "../../blooket-question-reads/contract/question-read.ts";
+
 export const BLOOKET_WRITE_SUBMISSION_VERSION = 1 as const;
 
 export interface BlooketSubmissionMedia {
@@ -71,6 +74,13 @@ export interface BlooketAddQuestionSubmission {
   readonly timeLimit: number;
 }
 
+export interface BlooketReplaceQuestionSubmission extends
+  Omit<BlooketAddQuestionSubmission, "kind"> {
+  readonly kind: "replace-question";
+  readonly previous: BlooketQuestionRead;
+}
+
 export type BlooketWriteSubmission =
   | BlooketCreateSetSubmission
-  | BlooketAddQuestionSubmission;
+  | BlooketAddQuestionSubmission
+  | BlooketReplaceQuestionSubmission;

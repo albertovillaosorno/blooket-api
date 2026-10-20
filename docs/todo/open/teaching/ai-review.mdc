@@ -69,6 +69,16 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-20, the authoring agent read the teacher profile, master/task skills
+and stable-ID library search through registered MCP handlers. It then read a
+real private image quiz, saved the full desired draft, appended a typing
+question and separately verified `published: true` without an editorial gate.
+The tools crossed the actual CLI/service/browser path and retained the prior
+image; this was local registered-tool invocation, not remote OAuth client
+acceptance. Existing-question correction and attachment transport still need
+functional completion.
+
+
 On 2026-10-20, a real CLI publication freshly verified a private quiz with a
 prepared question image. Teacher tool metadata now advertises the already
 admitted `text-publication` capability scope, so an AI can inspect base text

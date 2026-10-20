@@ -188,6 +188,20 @@ This initial existing-set workflow only appends. It refuses replacements,
 deletions, reordering or metadata changes; in-place question editing remains
 pending in `blooket-11`. Portable transport coverage is not live acceptance.
 
+Internal replacement planning now has schema three, with one distinct
+`replace-question` operation, the entire original question digest and a copied
+prior saved row. Its checkpoint binds the existing remote set at index zero.
+The browser surface has a separate optional replacement method; an older
+companion cannot fall back to Add Question.
+
+The executor requires the frozen original digest before opening the journal.
+Differential verification replaces the single matching new row with its exact
+prior row and requires the full original digest plus a second independent
+saved read. Real-file regressions recover a lost reply without another write
+and refuse concurrent changes. This internal engine does not yet expose a
+replacement CLI/MCP command or implement the native edit form.
+
+
 Version-one snapshots remain text-only and retain their existing checkpoint and
 journal bindings. Final image verification and reconciliation consume the
 version-two frozen expected context without resolving today's media library.

@@ -366,7 +366,7 @@ async function safeExecute(
     };
     const confirmed = own(["ok", "receipt"]);
     if (confirmed?.["ok"] === true) {
-      if (operation.kind === "question" && confirmed["receipt"] === null)
+      if (operation.kind !== "set" && confirmed["receipt"] === null)
         return { ok: true, receipt: null };
       if (operation.kind === "set") {
         const receipt = decodeBlooketWriteReceipt(confirmed["receipt"]);

@@ -35,6 +35,7 @@ import type { ObservedBlooketNavigationStateKind } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import type {
   BlooketAddQuestionSubmission,
+  BlooketReplaceQuestionSubmission,
   BlooketCreateSetSubmission,
 } from "../../../ir/blooket-write-submissions/contract/write-submission.ts";
 import type { BlooketPreparedMedia } from "./prepared-media.ts";
@@ -73,6 +74,12 @@ export interface BlooketBrowserWriteSurfacePort {
     submission: BlooketCreateSetSubmission,
     media: readonly BlooketPreparedMedia[],
   ): Promise<BlooketCreateSetSurfaceResult>;
+
+  // Older companions cannot interpret replacement as append.
+  replaceQuestion?(
+    submission: BlooketReplaceQuestionSubmission,
+    media: readonly BlooketPreparedMedia[],
+  ): Promise<BlooketAddQuestionSurfaceResult>;
 
   addQuestion(
     submission: BlooketAddQuestionSubmission,

@@ -73,6 +73,20 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20 at 20:02 UTC, registered MCP tool handlers read the real private
+image quiz, saved its full desired draft, appended a typing question and
+separately verified `published: true`. The prior image question stayed intact;
+the new question retained exact matching and its 30-second timer. These calls
+used the real CLI, localhost service and authenticated browser; they do not
+establish a remote OAuth/ChatGPT client connection.
+
+A schema-three internal replacement engine now binds one saved position,
+the full original digest and an immutable prior row. Its journal and verifier
+recover a lost reply without another write, refuse changed surrounding rows,
+and never fall back from replacement to Add Question. The dedicated browser
+edit method and canonical replacement command are still pending.
+
+
 On 2026-10-20 at 19:55 UTC, the canonical CLI completed a new private fictional
 quiz with one multiple-choice question and a prepared library image. Create
 Set advanced once with a durable remote ID, Add Question advanced once, and a
@@ -87,8 +101,9 @@ Its native screenshot command timed out, so no screenshot evidence is claimed.
 
 The temporary visual tab was closed, leaving one backend. Older ambiguous
 attempts were preserved without another Save. This proves image creation and
-fresh read-back; existing-question replacement and the remaining live append/
-multi-question/teacher-tool journeys are still pending.
+fresh read-back; existing-question replacement and uninterrupted multi-question
+publication are still pending. The later MCP append evidence above covers
+extension of this quiz.
 
 
 On 2026-10-20, a red-to-green final-verification regression demonstrated
@@ -1337,9 +1352,10 @@ rule evaluation limitation remains explicit in the development handoff.
 ## Blockers
 
 Canonical private Create Set, typing and multiple-choice questions, and a
-prepared question image have real fresh verification. Uninterrupted
-multi-question publication, live append and replacement of existing questions
-remain pending. Historical HTTP 429 attempts retain their journals without
+prepared question image and a registered-MCP append have real fresh
+verification. Uninterrupted multi-question publication and replacement of
+existing questions remain pending. Historical HTTP 429 attempts retain their
+journals without
 replay. Computer Use reads and keyboard activation work in the current Chrome;
 native clicks/screenshots still time out independently of product publication.
 

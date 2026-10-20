@@ -1027,3 +1027,44 @@ test("reconciliation never invokes accessor-backed probe replies",
   assert.equal(getters, 0);
   },
 );
+
+
+test("replacement verifies one changed row while retaining every other row",
+  async () => {
+    const { replacementFixture } = await import(
+      "../../../projects/blooket-write-plans/domain/replacement-fixtures.ts");
+    const { buildBlooketReplacementPlan } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+      "../../../../src/projects/blooket-write-plans/domain/replacement-plan.ts");
+    const { questionBaselineFor } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+      "../../../../src/api/blooket-write-execution/application/set-read-verifier.ts");
+    const f = replacementFixture();
+    const baseline = questionBaselineFor(f.rows)!;
+    const plan = buildBlooketReplacementPlan(f.desired,
+      { remoteSetId: "fixture", baseline }, f.previous)!;
+    let current = structuredClone(f.rows);
+    const reads: BlooketSetReadPort = {
+      list: async () => ({ ok: true, value: [], completeness: "complete" }),
+      get: async () => { throw Error("no metadata read in this verifier"); },
+    };
+    const verifier = blooketSetReadWriteVerifier(reads,
+      { list: async () => ({ ok: true, value: structuredClone(current) }) });
+    const operation = plan.operations[0], target = { remoteSetId: "fixture" };
+    assert.deepEqual(await verifier.captureBaseline(operation, target),
+      { ok: true, baseline });
+    assert.deepEqual(await verifier.verify(operation, target, baseline),
+      { ok: true, outcome: "inconclusive" });
+    current[1] = f.changed;
+    assert.deepEqual(await verifier.verify(operation, target, baseline),
+      { ok: true, outcome: "confirmed", receipt: null });
+    current[0] = { ...current[0]!, timeLimit: 50 };
+    assert.deepEqual(await verifier.verify(operation, target, baseline),
+      { ok: true, outcome: "inconclusive" });
+    current = [...f.rows, { ...f.changed, number: 3 }];
+    assert.deepEqual(await verifier.verify(operation, target, baseline),
+      { ok: true, outcome: "inconclusive" });
+    current = [f.rows[0]!, { ...f.previous, timeLimit: 25 }];
+    assert.deepEqual(await verifier.captureBaseline(operation, target),
+      { ok: true, baseline: null });
+  });
