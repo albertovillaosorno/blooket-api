@@ -932,7 +932,7 @@ function ownedBrowser(
       throw Error("unowned-temporary-tab");
     const observed = exactTemporaryReadTab(await chrome.tabs.get(id));
     if (observed.id !== id ||
-        classifyBlooketReadTabLoad(observed, owned.url) === "changed" ||
+        classifyBlooketReadTabLoad(observed, owned.url, true) === "changed" ||
         observed.active === true ||
         (owned.windowId !== undefined &&
          observed.windowId !== owned.windowId))
@@ -1041,7 +1041,7 @@ async function inspectDetachedBlooketSets(
     let ready = false;
     for (let i = 0; i < 30; i++) {
       const tab = await browser.tabs.get(tabId!);
-      const load = classifyBlooketReadTabLoad(tab, url);
+      const load = classifyBlooketReadTabLoad(tab, url, true);
       if (load === "changed") return failed();
       if (load === "ready") { ready = true; break; }
       await pause(100);
