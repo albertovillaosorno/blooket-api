@@ -97,10 +97,10 @@ Releases use quarterly CalVer tags `vYY.Q.PATCH`, with UTC three-month quarters,
 and product versions `YY.Q.PATCH` (for example `26.4.0`). Tags must match
 `PRODUCT_VERSION` and require the repository variable `RELEASE_ENABLED=true`.
 
-A release tag invokes the reusable CI workflow for that exact commit first.
-Portable validation must pass before the ARM64 macOS/Safari job can run; only
-after the complete CI workflow succeeds may the release gate admit publication.
-Failed, canceled, or skipped CI blocks release.
+A release tag invokes the reusable CI workflow for its exact commit.
+Linux x64 package build, verification and portable validation gate publication;
+macOS/Safari CI runs only on explicit `ci-*` tags and never blocks a Linux
+release. Failed Linux verification blocks release; Mac is not a prerequisite.
 
 Release does not rebuild or re-test; it publishes CI artifacts. Release notes
 are handwritten later in the GitHub UI, with no automated changelog or generated
@@ -109,16 +109,16 @@ notes.
 Personal-use product targets are Linux x64 and macOS ARM64. Chrome and
 Firefox need their own working extension artifacts; native Safari acceptance
 is independent. Linux archive assembly/startup checks are user-facing delivery
-evidence, not just test stubs. The current release workflow still only
-publishes `darwin-arm64.zip`; adding a Linux public asset needs its own exact
-verification and publication gate, not an unreviewed CI bypass.
+evidence, not just test stubs. The current release workflow publishes
+`linux-x64.tar.gz` from the verified Ubuntu job, independently of Mac.
 
 Do not require Apple Developer Program enrollment, a Team ID, or notarization
 for personally approved Mac installations. A notarized Developer ID verifier
 is legacy optional public-distribution infrastructure and must not become a
-mandatory blocker for the no-Apple-ID personal workflow. New update modes
-must still authenticate publisher keys and bytes, preserve rollback, and honor
-explicit native OS permission; never silently bypass Gatekeeper.
+mandatory blocker for the no-Apple-ID personal workflow. Personal update
+checks use the fixed repository's GitHub asset SHA-256 digest and exact bytes;
+a valid digest alone cannot authenticate a compromised GitHub publisher.
+Never delete a usable app or silently bypass Gatekeeper during replacement.
 
 ## Architecture rules
 

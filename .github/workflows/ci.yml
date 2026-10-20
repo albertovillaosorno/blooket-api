@@ -3,10 +3,7 @@ name: CI
 on:
   push:
     tags: ["ci-*"]
-  workflow_call:
-    secrets:
-      update-signing-key:
-        required: false
+  workflow_call: {}
 
 permissions:
   contents: read
@@ -35,8 +32,27 @@ jobs:
           set -euo pipefail
           npm run package -- linux-x64
           npm run package:verify -- linux-x64
+      - name: Verify clean Linux release package
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node src/platforms/distribution/adapter-inbound/release-tag.ts \
+            "$RELEASE_TAG"
+          npm run package:verify -- linux-x64 --release
+      - name: Upload verified Linux package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-linux-x64
+          path: .temp/distributions/linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
   macos-arm:
+    # Optional native smoke on explicit ci-* tags. Releases need only Linux.
+    if: github.event_name == 'push'
     needs: validate
     runs-on: macos-26
     timeout-minutes: 35
