@@ -585,15 +585,20 @@ async function observeQuestion(
       // Saving can briefly unmount the authenticated Edit shell. Only read
       // within this same post-submit budget; never submit again or interpret
       // an unknown page as saved state. Explicit human stops remain immediate.
-      if (observed === "unexpected-page") {
-        pendingUnknown = true;
+      if (observed === "unexpected-page" || observed === undefined) {
+        // A post-Save 429 may leave React unclassified or the read response
+        // unavailable. Diagnose the same latched request before the deadline;
+        // all explicit human stops still take precedence below.
+        const throttled = await script(
+          inspectBlooketPostSubmitRateLimit as (...args: never[]) => unknown,
+          [input.setId],
+        ).catch(() => false);
+        if (throttled === true) return navigationFailure("rate-limited");
+        if (observed === "unexpected-page") pendingUnknown = true;
         await pause(POLL_MS);
         continue;
       }
-      if (observed !== undefined)
-        return navigationFailure(normalizeUnexpected(observed));
-      await pause(POLL_MS);
-      continue;
+      return navigationFailure(normalizeUnexpected(observed));
     }
     pendingUnknown = false;
 
