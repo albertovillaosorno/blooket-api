@@ -1726,3 +1726,42 @@ test("final Add Question serializes owned arrays without inherited methods",
     });
   },
 );
+
+
+test("replacement opener targets an existing card with unchanged row count",
+  () => {
+  const page = fixture(2);
+  const edit = node("BUTTON", "Edit");
+  const cards = [1, 2].map(number => node("DIV", "", {
+    "aria-label": "Edit question " + number,
+  }));
+  cards[1]!.selectors["button"] = [edit];
+  page.document.selectors[
+    '[role="button"][aria-label^="Edit question "]'] = cards;
+  page.document.selectors[
+    '[role="button"][aria-label="Edit question 2"]'] = [cards[1]!];
+  page.counter.textContent = "2 Questions";
+  closedQuestionEditor(page, edit);
+  withPage(page.document, "https://dashboard.blooket.com/edit?id=set-fixture",
+    () => {
+    const desired: BlooketTextQuestionPageInput = {
+      setId: "set-fixture", number: 2, question: "Type sun.",
+      qType: "typing", random: true, timeLimit: 15,
+      answerTypes: ["exactly"], answers: [{ text: "sun", correct: true }],
+    };
+    const replacement = { ...desired,
+      replacement: { questionCount: 2, previous: desired } };
+    assert.equal(runBlooketAddQuestionPageAction("open-replacement",
+      JSON.stringify(replacement)), true);
+    assert.equal(edit.clicked, 1);
+    assert.equal(page.add.clicked, 0);
+    assert.equal(isBlooketAddQuestionPanelReady("set-fixture"), true);
+    assert.deepEqual(prepareBlooketAddQuestionForm(replacement), { ok: true });
+    assert.deepEqual(submitBlooketAddQuestionForm(replacement), { ok: true });
+    assert.equal(page.submit.clicked, 1);
+    assert.deepEqual(submitBlooketAddQuestionForm(replacement), {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(page.submit.clicked, 1);
+  });
+});

@@ -29,6 +29,11 @@
 // - Defaults:
 //   - Malformed bridge values become stable browser failures.
 //
+import type { BlooketAddQuestionSubmission,
+  BlooketReplaceQuestionSubmission } from
+  "../../../ir/blooket-write-submissions/contract/write-submission.ts";
+import type { BlooketPreparedMedia } from
+  "../../blooket-write-execution/contract/prepared-media.ts";
 import { BLOOKET_NAVIGATION_STATE_KINDS } from
   "../../../ir/blooket-navigation/domain/navigation-state.ts";
 import type { ObservedBlooketNavigationStateKind } from
@@ -67,6 +72,67 @@ export function createBlooketBrowserBridgeAdapters(
   readonly questions: BlooketQuestionReadPort;
   readonly writes: BlooketBrowserWriteSurfacePort;
 } {
+  const questionWrite = async (
+    submission: BlooketAddQuestionSubmission | BlooketReplaceQuestionSubmission,
+    media: readonly BlooketPreparedMedia[],
+  ) => {
+    if (submission.kind === "replace-question" &&
+        (submission.previous.hasImage || submission.previous.hasAudio ||
+          submission.previous.equation !== null ||
+          submission.previous.answers.some(answer =>
+            answer.kind !== "text"))) return browserFailureWithKind();
+    if (submission.answers.some((answer) => answer.kind !== "text"))
+      return browserFailureWithKind();
+    let image: BlooketPreparedImage | undefined;
+    if (submission.image !== null) {
+      const file = media[0];
+      if (media.length !== 1 || !file ||
+          file.mediaId !== submission.image.mediaId ||
+          !Number.isSafeInteger(file.revision) || file.revision < 1 ||
+          !(file.bytes instanceof Uint8Array) || file.bytes.length < 1 ||
+          file.bytes.length >= 2_500_000) return browserFailureWithKind();
+      const decoded = decodeBlooketPreparedImage({
+        format: file.format,
+        base64: Buffer.from(file.bytes).toString("base64"),
+      });
+      if (!decoded.ok) return browserFailureWithKind();
+      image = decoded.value;
+    } else if (media.length !== 0) return browserFailureWithKind();
+    const result = await safeRequest(transport, {
+      kind: submission.kind === "replace-question"
+        ? "questions.replace" : "questions.create",
+      setId: submission.remoteSetId,
+      number: submission.number,
+      question: submission.question,
+      answers: submission.answers.map((answer) => ({
+        text: answer.kind === "text" ? answer.text : "",
+        correct: answer.correct,
+      })),
+      qType: submission.qType,
+      random: submission.random,
+      answerTypes: submission.answerTypes,
+      timeLimit: submission.timeLimit,
+      ...(image ? { image } : {}),
+      ...(submission.kind === "replace-question" ? { replacement: {
+        questionCount: submission.questionCount,
+        previous: {
+          setId: submission.remoteSetId,
+          number: submission.previous.number,
+          question: submission.previous.question,
+          answers: submission.previous.answers.map(answer => ({
+            text: answer.content ?? "", correct: answer.correct,
+          })),
+          qType: submission.previous.qType,
+          random: submission.previous.random,
+          answerTypes: submission.previous.qType === "mc" ? null
+            : submission.previous.answers.map(answer => answer.match!),
+          timeLimit: submission.previous.timeLimit,
+        },
+      } } : {}),
+    });
+    if (!result.ok) return browserFailureWithKind(result.code);
+    return decodeAddQuestionSurfaceResult(result.value);
+  };
   return {
     session: {
       observe: async () => {
@@ -159,6 +225,14 @@ export function createBlooketBrowserBridgeAdapters(
     },
 
     writes: {
+      inspectQuestionReplacement: async () => {
+        const result = await safeRequest(transport,
+          { kind: "writes.inspect-replacement" });
+        if (!result.ok || !exactKeys(result.value, "questionReplacement"))
+          return false;
+        return Object.getOwnPropertyDescriptor(result.value,
+          "questionReplacement")?.value === "single-row-reload-v1";
+      },
       inspectCreateSetConfirmation: async () => {
         const result = await safeRequest(transport, { kind: "writes.inspect" });
         return result.ok && currentWriteDeclaration(result.value);
@@ -175,42 +249,8 @@ export function createBlooketBrowserBridgeAdapters(
         if (!result.ok) return browserFailureWithKind(result.code);
         return decodeCreateSetSurfaceResult(result.value);
       },
-      addQuestion: async (submission, media) => {
-        if (submission.answers.some((answer) => answer.kind !== "text"))
-          return browserFailureWithKind();
-        let image: BlooketPreparedImage | undefined;
-        if (submission.image !== null) {
-          const file = media[0];
-          if (media.length !== 1 || !file ||
-              file.mediaId !== submission.image.mediaId ||
-              !Number.isSafeInteger(file.revision) || file.revision < 1 ||
-              !(file.bytes instanceof Uint8Array) || file.bytes.length < 1 ||
-              file.bytes.length >= 2_500_000) return browserFailureWithKind();
-          const decoded = decodeBlooketPreparedImage({
-            format: file.format,
-            base64: Buffer.from(file.bytes).toString("base64"),
-          });
-          if (!decoded.ok) return browserFailureWithKind();
-          image = decoded.value;
-        } else if (media.length !== 0) return browserFailureWithKind();
-        const result = await safeRequest(transport, {
-          kind: "questions.create",
-          setId: submission.remoteSetId,
-          number: submission.number,
-          question: submission.question,
-          answers: submission.answers.map((answer) => ({
-            text: answer.kind === "text" ? answer.text : "",
-            correct: answer.correct,
-          })),
-          qType: submission.qType,
-          random: submission.random,
-          answerTypes: submission.answerTypes,
-          timeLimit: submission.timeLimit,
-          ...(image ? { image } : {}),
-        });
-        if (!result.ok) return browserFailureWithKind(result.code);
-        return decodeAddQuestionSurfaceResult(result.value);
-      },
+      addQuestion: questionWrite,
+      replaceQuestion: questionWrite,
     },
   };
 }

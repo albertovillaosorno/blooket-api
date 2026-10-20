@@ -69,6 +69,7 @@ export interface BlooketBrowserWriteSurfacePort {
   // This is the loaded companion's declared confirmation contract, not
   // provider acceptance. Missing support cannot admit observed-set creation.
   inspectCreateSetConfirmation?(): Promise<boolean>;
+  inspectQuestionReplacement?(): Promise<boolean>;
 
   createSet(
     submission: BlooketCreateSetSubmission,

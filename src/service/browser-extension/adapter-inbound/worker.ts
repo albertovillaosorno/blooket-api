@@ -1214,7 +1214,8 @@ async function relay(current: Connection, activeGeneration: number) {
         const budgetMs = job.command.kind === "session.authenticate"
           ? 7_500
           : job.command.kind === "sets.create" ||
-              job.command.kind === "questions.create"
+              job.command.kind === "questions.create" ||
+              job.command.kind === "questions.replace"
             ? 57_000
             : job.command.kind === "capabilities.inspect" ||
                 job.command.kind === "capabilities.inspect-text"
@@ -1224,7 +1225,11 @@ async function relay(current: Connection, activeGeneration: number) {
         );
         let result: unknown = { ok: false, code: "blooket-browser-failed" };
         try {
-          if (job.command.kind === "writes.inspect") {
+          if (job.command.kind === "writes.inspect-replacement") {
+            result = { ok: true, value: {
+              questionReplacement: "single-row-reload-v1",
+            } };
+          } else if (job.command.kind === "writes.inspect") {
             // Local protocol declaration only: no page script, navigation,
             // authentication, or provider mutation. Create Set still owes
             // exact saved metadata after reload through its actual host.
@@ -1297,7 +1302,8 @@ async function relay(current: Connection, activeGeneration: number) {
                   : { ok: true, value: submitted };
               }
             }
-          } else if (job.command.kind === "questions.create") {
+          } else if (job.command.kind === "questions.create" ||
+              job.command.kind === "questions.replace") {
             const host = createExtensionAddQuestionHost(
               jobBrowser,
               current.tabId,
@@ -1315,6 +1321,8 @@ async function relay(current: Connection, activeGeneration: number) {
                 answerTypes: job.command.answerTypes,
                 timeLimit: job.command.timeLimit,
                 ...(job.command.image ? { image: job.command.image } : {}),
+                ...(job.command.replacement
+                  ? { replacement: job.command.replacement } : {}),
               }),
             };
           }

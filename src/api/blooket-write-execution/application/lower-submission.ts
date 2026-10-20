@@ -106,7 +106,10 @@ export function lowerBlooketWriteSubmission(
   const lowered = lowerQuestion(operation, target.remoteSetId);
   if (!lowered.ok || operation.kind !== "replace-question") return lowered;
   const previous = decodeBlooketQuestionRead(operation.previous);
-  if (!previous.ok || previous.value.number !== operation.questionNumber ||
+  if (!Number.isSafeInteger(operation.questionCount) ||
+      operation.questionCount < operation.questionNumber ||
+      operation.questionCount > 200 ||
+      !previous.ok || previous.value.number !== operation.questionNumber ||
       previous.value.hasAudio || previous.value.answers.some(answer =>
         answer.kind !== "text") || (previous.value.hasImage &&
         (previous.value.schemaVersion !== 4 ||
@@ -114,7 +117,7 @@ export function lowerBlooketWriteSubmission(
       lowered.value.kind !== "add-question")
     return { ok: false, code: "invalid-question-content" };
   return { ok: true, value: { ...lowered.value, kind: "replace-question",
-    previous: previous.value } };
+    previous: previous.value, questionCount: operation.questionCount } };
 }
 
 function lowerSet(

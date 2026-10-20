@@ -533,3 +533,26 @@ test("Add Question bridge owns exact arrays before reading proxy slots",
   })).ok, false);
   },
 );
+
+
+test("replacement bridge requires the prior row and unchanged native layout",
+  () => {
+  const previous = { setId: "set-fixture", number: 2, question: "Old prompt.",
+    answers: [{ text: "old", correct: true }], qType: "typing",
+    random: true, answerTypes: ["exactly"], timeLimit: 30 };
+  const command = { ...previous, kind: "questions.replace",
+    question: "New prompt.", replacement: { questionCount: 2, previous } };
+  assert.equal(decodeBlooketBrowserBridgeRequest(request(command)).ok, true);
+  for (const patch of [{ replacement: undefined },
+    { replacement: { questionCount: 1, previous } },
+    { replacement: { questionCount: 2, previous: { ...previous, number: 1 } } },
+    { qType: "mc", answerTypes: null },
+    { image: { format: "png", base64: "AAAA" } }]) {
+    assert.equal(decodeBlooketBrowserBridgeRequest(request({
+      ...command, ...patch,
+    })).ok, false);
+  }
+  assert.equal(decodeBlooketBrowserBridgeRequest(request({
+    ...command, kind: "questions.create",
+  })).ok, false);
+});

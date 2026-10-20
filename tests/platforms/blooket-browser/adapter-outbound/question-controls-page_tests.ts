@@ -192,7 +192,8 @@ function editor(kind: "typing" | "mc" = "typing",
       }
       render();
     };
-    form.selectors['input[name="accepted-answers"]'] = answers;
+    form.selectors['input[name="accepted-answers"]'] =
+      qType === "typing" ? answers : [];
   };
   typing.onClick = () => {
     qType = "typing";
@@ -300,6 +301,26 @@ function editor(kind: "typing" | "mc" = "typing",
   };
   return { document, form, hidden, watch, prompt, time, picker, list,
     delayMcEvents, delayTypingEvents,
+    seedSavedMc: () => {
+      prompt.value = "Old prompt.";
+      answers[0]!.value = "old";
+      answers[1]!.value = "moon";
+      selected[0] = true;
+      mcAnswerLength = 2;
+      time.value = "30";
+      extraProviderField = true;
+      render();
+      Object.assign(watch, { questionCount: 2 });
+    },
+    seedSaved: () => {
+      typing.click();
+      prompt.value = "Old prompt.";
+      answers[0]!.value = "old";
+      time.value = "30";
+      extraProviderField = true;
+      render();
+      Object.assign(watch, { questionCount: 2 });
+    },
     render, hiddenWrites: () => hiddenWrites,
     mcTrailingEmptyEvents: () => mcTrailingEmptyEvents,
     ignoreChanges: () => { ignored = true; },
@@ -1186,4 +1207,64 @@ test("pre-submit echo cannot re-admit detached, dirty or submitted forms",
       assert.equal(inspectBlooketPreparedQuestionEcho(input), false);
       assert.equal(page.hiddenWrites(), 0);
     });
+});
+
+
+test("replacement prepares an existing typing row without hidden writes",
+  async () => {
+  await withEditor(async page => {
+    page.seedSaved();
+    const previous = { ...input, question: "Old prompt.", timeLimit: 30,
+      answerTypes: ["exactly"] as const,
+      answers: [{ text: "old", correct: true }] };
+    const replacement = { ...input,
+      replacement: { questionCount: 2, previous } };
+    assert.equal(await prepareBlooketQuestionControls(replacement), true);
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(JSON.parse(page.hidden.value).providerExtra, true);
+    assert.equal(JSON.parse(page.hidden.value).question, input.question);
+    assert.equal(JSON.parse(page.hidden.value).answers[0], "sun");
+    Object.assign(page.watch, { prepared: true, finalized: true });
+    assert.equal(inspectBlooketPreparedQuestionEcho(replacement), true);
+  });
+});
+
+test("replacement refuses a mismatched saved prompt before changing controls",
+  async () => {
+  await withEditor(async page => {
+    page.seedSaved();
+    const previous = { ...input, question: "Different saved prompt.",
+      timeLimit: 30, answerTypes: ["exactly"] as const,
+      answers: [{ text: "old", correct: true }] };
+    assert.equal(await prepareBlooketQuestionControls({ ...input,
+      replacement: { questionCount: 2, previous } }), false);
+    assert.equal(page.prompt.value, "Old prompt.");
+    assert.equal(page.time.value, "30");
+    assert.equal(page.hiddenWrites(), 0);
+  });
+});
+
+
+test("replacement MC preserves native correctness while changing answer text",
+  async () => {
+  await withEditor(async page => {
+    page.seedSavedMc();
+    const previous: BlooketQuestionPageInput = {
+      setId: "set-fixture", number: 1, question: "Old prompt.",
+      qType: "mc", random: true, answerTypes: null, timeLimit: 30,
+      answers: [{ text: "old", correct: true },
+        { text: "moon", correct: false }],
+    };
+    const desired = { ...previous, question: "New prompt.", timeLimit: 15,
+      answers: [{ text: "sun", correct: false },
+        { text: "moon", correct: true }],
+      replacement: { questionCount: 2, previous } };
+    assert.equal(await prepareBlooketQuestionControls(desired), true);
+    const saved = JSON.parse(page.hidden.value);
+    assert.deepEqual(saved.answers, ["sun", "moon"]);
+    assert.deepEqual(saved.correctAnswers, ["moon"]);
+    assert.equal(saved.providerExtra, true);
+    assert.equal(page.hiddenWrites(), 0);
+    assert.equal(page.mcTrailingEmptyEvents(), 0);
+  }, "mc");
 });
