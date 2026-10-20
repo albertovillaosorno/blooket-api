@@ -804,7 +804,7 @@ and your existing data remains available, switch your launcher/shortcut to
 that directory. If it fails, point the shortcut back to the preserved old
 package. Do not delete the old app or its user-data directory.
 
-[Personal update delivery](docs/todo/open/delivery/updates.mdc) records the
+[Personal update delivery](docs/todo/completed/delivery/updates.mdc) records the
 implemented check/download and the remaining automatic replacement work.
 Background checking, unattended installs and rollback are not enabled.
 

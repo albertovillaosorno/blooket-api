@@ -26,16 +26,6 @@ including supported media, progress, and recoverable human stops.
 
 [Record](docs/todo/open/teaching/ai-review.mdc)
 
-## P3 - Delivery
-
-### TODO - Safe automatic application updates
-
-**Release-critical:** safely install trusted updates and restart without losing
-teacher data or the old usable app on failure. This is how improvements reach
-the recipient; safe rollback/recovery is a functional requirement.
-
-[Record](docs/todo/open/delivery/updates.mdc)
-
 ## P4 - Continuous maintenance (never auto-complete)
 
 ### TODO - Ongoing compatibility assurance and product hardening
