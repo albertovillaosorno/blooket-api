@@ -506,8 +506,9 @@ npm run package -- --firefox-extension
 In Chrome 110 or newer, open `chrome://extensions`, enable Developer mode,
 and select **Load unpacked** at `.temp/distributions/browser-extension/`.
 
-In desktop Firefox, open `about:debugging#/runtime/this-firefox`, select
-**Load Temporary Add-on**, and pick `manifest.json` inside
+In desktop Firefox 142 or newer (158 was tested on Fedora), open
+`about:debugging#/runtime/this-firefox`, select **Load Temporary Add-on**,
+and pick `manifest.json` inside
 `.temp/distributions/firefox-extension/`. Open the Blooket API workspace
 **in that same Firefox profile** to connect it.
 
