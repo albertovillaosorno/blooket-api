@@ -163,6 +163,23 @@ const tools = [
     true,
   ),
   tool(
+    "library_image_import",
+    "library.image.import",
+    "Import an explicitly supplied small image into the private teacher " +
+      "library using canonical base64 bytes. Only images supplied to this " +
+      "tool are available: chat attachments are not automatically passed " +
+      "through MCP. No local paths or image URLs are accepted. A repeated " +
+      "identical image and original metadata reuse the existing stable ID. " +
+      "Larger files must be imported locally through the Studio interface.",
+    {
+      name: { ...string, maxLength: 200 },
+      description: { ...string, maxLength: 10_000 },
+      base64: { ...string, minLength: 4, maxLength: 900_000,
+        description: "Canonical base64 image bytes; at most 675 KB." },
+    },
+    false,
+  ),
+  tool(
     "library_enrich",
     "library.enrich",
     "Save detected source language, normalized English name/description, " +

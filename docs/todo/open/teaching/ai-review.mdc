@@ -69,6 +69,17 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-20, a new bounded `library_image_import` MCP tool now accepts
+explicit client-supplied canonical base64 (up to 900,000 encoded characters)
+and preserves original name/description under a service-owned media ID. An
+identical replay reuses its prior asset, and unknown path fields are refused.
+Its actual MCP-to-CLI-to-library integration passed with a generated image;
+this is not proof that arbitrary ChatGPT attachments are automatically
+forwarded to MCP. Local Studio intake remains the path for larger images.
+
+The independent real existing-question correction is still blocked by the
+uncertain 429-limited provider attempt, so this record stays open.
+
 On 2026-10-20 the registered canonical creation/image and MCP append path
 still had positive remote evidence, but the first live existing-question
 replacement entered an uncertain journal. The independent fresh question
