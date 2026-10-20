@@ -80,6 +80,8 @@ export interface BlooketWriteVerificationPort {
   captureBaseline(
     operation: BlooketWriteOperation,
     target: BlooketWriteTarget,
+    // Omitted phases use the final pre-attempt checks, never the early path.
+    phase?: "before-pacing" | "before-attempt",
   ): Promise<BlooketWriteVerificationBaselineResult>;
 
   verify(

@@ -243,12 +243,6 @@ export async function executeBlooketPublicationCommand(
       if (!admitted || !providerTextCanBeSubmitted(admitted.plan.operations))
         return fail("blooket-publication-invalid-draft");
       if (requestedSetId !== undefined) {
-        const detail = await getBlooketSet(blooket.session, blooket.secrets,
-          blooket.sets, requestedSetId, { readOnly: true });
-        if (!detail.ok) return fail(detail.code, "metadata");
-        if (detail.kind !== "set")
-          return success({ draftId, phase: detail.kind,
-            state: detail.state, published: false });
         const existing = await listBlooketQuestions(blooket.session,
           blooket.secrets, blooket.questions, requestedSetId,
           { readOnly: true });
@@ -256,11 +250,9 @@ export async function executeBlooketPublicationCommand(
         if (existing.kind !== "questions")
           return success({ draftId, phase: existing.kind,
             state: existing.state, published: false });
-        if (detail.value.id !== requestedSetId ||
-            detail.value.title !== document.value.title ||
-            detail.value.description !== document.value.description ||
-            detail.value.visibility !== document.value.visibility ||
-            existing.value.length >= document.value.questions.length ||
+        // Planning only freezes the prior questions. Metadata is checked
+        // once, after pacing/media admission and before the attempt journal.
+        if (existing.value.length >= document.value.questions.length ||
             !matchesQuestions(existing.value,
               admitted.plan.operations.slice(1, existing.value.length + 1),
               requestedSetId, expectedMedia))
@@ -334,36 +326,45 @@ export async function executeBlooketPublicationCommand(
       blooket.sets, blooket.questions, expectedMedia,
       isBrowserWriteExecutionPort(writes) ? "observed" : "complete",
     );
-    const verifier = plan.schemaVersion === 1 ? baseVerifier : {
+    let metadataConflict = false;
+    const verifier = {
       ...baseVerifier,
       captureBaseline: async (...args: Parameters<
         typeof baseVerifier.captureBaseline>) => {
+        const [operation, target, phase] = args;
+        // Native Edit Info performs a provider request. Avoid redundant
+        // early requests, but always check fresh metadata after pacing and
+        // media admission, before capturing the final question collection.
+        if (operation.kind === "question" && phase !== "before-pacing") {
+          if (target.remoteSetId === null)
+            return { ok: true as const, baseline: null };
+          const detail = await getBlooketSet(blooket.session, blooket.secrets,
+            blooket.sets, target.remoteSetId, { readOnly: true });
+          if (!detail.ok) return { ok: false as const,
+            kind: "browser" as const,
+            code: detail.code === "blooket-browser-unavailable" ||
+              detail.code === "blooket-browser-incompatible"
+              ? detail.code : "blooket-browser-failed" as const };
+          if (detail.kind !== "set")
+            return { ok: false as const, kind: "navigation" as const,
+              state: detail.state };
+          const expected = desiredPlan.operations[0];
+          if (expected?.kind !== "set" ||
+              detail.value.id !== target.remoteSetId ||
+              detail.value.title !== expected.title ||
+              detail.value.description !== expected.description ||
+              detail.value.visibility !== expected.visibility) {
+            metadataConflict = true;
+            return { ok: true as const, baseline: null };
+          }
+        }
         const captured = await baseVerifier.captureBaseline(...args);
-        // Session/media preparation may await between preflight and the
-        // durable write-ahead journal. Recheck that exact collection here.
-        if (!captured.ok) return captured;
-        if (!expectedAppendBaseline ||
-            !sameBlooketWriteVerificationBaseline(captured.baseline,
-              expectedAppendBaseline))
-          return { ok: true as const, baseline: null };
-        // The question digest alone cannot detect a concurrent change to
-        // set metadata while mutation pacing or media admission awaits.
-        const detail = await getBlooketSet(blooket.session, blooket.secrets,
-          blooket.sets, plan.target.remoteSetId, { readOnly: true });
-        if (!detail.ok) return { ok: false as const,
-          kind: "browser" as const,
-          code: detail.code === "blooket-browser-unavailable" ||
-            detail.code === "blooket-browser-incompatible"
-            ? detail.code : "blooket-browser-failed" as const };
-        if (detail.kind !== "set")
-          return { ok: false as const, kind: "navigation" as const,
-            state: detail.state };
-        const expected = desiredPlan.operations[0];
-        return expected?.kind === "set" &&
-          detail.value.id === plan.target.remoteSetId &&
-          detail.value.title === expected.title &&
-          detail.value.description === expected.description &&
-          detail.value.visibility === expected.visibility
+        if (!captured.ok || plan.schemaVersion === 1) return captured;
+        // The append target includes all prior questions, not just the
+        // prefix frozen when its snapshot was first created.
+        return expectedAppendBaseline &&
+          sameBlooketWriteVerificationBaseline(captured.baseline,
+            expectedAppendBaseline)
           ? captured : { ok: true as const, baseline: null };
       },
     };
@@ -545,27 +546,14 @@ export async function executeBlooketPublicationCommand(
     }
     // An earlier Create Set receipt alone must not authorize changes to an
     // unrelated existing quiz if the user or provider switched edit routes.
-    // Read the exact remote metadata again before any subsequent question
-    // mutation; a human stop or unknown route cannot authorize a write.
+    // Check prior questions here. The final baseline capture checks exact
+    // remote metadata after pacing/media; an unknown route grants no write.
     if (attempt.kind === "missing" &&
         (checkpoint.nextOperationIndex > 0 || plan.schemaVersion === 2) &&
         checkpoint.nextOperationIndex < plan.operations.length) {
       const expected = desiredPlan.operations[0];
       if (!expected || expected.kind !== "set" ||
           checkpoint.remoteSetId === null)
-        return fail("blooket-publication-remote-conflict");
-      const detail = await getBlooketSet(
-        blooket.session, blooket.secrets, blooket.sets,
-        checkpoint.remoteSetId, { readOnly: true },
-      );
-      if (!detail.ok) return fail(detail.code, "metadata");
-      if (detail.kind !== "set")
-        return success({ ...progress, phase: detail.kind,
-          state: detail.state });
-      if (detail.value.id !== checkpoint.remoteSetId ||
-          detail.value.title !== expected.title ||
-          detail.value.description !== expected.description ||
-          detail.value.visibility !== expected.visibility)
         return fail("blooket-publication-remote-conflict");
       {
         const existing = await listBlooketQuestions(
@@ -614,7 +602,9 @@ export async function executeBlooketPublicationCommand(
       },
     );
     if (!result.ok)
-      return fail("code" in result ? result.code
+      return fail(metadataConflict
+        ? "blooket-publication-remote-conflict"
+        : "code" in result ? result.code
         : "blooket-publication-recovery-required",
         "stage" in result ? result.stage : undefined);
     // A provider wait or human stop does not clear an attempted write.
