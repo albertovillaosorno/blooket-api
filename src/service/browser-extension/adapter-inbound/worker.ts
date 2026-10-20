@@ -694,10 +694,10 @@ async function readPage(
       readonly visibility: "private" | "public";
     } | undefined;
     try {
-      // Opening details is asynchronous; retry only reads.
-      // Never submit a Save Set mutation.
-      for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
-        attempt++) {
+      // Edit Info can take seconds to return even on a successful response.
+      // Poll only observations within the existing read budget, reserving
+      // time for confirmation and Cancel. Never repeat the native opener.
+      while (Date.now() < readDeadline - 500) {
         if (!await ownsDetailRoute())
           throw new Error("browser-details-unavailable");
         const result = await script(

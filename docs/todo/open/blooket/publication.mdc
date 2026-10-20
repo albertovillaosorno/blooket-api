@@ -73,6 +73,25 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, a fresh canonical metadata read received HTTP 200 but its
+native panel opened after more than two seconds. The worker's fixed fifteen
+100-millisecond observation attempts stopped first and left the read-owned
+panel open. A later read using the same product inspector confirmed the
+unchanged visible panel; Computer Use canceled it without saving.
+
+The worker now observes panel readiness within the original eight-second read
+budget, reserving 500 milliseconds for confirmation and cleanup. It never
+repeats the native opener. A red-to-green bridge regression requires twenty
+unavailable observations before successful reading and cancellation. This
+fixes a live integration timing failure; image publication is still pending.
+
+The earlier five-second spacing did not establish image acceptance. On
+2026-10-16, a later metadata action still received HTTP 429 and a
+"Just a moment..." response seven seconds after the previous action. No
+question editor, upload or Save was started, and the append remained ready.
+
+The provider's exact pacing/security policy remains unknown.
+
 On 2026-10-19, red-to-green Chrome update-event tests showed an accessor-
 backed challenge title could trigger a human-attention tab activation while
 its owned event fields contained no trusted title. The extension now admits

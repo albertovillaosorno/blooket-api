@@ -116,6 +116,7 @@ test(
   let detailPanelProxyReads = 0;
   let detailDrifts = false;
   let detailReadCount = 0;
+  let detailPanelFailuresRemaining = 0;
   let detailSecondReadHasHiddenField = false;
   let detailReadWrongId = false;
   let detailSwitchTabAfterScript = false;
@@ -812,6 +813,12 @@ test(
           } } }];
         }
         if (operation.kind === "sets.get") {
+          if (detailPanelFailuresRemaining > 0) {
+            detailPanelFailuresRemaining--;
+            return [{ result: {
+              ok: false, code: "blooket-browser-failed",
+            } }];
+          }
           detailReadCount++;
           if (detailReloadDuringInspection) {
             detailReloadDuringInspection = false;
@@ -1639,6 +1646,16 @@ test(
       tabUrl,
       "https://dashboard.blooket.com/edit?id=opaque%20id%2Fwith%20spaces",
     );
+    detailPanelFailuresRemaining = 20;
+    const beforeSlowPanel = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, true, "a slow metadata action must use its remaining read budget");
+    assert.equal(detailPanelFailuresRemaining, 0);
+    assert.equal(scripts.slice(beforeSlowPanel).filter(name =>
+      name === "openBlooketDetailPanel").length, 1);
+    assert.equal(scripts.slice(beforeSlowPanel).includes(
+      "closeBlooketDetailPanel"), true);
     detailSidebarProxy = true;
     const beforeProxyPanel = scripts.length;
     assert.equal((await expectReply({ kind: "sets.get",
