@@ -56,9 +56,14 @@ export function decodeBlooketBrowserClient(
   if (typeof value === "string" && value.length <= 200) {
     try {
       const url = new URL(value);
-      if (["chrome-extension:", "safari-web-extension:"].includes(
-        url.protocol,
-      ) && /^[a-z0-9-]{1,128}$/iu.test(url.hostname) &&
+      const firefox = url.protocol === "moz-extension:";
+      const extensionHost = firefox
+        ? /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u
+          .test(url.hostname)
+        : ["chrome-extension:", "safari-web-extension:"]
+          .includes(url.protocol) &&
+          /^[a-z0-9-]{1,128}$/iu.test(url.hostname);
+      if (extensionHost &&
           url.host === url.hostname && !url.username && !url.password &&
           url.pathname === "/" && !url.search &&
           (!url.hash || /^#[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u

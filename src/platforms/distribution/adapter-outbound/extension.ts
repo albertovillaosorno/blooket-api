@@ -94,3 +94,34 @@ export async function buildBrowserExtension(
     throw new Error("browser-extension-build-failed");
   }
 }
+
+// Firefox MV3 uses an event-page background rather than Chrome's service
+// worker. Keep the compiled page code identical and change only the manifest.
+// Temporary about:debugging installs need no Mozilla account; permanent
+// distribution may require Mozilla's (free) add-on signing process.
+export async function buildFirefoxExtension(
+  repo: string,
+  destination: string,
+): Promise<void> {
+  await buildBrowserExtension(repo, destination);
+  try {
+    const path = join(destination, "manifest.json");
+    const manifest = JSON.parse(await readFile(path, "utf8"));
+    delete manifest.minimum_chrome_version;
+    manifest.background = {
+      scripts: ["src/service/browser-extension/adapter-inbound/worker.js"],
+      type: "module",
+    };
+    manifest.browser_specific_settings = {
+      gecko: {
+        id: "blooket-api@albertovillaosorno.github",
+        strict_min_version: "128.0",
+        data_collection_permissions: { required: ["none"] },
+      },
+    };
+    await writeFile(path, JSON.stringify(manifest, null, 2) + "\n");
+  } catch {
+    await rm(destination, { recursive: true, force: true });
+    throw new Error("firefox-extension-build-failed");
+  }
+}

@@ -174,6 +174,25 @@ export async function verifyDistribution(
     assert.deepEqual(browserManifest.permissions, ["storage", "scripting"]);
     assert.equal(browserManifest.background.service_worker,
       "src/service/browser-extension/adapter-inbound/worker.js");
+    const firefox = join(resources, "extensions/firefox");
+    const firefoxManifest = JSON.parse(await readFile(
+      join(firefox, "manifest.json"), "utf8",
+    ));
+    assert.equal(firefoxManifest.manifest_version, 3);
+    assert.equal(firefoxManifest.version_name, PRODUCT_VERSION);
+    assert.deepEqual(firefoxManifest.permissions, ["storage", "scripting"]);
+    assert.deepEqual(firefoxManifest.host_permissions,
+      browserManifest.host_permissions);
+    assert.equal(firefoxManifest.background.service_worker, undefined);
+    assert.equal(firefoxManifest.background.type, "module");
+    assert.deepEqual(firefoxManifest.background.scripts, [
+      "src/service/browser-extension/adapter-inbound/worker.js",
+    ]);
+    assert.equal(firefoxManifest.browser_specific_settings.gecko.id,
+      "blooket-api@albertovillaosorno.github");
+    const firefoxWorker = await readFile(join(firefox,
+      firefoxManifest.background.scripts[0]), "utf8");
+    assert.ok(firefoxWorker.length > 100);
     const worker = await readFile(join(browser,
       "src/service/browser-extension/adapter-inbound/worker.js"), "utf8");
     assert.doesNotMatch(worker, /from\s+["'][^"']+\.ts["']/u);

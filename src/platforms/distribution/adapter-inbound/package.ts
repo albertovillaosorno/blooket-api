@@ -32,7 +32,8 @@
 import { buildDistribution, distributionDirectory, TARGETS } from
   "../adapter-outbound/build.ts";
 import { verifyDistribution } from "../adapter-outbound/verify.ts";
-import { buildBrowserExtension } from "../adapter-outbound/extension.ts";
+import { buildBrowserExtension, buildFirefoxExtension } from
+  "../adapter-outbound/extension.ts";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,12 +55,17 @@ for (let index = 0; index < extra.length; index++) {
     } catch { validOptions = false; }
   } else validOptions = false;
 }
-if (args.length === 1 && args[0] === "--extension") {
+if (args.length === 1 &&
+    ["--extension", "--firefox-extension"].includes(args[0]!)) {
   const repo = fileURLToPath(new URL("../../../../", import.meta.url));
-  const destination = join(repo, ".temp/distributions/browser-extension");
+  const firefox = args[0] === "--firefox-extension";
+  const destination = join(repo, firefox
+    ? ".temp/distributions/firefox-extension"
+    : ".temp/distributions/browser-extension");
   try {
     await mkdir(join(repo, ".temp/distributions"), { recursive: true });
-    await buildBrowserExtension(repo, destination);
+    if (firefox) await buildFirefoxExtension(repo, destination);
+    else await buildBrowserExtension(repo, destination);
     process.stdout.write("Extension assembled: " + destination + "\n");
   } catch {
     process.stderr.write("Extension assembly failed; check the destination.\n");

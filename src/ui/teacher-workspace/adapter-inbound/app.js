@@ -51,8 +51,9 @@ const words = {
     readChallenge:
       "Cloudflare sigue requiriendo intervención. Pulsa Mostrar pestaña " +
       "conectada, verifica allí y vuelve a comprobar Mis Sets. Si el " +
-      "diagnóstico de debug.blooket.com pasó en Firefox, repítelo en una " +
-      "pestaña nueva del Chrome conectado: son sesiones distintas.",
+      "diagnóstico de debug.blooket.com pasó en otro navegador o perfil, " +
+      "repítelo en una pestaña del navegador conectado: son sesiones " +
+      "distintas.",
     readSignedOut: "Inicia sesión en la pestaña conectada.",
     readOrganization:
       "Selecciona la organización en la pestaña conectada.",
@@ -401,8 +402,8 @@ const words = {
     readChallenge:
       "Cloudflare still needs attention. Select Show connected tab, " +
       "complete verification there, then check My Sets again. If the " +
-      "debug.blooket.com checks passed in Firefox, rerun them in a new " +
-      "tab of the connected Chrome profile: browser sessions differ.",
+      "debug.blooket.com checks passed in another browser or profile, " +
+      "rerun them in a tab of the connected browser: sessions differ.",
     readSignedOut: "Sign in using the connected tab.",
     readOrganization:
       "Choose the organization in the connected tab.",

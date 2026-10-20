@@ -45,7 +45,8 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, dirname, resolve, basename } from "node:path";
-import { buildBrowserExtension } from "./extension.ts";
+import { buildBrowserExtension, buildFirefoxExtension } from
+  "./extension.ts";
 import { buildMacIcon } from "./icons.ts";
 import { EXCHANGE_HELPER_NAME } from
   "../../bundle-exchange/adapter-outbound/identity.ts";
@@ -265,6 +266,7 @@ export async function buildDistribution(
     await mkdir(runtime, { recursive: true });
     await mkdir(join(resource, "extensions"), { recursive: true });
     await buildBrowserExtension(repo, join(resource, "extensions/chrome"));
+    await buildFirefoxExtension(repo, join(resource, "extensions/firefox"));
     for (const file of [
       "src",
       "assets/icon",
