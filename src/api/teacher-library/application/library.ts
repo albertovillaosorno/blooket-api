@@ -61,6 +61,7 @@ import {
   safeLibraryPath,
   withLibraryLock,
   boundedBytes,
+  exists,
 } from "../../../platforms/user-library/adapter-outbound/files.ts";
 import {
   loadPreferences,
@@ -485,6 +486,10 @@ export async function importLibraryImage(
       }
     }
     const path = await safeLibraryPath(library, asset, true);
+    // A crash may leave bytes without metadata. Do not overwrite those
+    // uncertain bytes when an explicit MCP import is replayed.
+    if (stableId !== undefined && await exists(path))
+      throw new Error("image-import-recovery-required");
     await writeAtomicFile(path, compacted.value.bytes);
     try {
       const metadata: LibraryMetadata = {
