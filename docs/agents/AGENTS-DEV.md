@@ -285,6 +285,42 @@ connection reaches the authorized Chrome/Chrome for Testing session. Read
 `docs/technical/browser-acceptance-tools.md` before selecting or attaching a
 controller; discover its current tools and help instead of inventing commands.
 
+### Development testing matrix (independent entrypoints)
+
+Do not wait for integrated Computer Use, a Mac, or an ARM64 runner when a
+portable or authenticated Linux test can verify the affected behavior.
+Treat each surface as distinct and record what it actually proves:
+
+- **Chrome for Testing:** run the installed browser with the already
+  authorized local profile and Blooket API extension. Inspect its real
+  session and loaded worker, not just rebuilt files or a separate login.
+- **Playwright MCP:** when the client exposes it, inspect `browser_tabs` and
+  `browser_snapshot` and select the same authorized Chrome tab. Microsoft's
+  controller extension (`--extension`) is distinct from this product's
+  extension. A fresh MCP browser without that session is not live proof.
+- **Chrome DevTools MCP:** attach only to a previously authorized debuggable
+  Chrome. Its browser tools can examine tab and extension state. Verify actual
+  tool availability rather than assuming the integrated browser exposes it.
+- **`chrome-devtools` CLI:** this is an independent system-zsh entrypoint,
+  even when the integrated browser or Playwright MCP is unavailable. Start
+  with `chrome-devtools --version` and sanitized `status`, then inspect its
+  `list_pages`, `list_extensions`, and documented command help. Reuse the
+  verified attached controller; never create a replacement account profile.
+- **Canonical product CLI/MCP:** run `npm run blooket -- ... --json` and the
+  registered teacher tools for admitted reads, publication and recovery.
+  Browser-controller clicks alone do not prove canonical write execution.
+
+For every suspected browser failure, first classify the failing layer:
+local service, extension transport, browser session, detached set/question
+read, canonical write journal, or external provider challenge. Collect only
+sanitized stage and code evidence.
+
+A read-only reproduction cannot certify a write, and a lost write reply cannot
+authorize a second Save. Run targeted Node tests and provider drift checks
+before live mutation. Reserve native
+macOS ARM64, Safari and ChatGPT-client acceptance for ongoing release
+hardening, as required by task `blooket-15`.
+
 ### Ensure the existing localhost service is running
 
 Before interactive browser acceptance, check the current local service:
