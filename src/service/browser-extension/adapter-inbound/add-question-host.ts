@@ -420,14 +420,21 @@ export function createExtensionAddQuestionHost(
           // injected script's reply. Never click again: observe the exact
           // formerly empty card and verify its durable content instead.
         }
+        // A provider 429 may race the first post-Save observation. Even a
+        // lost injected-script acknowledgement cannot authorize another
+        // Save; keep the same owner and classify only a linked 429 signal.
         const initialRead = await observeQuestion(
           input, ownedScript, chrome, tabId, pause, imageIdentity,
-        );
+        ).catch(() => browserFailure());
         if (!initialRead.ok) {
-          if (initialRead.kind === "browser") {
-            // Only a same-set fetch throttled *after* the one Save click
-            // identifies a provider wait. This never clears the attempt or
-            // retries it; earlier page-load 429s remain inconclusive.
+          // A missing reply or unclassified transitional page can race the
+          // 429. Explicit human stops take precedence: an old throttle must
+          // never mask a current security challenge or expired session.
+          if (initialRead.kind === "browser" ||
+              (initialRead.kind === "navigation" &&
+               initialRead.state === "unexpected-page")) {
+            // This read-only probe requires the same document's submit latch
+            // and exact same-set request after Save, not a prior page 429.
             const throttled = await ownedScript(
               inspectBlooketPostSubmitRateLimit as
                 (...args: never[]) => unknown,
