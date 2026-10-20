@@ -69,6 +69,21 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-20, a real CLI publication freshly verified a private quiz with a
+prepared question image. Teacher tool metadata now advertises the already
+admitted `text-publication` capability scope, so an AI can inspect base text
+and question-image support without unrelated premium drawers. A regression
+failed against the previous advertised schema; the MCP/CLI/service integration
+also checks that this scope dispatches only the scoped capability job.
+
+Bundled authoring guidance documents the exact stable-ID question-image slot,
+current rendition admission and explicit local attachment import. The bundled
+human-validation skill now permits bounded provider-completed verification,
+matching the teacher profile; interactive confirmation rules remain intact.
+These changes do not prove a complete remote AI client journey or replacement
+of an existing question.
+
+
 On 2026-10-20, red-to-green Quizzes regressions caught a real unauthenticated
 preflight stop before the first publication snapshot: the canonical command
 returned `session-required` without operation counts, but the UI rejected the

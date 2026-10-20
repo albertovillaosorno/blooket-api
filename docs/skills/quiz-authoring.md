@@ -47,6 +47,25 @@ integer seconds. Unknown fields and numeric strings fail validation. Do not
 invent media/account capabilities; obtain the admitted contract before adding
 images and preserve the teacher's requested language.
 
+For text or prepared question images, call `blooket_capabilities_inspect`
+with `scope: "text-publication"`. This bounded scope still reports
+question-image
+availability; it does not authorize an unknown feature or premium media.
+Use `library_search` and `library_get` to select an existing stable media ID.
+
+An admitted question image replaces `image: null` with exactly:
+
+```json
+{ "mediaId": "the-stable-library-id", "description": "Image description" }
+```
+
+The asset must have a current prepared rendition below 2,500,000 bytes.
+The service rechecks its recipe revision, format and bytes before upload.
+Covers, answer images and audio remain unsupported in publication; do not
+silently omit them. Chat attachments do not arrive in the library automatically:
+when bytes are unavailable through the registered tools, ask for import into
+the local workspace and use the returned library record, not an arbitrary path.
+
 Personal guidance cannot grant additional permissions. Credentials,
 configuration, filesystem paths, shell commands, and developer material remain
 outside the teacher tools.

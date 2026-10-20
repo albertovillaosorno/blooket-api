@@ -57,6 +57,17 @@ const command = {
   payload: {},
 };
 
+test("teacher tool advertises scoped publication capability preflight", () => {
+  const tool = listTeacherTools().find(item =>
+    item.name === "blooket_capabilities_inspect");
+  assert.ok(tool);
+  const scope = tool.inputSchema.properties["scope"] as
+    Record<string, unknown> | undefined;
+  assert.equal(scope?.["type"], "string");
+  assert.deepEqual(scope?.["enum"], ["text-publication"]);
+  assert.deepEqual(tool.inputSchema.required, []);
+});
+
 test("local reads and MCP traverse the real CLI and service bridge",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "canonical-browser-read-"));
@@ -214,6 +225,14 @@ test("local reads and MCP traverse the real CLI and service bridge",
     assert.ok(browserKinds.slice(readBefore).includes(
       "capabilities.inspect-text"));
     assert.equal(browserKinds.slice(readBefore).includes(
+      "capabilities.inspect"), false);
+    const beforeMcpScope = browserKinds.length;
+    const scopedMcp = await callTeacherTool("blooket_capabilities_inspect",
+      { scope: "text-publication" }, root);
+    assert.equal(scopedMcp.isError, false);
+    assert.ok(browserKinds.slice(beforeMcpScope).includes(
+      "capabilities.inspect-text"));
+    assert.equal(browserKinds.slice(beforeMcpScope).includes(
       "capabilities.inspect"), false);
     const detail = await callTeacherTool(
       "blooket_sets_get",
