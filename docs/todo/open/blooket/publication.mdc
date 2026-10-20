@@ -73,6 +73,23 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, the account owner observed Cloudflare completing verification
+and redirecting without any human input. A subsequent canonical session
+inspection independently returned the authenticated Edit state. The companion
+now gives an observed verification up to six seconds to complete itself
+within the
+existing read budget and requires a new complete session proof afterward.
+Only passive observations of the same owned route are repeated; no challenge,
+login or mutation control is clicked by this wait.
+
+Native challenge-title attention is also delayed and rechecked against the
+current owned tab, so a cleared title does not steal focus. Persistent
+verification still reports its actual stop. Developer and teacher guidance now
+allows provider-completed verification instead of requiring human interaction
+for every transient challenge page. Regression fixtures cover passive automatic
+continuation across a replaced native document, foreign-route refusal, retained
+persistent stops and delayed attention.
+
 On 2026-10-20, a fresh canonical metadata read received HTTP 200 but its
 native panel opened after more than two seconds. The worker's fixed fifteen
 100-millisecond observation attempts stopped first and left the read-owned

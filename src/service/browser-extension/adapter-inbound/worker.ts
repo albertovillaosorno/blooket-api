@@ -191,6 +191,8 @@ function pairedBrowserLabel(): Promise<string> {
   })();
   return browserClientLabel;
 }
+const AUTOMATIC_VERIFICATION_GRACE_MS = 6_000;
+const pendingChallengeAttention = new WeakSet<Connection>();
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 const admitDetailRead = createDetailReadPacer({
@@ -369,6 +371,29 @@ async function read(
 ) {
   // Leave room for the ten-second bridge deadline, including navigation.
   const readDeadline = Date.now() + 8_000;
+  if (operation.kind === "session.observe") {
+    const source = await browser.tabs.get(current.tabId);
+    let observed = await readPage(current, browser, operation, readDeadline);
+    if (exactSessionObservation(observed) !== "security-challenge")
+      return observed;
+    const graceDeadline = Math.min(readDeadline - 500,
+      Date.now() + AUTOMATIC_VERIFICATION_GRACE_MS);
+    while (Date.now() < graceDeadline) {
+      await pause(250);
+      const next = await browser.tabs.get(current.tabId);
+      // Only observe the existing route while the provider completes its own
+      // verification. Navigation to another route never grants continuation.
+      if (next.url !== source.url || (next.pendingUrl !== undefined &&
+          next.pendingUrl !== source.url))
+        throw new Error("browser-session-changed");
+      if (next.status !== "complete" || next.pendingUrl !== undefined)
+        continue;
+      observed = await readPage(current, browser, operation, readDeadline);
+      if (exactSessionObservation(observed) !== "security-challenge")
+        return observed;
+    }
+    return observed;
+  }
   if (operation.kind !== "sets.get")
     return readPage(current, browser, operation, readDeadline);
   // Edit Info performs a native server action even though we only read it.
@@ -1600,21 +1625,35 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   return true;
 });
 
-// A newly opened background Blooket tab may show a Cloudflare page before
-// the first CLI read. Surface it once, based only on the owned tab's URL and
-// interstitial title. This is visibility, not authentication evidence.
+// A provider verification can clear itself. Delay attention, then inspect
+// the same owned tab again; a transient title must not steal teacher focus.
 chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
-  if (!connection || tabId !== connection.tabId || humanWindowRaised)
-    return;
+  if (!connection || tabId !== connection.tabId || humanWindowRaised ||
+      pendingChallengeAttention.has(connection)) return;
   const title = changes && typeof changes === "object" ?
     Object.getOwnPropertyDescriptor(changes, "title") : undefined;
   if (!title?.enumerable || !("value" in title) ||
       title.value !== "Just a moment..." ||
       !exactHumanBlooketTab(tab, tabId)) return;
   const owned = connection;
-  humanWindowRaised = true;
-  void showHumanBlooketTab(tabId, () => connection === owned)
-    .catch(() => undefined);
+  const activeGeneration = generation;
+  const isOwner = () => connection === owned &&
+    generation === activeGeneration;
+  pendingChallengeAttention.add(owned);
+  void (async () => {
+    try {
+      await pause(AUTOMATIC_VERIFICATION_GRACE_MS);
+      if (!isOwner() || humanWindowRaised) return;
+      const current = await chrome.tabs.get(tabId);
+      if (!isOwner() || humanWindowRaised ||
+          !exactHumanBlooketTab(current, tabId)) return;
+      const currentTitle = Object.getOwnPropertyDescriptor(current, "title");
+      if (!currentTitle?.enumerable || !("value" in currentTitle) ||
+          currentTitle.value !== "Just a moment...") return;
+      humanWindowRaised = true;
+      await showHumanBlooketTab(tabId, isOwner);
+    } finally { pendingChallengeAttention.delete(owned); }
+  })().catch(() => undefined);
 });
 
 // Only Chrome's confirmed closure releases a retained read slot. Do not

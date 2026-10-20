@@ -126,6 +126,10 @@ test(
   let detailReloadDuringInspection = false;
   let sessionSwitchAfterScript: string | null = null;
   let observedSessionOverride: string | null = null;
+  let automaticVerificationReads = 0;
+  let verificationRouteAfter: string | null = null;
+  let verificationTabReads = 0;
+  let currentChallengeTitle: string | undefined;
   let sessionSecondHasHiddenField = false;
   let sessionReadProbeCount = 0;
   let driftSessionAtSameRoute = false;
@@ -311,7 +315,12 @@ test(
           });
           return tab;
         }
+        if (verificationTabReads > 0 && --verificationTabReads === 0) {
+          tabUrl = verificationRouteAfter!;
+          documentOrigin += 1_000;
+        }
         return { id, url: tabUrl, status: "complete", windowId: 3,
+          ...(currentChallengeTitle ? { title: currentChallengeTitle } : {}),
           ...(pendingSourceRedirect ||
               (pendingAfterSetObservation && setListReads > 0) ||
               (pendingAfterDetailSidebar && detailSidebarReadCount > 0) ? {
@@ -778,6 +787,13 @@ test(
           }
         }
         if (operation.kind === "session.observe" &&
+            automaticVerificationReads > 0) {
+          automaticVerificationReads--;
+          if (automaticVerificationReads === 0 && verificationRouteAfter)
+            verificationTabReads = 2;
+          return [{ result: { ok: true, value: "security-challenge" } }];
+        }
+        if (operation.kind === "session.observe" &&
             observedSessionOverride !== null) {
           return [{ result: { ok: true, value: observedSessionOverride } }];
         }
@@ -1070,7 +1086,8 @@ test(
   async function expectReply(command) {
     const request = job(command);
     jobs.push(request);
-    const deadline = realNow() + 3000;
+    const deadline = realNow() +
+      (command.kind === "session.observe" ? 8_000 : 3_000);
     while (!replies.some((reply) => reply.id === request.id)) {
       assert.ok(realNow() < deadline, "worker did not settle its request");
       await pause(20);
@@ -1162,6 +1179,33 @@ test(
     });
     assert.equal(scripts.length, scriptsBeforeConfirmation);
     assert.equal(foregroundedTabs.length, 0);
+    onTabUpdated(7, { title: "Just a moment..." }, {
+      id: 7, url: tabUrl, windowId: 3,
+    });
+    automaticVerificationReads = 2;
+    verificationRouteAfter = tabUrl;
+    const beforeAutomaticVerification = scripts.length;
+    const beforeVerificationReloads = readReloads;
+    const automaticallyVerified = await expectReply({
+      kind: "session.observe",
+    });
+    assert.equal(automaticallyVerified.ok, true);
+    assert.equal(automaticallyVerified.value, "my-sets",
+      "a provider-completed verification must receive a fresh session proof");
+    assert.equal(readReloads, beforeVerificationReloads);
+    assert.equal(foregroundedTabs.length, 0);
+    assert.ok(scripts.slice(beforeAutomaticVerification).every(name =>
+      name === "inspectBlooketPage" ||
+      name === "inspectBlooketSessionDocumentOrigin" ||
+      name === "inspectBlooketDocumentOrigin"));
+    automaticVerificationReads = 2;
+    verificationRouteAfter = "https://foreign.invalid/after-verification";
+    assert.equal((await expectReply({ kind: "session.observe" })).ok, false);
+    verificationRouteAfter = null;
+    tabUrl = "https://dashboard.blooket.com/my-sets";
+    documentOrigin += 1_000;
+    assert.equal(foregroundedTabs.length, 0);
+
     for (const field of ["url", "windowId", "pendingUrl"] as const) {
       humanTabGetter = field;
       const beforeGetterFocus = focusedWindows.length;
@@ -2146,13 +2190,14 @@ test(
     await pause(20);
     assert.equal(challengeTitleGetterReads, 0);
     assert.deepEqual(foregroundedTabs, []);
+    currentChallengeTitle = "Just a moment...";
     onTabUpdated(7, { title: "Just a moment..." }, {
       id: 7, url: tabUrl, windowId: 3,
     });
     onTabUpdated(7, { title: "Just a moment..." }, {
       id: 7, url: tabUrl, windowId: 3,
     });
-    const eventDeadline = realNow() + 1000;
+    const eventDeadline = realNow() + 7_000;
     while (focusedWindows.length !== 1) {
       assert.ok(realNow() < eventDeadline,
         "owned background challenge did not open its browser window");
