@@ -1041,6 +1041,33 @@ test("each draft step writes once and requires separate fresh verification",
       "blooket-publication-remote-conflict");
   }); });
 
+test("fresh verify refuses a different set ID with matching metadata",
+  async () => { await fixture(async state => {
+    await executeBlooketPublicationCommand(command("step", state.revision),
+      state.host);
+    await executeBlooketPublicationCommand(command("step", state.revision),
+      state.host);
+    const originalGet = state.host.blooket.sets.get;
+    const changed = await executeBlooketPublicationCommand(
+      command("verify"), { ...state.host,
+        blooket: { ...state.host.blooket, sets: {
+          ...state.host.blooket.sets,
+          get: async id => {
+            const response = await originalGet(id);
+            assert.ok(response.ok && response.value);
+            return { ok: true as const, value: {
+              ...response.value, id: "different-set-with-same-metadata",
+            } };
+          },
+        } },
+      },
+    );
+    assert.equal(changed.ok, false);
+    if (!changed.ok) assert.equal(changed.issues[0]?.code,
+      "blooket-publication-remote-conflict");
+    assert.equal(state.writes(), 2);
+  }); });
+
 test("injected malformed publication policy cannot start a remote write",
   async () => { await fixture(async state => {
   const base = { minimumStartIntervalMs: 2_000,

@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, a red-to-green final-verification regression demonstrated
+that a remote set ID mismatch is rejected by the validated read boundary,
+but was surfaced as its low-level read code instead of an actionable
+publication conflict. Fresh verification now reports
+`blooket-publication-remote-conflict` if a different remote identity is
+returned with otherwise matching metadata. The durable checkpoint stays
+unchanged, and no extra Save is attempted. This is synthetic substitution,
+not authenticated provider publication acceptance.
+
 On 2026-10-20, a fresh unclaimed backend tab completed a canonical metadata
 read. The next append preflight encountered HTTP 429 on another native Edit
 Info request before any image upload or question Save. Publication now avoids
