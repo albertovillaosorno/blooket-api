@@ -80,6 +80,19 @@ The updater implementation, trust, safe failure, and recovery remain required.
 
 ## Implementation notes
 
+On 2026-10-20, the user reduced the personal update scope to a GitHub
+Releases SHA-256 download and a manual package switch on Linux. The Linux
+release pipeline now builds/verifies `linux-x64.tar.gz` without requiring
+macOS CI, notarization, a Team ID, or Apple Developer membership. The
+local settings UI accepts only fixed-repository release assets with GitHub's
+upload-time SHA-256 digest, checks exact downloaded bytes, and stages the
+archive without changing the installed app.
+
+Synthetic HTTP/integrity tests and the repository suite pass. Native
+automatic exchange remains optional follow-up work, not a blocker for the
+personal Linux release flow.
+
+
 On 2026-10-20, the personal-Mac/manual-install alternative was documented in
 `README.md`: Apple Developer membership or a Team ID is not required to build
 and personally approve a locally trusted ARM64 app. The Mac owner must

@@ -16,8 +16,6 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/ci.yml
-    secrets:
-      update-signing-key: ${{ secrets.BLOOKET_UPDATE_SIGNING_KEY }}
 
   gate:
     needs: ci
@@ -52,18 +50,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: package-darwin-arm64
+          name: package-linux-x64
           path: .temp/release-assets
-      - name: Publish verified ARM64 app
+      - name: Publish verified Linux app
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          app=.temp/release-assets/darwin-arm64.zip
-          manifest=.temp/release-assets/update-manifest.json
+          app=.temp/release-assets/linux-x64.tar.gz
           test -s "$app"
-          test -s "$manifest"
-          gh release create "$RELEASE_TAG" "$app" "$manifest" \
+          gh release create "$RELEASE_TAG" "$app" \
             --verify-tag --title "$RELEASE_TAG" --notes ""

@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted policy with portable catalog checking and signed-archive staging.
-Automatic installation remains pending. Explicit packaged login controls are
-implemented; native macOS/Safari assurance remains in ongoing task blooket-15.
+Accepted personal Linux policy: on-demand GitHub release checks, verified
+GitHub SHA-256 downloads and manual replacement. Automatic installation is
+not enabled. Mac testing remains optional ongoing compatibility work.
 
 ## Decision ID
 
@@ -46,6 +46,21 @@ numeric YY and canonical `version_name`. Apple's build counter is
 projections preserve the old patch bound without creating a second release
 policy; see [Chrome's version contract][chrome] and [Apple's build
 contract][apple].
+
+As of 2026-10-20, Linux is the independent release authority. The Ubuntu CI
+job builds/verifies `linux-x64.tar.gz`, and GitHub publishes that tested
+artifact without waiting for native Mac tests or Apple certificates.
+
+GitHub's release-assets API exposes an upload-time `sha256:` digest. The
+on-demand Linux UI can download an asset only with a valid digest and checks
+streamed bytes against both GitHub's digest and its size before staging.
+The update UI never replaces an application itself; manual replacement must
+retain the old usable package and user data.
+
+A GitHub SHA-256 digest protects integrity relative to the public release;
+it is not an independent cryptographic identity for the GitHub account owner.
+The legacy signed-manifest/Apple verification components are optional future
+paths and not release blockers for personal Linux usage.
 
 The update authority is this repository's public [GitHub Releases][releases],
 using the [public release API][api] without teacher GitHub credentials. Final
