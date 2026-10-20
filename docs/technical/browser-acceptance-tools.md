@@ -84,6 +84,34 @@ to obtain a stage diagnostic. If the authorized controller cannot inspect its
 isolated world without crossing a security or ownership boundary, leave the
 journal uncertain and report the diagnostic as unavailable.
 
+### Identifying a throttled Save without sending another one
+
+On 2026-10-20, the extension-isolated-world watch for a single existing
+question replacement reported `submit-attempted`. A content-free inspection
+found exactly one `fetch` since that latch, with HTTP response status 429 and
+an exact match to the owning Edit route. The saved question did not pass
+fresh verification, so the journal remains uncertain. No second Save or
+modal dismissal is authorized by these observations.
+
+`inspectBlooketPostSubmitRateLimit` is the existing sanitized provider probe.
+It requires the same native document, set, submitted latch, unmodified watch,
+and a matching post-submit `PerformanceResourceTiming` fetch response.
+An earlier, foreign-set, non-fetch, or unrelated 429 cannot explain the Save.
+A true result means **wait and reconcile without replay**, not success or
+proof that a rejected request can never complete later.
+
+The question host checks a linked 429 when a post-Save observation is lost,
+invalid, or briefly unclassified. It preserves an explicit sign-out,
+organization prompt or security challenge instead of masking it with stale
+rate-limit evidence. Do not inspect raw browser request URLs, query values,
+headers, bodies, tokens or teacher text in diagnostics.
+
+Chrome's official [scripting API documentation][chrome-scripting], checked on
+2026-10-20, confirms that injected functions are serialized and that the
+extension-isolated execution world is the default. Page-console globals are
+not substitutes for this watch. A controller must attach to the existing
+authorized extension; never launch a second profile to recover a diagnostic.
+
 ## Playwright MCP
 
 Microsoft's [extension documentation][playwright-extension], checked on
@@ -245,3 +273,6 @@ for portable functionality or browser publication fixes.
 [devtools-tools]: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/tool-reference.md
 <!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
 [devtools-connection]: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/src/BrowserManager.ts
+
+<!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
+[chrome-scripting]: https://developer.chrome.com/docs/extensions/reference/api/scripting
