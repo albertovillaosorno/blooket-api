@@ -357,6 +357,12 @@ export function createExtensionAddQuestionHost(
         // Admission above already decoded these semantics; each page entry
         // still validates its owned form and exact provider state.
         const serializedInput = JSON.stringify(input);
+        const linkedPostSubmitThrottle = async (): Promise<boolean> =>
+          (await ownedScript(
+            inspectBlooketPostSubmitRateLimit as
+              (...args: never[]) => unknown,
+            [input.setId],
+          ).catch(() => false)) === true;
 
         const controlsPrepared = await ownedScript(
           prepareBlooketQuestionControls as (...args: never[]) => unknown,
@@ -414,7 +420,21 @@ export function createExtensionAddQuestionHost(
             runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
             ["submit", serializedInput],
           );
-          if (!exactOk(submittedResult)) return browserFailure();
+          if (!exactOk(submittedResult)) {
+            // A negative reply can follow the latched Save click. Preserve a
+            // current human stop instead of overriding it with a prior 429.
+            const observed = await observe(ownedScript)
+              .catch(() => undefined);
+            if (observed === "security-challenge" ||
+                observed === "organization-prompt" ||
+                observed === "signed-out" ||
+                observed === "expired-session" ||
+                observed === "rate-limited")
+              return navigationFailure(observed);
+            // Only this same document's post-submit 429 explains the loss.
+            return await linkedPostSubmitThrottle()
+              ? navigationFailure("rate-limited") : browserFailure();
+          }
         } catch {
           // The Save Question click can complete while Chrome loses the
           // injected script's reply. Never click again: observe the exact
@@ -435,12 +455,7 @@ export function createExtensionAddQuestionHost(
                initialRead.state === "unexpected-page")) {
             // This read-only probe requires the same document's submit latch
             // and exact same-set request after Save, not a prior page 429.
-            const throttled = await ownedScript(
-              inspectBlooketPostSubmitRateLimit as
-                (...args: never[]) => unknown,
-              [input.setId],
-            ).catch(() => false);
-            if (throttled === true)
+            if (await linkedPostSubmitThrottle())
               return navigationFailure("rate-limited");
           }
           return initialRead;

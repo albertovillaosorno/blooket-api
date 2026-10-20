@@ -78,6 +78,7 @@ function fakeChrome(options: {
   readonly postSubmit429?: boolean;
   readonly postSubmitObservationLost?: boolean;
   readonly postSubmitNavigationState?: string;
+  readonly saveAckRejected?: boolean;
 }) {
   let tab = {
     url: options.initialUrl ??
@@ -185,7 +186,9 @@ function fakeChrome(options: {
               questionAdded = true;
               assert.equal(typeof args[1], "string");
               submittedImage = !!JSON.parse(args[1] as string).image;
-              return [{ result: { ok: true } }];
+              return [{ result: options.saveAckRejected
+                ? { ok: false, code: "blooket-browser-failed" }
+                : { ok: true } }];
             }
             throw new Error("unexpected-add-question-action");
           case "listBlooketQuestionNumbers":
@@ -308,6 +311,45 @@ test("a lost post-Save observation still reports an owned 429",
       call === "runBlooketAddQuestionPageAction:submit").length, 1);
     assert.equal(fake.calls.includes("reload"), false);
   }
+});
+
+test("a rejected Save reply still diagnoses an exact post-submit 429",
+  async () => {
+  for (const postSubmit429 of [true, false]) {
+    const fake = fakeChrome({ saveAckRejected: true, postSubmit429 });
+    const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+      async () => undefined).addQuestion(input);
+    assert.deepEqual(result, postSubmit429
+      ? { ok: false, kind: "navigation", state: "rate-limited" }
+      : { ok: false, kind: "browser", code: "blooket-browser-failed" });
+    assert.equal(fake.calls.filter(call =>
+      call === "runBlooketAddQuestionPageAction:submit").length, 1);
+    assert.equal(fake.calls.includes("reload"), false);
+  }
+});
+
+test("a rejected Save acknowledgement also preserves a human challenge",
+  async () => {
+  const fake = fakeChrome({ saveAckRejected: true,
+    postSubmit429: true, postSubmitNavigationState: "security-challenge" });
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "navigation",
+    state: "security-challenge" });
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+});
+
+test("a rejected Save reply retains an explicit rate-limit page stop",
+  async () => {
+  const fake = fakeChrome({ saveAckRejected: true,
+    postSubmit429: false, postSubmitNavigationState: "rate-limited" });
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "navigation",
+    state: "rate-limited" });
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
 });
 
 test("a post-Save security challenge is never hidden by an older 429",
