@@ -466,6 +466,10 @@ route, window and active-state descriptors before reuse or disposal.
 An accessor-backed inactive claim cannot authorize closing a tab a teacher
 may have adopted.
 
+Automatic human-challenge attention also requires a descriptor-backed
+Chrome title-change event and independently admitted tab identity before
+focus is scheduled. A getter cannot spend the one-time attention latch.
+
 Human challenge focus also requires native own-data tab and window
 identities before activating a tab, after activation and before focusing the
 window. Chrome property getters cannot upgrade a foreign/stale tab to a

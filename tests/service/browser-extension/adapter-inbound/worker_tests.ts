@@ -2118,6 +2118,17 @@ test(
       id: 7, url: tabUrl,
     });
     assert.equal(foregroundedTabs.length, 0);
+    let challengeTitleGetterReads = 0;
+    const fakeChallenge = Object.defineProperty({}, "title", {
+      enumerable: true, get() {
+        challengeTitleGetterReads++;
+        return "Just a moment...";
+      },
+    });
+    onTabUpdated(7, fakeChallenge, { id: 7, url: tabUrl, windowId: 3 });
+    await pause(20);
+    assert.equal(challengeTitleGetterReads, 0);
+    assert.deepEqual(foregroundedTabs, []);
     onTabUpdated(7, { title: "Just a moment..." }, {
       id: 7, url: tabUrl, windowId: 3,
     });
