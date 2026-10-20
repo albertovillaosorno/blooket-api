@@ -610,7 +610,9 @@ Only the new suffix is sent; subsequent `step`, `status`, `reconcile` and
 deletion, replacement and reordering are refused.
 
 Portable MCP-to-CLI-to-service
-coverage verifies append behavior; live append acceptance remains pending.
+coverage verifies append behavior. On October 20, registered MCP handlers
+also appended a typing question to the real image quiz and freshly verified
+the full result, preserving its existing image question.
 
 An October 15 Chrome test identified omitted null fields in injected MC input;
 JSON text now preserves them and real native preparation passes. The next

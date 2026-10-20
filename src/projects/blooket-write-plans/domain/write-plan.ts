@@ -58,6 +58,9 @@ import type {
   TypingAnswerQuestion,
 } from "../../question-documents/domain/question.ts";
 
+import type { BlooketQuestionRead } from
+  "../../../ir/blooket-question-reads/contract/question-read.ts";
+
 export const BLOOKET_WRITE_PLAN_VERSION = 1 as const;
 
 interface BlooketWritePlanIdentity {
@@ -80,7 +83,14 @@ export interface BlooketAppendWritePlan extends BlooketWritePlanIdentity {
   readonly target: BlooketAppendTarget;
 }
 
-export type BlooketWritePlan = BlooketCreateWritePlan | BlooketAppendWritePlan;
+export interface BlooketReplaceWritePlan extends BlooketWritePlanIdentity {
+  readonly schemaVersion: 3;
+  readonly target: BlooketAppendTarget;
+  readonly operations: readonly [BlooketReplaceQuestionOperation];
+}
+
+export type BlooketWritePlan = BlooketCreateWritePlan | BlooketAppendWritePlan
+  | BlooketReplaceWritePlan;
 
 // The complete desired quiz remains the validation authority. Only its new
 // suffix is executed; a target and prior collection digest bind recovery.
@@ -112,7 +122,8 @@ export function buildBlooketAppendPlan(
 
 export type BlooketWriteOperation =
   | BlooketSetOperation
-  | BlooketQuestionOperation;
+  | BlooketQuestionOperation
+  | BlooketReplaceQuestionOperation;
 
 export interface BlooketSetOperation {
   readonly operationId: string;
@@ -140,6 +151,15 @@ export interface BlooketQuestionOperation {
   readonly questionNumber: number;
   readonly question: PlannedBlooketQuestion;
 }
+
+export interface BlooketReplaceQuestionOperation extends
+  Omit<BlooketQuestionOperation, "kind"> {
+  readonly kind: "replace-question";
+  readonly previous: BlooketQuestionRead;
+}
+
+export type BlooketQuestionWriteOperation = BlooketQuestionOperation
+  | BlooketReplaceQuestionOperation;
 
 export type PlannedBlooketQuestion =
   | PlannedMultipleChoiceQuestion

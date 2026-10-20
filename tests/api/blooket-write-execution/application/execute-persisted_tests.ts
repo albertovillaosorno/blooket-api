@@ -2559,3 +2559,58 @@ test("malformed media read replies stop before journal and mutation budget",
   }
   },
 );
+
+
+for (const conflict of [false, true]) {
+  test(`replacement ${conflict ? "refuses changed baseline" :
+    "recovers a lost receipt"} without appending`, () =>
+    withTemporaryDirectory(async dir => {
+      const { replacementFixture } = await import(
+        "../../../projects/blooket-write-plans/domain/replacement-fixtures.ts");
+      const { buildBlooketReplacementPlan } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+        "../../../../src/projects/blooket-write-plans/domain/replacement-plan.ts");
+      const { blooketSetReadWriteVerifier, questionBaselineFor } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+        "../../../../src/api/blooket-write-execution/application/set-read-verifier.ts");
+      const { verifyPersistedBlooketWrite } = await import(
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+        "../../../../src/api/blooket-write-execution/application/verify-reconciliation.ts");
+      const f = replacementFixture();
+      const baseline = questionBaselineFor(f.rows)!;
+      const replacement = buildBlooketReplacementPlan(f.desired,
+        { remoteSetId: "fixture", baseline }, f.previous)!;
+      const paths = persistence(join(dir, "replacement.json"));
+      const verifier = blooketSetReadWriteVerifier({
+        list: async () => ({ ok: true, value: [], completeness: "complete" }),
+        get: async () => { throw Error("unused metadata port"); },
+      }, { list: async () => ({ ok: true, value: structuredClone(f.rows) }) });
+      let starts = 0;
+      const writer: BlooketWriteExecutionPort = { execute: async operation => {
+        assert.equal(operation.kind, "replace-question");
+        starts++;
+        f.rows[1] = f.changed;
+        return { ok: false, kind: "browser", code: "blooket-browser-failed" };
+      } };
+      if (conflict) f.rows[0] = { ...f.rows[0]!, timeLimit: 50 };
+      const result = await executePersistedBlooketWrite(paths, replacement,
+        browser([]), secrets(), writer, verifier,
+        { requireVerificationBaseline: true });
+      if (conflict) {
+        assert.ok(!result.ok && result.stage === "remote-precondition");
+        assert.equal(starts, 0);
+        await assert.rejects(readFile(paths.attempt), { code: "ENOENT" });
+        return;
+      }
+      assert.ok(result.ok && result.kind === "reconciliation-required");
+      assert.equal(starts, 1);
+      const recovered = await verifyPersistedBlooketWrite(paths, replacement,
+        browser([]), secrets(), verifier);
+      assert.ok(recovered.ok && recovered.kind === "recovered");
+      const complete = await executePersistedBlooketWrite(paths, replacement,
+        browser([]), secrets(), writer, verifier);
+      assert.ok(complete.ok && complete.kind === "complete");
+      assert.equal(starts, 1);
+      assert.equal(f.rows.length, 2);
+    }));
+}

@@ -50,7 +50,7 @@ import {
 } from
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
 import type {
-  BlooketQuestionOperation,
+  BlooketQuestionWriteOperation,
 } from "../../../projects/blooket-write-plans/domain/write-plan.ts";
 import type { BlooketQuestionReadPort } from
   "../../blooket-set-reads/contract/question-reads.ts";
@@ -83,7 +83,7 @@ export function blooketSetReadWriteVerifier(
     : decodePreparedMediaIdentities(expectedMedia);
   return {
     captureBaseline: async (operation, target) => {
-      if (operation.kind === "question") {
+      if (operation.kind !== "set") {
         if (questionReads === undefined || target.remoteSetId === null) {
           return { ok: true, baseline: null };
         }
@@ -92,10 +92,14 @@ export function blooketSetReadWriteVerifier(
           target.remoteSetId,
         );
         if (!listed.ok) return listed;
-        return {
-          ok: true,
-          baseline: questionBaselineFor(listed.value),
-        };
+        if (operation.kind === "replace-question") {
+          const before = listed.value[operation.questionNumber - 1];
+          if (!before || !sameBlooketWriteVerificationBaseline(
+              questionBaselineFor([before]),
+              questionBaselineFor([operation.previous])))
+            return { ok: true, baseline: null };
+        }
+        return { ok: true, baseline: questionBaselineFor(listed.value) };
       }
 
       const listed = await safeList(reads);
@@ -115,7 +119,7 @@ export function blooketSetReadWriteVerifier(
     verify: async (operation, target, baseline) => {
       if (expectedMedia !== undefined && media === undefined)
         return { ok: true, outcome: "inconclusive" };
-      if (operation.kind === "question") {
+      if (operation.kind !== "set") {
         return verifyQuestion(
           questionReads,
           operation,
@@ -197,7 +201,7 @@ export function blooketSetReadWriteVerifier(
 
 async function verifyQuestion(
   reads: BlooketQuestionReadPort | undefined,
-  operation: BlooketQuestionOperation,
+  operation: BlooketQuestionWriteOperation,
   target: BlooketWriteTarget,
   baseline: BlooketWriteVerificationBaseline | null,
   media?: PreparedMediaIdentities,
@@ -222,14 +226,15 @@ async function verifyQuestion(
     // The unchanged page is not authoritative negative write evidence.
     return { ok: true, outcome: "inconclusive" };
   }
-  if (listed.value.length !== baseline.itemCount + 1) {
+  if (listed.value.length !== baseline.itemCount +
+      (operation.kind === "replace-question" ? 0 : 1)) {
     return { ok: true, outcome: "inconclusive" };
   }
 
   const lowered = lowerBlooketWriteSubmission(operation, target);
   if (
     !lowered.ok
-    || lowered.value.kind !== "add-question"
+    || lowered.value.kind === "create-set"
     || lowered.value.answers.some((answer) => answer.kind !== "text")
   ) {
     return { ok: true, outcome: "inconclusive" };
@@ -240,6 +245,8 @@ async function verifyQuestion(
     : media?.items.find(item => item.mediaId === expectedImageId);
   if (lowered.value.image !== null && expectedImage === undefined)
     return { ok: true, outcome: "inconclusive" };
+  const previous = lowered.value.kind === "replace-question"
+    ? lowered.value.previous : undefined;
   const candidates = listed.value
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => questionMatches(
@@ -248,7 +255,10 @@ async function verifyQuestion(
       expectedImage,
     ))
     .filter(({ index }) => sameBlooketWriteVerificationBaseline(
-      questionBaselineFor(withoutIndex(listed.value, index)),
+      questionBaselineFor(previous !== undefined
+        ? listed.value.map((question, position) => position === index
+          ? previous : question)
+        : withoutIndex(listed.value, index)),
       baseline,
     ));
   if (candidates.length !== 1)
@@ -268,7 +278,7 @@ export function questionMatches(
   >["value"],
   expectedImage?: PreparedMediaIdentity,
 ): boolean {
-  if (expected.kind !== "add-question") return false;
+  if (expected.kind === "create-set") return false;
   const identity = expectedImage === undefined ? undefined
     : decodePreparedMediaIdentities({ schemaVersion: 1,
       items: [expectedImage] })?.items[0];

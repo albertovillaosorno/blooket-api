@@ -383,7 +383,7 @@ async function safeVerify(
     const confirmed = own(["ok", "outcome", "receipt"]);
     if (confirmed?.["ok"] === true &&
         confirmed["outcome"] === "confirmed") {
-      if (operation.kind === "question" && confirmed["receipt"] === null)
+      if (operation.kind !== "set" && confirmed["receipt"] === null)
         return { ok: true, outcome: "confirmed", receipt: null };
       if (operation.kind === "set") {
         const receipt = decodeBlooketWriteReceipt(confirmed["receipt"]);

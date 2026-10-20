@@ -508,7 +508,7 @@ function decodeWriteAttempt(
 
 function decodeAttemptBaseline(
   value: unknown,
-  operationKind: "set" | "question",
+  operationKind: "set" | "question" | "replace-question",
 ):
   | {
       readonly ok: true;
@@ -530,7 +530,7 @@ function decodeAttemptBaseline(
 function decodeStoredBaseline(
   version: unknown,
   value: unknown,
-  operationKind: "set" | "question" | undefined,
+  operationKind: "set" | "question" | "replace-question" | undefined,
   issues: ValidationIssue[],
 ): BlooketWriteVerificationBaseline | null | undefined {
   if (
@@ -557,7 +557,7 @@ function decodeStoredBaseline(
 
 function decodeConfirmedReceipt(
   value: unknown,
-  operationKind: "set" | "question",
+  operationKind: "set" | "question" | "replace-question",
 ):
   | { readonly ok: true; readonly value: BlooketWriteReceipt | null }
   | {
@@ -565,7 +565,7 @@ function decodeConfirmedReceipt(
       readonly kind: "invalid";
       readonly issues: readonly ValidationIssue[];
     } {
-  if (operationKind === "question") {
+  if (operationKind !== "set") {
     return value === null
       ? { ok: true, value: null }
       : invalidFailure(
@@ -584,7 +584,7 @@ function decodeStoredReceipt(
   version: unknown,
   value: unknown,
   phase: unknown,
-  operationKind: "set" | "question" | undefined,
+  operationKind: "set" | "question" | "replace-question" | undefined,
   issues: ValidationIssue[],
 ): BlooketWriteReceipt | null | undefined {
   if (operationKind === undefined) {
@@ -613,7 +613,7 @@ function decodeStoredReceipt(
   if (phase !== "confirmed") {
     return null;
   }
-  if (operationKind === "question") {
+  if (operationKind !== "set") {
     if (value !== null) {
       issues.push({
         path: "$.receipt",

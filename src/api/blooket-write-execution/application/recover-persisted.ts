@@ -304,7 +304,7 @@ function checkpointMatchesConfirmedAttempt(
   if (operation === undefined) {
     return false;
   }
-  if (operation.kind === "question") {
+  if (operation.kind !== "set") {
     return attempt.receipt === null
       && checkpoint.remoteSetId !== null;
   }
