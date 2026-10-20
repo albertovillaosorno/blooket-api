@@ -792,10 +792,13 @@ compares its exact byte count and SHA-256 to GitHub's API before showing the
 verified archive path. No Apple Developer membership or Mac CI is involved.
 
 The release job now publishes verified `linux-x64.tar.gz` from Ubuntu only;
-optional Mac/Safari CI does not block Linux. A GitHub digest verifies that
-downloaded bytes match that release asset. It does not independently verify
-who controlled the publishing GitHub account. Missing hashes, wrong bytes,
-unexpected redirects and incomplete downloads never produce usable archives.
+optional Mac/Safari CI does not block Linux. If newer GitHub tags are Mac-only,
+the Linux update check can select the newest compatible Linux release.
+
+A GitHub digest verifies that downloaded bytes match that release asset. It
+does not independently verify who controlled the publishing GitHub account.
+Missing hashes, wrong bytes, unexpected redirects and incomplete downloads
+never produce usable archives.
 
 **Installation is manual for now.** Stop Blooket API via `--stop`, preserve
 the existing extracted package as a backup, and unpack the verified archive

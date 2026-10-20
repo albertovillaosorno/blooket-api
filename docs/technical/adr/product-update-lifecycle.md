@@ -326,9 +326,10 @@ resource forks, ACLs, notarization or a usable shipping updater.
 
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
-`blooket-17` owns update integration, trusted metadata, staging, recovery, and
-production-path acceptance. It depends on configuration, remote write recovery,
-lifecycle, and trusted packaging; it exposes no remote installation authority.
+`blooket-17` is completed for the owner's narrower on-demand Linux release
+check and GitHub SHA-256 download. It stages a private archive but grants no
+remote installation authority. Auto-replacement is deferred, not required
+for the personal Linux release workflow.
 
 The packaged native main executable invokes Service Management only for exact
 local login-control arguments. Ordinary app launch and MCP execution never open
@@ -336,11 +337,11 @@ Terminal or register persistence implicitly. The local page displays actual OS
 authorization, including pending approval, and keeps removal independently
 available; ordinary settings saves cannot bypass this control.
 
-The updater stages at a safe boundary, preserves the private user-data root,
-never replaces a running application blindly, and never replays an ambiguous
-Blooket write after restart. Missing manifests/authenticity and unimplemented
-safe installation/recovery block functional completion. Native Mac/Safari
-acceptance belongs to task blooket-15; lack of those hosts does not block P2/P3.
+The manual downloader verifies GitHub's digest and stages into a private
+user-data directory; it does not replace a running application or replay an
+ambiguous Blooket write. An automatic installer would require extra safety,
+but it cannot block the user's accepted manual workflow. Native Mac/Safari
+acceptance belongs to task blooket-15 and cannot block Linux delivery.
 
 ## Consequences
 
@@ -365,11 +366,11 @@ Version tests cover canonical syntax, numeric ordering, UTC quarter boundaries,
 tag/source matching, and bounded package projections. Roadmap integrity checks
 verify record identity, dependencies, links, and completion status/path.
 
-Portable catalog and local manual-check tests are implemented. The remaining
-updater matrix and trusted release acceptance are pending in
-[the update record](../../todo/open/delivery/updates.mdc). Native Mac/Safari
-acceptance stays in the final ongoing record. Portable tests do
-not establish Safari, Keychain, signing, notarization, or recipient acceptance.
+Portable catalog checks, SHA-256 download tests, Linux package assembly,
+and extracted package verification provide the evidence for the completed
+[personal update record](../../todo/completed/delivery/updates.mdc).
+Automatic installation remains deferred. Native Mac/Safari acceptance stays
+in ongoing maintenance; portable tests cannot establish native Mac behavior.
 
 [chrome]:
   https://developer.chrome.com/docs/extensions/reference/manifest/version

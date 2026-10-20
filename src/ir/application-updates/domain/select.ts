@@ -124,10 +124,14 @@ export function selectPublicUpdate(
   final.sort((a, b) => compareProductVersions(b.tag.slice(1), a.tag.slice(1)));
   const newest = final[0];
   if (!newest) return { status: "current", skippedTags };
-  const version = newest.tag.slice(1);
-  const matching = newest.assets.filter(
-    (asset) => asset.name === archive,
-  );
+  // GitHub tags may contain a Mac-only build. Continue to the latest
+  // compatible Linux asset instead of hiding a usable Linux update.
+  const candidate = target === LINUX_UPDATE_TARGET
+    ? final.find(release =>
+      release.assets.some(asset => asset.name === archive)) ?? newest
+    : newest;
+  const version = candidate.tag.slice(1);
+  const matching = candidate.assets.filter(asset => asset.name === archive);
   if (matching.length !== 1)
     return {
       status: "incompatible-asset",
@@ -137,8 +141,8 @@ export function selectPublicUpdate(
   return {
     status: "available",
     version,
-    tag: newest.tag,
-    releaseUrl: newest.url,
+    tag: candidate.tag,
+    releaseUrl: candidate.url,
     asset: matching[0]!,
     verificationRequired: true,
     skippedTags,

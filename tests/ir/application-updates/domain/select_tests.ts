@@ -90,6 +90,17 @@ test(
   assert.equal(choose([], "windows-x64").status, "unsupported-platform");
 });
 
+test("Linux selects newest compatible release past a Mac-only tag", () => {
+  const candidate = choose([
+    release("26.4.3", 3, ["darwin-arm64.zip"]),
+    release("26.4.2", 2, ["linux-x64.tar.gz"]),
+  ], "linux-x64");
+  assert.equal(candidate.status, "available");
+  if (candidate.status !== "available") return;
+  assert.equal(candidate.version, "26.4.2");
+  assert.equal(candidate.asset.name, "linux-x64.tar.gz");
+});
+
 test(
   "drafts and prereleases are ignored; invalid catalogs are failures", () => {
   assert.equal(
