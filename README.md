@@ -9,11 +9,12 @@ Linux computer owns files, credentials, media preparation, and execution.
 An optional Cloudflare Tunnel connects online AI clients to its authenticated
 MCP gateway.
 
-**This is a working development prototype. Automatic Blooket publication,
-Safari integration, production updates, and acceptance with the recipient's
-ChatGPT account remain unfinished.** It is independent of Blooket and is neither
-affiliated with nor
-endorsed by the platform.
+**This is a working development prototype.** Canonical CLI/MCP publication
+has created and freshly verified a private set with a question image and a
+subsequent appended text question in the authorized Chrome session. Editing an
+existing question, unattended multi-question publication, native Safari,
+production updates, and recipient-ChatGPT acceptance remain unfinished.
+The project is independent of Blooket and is not endorsed by the platform.
 
 ## What works today
 
@@ -36,9 +37,11 @@ endorsed by the platform.
 - Explicit local service stop and reversible packaged Mac login startup,
   showing the OS authorization state instead of inferring it from a preference.
 
-Current MCP tools retrieve teacher instructions, search/read/enrich media, and
-list/read/write skills and drafts. Media search returns bounded pages and a
-continuation cursor. **Saving a draft does not publish a quiz.**
+Registered MCP tools retrieve teacher instructions, search/read/enrich media,
+manage skills and drafts, and expose guarded quiz publication, status,
+verification and recovery via the canonical CLI. Media search returns bounded
+pages and a continuation cursor. **Saving a draft does not publish a quiz**;
+only a completed, freshly verified remote operation does.
 
 Linux x64 and macOS ARM64 are both intended personal-use targets. The Linux
 package has passed local startup, native media preparation, packaged CLI,
@@ -48,10 +51,10 @@ API.app`. Native Mac acceptance and signing/notarization remain in ongoing
 platform hardening; safe application replacement remains unfinished.
 
 Chrome and Firefox extensions can be assembled locally. Authenticated set
-summaries,
-private details, saved questions with bounded image evidence, and capabilities
-have passed real service and CLI reads in the authorized Chrome session.
-Ordinary automatic quiz publication still requires live acceptance.
+summaries, private details, saved questions with bounded image evidence, and
+capabilities have passed real service and CLI reads in authorized Chrome.
+Creation, image verification, and an appended text question have also passed
+live canonical reads; existing-question replacement is still unverified.
 
 Non-empty collection completeness, pagination, public set details, and
 unsupported media variants remain unknown or pending. Keep these limits
