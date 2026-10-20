@@ -79,6 +79,18 @@ The updater implementation, trust, safe failure, and recovery remain required.
 
 ## Implementation notes
 
+On 2026-10-20, independent installer program preparation was added under
+`platforms/update-extraction`. A captured prepared installation may copy its
+old Apple-assessed bundle into an exclusively created private `installer/`
+directory. The adapter bounds source layout/space, compares and freezes copied
+bytes and links, and reassesses the copied publisher/version.
+
+Portable tests show the copy remains separate through actual Linux exchange,
+reject altered bytes/publisher/external links and preserve pre-existing work.
+Cancellation/timeout cannot clean the directory before the copy writer closes.
+This is program preparation only: independent startup/ownership transfer,
+production trust and UI installation remain pending, not blocked on Mac access.
+
 ### Detailed update reliability and security requirements
 
 ### Independent preferences and ownership

@@ -75,7 +75,7 @@ export async function snapshotArchive(source: string, destination: string,
   await chmod(destination, 0o400);
 }
 
-async function hashFile(path: string, signal: AbortSignal) {
+export async function hashFile(path: string, signal: AbortSignal) {
   signal.throwIfAborted();
   const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {

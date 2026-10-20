@@ -276,6 +276,24 @@ avoiding the parent-disconnect close-accounting issue reported in
 not immutable installer preparation, production publisher selection or a
 completed replacement/recovery transaction.
 
+Independent installer program preparation now has a local adapter. It copies
+only the captured installed bundle into an exclusively created private sibling
+of the candidate, after reassessing the old publisher/version and bounding the
+source tree and available space. Native copying preserves bundle metadata;
+exact regular bytes, executable bits and internal links are checked and frozen
+before the copy receives its own Apple reassessment.
+
+The original and candidate identities must remain unchanged. Cancellation and
+timeouts retain the copy writer until actual closure before cleaning only the
+owned generated directory; pre-existing copies are preserved. Portable tests
+exercise actual byte copies and Linux bundle exchange, demonstrating that the
+independent program directory stays fixed while both app names exchange.
+
+This prepares program bytes only. Independent installer startup, private
+ownership handoff, production publisher provisioning and the product install
+controls remain required; synthetic Apple/copy commands do not prove native
+resource forks, ACLs, notarization or a usable shipping updater.
+
 Both launch-at-login and automatic updates default off and remain independent
 local preferences. Record `blooket-13` owns native lifecycle registration;
 `blooket-17` owns update integration, trusted metadata, staging, recovery, and
