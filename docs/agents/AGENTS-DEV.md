@@ -222,9 +222,14 @@ Never print, return, log, serialize into projects, or expose credentials,
 cookies, authorization headers, or secret-store payloads.
 
 Use the security capability for credentials. Browser automation operates from
-the teacher's local computer and confirmed session. A CAPTCHA, unfamiliar login
-challenge, or ambiguous security state requires human interaction. Do not build
-or suggest bypasses.
+the teacher's local computer and confirmed session. Provider verification may
+complete automatically: observe it for a bounded interval and require fresh
+session evidence before continuing. Do not classify every transient Cloudflare
+page as a request for human action.
+
+Interactive verification follows the active controller's confirmation rules.
+Preserve uncertain writes and authentication boundaries; never bypass security
+protections or infer success from a completed redirect alone.
 
 The Blooket organization-selection prompt is a known state. Do not select an
 organization or submit that form automatically.
@@ -256,8 +261,12 @@ boundary rather than embedding credentials in browser scripts or fixtures.
 
 An authenticated session permits non-mutating acceptance checks. Do not create,
 edit, delete, upload, or otherwise mutate account content without separate
-explicit authorization. CAPTCHA, security challenges, organization prompts,
-and unfamiliar login states remain human stops, never automation targets.
+explicit authorization.
+
+Allow provider-completed verification to settle before
+requesting intervention; observe only, with no automatic challenge clicks.
+Persistent interactive challenges follow the controller's confirmation rules.
+Organization prompts and unfamiliar login states still require the human.
 Clean up only session-created test profiles and other owned ephemeral files.
 
 Development browser control is not limited to an integrated browser. Use an
