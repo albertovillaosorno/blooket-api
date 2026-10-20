@@ -66,3 +66,20 @@ test("library enrichment requires bounded detected language", () => {
     /unknown-or-missing-field/u,
   );
 });
+
+test("image intake rejects paths and oversized payloads", () => {
+  const request = { name: "My cat", description: "Picture",
+    base64: "aGVsbG8=" };
+  assert.deepEqual(decodeLibraryCommand("library.image.import", request),
+    { kind: "image-import", ...request });
+  for (const bad of [
+    { ...request, path: "private.png" },
+    { ...request, base64: "aGVsbG8" },
+    { ...request, base64: "aGVsbG8=\n" },
+    { ...request, base64: "A".repeat(900_004) },
+    { ...request, name: "" },
+  ]) assert.throws(
+    () => decodeLibraryCommand("library.image.import", bad),
+    /invalid-image-import|unknown-or-missing-field/u,
+  );
+});

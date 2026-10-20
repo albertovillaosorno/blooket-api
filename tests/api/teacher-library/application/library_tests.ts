@@ -1091,3 +1091,68 @@ test("skill reads and revision checks refuse oversized or linked files",
   }
   },
 );
+
+test("AI image import uses stable IDs and does not replay uploads",
+  async () => {
+  const { root, input } = await setup();
+  try {
+    const command = (operationId: string) => ({
+      version: 1 as const,
+      operationId,
+      command: "library.image.import",
+      payload: { name: input.name, description: input.description,
+        base64: input.base64 },
+    });
+    const first = await executeLibraryCommand(command("test:import-1"), root);
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    const second = await executeLibraryCommand(command("test:import-2"), root);
+    assert.equal(second.ok, true);
+    if (!second.ok) return;
+    assert.deepEqual(second.value, first.value);
+    const result = first.value as { id: string; revision: number };
+    assert.equal(result.revision, 1);
+    assert.match(result.id, /^[a-f0-9-]{36}$/u);
+    const library = (await loadPreferences(root)).mediaRoot;
+    const records = await listLibrary(library);
+    assert.equal(records.length, 1);
+    assert.equal(records[0]?.id, result.id);
+    assert.equal(records[0]?.original.name, input.name);
+    assert.equal(records[0]?.original.description, input.description);
+    assert.equal(records[0]?.prepared, null);
+    assert.equal(records[0]?.edit.panX, 0);
+    assert.equal(records[0]?.edit.zoom, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("image import replay cannot undo later teacher-authored metadata edits",
+  async () => {
+  const { root, input } = await setup();
+  try {
+    const command = (operationId: string) => ({
+      version: 1 as const, operationId,
+      command: "library.image.import",
+      payload: { name: input.name, description: input.description,
+        base64: input.base64 },
+    });
+    const imported = await executeLibraryCommand(
+      command("image:initial"), root);
+    assert.equal(imported.ok, true);
+    if (!imported.ok) return;
+    const id = (imported.value as { id: string }).id;
+    const prefs = await loadPreferences(root);
+    const initial = (await listLibrary(prefs.mediaRoot)).find(
+      item => item.id === id)!;
+    const edited = await editLibraryImage(root, {
+      id, revision: initial.revision, edit: initial.edit,
+      original: { name: "Teacher correction",
+        description: initial.original.description },
+    });
+    assert.equal(edited.original.name, "Teacher correction");
+    const replay = await executeLibraryCommand(command("image:replay"), root);
+    assert.equal(replay.ok, false);
+    const stored = await listLibrary(prefs.mediaRoot);
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0]!.original.name, "Teacher correction");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

@@ -53,16 +53,35 @@ Call `blooket_publication_append` with that draft ID, saved revision and exact
 `remoteSetId`. It sends at most one new question, without creating a set.
 Continue its remaining steps with `blooket_publication_step`, then verify.
 
-Replacement, deletion, reordering and changes to existing question content or
-metadata are still unsupported. Explain that stop; do not create a replacement
-quiz or omit a requested edit. An uncertain append uses the same status and
-read-only reconciliation workflow as new publication.
+A bounded text-only existing-question replacement is available through
+`blooket_publication_replace`. It requires the exact remote set ID, the
+original row's fresh state and a full desired draft that changes only one row
+without changing its type, answer count or media. Deletion, reordering,
+question media replacement and metadata changes remain unsupported. When a
+replacement is throttled or uncertain, stop and reconcile without another
+Save or a replacement quiz; no synthetic success proves live persistence.
 
 ## Media
 
 Use media stable IDs returned by the library tools. Search the library before
 assuming an image is unavailable. Preserve teacher-authored names and
-descriptions. Canonical asset filenames are internal service details; do not ask
+descriptions.
+
+If the connected AI client explicitly supplies image bytes as canonical
+base64, `library_image_import` accepts a small image (at most 675 KB) plus
+the original name and description, returning its stable ID. Exact repeated
+inputs reuse the same ID.
+
+Chat attachments are **not** automatically available to MCP: never
+fabricate their bytes, URLs or paths. If the client cannot
+supply admitted base64, direct the teacher to import the file using the local
+Studio UI and then search by original metadata. Larger files belong in the
+local intake.
+
+Do not interpret import as prepared Blooket media; the ordinary
+recipe preparation and remote verification requirements still apply.
+
+Canonical asset filenames are internal service details; do not ask
 the teacher to manage them or choose filesystem paths.
 
 Language identification is an AI enrichment operation, not an interface-locale

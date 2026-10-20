@@ -37,6 +37,7 @@ export const LIBRARY_COMMANDS = [
   "library.search",
   "library.get",
   "library.enrich",
+  "library.image.import",
   "skills.list",
   "skills.get",
   "skills.put",
@@ -55,6 +56,8 @@ export type LibraryPayload =
       readonly after: string | null;
     }
   | { readonly kind: "get"; readonly id: string }
+  | { readonly kind: "image-import"; readonly name: string;
+      readonly description: string; readonly base64: string }
   | {
       readonly kind: "enrich";
       readonly id: string;
@@ -112,6 +115,18 @@ export function decodeLibraryCommand(
       kind: "list",
       query: name === "library.list" ? (value["query"] as string) : "",
     };
+  }
+  if (name === "library.image.import") {
+    keys(value, ["name", "description", "base64"]);
+    if (!string(value["name"], 200) || !value["name"].trim() ||
+        !string(value["description"], 10_000) ||
+        !string(value["base64"], 900_000) ||
+        value["base64"].length === 0 ||
+        value["base64"].length % 4 !== 0 ||
+        !/^[A-Za-z0-9+/]*={0,2}$/u.test(value["base64"]))
+      throw new Error("invalid-image-import");
+    return { kind: "image-import", name: value["name"],
+      description: value["description"], base64: value["base64"] };
   }
   if (!logicalId(value["id"])) throw new Error("invalid-logical-id");
   const id = value["id"];

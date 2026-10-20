@@ -130,6 +130,25 @@ export async function executeLibraryCommand(
     return await withCanonicalDataWriter(root, async () => {
       const preferences = await loadPreferences(root);
       await initializeLibrary(preferences.mediaRoot);
+      if (payload.kind === "image-import") {
+        const digest = createHash("sha256")
+          .update(Buffer.from(payload.base64, "base64"))
+          .update(JSON.stringify([payload.name, payload.description]))
+          .digest("hex");
+        const id = [digest.slice(0, 8), digest.slice(8, 12),
+          digest.slice(12, 16), digest.slice(16, 20),
+          digest.slice(20, 32)].join("-");
+        const record = await importLibraryImage(root, {
+          name: payload.name, description: payload.description,
+          base64: payload.base64,
+          edit: { ...preferences.defaults,
+            panX: 0, panY: 0, zoom: 1, contrast: 1, saturation: 1,
+            background: { mode: "blur", color: "#ffffff" },
+          },
+        }, id);
+        return commandSuccess(command.operationId,
+          { id: record.id, revision: record.revision });
+      }
       if (command.command.startsWith("library.")) {
         const records = await withLibraryLock(preferences.mediaRoot, () =>
           listLibrary(preferences.mediaRoot),
@@ -417,6 +436,7 @@ export async function inspectPreparationAdmission(
 export async function importLibraryImage(
   root: string,
   input: unknown,
+  stableId?: string,
 ): Promise<LibraryMetadata> {
   const request = object(input);
   exact(request, ["name", "description", "base64", "edit"]);
@@ -447,8 +467,23 @@ export async function importLibraryImage(
   const library = preferences.mediaRoot;
   await initializeLibrary(library);
   return await withLibraryLock(library, async () => {
-    const id = randomUUID();
+    const id = stableId ?? randomUUID();
     const asset = "photos/" + id + "." + compacted.value.format;
+    if (stableId !== undefined) {
+      const existing = (await listLibrary(library))
+        .find(item => item.id === id);
+      if (existing !== undefined) {
+        if (existing.original.name !== request["name"] ||
+            existing.original.description !== request["description"] ||
+            existing.asset !== asset)
+          throw new Error("image-import-identity-conflict");
+        const stored = await boundedBytes(
+          await safeLibraryPath(library, existing.asset), 25_000_000);
+        if (!Buffer.from(stored).equals(compacted.value.bytes))
+          throw new Error("image-import-identity-conflict");
+        return existing;
+      }
+    }
     const path = await safeLibraryPath(library, asset, true);
     await writeAtomicFile(path, compacted.value.bytes);
     try {
