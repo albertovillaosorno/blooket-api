@@ -12,6 +12,57 @@ Playwright MCP, Chrome DevTools MCP, and an installed CLI are alternatives;
 their presence does not establish a working connection. Read the controller's
 current documentation and inspect its actual tabs before account operations.
 
+## Choose an independent controller, then validate the product path
+
+Use Chrome for Testing already installed on Fedora when it is the browser
+with the admitted extension and signed-in owner session. Its existence on
+disk is not proof of a loaded worker. Do not fetch or create a new profile to
+replace a disconnected authenticated session.
+
+The supported verification paths are deliberately independent:
+
+- Chrome for Testing shows actual browser and extension execution, not a
+  confirmed remote write.
+- Playwright MCP shows attached tab controls and snapshots, not journal
+  advancement.
+- Chrome DevTools MCP inspects browser and extension state, not an admitted
+  teacher tool call.
+- `chrome-devtools` CLI supplies independent zsh page/extension commands,
+  not remote persistence proof.
+- Product CLI/MCP exercises publication, reconciliation and fresh reads,
+  not native Safari or ChatGPT account behavior.
+
+Check each tool independently; an unavailable integrated browser is not a
+reason to skip an available CLI or attached Playwright MCP. Conversely, a
+controller launching a new browser cannot substitute for the owner's existing
+Blooket session. The installed `chrome-devtools` CLI works through system zsh;
+its `--help` is the argument authority for the deployed version.
+
+For a safe CLI preflight, inspect the controller before requesting a new tab:
+
+```sh
+chrome-devtools --version
+chrome-devtools list_pages --output-format=md
+chrome-devtools list_extensions --output-format=md
+```
+
+Redact private page titles, identifiers, debugging endpoints and session
+metadata from reports. If the controller is disconnected, diagnose attachment
+without opening Blooket elsewhere. Only an observed extension ID can be
+reloaded, and only after no journaled mutation or unsaved editor would be
+lost. To verify product behavior, use the canonical CLI through the same
+explicitly approved local service data root:
+
+```sh
+BLOOKET_DATA_HOME="$PWD/.temp/browser-acceptance-current" \
+  npm run blooket -- session inspect --json
+```
+
+Run `npm run provider:drift:check`, matching Node regressions and `jig validate`
+when provider selectors, saved reads or browser bridging change. The platform
+matrix and documented official implementations guide future theoretical Mac
+and ARM64 assurance; neither is a completion gate for portable publication.
+
 ## Safe question write-stage diagnostics
 
 The isolated Blooket API extension owns the per-document Add Question watch.

@@ -730,6 +730,20 @@ present an unsigned archive as a trusted public automatic-update release.
 
 ## Develop and verify
 
+The developer contract supports **Chrome for Testing**, **Playwright MCP**,
+**Chrome DevTools MCP**, and the independently installed `chrome-devtools`
+**CLI**, not only integrated browser control. Reuse the observed authorized
+Chrome session and Blooket API extension; do not launch a second profile just
+to work around a disconnected controller. The canonical `npm run blooket`
+CLI and registered teacher MCP tools remain the proof of real publication
+and recovery, with independent fresh Blooket read-back.
+
+Read [browser acceptance tools](docs/technical/browser-acceptance-tools.md)
+and the [developer profile](docs/agents/AGENTS-DEV.md) for safe attachment,
+CLI commands, test scope, and secret boundaries. Portable Linux testing and
+provider-drift regressions proceed now; native Mac/ARM64 and Safari assurance
+remain in the perpetual hardening task rather than blocking functionality.
+
 ```sh
 npm run validate
 node --check src/ui/teacher-workspace/adapter-inbound/app.js
