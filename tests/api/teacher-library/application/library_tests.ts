@@ -1156,3 +1156,26 @@ test("image import replay cannot undo later teacher-authored metadata edits",
     assert.equal(stored[0]!.original.name, "Teacher correction");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("a replay preserves orphaned image bytes after missing metadata",
+  async () => {
+  const { root, input } = await setup();
+  try {
+    const request = (operationId: string) => ({
+      version: 1 as const, operationId, command: "library.image.import",
+      payload: { name: input.name, description: input.description,
+        base64: input.base64 },
+    });
+    const first = await executeLibraryCommand(request("image:one"), root);
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    const library = (await loadPreferences(root)).mediaRoot;
+    const record = (await listLibrary(library))[0]!;
+    const asset = join(library, record.asset);
+    const saved = await readFile(asset);
+    await rm(join(library, metadataPath(record.asset)));
+    const retry = await executeLibraryCommand(request("image:two"), root);
+    assert.equal(retry.ok, false);
+    assert.deepEqual(await readFile(asset), saved);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
