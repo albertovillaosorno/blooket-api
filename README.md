@@ -597,8 +597,10 @@ confirmed through ordinary read-only journal reconciliation without
 resubmission, and fresh reads verified its answer, exact matching and time.
 
 Prepared question images are admitted by stable library ID; covers, answer
-images and audio remain refused. Live prepared-image upload acceptance and
-replacement of existing questions remain unfinished.
+images and audio remain refused. On October 20, canonical creation of a
+private quiz with a prepared question image passed separate fresh verification,
+including exact saved image bytes. Replacement of existing questions remains
+unfinished.
 
 Canonical `publication append <draft-id> <revision> <set-id>` and
 `blooket_publication_append` extend an existing set. The saved draft describes

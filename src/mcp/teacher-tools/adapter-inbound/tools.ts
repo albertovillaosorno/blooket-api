@@ -83,9 +83,13 @@ const tools = [
     "blooket_capabilities_inspect",
     "blooket.capabilities.inspect",
     "Read a validated Blooket capability snapshot through the connected " +
-      "local browser. This does not sign in or publish. Account-dependent " +
-      "media stays explicit when no existing set is available to probe.",
-    {},
+      "local browser. This does not sign in or publish. Use text-publication " +
+      "for base text and prepared question images. Account-dependent media " +
+      "stays explicit when no existing set is available to probe.",
+    { scope: { type: "string", enum: ["text-publication"],
+      description:
+        "Inspect base text and question-image capabilities without " +
+        "unrelated premium audio or answer-image drawers." } },
     true,
     [],
     true,
@@ -249,8 +253,8 @@ const tools = [
           "Replacing, deleting or reordering existing questions is refused. " +
           "Resume with step; reconcile uncertainty without resubmission."
       : action === "verify"
-        ? "Freshly verify all text quiz metadata, questions, answers, " +
-          "types and timing after all publication writes finish. " +
+        ? "Freshly verify quiz metadata, questions, answers, types, timing " +
+          "and supported prepared question-image bytes after writes finish. " +
           "Only this successful check reports published=true."
         : action === "reconcile"
           ? "Observe and reconcile an uncertain publication step without " +

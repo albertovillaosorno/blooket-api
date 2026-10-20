@@ -73,6 +73,24 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20 at 19:55 UTC, the canonical CLI completed a new private fictional
+quiz with one multiple-choice question and a prepared library image. Create
+Set advanced once with a durable remote ID, Add Question advanced once, and a
+separate `publication verify` returned `published: true` with both operations
+complete. The attempt journal was absent after confirmed checkpoint advancement.
+
+A further fresh `questions list` returned the exact prompt, two text answers,
+correctness, shuffle and 15-second timer, plus schema-four image evidence of
+12,797 bytes matching the frozen prepared rendition's SHA-256. Computer Use
+independently observed the saved card and opened its image lightbox by keyboard.
+Its native screenshot command timed out, so no screenshot evidence is claimed.
+
+The temporary visual tab was closed, leaving one backend. Older ambiguous
+attempts were preserved without another Save. This proves image creation and
+fresh read-back; existing-question replacement and the remaining live append/
+multi-question/teacher-tool journeys are still pending.
+
+
 On 2026-10-20, a red-to-green final-verification regression demonstrated
 that a remote set ID mismatch is rejected by the validated read boundary,
 but was surfaced as its low-level read code instead of an actionable
@@ -1318,12 +1336,12 @@ rule evaluation limitation remains explicit in the development handoff.
 
 ## Blockers
 
-Canonical Create Set and one typing question have real fresh verification.
-Uninterrupted multi-question publication, prepared-media upload, live append
-and replacement of existing questions remain pending. The latest native MC Save
-received HTTP 429 and retains its uncertain journal without replay. Computer Use
-currently fails its own request-header-policy initialization before page access;
-that controller failure does not establish a Blooket challenge or session loss.
+Canonical private Create Set, typing and multiple-choice questions, and a
+prepared question image have real fresh verification. Uninterrupted
+multi-question publication, live append and replacement of existing questions
+remain pending. Historical HTTP 429 attempts retain their journals without
+replay. Computer Use reads and keyboard activation work in the current Chrome;
+native clicks/screenshots still time out independently of product publication.
 
 Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
 and does not block this functional record.
