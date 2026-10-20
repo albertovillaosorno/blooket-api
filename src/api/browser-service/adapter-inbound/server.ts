@@ -981,7 +981,9 @@ async function handleBrowserBridgeRequest(
   const allowedOrigin =
     extensionOrigin === undefined ||
     extensionOrigin.startsWith("chrome-extension://") ||
-    extensionOrigin.startsWith("safari-web-extension://");
+    extensionOrigin.startsWith("safari-web-extension://") ||
+    /^moz-extension:\/\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/u
+      .test(extensionOrigin);
   if (!allowedOrigin) {
     json(response, 403, { ok: false, code: "invalid-origin" });
     return;

@@ -35,11 +35,37 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { buildBrowserExtension } from
+import { buildBrowserExtension, buildFirefoxExtension } from
   "../../../../src/platforms/distribution/adapter-outbound/extension.ts";
 
 import { PRODUCT_VERSION, extensionVersion } from
   "../../../../src/ir/product-version/contract/version.ts";
+
+test("Firefox build runs its MV3 background as a module document",
+  async () => {
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const root = await mkdtemp(join(repo, ".temp/firefox-extension-test-"));
+  const output = join(root, "firefox");
+  try {
+    await buildFirefoxExtension(repo, output);
+    const manifest = JSON.parse(await readFile(
+      join(output, "manifest.json"), "utf8",
+    ));
+    assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.minimum_chrome_version, undefined);
+    assert.equal(manifest.background.service_worker, undefined);
+    assert.deepEqual(manifest.background.scripts, [
+      "src/service/browser-extension/adapter-inbound/worker.js",
+    ]);
+    assert.equal(manifest.background.type, "module");
+    assert.equal(manifest.browser_specific_settings.gecko.id,
+      "blooket-api@albertovillaosorno.github");
+    assert.deepEqual(manifest.browser_specific_settings.gecko
+      .data_collection_permissions.required, ["none"]);
+    assert.deepEqual(manifest.permissions, ["storage", "scripting"]);
+    await readFile(join(output, manifest.background.scripts[0]), "utf8");
+  } finally { await rm(root, { recursive: true }); }
+});
 
 test(
   "extension compilation emits a closed browser-safe module tree",

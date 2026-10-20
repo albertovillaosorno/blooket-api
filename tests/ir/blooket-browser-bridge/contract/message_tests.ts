@@ -49,6 +49,9 @@ test("browser client labels admit only canonical extension roots", () => {
     "chrome-extension://fixture-extension/#" +
       "89aa67d6-4253-4013-9a54-68c37ce9e2af",
     "safari-web-extension://FC730C5C-1446-42CF-A5BB-9097337A63D1/",
+    "moz-extension://bbaca434-855e-4d95-94e7-1ae4924b0302/",
+    "moz-extension://bbaca434-855e-4d95-94e7-1ae4924b0302/#" +
+      "89aa67d6-4253-4013-9a54-68c37ce9e2af",
   ]) assert.deepEqual(decodeBlooketBrowserClient(value), { ok: true, value });
   for (const value of [
     undefined, null, [], ["chrome-extension://fixture/"],
@@ -62,6 +65,9 @@ test("browser client labels admit only canonical extension roots", () => {
     "chrome-extension://fixture/\n", "https://fixture/", "file:///",
     "chrome-extension://" + "a".repeat(201) + "/",
     "chrome-extension://fixture/, chrome-extension://other/",
+    "moz-extension://not-a-uuid/",
+    "moz-extension://bbaca434-855e-4d95-94e7-1ae4924b0302/path",
+    "moz-extension://bbaca434-855e-4d95-94e7-1ae4924b0302/#nope",
   ]) assert.equal(decodeBlooketBrowserClient(value).ok, false);
 });
 

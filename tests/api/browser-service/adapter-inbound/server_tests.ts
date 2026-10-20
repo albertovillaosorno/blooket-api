@@ -350,9 +350,9 @@ test(
       assert.match(app, /\/api\/blooket-readiness-check/u);
       assert.match(app, /readInterrupted/u);
       assert.match(app, /debug\.blooket\.com/u);
-      assert.match(app, /pestaña nueva del Chrome conectado/u);
-      assert.match(app, /connected Chrome profile/u);
-      assert.match(app, /rerun them in a new/u);
+      assert.match(app, /navegador conectado/u);
+      assert.match(app, /connected browser/u);
+      assert.match(app, /rerun them in a tab/u);
       assert.match(app, /controller\.signal/u);
       assert.match(app, /\/api\/media-admission/u);
       assert.match(app, /schedulePreparationAdmission\(\)/u);
@@ -1489,6 +1489,55 @@ test("two paired browsers cannot silently redirect teacher reads or focus",
   }
   },
 );
+
+test("Firefox bridge admits only matching authenticated extension origin",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "firefox-browser-bridge-"));
+  const service = await startBrowserService({ root, port: 0 });
+  try {
+    const boot = (await (await fetch(service.origin + "/api/bootstrap"))
+      .json()) as { browserBridge: { token: string } };
+    const firefoxOrigin =
+      "moz-extension://bbaca434-855e-4d95-94e7-1ae4924b0302";
+    const headers = {
+      Authorization: "Bearer " + boot.browserBridge.token,
+      Origin: firefoxOrigin,
+      "x-blooket-browser-client": firefoxOrigin + "/",
+    };
+    const pending = service.browserBridge.request({ kind: "session.observe" });
+    for (const wrong of [
+      "moz-extension://not-a-uuid",
+      "moz-extension://bbaca434-855e-4d95-94e7-1ae4924b0302/evil",
+      "https://evil.example",
+    ]) {
+      const rejected = await fetch(
+        service.origin + "/api/browser-bridge/next",
+        { headers: { ...headers, Origin: wrong } },
+      );
+      assert.equal(rejected.status, 403);
+    }
+    const next = await fetch(service.origin + "/api/browser-bridge/next",
+      { headers });
+    assert.equal(next.status, 200);
+    assert.equal(next.headers.get("access-control-allow-origin"),
+      firefoxOrigin);
+    const job = ((await next.json()) as { job: { id: string } }).job;
+    const completed = await fetch(
+      service.origin + "/api/browser-bridge/result", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ schemaVersion: 1, id: job.id,
+          ok: true, value: "my-sets" }),
+      },
+    );
+    assert.equal(completed.status, 200);
+    assert.deepEqual(await pending, { ok: true, value: "my-sets" });
+  } finally {
+    service.server.close();
+    service.server.closeAllConnections();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("same extension ID with different browser profiles remains distinct",
   async () => {
