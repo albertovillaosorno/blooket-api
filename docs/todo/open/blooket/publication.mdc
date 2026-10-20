@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-19, red-to-green Chrome update-event tests showed an accessor-
+backed challenge title could trigger a human-attention tab activation while
+its owned event fields contained no trusted title. The extension now admits
+only an owned `Just a moment...` title and an independently admitted Blooket
+tab before scheduling focus. No real Cloudflare challenge was triggered.
+
 On 2026-10-19, red-to-green read-navigation regressions showed that a
 synthetic Chrome `tabs.get` URL getter could impersonate an owned dashboard
 route and trigger an otherwise authorized page reload. A shared owned route

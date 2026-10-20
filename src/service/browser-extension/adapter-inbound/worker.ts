@@ -1604,8 +1604,13 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 // the first CLI read. Surface it once, based only on the owned tab's URL and
 // interstitial title. This is visibility, not authentication evidence.
 chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
-  if (!connection || tabId !== connection.tabId || humanWindowRaised ||
-      changes.title !== "Just a moment..." || !tab.url) return;
+  if (!connection || tabId !== connection.tabId || humanWindowRaised)
+    return;
+  const title = changes && typeof changes === "object" ?
+    Object.getOwnPropertyDescriptor(changes, "title") : undefined;
+  if (!title?.enumerable || !("value" in title) ||
+      title.value !== "Just a moment..." ||
+      !exactHumanBlooketTab(tab, tabId)) return;
   const owned = connection;
   humanWindowRaised = true;
   void showHumanBlooketTab(tabId, () => connection === owned)
