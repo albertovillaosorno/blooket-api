@@ -121,3 +121,29 @@ test("bad hash, length, wrong target and foreign redirect fail closed",
     assert.deepEqual(await readdir(directory), []);
   });
 });
+
+test("cancelled GitHub download retains no archive and permits retry",
+  async () => {
+  await temporary(async directory => {
+    const controller = new AbortController();
+    const first = downloadGithubAsset({ directory,
+      selection: selected, target: "linux-x64",
+      signal: controller.signal,
+      fetch: async (_url, init) => {
+        assert.equal(init.redirect, "manual");
+        controller.abort();
+        return new Response(bytes);
+      },
+    });
+    assert.deepEqual(await first, {
+      status: "download-failed", reason: "cancelled",
+    });
+    assert.deepEqual(await readdir(directory), []);
+    const retry = await downloadGithubAsset({ directory,
+      selection: selected, target: "linux-x64", fetch: fetchArchive,
+    });
+    assert.equal(retry.status, "downloaded");
+    if (retry.status === "downloaded")
+      assert.deepEqual(await readFile(retry.archivePath), bytes);
+  });
+});
