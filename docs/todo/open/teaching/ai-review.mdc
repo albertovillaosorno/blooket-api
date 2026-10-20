@@ -69,6 +69,14 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-20, red-to-green Quizzes regressions caught a real unauthenticated
+preflight stop before the first publication snapshot: the canonical command
+returned `session-required` without operation counts, but the UI rejected the
+response as malformed and displayed a generic pause. The UI now admits this
+bounded no-count terminal state, makes no additional write, and presents the
+existing sign-in instruction in both languages. This is synthetic UI evidence,
+not authenticated quiz publication acceptance.
+
 On 2026-10-16, the Quizzes view mapped a retained publication journal
 requiring recovery and a native-invalid draft to a generic paused message.
 The classifier now maps recovery to its journal-preservation warning and

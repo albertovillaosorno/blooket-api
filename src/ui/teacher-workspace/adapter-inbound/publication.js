@@ -44,8 +44,8 @@ function progress(value, draftId) {
   // They are recoverable stops, never authorization for another write.
   const noCounts = value.completedOperations === undefined &&
     value.totalOperations === undefined;
-  if (noCounts && ["not-started", "wait", "human-action-required"]
-    .includes(value.phase) && !value.published)
+  if (noCounts && ["not-started", "wait", "human-action-required",
+    "session-required"].includes(value.phase) && !value.published)
     return { ...value, completedOperations: 0, totalOperations: 0 };
   if (!Number.isSafeInteger(value.completedOperations) ||
       !Number.isSafeInteger(value.totalOperations) ||

@@ -2097,6 +2097,10 @@ function publicationLabel(value) {
   if (phase === "reconciliation-required")
     return t(value.state === "rate-limited"
       ? "publicationRateLimitedUncertain" : "publicationUncertain");
+  if (phase === "session-required")
+    return t(value.state === "signed-out" ||
+        value.state === "expired-session"
+      ? "readSignedOut" : "publicationPaused");
   if (phase === "human-action-required") {
     if (value.state === "organization-prompt") return t("readOrganization");
     if (value.state === "security-challenge") return t("readChallenge");

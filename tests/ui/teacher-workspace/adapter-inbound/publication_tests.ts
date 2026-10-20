@@ -124,6 +124,24 @@ test("one UI publish intent advances and verifies each durable operation",
     "advanced", "verified"]);
 });
 
+test("signed-out preflight without snapshot shows a recoverable stop",
+  async () => {
+  const calls: string[] = [];
+  const reports: string[] = [];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return name.endsWith("status")
+      ? { draftId: ID, phase: "not-started", published: false }
+      : { draftId: ID, phase: "session-required",
+          state: "signed-out", published: false };
+  }, value => reports.push(value.phase));
+  assert.equal(result.phase, "session-required");
+  assert.equal(result.state, "signed-out");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+  assert.deepEqual(reports, ["not-started", "session-required"]);
+});
+
 test("an ambiguous journal stops UI automation without replay", async () => {
   const calls: string[] = [];
   const result = await publishTextDraft(ID, REV, async name => {
