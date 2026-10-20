@@ -1387,22 +1387,27 @@ async function disconnect() {
   status = "disconnected";
   await chrome.storage.session?.remove("connection");
 }
-function admittedBlooketTab(tab: BrowserTab | undefined): boolean {
-  // A committed Blooket URL is stale if Chrome has started navigating away.
+// Presence preserves a remembered Blooket tab through pending navigation.
+// It grants no page/read authority: admission below still rejects pending URLs.
+function existingBlooketTab(tab: BrowserTab | undefined): boolean {
   if (!tab || typeof tab !== "object") return false;
   const id = Object.getOwnPropertyDescriptor(tab, "id");
   const url = Object.getOwnPropertyDescriptor(tab, "url");
-  const pending = Object.getOwnPropertyDescriptor(tab, "pendingUrl");
   if (!id?.enumerable || !("value" in id) ||
       !Number.isSafeInteger(id.value) || id.value < 1 ||
       !url?.enumerable || !("value" in url) ||
-      typeof url.value !== "string" ||
-      (pending && (!pending.enumerable || !("value" in pending) ||
-        pending.value !== undefined))) return false;
+      typeof url.value !== "string") return false;
   try {
     return ["https://dashboard.blooket.com", "https://id.blooket.com"]
       .includes(new URL(url.value).origin);
   } catch { return false; }
+}
+function admittedBlooketTab(tab: BrowserTab | undefined): boolean {
+  if (!existingBlooketTab(tab)) return false;
+  // A committed Blooket URL cannot authorize scripts while navigating away.
+  const pending = Object.getOwnPropertyDescriptor(tab!, "pendingUrl");
+  return !pending || (pending.enumerable === true && "value" in pending &&
+    pending.value === undefined);
 }
 
 function reclaimableBlooketTab(tab: BrowserTab | undefined): boolean {
@@ -1459,6 +1464,12 @@ async function connectWorkspace(message: unknown) {
       const tab = await chrome.tabs.get(connection.tabId);
       if (tab.id === connection.tabId && admittedBlooketTab(tab))
         return { ok: true, status };
+      // Our own read navigation can overlap the workspace's periodic beacon.
+      // A pending Blooket tab is still present, not permission to replace it.
+      if (existingBlooketTab(tab)) {
+        status = "blooket-attention-required";
+        return { ok: false, status };
+      }
     } catch { /* The owned tab was closed. Reconnect to a new one. */ }
   }
   let verified: unknown;
@@ -1490,6 +1501,10 @@ async function connectWorkspace(message: unknown) {
       const existing = await chrome.tabs.get(connection.tabId);
       if (existing.id === connection.tabId && admittedBlooketTab(existing))
         tab = existing;
+      else if (existingBlooketTab(existing)) {
+        status = "blooket-attention-required";
+        return { ok: false, status };
+      }
     } catch {
       /* Closed. */
     }
@@ -1505,7 +1520,7 @@ async function connectWorkspace(message: unknown) {
       if (typeof owned === "number" && Number.isSafeInteger(owned) &&
           owned > 0) {
         const previousTab = await chrome.tabs.get(owned);
-        if (previousTab.id === owned && admittedBlooketTab(previousTab)) {
+        if (previousTab.id === owned && existingBlooketTab(previousTab)) {
           if (reclaimableBlooketTab(previousTab)) tab = previousTab;
           else {
             // Reload invalidates isolated-world editor ownership. Preserve

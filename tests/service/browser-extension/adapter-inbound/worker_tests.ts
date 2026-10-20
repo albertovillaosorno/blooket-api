@@ -1205,6 +1205,17 @@ test(
     tabUrl = "https://dashboard.blooket.com/my-sets";
     documentOrigin += 1_000;
     assert.equal(foregroundedTabs.length, 0);
+    pendingSourceRedirect = true;
+    const beforePendingAnnouncement = creates;
+    assert.deepEqual(await announce({ origin, token }), {
+      ok: false, status: "blooket-attention-required",
+    });
+    assert.equal(creates, beforePendingAnnouncement,
+      "workspace discovery must not replace a live navigating backend");
+    assert.equal(stored.connection.tabId, 7);
+    pendingSourceRedirect = false;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "my-sets");
 
     for (const field of ["url", "windowId", "pendingUrl"] as const) {
       humanTabGetter = field;
@@ -2661,6 +2672,7 @@ test("extension reload preserves an editor without creating replacement tabs",
   const origin = "http://127.0.0.1:4567";
   const ext = "chrome-extension://recycled-tab-fixture/";
   let listener;
+  let pendingReload = false;
   const created: number[] = [];
   const stored: Record<string, unknown> = { "blooket-owned-tab-id": 7 };
   const sessions: Record<string, unknown> = {};
@@ -2677,7 +2689,11 @@ test("extension reload preserves an editor without creating replacement tabs",
         get: async (id: number) => ({ id, status: "complete",
           url: id === 7
             ? "https://dashboard.blooket.com/edit?id=teacher-draft"
-            : "https://dashboard.blooket.com/my-sets" }),
+            : "https://dashboard.blooket.com/my-sets",
+          ...(pendingReload ? {
+            pendingUrl: "https://dashboard.blooket.com/edit?id=teacher-draft",
+            status: "loading",
+          } : {}) }),
         create: async () => {
           created.push(8);
           return { id: 8, url: "https://dashboard.blooket.com/my-sets",
@@ -2720,6 +2736,7 @@ test("extension reload preserves an editor without creating replacement tabs",
       status: "blooket-tab-retained" });
     assert.deepEqual(created, []);
     assert.equal(stored["blooket-owned-tab-id"], 7);
+    pendingReload = true;
     const again = await new Promise(resolve => {
       listener({ kind: "workspace-ready", origin,
         token: "a".repeat(43) }, {

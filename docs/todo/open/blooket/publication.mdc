@@ -73,6 +73,20 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, live canonical preflight lost its bridge while the local
+workspace announced during a Blooket navigation. The announcement mistook a
+pending URL for a missing backend, created a replacement tab and retired the
+active relay. This explained both extra tabs and unavailable metadata reads.
+
+Discovery now preserves a live navigating tab without granting it read or
+mutation authority. The remembered-tab path also retains a pending Blooket
+document across reload. Red-to-green worker regressions reproduce both the
+periodic announcement and remembered-tab cases; pending/foreign page admission
+still fails closed. Live publication acceptance remains pending.
+
+Chrome's [Tabs API][pending-tab-doc], checked on 2026-10-20, identifies
+`pendingUrl` as an uncommitted navigation, not evidence of tab closure.
+
 On 2026-10-20, the account owner observed Cloudflare completing verification
 and redirecting without any human input. A subsequent canonical session
 inspection independently returned the authenticated Edit state. The companion
