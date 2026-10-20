@@ -157,6 +157,20 @@ this final record.
 
 ## Evidence
 
+On 2026-10-20, a red-to-green browser-lifecycle regression found that a newly
+created detached read tab could report Chrome's initial `about:blank` with
+`status: complete` before its requested URL became visible. The shared reader
+immediately classified that short transition as foreign navigation, even
+though it owned the new tab.
+
+Only freshly created capability/question readers now tolerate this specific
+bounded pre-commit state; existing teacher tabs, foreign pending routes and
+stuck blank pages continue to fail closed. Synthetic
+Chrome tests cover successful commit, no page scripts before commitment, and
+owned cleanup. This does not resolve or certify the last real replacement
+preflight failure; a fresh connected-browser read is still required.
+
+
 An opt-in Linux desktop shortcut is now packaged with the x64 executable.
 Native Linux smoke ran the packaged `install-desktop-shortcut` against a
 synthetic user home: first install succeeded, while the second refused to

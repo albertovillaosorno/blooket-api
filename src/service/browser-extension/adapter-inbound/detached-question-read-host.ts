@@ -98,7 +98,7 @@ export async function inspectDetachedBlooketQuestions(
         await chrome.tabs.get(createdId!),
       );
       if (!tab) return failed();
-      const load = classifyBlooketReadTabLoad(tab, target);
+      const load = classifyBlooketReadTabLoad(tab, target, true);
       if (load === "changed") return failed();
       if (load === "ready") { loaded = true; break; }
       await pause(100);

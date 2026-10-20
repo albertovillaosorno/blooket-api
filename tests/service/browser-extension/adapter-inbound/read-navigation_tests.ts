@@ -76,6 +76,21 @@ test("Chrome pendingUrl is load evidence, not a committed document", () => {
     status: "complete" }, SETS), "changed");
 });
 
+test("fresh about:blank is bounded loading evidence", () => {
+  const blank = { url: "about:blank", status: "complete" };
+  assert.equal(classifyBlooketReadTabLoad(blank, SETS), "changed");
+  assert.equal(classifyBlooketReadTabLoad(blank, SETS, true), "loading");
+  assert.equal(classifyBlooketReadTabLoad(
+    { url: "about:blank", status: "loading" }, SETS, true), "loading");
+  for (const tab of [
+    { url: "about:blank", status: "unloaded" },
+    { status: "complete" },
+    { url: "https://foreign.invalid/", status: "complete" },
+    { url: "about:blank", status: "complete",
+      pendingUrl: "https://foreign.invalid/" },
+  ]) assert.equal(classifyBlooketReadTabLoad(tab, SETS, true), "changed");
+});
+
 test("a complete tab with a pending navigation is not a stable read", () => {
   assert.equal(classifyBlooketReadTabLoad({ url: SETS,
     pendingUrl: SETS, status: "complete" }, SETS), "changed");

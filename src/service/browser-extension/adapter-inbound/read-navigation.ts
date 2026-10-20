@@ -72,10 +72,18 @@ export function snapshotBlooketReadTab(value: unknown):
 // a different pending URL also invalidates an otherwise matching old URL.
 export function classifyBlooketReadTabLoad(
   tab: ReadTab, target: string,
+  newlyCreated = false,
 ): "ready" | "loading" | "changed" {
   const owned = snapshotBlooketReadTab(tab);
   if (!owned) return "changed";
   tab = owned;
+  // Only a tab we just created for this exact target may briefly expose
+  // Chrome's initial about:blank document before it commits navigation.
+  // An existing teacher tab at that route is never adoptable evidence.
+  if (newlyCreated && tab.pendingUrl === undefined &&
+      tab.url === "about:blank" &&
+      (tab.status === "loading" || tab.status === "complete"))
+    return "loading";
   if (tab.pendingUrl !== undefined)
     return tab.pendingUrl === target && tab.status === "loading" &&
       (tab.url === undefined || tab.url === "" ||
