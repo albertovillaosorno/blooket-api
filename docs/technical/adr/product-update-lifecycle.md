@@ -68,7 +68,22 @@ manifest generation and transfers that public document with the exact archive.
 
 Verified metadata must match the selected release; actual archive bytes must
 match its signed size/hash. Apple trust and transactional installation remain
-independent mandatory checks.
+independent mandatory checks for the current automatic update path. A trusted
+personal ARM64 Mac can separately run and manually approve a locally built
+app without Apple Developer membership or a Team ID; those local permissions
+do not authenticate future downloadable releases or enable the updater.
+
+The no-Developer-ID personal deployment workflow is documented in the README.
+Personal Mac delivery explicitly does not require paid Apple Developer
+membership. A separate private-update trust mode must be engineered around
+independently pinned Ed25519 roots, exact code bytes and explicit macOS human
+approval before any unnotarized version can launch. It must also retain
+installation fences, safe restart, previous bundles and rollback.
+
+The existing
+Apple native assessment requires notarized Developer ID and stays fail closed;
+no automatic update path bypasses it today. Developer ID is an optional higher
+assurance public-distribution mode, not a prerequisite for local use.
 
 Release metadata production now has a bounded local implementation. It hashes
 the actual final ARM64 archive, validates its physical ZIP layout, and matches
