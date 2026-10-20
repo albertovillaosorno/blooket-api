@@ -77,6 +77,7 @@ function fakeChrome(options: {
   readonly savePersists?: boolean;
   readonly postSubmit429?: boolean;
   readonly postSubmitObservationLost?: boolean;
+  readonly postSubmitObservationMissing?: boolean;
   readonly postSubmitNavigationState?: string;
   readonly saveAckRejected?: boolean;
 }) {
@@ -137,6 +138,8 @@ function fakeChrome(options: {
           case "inspectBlooketPage":
             if (options.postSubmitObservationLost && questionAdded)
               throw Error("lost-post-submit-observation");
+            if (options.postSubmitObservationMissing && questionAdded)
+              return [{ result: null }];
             return [{
               result: {
                 ok: true,
@@ -363,6 +366,36 @@ test("a post-Save security challenge is never hidden by an older 429",
   assert.equal(fake.calls.filter(call =>
     call === "runBlooketAddQuestionPageAction:submit").length, 1);
   assert.equal(fake.calls.includes("reload"), false);
+});
+
+test("a same-set 429 stops an unexpected post-Save page promptly",
+  async () => {
+  const fake = fakeChrome({ postSubmit429: true,
+    postSubmitNavigationState: "unexpected-page" });
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "navigation",
+    state: "rate-limited" });
+  assert.ok(fake.calls.filter(call =>
+    call === "inspectBlooketPage").length <= 3,
+  "provider throttling must not wait through every unknown-page poll");
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
+  assert.equal(fake.calls.includes("reload"), false);
+});
+
+test("a same-set 429 short-circuits unavailable post-Save page reads",
+  async () => {
+  const fake = fakeChrome({ postSubmit429: true,
+    postSubmitObservationMissing: true });
+  const result = await createExtensionAddQuestionHost(fake.chrome, 7,
+    async () => undefined).addQuestion(input);
+  assert.deepEqual(result, { ok: false, kind: "navigation",
+    state: "rate-limited" });
+  assert.ok(fake.calls.filter(call =>
+    call === "inspectBlooketPage").length <= 3);
+  assert.equal(fake.calls.filter(call =>
+    call === "runBlooketAddQuestionPageAction:submit").length, 1);
 });
 
 test("a failed Save without linked 429 remains uncertain, not a replay",
