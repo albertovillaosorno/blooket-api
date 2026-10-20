@@ -679,6 +679,15 @@ with the Firefox add-on loaded from
 `$HOME/Applications/blooket-api/extensions/firefox/manifest.json`.
 Use `--status` to inspect the local service and `--stop` for clean shutdown.
 Running the launcher without `--no-open` uses your system default browser.
+To open Firefox explicitly without changing that default, use:
+
+```sh
+BLOOKET_BROWSER=firefox "$HOME/Applications/blooket-api/blooket-api"
+```
+
+The selection also applies to the Blooket tab opened from the app while its
+service is started with this environment. Only `firefox` and `default` are
+accepted; arbitrary executable paths and additional flags are not supported.
 
 Keep one service and one browser profile per computer; your Linux data and
 her macOS data, passwords, drafts and Blooket sessions stay on their own

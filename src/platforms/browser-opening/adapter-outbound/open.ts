@@ -80,16 +80,30 @@ export async function openLocalWorkspace(origin: string) {
   await openWithSystemBrowser(origin);
 }
 
+// A user may choose Firefox for a single launcher invocation without changing
+// the OS default. A closed enum prevents arbitrary executable/flag injection.
+export function browserLaunchCommand(
+  platform: NodeJS.Platform,
+  choice: string | undefined,
+  target: string,
+): { readonly executable: string; readonly args: string[] } {
+  if (choice !== undefined && choice !== "default" && choice !== "firefox")
+    throw new Error("browser-opening-unsupported-preference");
+  if (platform === "darwin") return choice === "firefox"
+    ? { executable: "/usr/bin/open", args: ["-a", "Firefox", target] }
+    : { executable: "/usr/bin/open", args: [target] };
+  if (platform === "linux") return choice === "firefox"
+    ? { executable: "/usr/bin/firefox", args: [target] }
+    : { executable: "/usr/bin/xdg-open", args: [target] };
+  throw new Error("browser-opening-unsupported");
+}
+
 async function openWithSystemBrowser(target: string): Promise<void> {
-  const executable =
-    process.platform === "darwin"
-      ? "/usr/bin/open"
-      : process.platform === "linux"
-        ? "/usr/bin/xdg-open"
-        : undefined;
-  if (!executable) throw new Error("browser-opening-unsupported");
+  const { executable, args } = browserLaunchCommand(
+    process.platform, process.env["BLOOKET_BROWSER"], target,
+  );
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(executable, [target], {
+    const child = spawn(executable, args, {
       stdio: "ignore",
       env: browserOpeningEnvironment(process.env),
     });

@@ -157,6 +157,12 @@ this final record.
 
 ## Evidence
 
+A 2026-10-20 red-to-green host regression added an explicit per-launch
+Firefox selection on Linux and macOS without changing the OS default browser.
+`BLOOKET_BROWSER=firefox` uses an allowlisted native executable/argument
+sequence and the existing reduced child environment; malformed preferences
+cannot become executable paths or injected flags.
+
 On 2026-10-20, the Firefox 158 browser was exercised with a temporary
 compiled Firefox WebExtension in an isolated headless profile. Mozilla's
 `web-ext lint --self-hosted --warnings-as-errors` found that the initial
