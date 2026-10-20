@@ -115,7 +115,9 @@ export async function buildFirefoxExtension(
     manifest.browser_specific_settings = {
       gecko: {
         id: "blooket-api@albertovillaosorno.github",
-        strict_min_version: "128.0",
+        // Mozilla's MV3 data-collection declaration needs Firefox 140+;
+        // the same declaration is supported on Android from 142.
+        strict_min_version: "142.0",
         data_collection_permissions: { required: ["none"] },
       },
     };

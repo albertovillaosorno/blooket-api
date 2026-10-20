@@ -60,6 +60,8 @@ test("Firefox build runs its MV3 background as a module document",
     assert.equal(manifest.background.type, "module");
     assert.equal(manifest.browser_specific_settings.gecko.id,
       "blooket-api@albertovillaosorno.github");
+    assert.equal(manifest.browser_specific_settings.gecko.strict_min_version,
+      "142.0");
     assert.deepEqual(manifest.browser_specific_settings.gecko
       .data_collection_permissions.required, ["none"]);
     assert.deepEqual(manifest.permissions, ["storage", "scripting"]);

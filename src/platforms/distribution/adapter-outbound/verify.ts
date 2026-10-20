@@ -190,6 +190,15 @@ export async function verifyDistribution(
     ]);
     assert.equal(firefoxManifest.browser_specific_settings.gecko.id,
       "blooket-api@albertovillaosorno.github");
+    assert.equal(
+      firefoxManifest.browser_specific_settings.gecko.strict_min_version,
+      "142.0",
+    );
+    assert.deepEqual(
+      firefoxManifest.browser_specific_settings.gecko
+        .data_collection_permissions.required,
+      ["none"],
+    );
     const firefoxWorker = await readFile(join(firefox,
       firefoxManifest.background.scripts[0]), "utf8");
     assert.ok(firefoxWorker.length > 100);

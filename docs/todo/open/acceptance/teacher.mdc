@@ -157,6 +157,19 @@ this final record.
 
 ## Evidence
 
+On 2026-10-20, the Firefox 158 browser was exercised with a temporary
+compiled Firefox WebExtension in an isolated headless profile. Mozilla's
+`web-ext lint --self-hosted --warnings-as-errors` found that the initial
+Firefox 128 minimum did not support the declared data-collection fields.
+The minimum is now Firefox 142, with zero linter errors or warnings.
+
+Native `web-ext run` installed the extension and a synthetic loopback page
+announced itself four times. A local refusal-only bridge recorded matching
+Firefox extension origin and correct bearer authentication on all four
+status requests, without pairing or opening a Blooket account tab.
+This verifies native Firefox extension execution and transport bootstrap;
+it does not establish live authenticated Blooket account acceptance.
+
 On 2026-10-15, a content-free authorized Chrome read found one same-origin
 HTTP 429 resource response on the provider Edit route during initial page
 loading. This is not a Save receipt, nor proof that the later Save was
