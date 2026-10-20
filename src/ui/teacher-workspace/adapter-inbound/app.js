@@ -108,11 +108,15 @@ const words = {
     updateChecking: "Buscando actualizaciones…",
     updateCurrent: "No hay una nueva versión disponible.",
     updateAvailable: "Hay una nueva versión disponible: ",
-    updateTrustPending: "La instalación automática aún está en preparación.",
+    updateTrustPending: "Instálala manualmente tras descargarla.",
+    downloadUpdate: "Descargar y verificar SHA-256",
+    downloadChecking: "Descargando y comprobando SHA-256 de GitHub…",
+    downloadComplete: "Archivo verificado. Instálalo manualmente: ",
+    downloadFailed: "La descarga no se pudo verificar. Nada se instaló.",
     updateIncompatible:
       "La nueva versión no tiene un archivo compatible con este equipo.",
     updateUnsupported:
-      "Este paquete de desarrollo para Linux no admite actualizaciones.",
+      "Todavía no hay paquetes compatibles para este sistema.",
     updateUnavailable:
       "No se pudo consultar GitHub. Puedes volver a intentarlo más tarde.",
     updateTimeout: "La consulta a GitHub tardó demasiado.",
@@ -458,11 +462,15 @@ const words = {
     updateChecking: "Checking for updates…",
     updateCurrent: "No new version is available.",
     updateAvailable: "A new version is available: ",
-    updateTrustPending: "Automatic installation is still in preparation.",
+    updateTrustPending: "Install manually after downloading.",
+    downloadUpdate: "Download and verify SHA-256",
+    downloadChecking: "Downloading and checking GitHub SHA-256…",
+    downloadComplete: "Verified file. Install it manually: ",
+    downloadFailed: "Could not verify the download. Nothing was installed.",
     updateIncompatible:
       "The new version has no compatible file for this computer.",
     updateUnsupported:
-      "This Linux development package does not support updates.",
+      "No compatible package is available for this system yet.",
     updateUnavailable: "GitHub could not be checked. You can try again later.",
     updateTimeout: "The GitHub check took too long.",
     updateCancelled: "The check was cancelled.",
@@ -736,6 +744,8 @@ let editorBusy = false,
   admissionFeasible = true,
   highQualityAdmitted = false;
 let updateDisplayTimer;
+let updateDownloadBusy = false;
+let updateDownloadMessage = "";
 let clipboardReading = false;
 let suggestions = [],
   searchIndex = [],
@@ -1760,6 +1770,13 @@ function renderUpdates() {
     ? Date.parse(updates.nextCheckAt) - Date.now()
     : 0;
   $("#checkUpdates").disabled = updates.phase === "checking" || wait > 0;
+  const digest = result?.status === "available"
+    ? result.asset?.digest : undefined;
+  const downloadable = updates.phase === "idle" &&
+    /^sha256:[0-9a-f]{64}$/u.test(digest ?? "");
+  $("#downloadUpdate").hidden = !downloadable;
+  $("#downloadUpdate").disabled = updateDownloadBusy;
+  $("#downloadUpdateResult").textContent = updateDownloadMessage;
   $("#updateRetry").textContent =
     wait > 0 ? t("updateRetryAt") + ": " + date(updates.nextCheckAt) : "";
   if (wait > 0) updateDisplayTimer = setTimeout(renderUpdates, wait + 1);
@@ -1994,7 +2011,25 @@ $("#installSafariExtension").addEventListener("click", async () => {
     button.disabled = false;
   }
 });
+$("#downloadUpdate").addEventListener("click", async () => {
+  if (updateDownloadBusy || $("#downloadUpdate").hidden) return;
+  updateDownloadBusy = true;
+  updateDownloadMessage = t("downloadChecking");
+  renderUpdates();
+  try {
+    const result = await api("/api/update-download", {});
+    updateDownloadMessage = result.status === "downloaded"
+      ? t("downloadComplete") + result.archivePath
+      : t("downloadFailed");
+  } catch {
+    updateDownloadMessage = t("downloadFailed");
+  } finally {
+    updateDownloadBusy = false;
+    renderUpdates();
+  }
+});
 $("#checkUpdates").addEventListener("click", async () => {
+  updateDownloadMessage = "";
   const previous = bootstrap.updates;
   if (!previous) return;
   bootstrap.updates = { ...previous, phase: "checking" };

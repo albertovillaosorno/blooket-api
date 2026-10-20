@@ -110,6 +110,8 @@ export function projectGithubReleases(value: unknown): unknown[] {
           size: asset["size"],
           state: asset["state"],
           url: asset["browser_download_url"],
+          ...(asset["digest"] === undefined || asset["digest"] === null
+            ? {} : { digest: asset["digest"] }),
         };
       }),
     };
@@ -226,7 +228,7 @@ export async function checkPublicUpdates(options: {
   readonly request?: typeof fetch;
   readonly timeoutMs?: number;
 }): Promise<UpdateCheckResult> {
-  if (options.target !== "darwin-arm64")
+  if (options.target !== "darwin-arm64" && options.target !== "linux-x64")
     return { status: "unsupported-platform" };
   const timeoutMs = options.timeoutMs ?? UPDATE_CHECK_TIMEOUT_MS;
   if (

@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, symlink, truncate, writeFile } from
   "node:fs/promises";
 import { join } from "node:path";
@@ -38,6 +39,8 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:net";
 import { startBrowserService } from
   "../../../../src/api/browser-service/adapter-inbound/server.ts";
+import { downloadGithubAsset } from
+  "../../../../src/platforms/update-downloads/adapter-outbound/github.ts";
 import { reserveDurableMutationStart } from
   "../../../../src/platforms/mutation-pacing-files/adapter-outbound/history.ts";
 import { createBlooketBrowserBridgeBroker } from
@@ -1605,3 +1608,69 @@ test("same extension ID with different browser profiles remains distinct",
   }
   },
 );
+
+test("personal GitHub archive download is local-only and bound to checked SHA",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "personal-update-service-"));
+  const tag = "v26.4.1";
+  const name = "linux-x64.tar.gz";
+  const bytes = Buffer.from("synthetic Linux release from GitHub");
+  const digest = "sha256:" + createHash("sha256")
+    .update(bytes).digest("hex");
+  const available = {
+    status: "available" as const, version: "26.4.1", tag,
+    releaseUrl: "https://github.com/albertovillaosorno/blooket-api" +
+      `/releases/tag/${tag}`,
+    asset: { id: 1, name, size: bytes.length,
+      url: "https://github.com/albertovillaosorno/blooket-api" +
+        `/releases/download/${tag}/${name}`,
+      state: "uploaded" as const, digest },
+    verificationRequired: true as const, skippedTags: 0,
+  };
+  let current: typeof available | null = null;
+  let downloads = 0;
+  const service = await startBrowserService({ root, port: 0,
+    updates: { status: () => ({ currentVersion: "26.4.0",
+      phase: "idle" as const, checkedAt: null, nextCheckAt: null,
+      result: current }),
+      check: async () => ({ currentVersion: "26.4.0",
+        phase: "idle" as const, checkedAt: null, nextCheckAt: null,
+        result: current }), close: () => {} },
+    downloadUpdate: async options => {
+      downloads++;
+      assert.equal(options.selection.asset.digest, available.asset.digest);
+      assert.equal(options.target, "linux-x64");
+      assert.equal(options.directory, join(root, "updates", "downloads"));
+      return await downloadGithubAsset({ ...options,
+        fetch: async () => new Response(bytes),
+      });
+    },
+  });
+  try {
+    const boot = await (await fetch(service.origin + "/api/bootstrap"))
+      .json() as { csrf: string };
+    const post = (value: object, csrf = boot.csrf) => fetch(
+      service.origin + "/api/update-download", {
+        method: "POST", headers: { "Content-Type": "application/json",
+          "X-CSRF-Token": csrf, Origin: service.origin },
+        body: JSON.stringify(value),
+      });
+    assert.equal((await post({})).status, 409);
+    assert.equal((await post({}, "invalid")).status, 403);
+    current = available;
+    assert.equal((await post({ path: "/arbitrary" })).status, 400);
+    const response = await post({});
+    assert.equal(response.status, 200);
+    const result = await response.json() as {
+      status: string; archivePath: string; digest: string;
+    };
+    assert.equal(result.status, "downloaded");
+    assert.equal(result.digest, digest);
+    assert.deepEqual(await readFile(result.archivePath), bytes);
+    assert.equal(downloads, 1);
+  } finally {
+    service.server.close();
+    service.server.closeAllConnections();
+    await rm(root, { recursive: true, force: true });
+  }
+});

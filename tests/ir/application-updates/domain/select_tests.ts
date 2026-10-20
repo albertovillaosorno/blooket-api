@@ -83,10 +83,11 @@ test(
   assert.equal(selected.version, "26.4.10");
   assert.equal(selected.verificationRequired, true);
   assert.equal(selected.asset.name, "darwin-arm64.zip");
-  assert.equal(
-    choose([release("26.4.1", 1, ["linux-x64.zip"])], "linux-x64").status,
-    "unsupported-platform",
-  );
+  assert.equal(choose([release("26.4.1", 1,
+    ["linux-x64.tar.gz"])], "linux-x64").status, "available");
+  assert.equal(choose([release("26.4.1")], "linux-x64").status,
+    "incompatible-asset");
+  assert.equal(choose([], "windows-x64").status, "unsupported-platform");
 });
 
 test(
@@ -145,5 +146,5 @@ test("wrong and duplicate assets never fall back to an older candidate", () => {
       reason: "duplicate",
     },
   );
-  assert.equal(choose([], "linux-x64").status, "unsupported-platform");
+  assert.equal(choose([], "linux-x64").status, "current");
 });

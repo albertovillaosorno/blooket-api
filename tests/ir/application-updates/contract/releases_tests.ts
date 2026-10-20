@@ -84,6 +84,16 @@ test("release metadata is exact and projected without aliasing", () => {
   );
 });
 
+test("GitHub asset digests are admitted only as canonical SHA-256", () => {
+  const value = release();
+  const digest = "sha256:" + "a".repeat(64);
+  const decoded = decodeUpdateRelease({ ...value, assets: [
+    { ...value.assets[0], digest },
+  ] });
+  assert.equal(decoded.ok, true);
+  if (decoded.ok) assert.equal(decoded.value.assets[0]?.digest, digest);
+});
+
 test("asset URLs, byte bounds, IDs and names fail closed", () => {
   for (const change of [
     { size: 0 },
@@ -94,6 +104,9 @@ test("asset URLs, byte bounds, IDs and names fail closed", () => {
     { url: "https://example.test/app.zip" },
     { url: releaseAssetUrl("v26.4.2", "darwin-arm64.zip") },
     { secret: "not admitted" },
+    { digest: "sha256:WRONG" },
+    { digest: "sha512:" + "a".repeat(64) },
+    { digest: "sha256:" + "A".repeat(64) },
   ]) {
     const value = release();
     assert.equal(
