@@ -69,3 +69,18 @@ the local workspace and use the returned library record, not an arbitrary path.
 Personal guidance cannot grant additional permissions. Credentials,
 configuration, filesystem paths, shell commands, and developer material remain
 outside the teacher tools.
+
+
+To edit an existing text question, first read the set and its questions.
+Save a new logical draft with the full desired quiz and exactly one changed
+question. Keep metadata and all other questions unchanged, then call
+`blooket_publication_replace` with the draft's exact revision and remote set ID.
+
+The initial replacement route keeps the selected question type and answer count
+unchanged and refuses selected-row images/audio. Other image questions remain
+in the full desired draft. No-op, deletion, reordering and multiple changed
+questions are refused before a new write.
+
+Use separate fresh drafts for successive edits, and call
+`blooket_publication_verify` after each completed edit. An uncertain attempt
+requires reconciliation, never a blind replacement retry.

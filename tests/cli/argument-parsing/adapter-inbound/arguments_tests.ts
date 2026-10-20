@@ -179,3 +179,18 @@ test("publication arguments require a saved revision and bounded draft ID",
       ["publication", "delete", "lesson-fixture"],
     ]) assert.equal(parseCliArguments(args).ok, false);
   });
+
+
+test("replacement CLI requires a saved revision and exact remote set", () => {
+  const revision = "b".repeat(64);
+  assert.deepEqual(parseCliArguments([
+    "publication", "replace", "edit-fixture", revision, "remote-set", "--json",
+  ]), { ok: true, invocation: {
+    kind: "blooket-publication", command: "blooket.publication.replace",
+    payload: { draftId: "edit-fixture", expectedRevision: revision,
+      remoteSetId: "remote-set" }, json: true,
+  } });
+  assert.equal(parseCliArguments([
+    "publication", "replace", "edit-fixture", revision,
+  ]).ok, false);
+});

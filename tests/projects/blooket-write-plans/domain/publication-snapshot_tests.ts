@@ -174,3 +174,32 @@ test("publication snapshots refuse accessors and hidden root fields",
   assert.equal(evaluated, 0);
   },
 );
+
+
+test("version four replacement snapshots retain an owned previous row", () => {
+  const snapshot = { ...legacy, schemaVersion: 4,
+    expectedMedia: { schemaVersion: 1, items: [] },
+    target: { remoteSetId: "existing-set", baseline: {
+      schemaVersion: 1, kind: "question-list", itemCount: 1,
+      sha256: "a".repeat(64),
+    }, previous: { schemaVersion: 3, number: 1, question: "Old prompt.",
+      equation: null, qType: "typing", random: true, timeLimit: 10,
+      answers: [{ kind: "text", content: "old", correct: true,
+        match: "exactly" }], hasImage: false, hasAudio: false,
+    } },
+  };
+  const decoded = decodeBlooketPublicationSnapshot(snapshot, "fixture");
+  assert.ok(decoded && decoded.plan.schemaVersion === 3);
+  assert.equal(decoded.plan.operations[0].kind, "replace-question");
+  assert.equal(decoded.plan.operations[0].questionCount, 1);
+  snapshot.target.previous.question = "Caller changed its row.";
+  assert.equal(decoded.plan.operations[0].previous.question, "Old prompt.");
+  assert.equal(decodeBlooketPublicationSnapshot({ ...snapshot,
+    schemaVersion: 3,
+  }, "fixture"), undefined);
+  assert.equal(decodeBlooketPublicationSnapshot({ ...snapshot,
+    target: { ...snapshot.target, previous: {
+      ...snapshot.target.previous, number: 2,
+    } },
+  }, "fixture"), undefined);
+});

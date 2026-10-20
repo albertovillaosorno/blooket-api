@@ -184,9 +184,9 @@ A later native-contract change cannot make an old attempting journal disappear:
 status and read-only reconciliation remain available even when a new write
 would fail today's provider-text preflight.
 
-This initial existing-set workflow only appends. It refuses replacements,
-deletions, reordering or metadata changes; in-place question editing remains
-pending in `blooket-11`. Portable transport coverage is not live acceptance.
+The append workflow refuses replacements, deletions, reordering and metadata
+changes. A separate single-question replacement command handles admitted edits;
+portable transport coverage is not live acceptance.
 
 Internal replacement planning now has schema three, with one distinct
 `replace-question` operation, the entire original question digest and a copied
@@ -198,8 +198,23 @@ The executor requires the frozen original digest before opening the journal.
 Differential verification replaces the single matching new row with its exact
 prior row and requires the full original digest plus a second independent
 saved read. Real-file regressions recover a lost reply without another write
-and refuse concurrent changes. This internal engine does not yet expose a
-replacement CLI/MCP command or implement the native edit form.
+and refuse concurrent changes.
+
+Version-four publication snapshots persist the desired full draft, expected
+media identities, original collection baseline and copied prior row. Canonical
+CLI/MCP `replace` admission requires exactly one changed existing question and
+an unchanged native type/answer count. Selected-row media is refused before
+snapshot creation. Other unchanged prepared image questions retain their exact
+expected identities.
+
+A loaded companion declaration is required before a new
+replacement attempt; final metadata and full baseline checks run after pacing.
+
+The browser opens the existing card's inner Edit button and changes visible
+React controls while retaining provider-owned extra fields internally.
+A single latched Save requires a matching saved row after reload and unchanged
+collection count. The shared verifier still checks every other row before
+advancement. Live native replacement acceptance remains pending.
 
 
 Version-one snapshots remain text-only and retain their existing checkpoint and

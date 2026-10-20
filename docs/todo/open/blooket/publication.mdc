@@ -73,6 +73,14 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, canonical `publication replace` and registered
+`blooket_publication_replace` were connected to version-four snapshots and the
+single-row replacement executor. Portable tests demonstrate one changed row,
+unchanged count, final verification, retained uncertain writes and recovery
+without resubmission. No-op/multi-row edits, unsupported layouts, stale metadata
+and an old loaded companion stop before the attempt journal. Live replacement
+and uninterrupted multi-question acceptance remain pending.
+
 On 2026-10-20 at 20:02 UTC, registered MCP tool handlers read the real private
 image quiz, saved its full desired draft, appended a typing question and
 separately verified `published: true`. The prior image question stayed intact;

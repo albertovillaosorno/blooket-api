@@ -202,6 +202,11 @@ test(
       assert.ok(append);
       assert.deepEqual(append.inputSchema.required,
         ["draftId", "expectedRevision", "remoteSetId"]);
+      const replacement = listed.result.tools.find(tool =>
+        tool.name === "blooket_publication_replace");
+      assert.ok(replacement);
+      assert.deepEqual(replacement.inputSchema.required,
+        ["draftId", "expectedRevision", "remoteSetId"]);
       const enrichment = listed.result.tools.find(
         (tool) => tool.name === "library_enrich",
       );

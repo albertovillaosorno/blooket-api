@@ -249,7 +249,7 @@ test("local reads and MCP traverse the real CLI and service bridge",
     assert.equal(
       listTeacherTools().filter((tool) => tool.name.startsWith("blooket_"))
         .length,
-      10,
+      11,
     );
     assert.equal(JSON.stringify(mcp).includes(bridge.pairingToken()), false);
     legacyList = true;
@@ -341,6 +341,8 @@ test("MCP publication crosses CLI service and journaled browser transport",
           confirmationInspections++;
           value = { createSetConfirmation: "reload-and-privacy-v1",
             textCapabilityScope: "stable-my-sets-v1" }; break;
+        case "writes.inspect-replacement":
+          value = { questionReplacement: "single-row-reload-v1" }; break;
         case "sets.list": value = {
           items: remote ? [{ schemaVersion: 1, id: remote["id"],
             title: remote["title"] }] : [],
@@ -355,8 +357,9 @@ test("MCP publication crosses CLI service and journaled browser transport",
             visibility: request.private ? "private" : "public" };
           value = { ok: true, remoteSetId: remote["id"] }; break;
         case "questions.create":
+        case "questions.replace": {
           mutations.push(request.kind);
-          questions.push({ schemaVersion: 3, number: request.number,
+          const row = { schemaVersion: 3, number: request.number,
             question: request.question, equation: null,
             qType: request.qType, random: request.random,
             timeLimit: request.timeLimit, hasImage: false, hasAudio: false,
@@ -364,8 +367,13 @@ test("MCP publication crosses CLI service and journaled browser transport",
               kind: "text", content: answer.text, correct: answer.correct,
               match: request.answerTypes?.[index] ?? null,
             })),
-          });
+          };
+          if (request.kind === "questions.replace") {
+            assert.equal(request.replacement?.questionCount, questions.length);
+            questions[request.number - 1] = row;
+          } else questions.push(row);
           value = { ok: true }; break;
+        }
         default: throw new Error("Unexpected publication bridge command.");
       }
       assert.ok(bridge.complete(bridge.pairingToken(), {
@@ -470,6 +478,46 @@ test("MCP publication crosses CLI service and journaled browser transport",
       assert.equal(questions[0]?.["question"], "Type sun.");
       assert.equal(questions[1]?.["question"], "Type moon.");
       assert.equal(confirmationInspections, 4);
+      const original = await executeJsonCommand("drafts.get", {
+        id: "append-fixture",
+      }, "cli:edit-source", root);
+      assert.ok(original.ok);
+      const desired = structuredClone((original.value as {
+        document: { questions: { prompt: string; timeLimitSeconds: number }[] };
+      }).document);
+      desired.questions[1]!.prompt = "Type planet.";
+      desired.questions[1]!.timeLimitSeconds = 35;
+      const savedEdit = await callTeacherTool("drafts_put", {
+        id: "edit-fixture", expectedRevision: null, document: desired,
+      }, root);
+      assert.equal(savedEdit.isError, false);
+      const editDraft = decodeResultEnvelope(
+        JSON.parse(savedEdit.content[0]!.text));
+      assert.ok(editDraft.ok && editDraft.value.ok);
+      if (!editDraft.ok || !editDraft.value.ok) throw Error("draft-refused");
+      const edited = await callTeacherTool("blooket_publication_replace", {
+        draftId: "edit-fixture", remoteSetId: "synthetic-created",
+        expectedRevision: (editDraft.value.value as { revision: string })
+          .revision,
+      }, root);
+      assert.equal(edited.isError, false, edited.content[0]?.text);
+      const verifiedEdit = await callTeacherTool("blooket_publication_verify", {
+        draftId: "edit-fixture",
+      }, root);
+      assert.equal(verifiedEdit.isError, false, verifiedEdit.content[0]?.text);
+      const editProof = decodeResultEnvelope(
+        JSON.parse(verifiedEdit.content[0]!.text));
+      assert.ok(editProof.ok && editProof.value.ok);
+      if (editProof.ok && editProof.value.ok)
+        assert.equal((editProof.value.value as { published: boolean })
+          .published,
+          true);
+      assert.deepEqual(mutations, ["sets.create", "questions.create",
+        "questions.create", "questions.replace"]);
+      assert.equal(questions.length, 2);
+      assert.equal(questions[0]?.["question"], "Type sun.");
+      assert.equal(questions[1]?.["question"], "Type planet.");
+      assert.equal(questions[1]?.["timeLimit"], 35);
     } finally {
       clearInterval(poll);
       bridge.close();
