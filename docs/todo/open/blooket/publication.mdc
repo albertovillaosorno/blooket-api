@@ -73,6 +73,21 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, a read-only Chrome extension-isolated-world probe found the
+prior replacement form's `submit-attempted` latch. Only one provider `fetch`
+was recorded after Save; its observed response status was HTTP 429, matching
+the exact same-set Edit route. No response bodies, account secrets or
+question text were read. This identifies provider throttling as the observed
+reason remote persistence was not confirmed, but a 429 never proves that
+no mutation can arrive late or authorizes another Save.
+
+A red-to-green regression exposed that losing the first post-Save page
+observation discarded the safe rate-limit diagnostic. The question host now
+checks the owned, post-submit 429 after an unclassified observation failure
+without replaying submission. Explicit security challenges and expired
+sessions take precedence even when older 429 evidence exists. The original
+live attempt journal is deliberately left untouched.
+
 A later 2026-10-20 owner-authorized Chrome continuation loaded the fixed
 companion, restored the existing My Sets session, and completed canonical
 reads of 17 sets and exactly two saved questions, retaining the first image.
