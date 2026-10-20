@@ -679,6 +679,18 @@ with the Firefox add-on loaded from
 `$HOME/Applications/blooket-api/extensions/firefox/manifest.json`.
 Use `--status` to inspect the local service and `--stop` for clean shutdown.
 Running the launcher without `--no-open` uses your system default browser.
+
+To add Blooket API to the Linux desktop applications menu, explicitly run:
+
+```sh
+"$HOME/Applications/blooket-api/install-desktop-shortcut"
+```
+
+This writes only `~/.local/share/applications/blooket-api.desktop`, without
+`sudo`. It refuses to replace an existing desktop entry. Move the installed
+package only after removing that shortcut yourself; it records the exact
+location of the executable and the icon. No menu item is added automatically.
+
 To open Firefox explicitly without changing that default, use:
 
 ```sh
@@ -769,13 +781,32 @@ removes the index entry. See [the record workflow](docs/todo/README.md).
 Configuration includes a manual “Check for updates” action with current
 version, last-check time, and EN/ES status. It uses anonymous public metadata
 with bounded requests, runs only when requested, and distinguishes unavailable
-GitHub from “no new version”. Linux supports personal manual installation,
-but does not yet have an automatic update installer.
+GitHub from “no new version”. Linux supports personal manual installation and
+on-demand, verified GitHub downloads.
 
-[Automatic updates](docs/todo/open/delivery/updates.mdc) are planned, not
-implemented. They will use final public GitHub Releases without a teacher GitHub
-account, with independent opt-in update and launch-at-login preferences, trusted
-artifacts, safe restart, and retained data. Both preferences default off.
+In Settings, select
+**Check for updates**, then **Download and verify SHA-256** when a newer Linux
+release exposes a GitHub digest. Blooket API checks the release in the fixed
+repository, streams the archive to your private user-data directory, and
+compares its exact byte count and SHA-256 to GitHub's API before showing the
+verified archive path. No Apple Developer membership or Mac CI is involved.
+
+The release job now publishes verified `linux-x64.tar.gz` from Ubuntu only;
+optional Mac/Safari CI does not block Linux. A GitHub digest verifies that
+downloaded bytes match that release asset. It does not independently verify
+who controlled the publishing GitHub account. Missing hashes, wrong bytes,
+unexpected redirects and incomplete downloads never produce usable archives.
+
+**Installation is manual for now.** Stop Blooket API via `--stop`, preserve
+the existing extracted package as a backup, and unpack the verified archive
+into a separate new directory. After confirming the new executable launches
+and your existing data remains available, switch your launcher/shortcut to
+that directory. If it fails, point the shortcut back to the preserved old
+package. Do not delete the old app or its user-data directory.
+
+[Personal update delivery](docs/todo/open/delivery/updates.mdc) records the
+implemented check/download and the remaining automatic replacement work.
+Background checking, unattended installs and rollback are not enabled.
 
 Configuration controls packaged Mac login registration through Service
 Management, including pending approval and explicit removal. Linux reports an
@@ -783,6 +814,6 @@ unsupported login control; native Mac/Safari assurance belongs to P4.
 
 The [release/update decision](docs/technical/adr/product-update-lifecycle.md)
 defines one version authority and required package projections. An unavailable
-release source must report a failure rather than “no new version”; trusted
-update metadata and publisher verification are prerequisites, not current
-pipeline claims.
+release source must report a failure rather than “no new version”.
+Authenticated GitHub asset URLs and SHA-256 are the download boundary;
+installed-package replacement is deliberately manual.

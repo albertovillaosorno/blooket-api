@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+An opt-in Linux desktop shortcut is now packaged with the x64 executable.
+Native Linux smoke ran the packaged `install-desktop-shortcut` against a
+synthetic user home: first install succeeded, while the second refused to
+replace the existing entry. Portable tests also refuse unsafe executable
+paths and keep the menu separate from service start and user data. Real
+machine-wide installation and personal menus were not modified.
+
 A 2026-10-20 red-to-green host regression added an explicit per-launch
 Firefox selection on Linux and macOS without changing the OS default browser.
 `BLOOKET_BROWSER=firefox` uses an allowlisted native executable/argument

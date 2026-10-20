@@ -161,6 +161,15 @@ export async function verifyDistribution(
       assert.ok(loginAgentPlist.includes("<key>RunAtLoad</key>"));
       assert.ok(!loginAgentPlist.includes("KeepAlive"));
     }
+    if (!mac) {
+      const shortcut = join(root, "install-desktop-shortcut");
+      const script = await readFile(shortcut, "utf8");
+      assert.ok(script.startsWith("#!/bin/sh\nset -eu\n"));
+      assert.ok(script.includes("adapter-inbound/linux-menu.ts"));
+      const info = await import("node:fs/promises").then(fs =>
+        fs.stat(shortcut));
+      assert.ok(info.mode & 0o111);
+    }
     const names = await readdir(app);
     assert.ok(!names.includes(".env") && !names.includes("reference"));
     await assert.rejects(access(join(app, "docs/agents/AGENTS-DEV.md")));
