@@ -64,6 +64,7 @@ function fixture(options: {
   readonly hydrateAfterMs?: number;
   readonly scriptLatencyMs?: number;
   readonly uncommittedForMs?: number;
+  readonly initialBlankForMs?: number;
   readonly pendingDestination?: string;
 } = {}) {
   const events: string[] = [];
@@ -90,6 +91,9 @@ function fixture(options: {
       get: async id => {
         assert.equal(id, 84);
         events.push("get");
+        if (options.initialBlankForMs !== undefined &&
+            now - 1_000 < options.initialBlankForMs)
+          return { id, url: "about:blank", status: "complete" };
         if (options.uncommittedForMs !== undefined &&
             now - 1_000 < options.uncommittedForMs)
           return { id, pendingUrl: options.pendingDestination ?? MY_SETS,
@@ -279,6 +283,24 @@ test("new capability tabs can have only pendingUrl before navigation commits",
     assert.equal(page.removed(), true);
     assert.ok(page.elapsed() >= 150);
   });
+
+test("a new Chrome blank capability tab can commit without a new profile",
+  async () => {
+  const page = fixture({ initialBlankForMs: 150 });
+  assert.equal((await page.inspect()).ok, true);
+  assert.equal(page.removed(), true);
+  assert.ok(page.elapsed() >= 150);
+  assert.equal(page.events.filter(name => name === "create").length, 1);
+});
+
+test("a stuck blank capability tab never accesses a provider page",
+  async () => {
+  const page = fixture({ initialBlankForMs: 4_000 });
+  assert.deepEqual(await page.inspect(),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.removed(), true);
+  assert.ok(!page.events.includes("inspectBlooketPage"));
+});
 
 test("a foreign pending capability navigation is never inspected", async () => {
   const page = fixture({ uncommittedForMs: 150,

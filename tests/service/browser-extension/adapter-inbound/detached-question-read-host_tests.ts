@@ -46,7 +46,7 @@ type Behavior = "normal" | "redirect" | "challenge" | "drift" |
   "challenge-after-shell" | "accessor-state" | "challenge-after-scan" |
   "hidden-ok-after-scan" | "uncommitted" |
   "pending-after-shell" | "pending-after-scan" |
-  "create-accessor" | "get-accessor";
+  "create-accessor" | "get-accessor" | "initial-blank" | "stuck-blank";
 
 function fixture(behavior: Behavior = "normal") {
   const events: string[] = [];
@@ -81,6 +81,9 @@ function fixture(behavior: Behavior = "normal") {
             behavior === "pending-after-scan" && calls >= 3)
           return { id, url: TARGET, status: "complete",
             pendingUrl: "https://foreign.invalid/" };
+        if ((behavior === "initial-blank" && tabReads <= 2) ||
+            behavior === "stuck-blank")
+          return { id, url: "about:blank", status: "complete" };
         if (behavior === "uncommitted" && tabReads <= 2)
           return { id, status: "loading", pendingUrl: TARGET };
         const tab = {
@@ -208,6 +211,25 @@ test("an initial pendingUrl can commit before a detached question scan",
     assert.equal(page.closed(), true);
     assert.equal(page.events.filter(event => event === "create").length, 1);
   });
+
+test("a fresh Chrome blank tab may commit before question inspection",
+  async () => {
+  const page = fixture("initial-blank");
+  assert.deepEqual(await page.inspect(), { ok: true, value: [] });
+  assert.equal(page.closed(), true);
+  assert.equal(page.events.filter(name => name === "create").length, 1);
+  assert.equal(page.events.filter(name => name === "remove").length, 1);
+});
+
+test("an uncommitted Chrome blank tab never authorizes a page script",
+  async () => {
+  const page = fixture("stuck-blank");
+  assert.deepEqual(await page.inspect(),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.closed(), true);
+  assert.equal(page.events.some(name =>
+    name === "inspectBlooketDocumentOrigin"), false);
+});
 
 test("never-hydrated and replaced detached documents do not become receipts",
   async () => {

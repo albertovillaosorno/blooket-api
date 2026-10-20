@@ -84,7 +84,7 @@ export async function inspectDetachedBlooketCapabilities(
         await chrome.tabs.get(tabId!),
       );
       if (!tab) return failed();
-      const load = classifyBlooketReadTabLoad(tab, MY_SETS);
+      const load = classifyBlooketReadTabLoad(tab, MY_SETS, true);
       if (load === "changed") return failed();
       if (load === "ready") { ready = true; break; }
       await pause(50);
