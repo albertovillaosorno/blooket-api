@@ -66,11 +66,18 @@ Decoding rejects a different or missing target, including old unbound progress.
 The same attempt journal, pacing, media admission, reconciliation and atomic
 persistence execute each new question without a second publication loop.
 
-Before every append, remote metadata and the entire completed question prefix
-must still match the frozen intent and original baseline. The executor's later
-baseline capture must also match that preflight collection before a write-ahead
-journal can start, detecting changes during intervening session/media awaits.
-Uncertain attempts require local recovery before another write.
+Before every question write, remote metadata and the entire completed question
+prefix must still match the frozen intent and original baseline. The executor
+captures questions before pacing, then checks metadata and captures questions
+again after pacing and media admission, before opening the write-ahead journal.
+The final collection must match the earlier collection.
+
+Metadata is queried only at that final boundary: the native Edit Info opener
+performs a provider
+request, so repeating it during planning and early preflight can trigger rate
+limiting without granting any additional mutation authority. An omitted internal
+capture phase uses final checks. Uncertain attempts require local recovery
+before another write.
 
 Checkpoint and verification-baseline decoders accept only own data fields;
 accessors and inherited values never authorize progress or read-back claims.

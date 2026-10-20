@@ -731,6 +731,74 @@ test("append detects a teacher edit between preflight and journal capture",
     assert.equal(s.questions[0]?.timeLimit, 40);
   }));
 
+for (const append of [false, true]) {
+  test(`${append ? "append" : "new quiz"} checks metadata once after pacing`,
+    () => fixture(async s => {
+      const request = append ? await appendFixture(s) :
+        command("step", s.revision);
+      if (!append) value(await executeBlooketPublicationCommand(request,
+        s.host));
+      const calls: string[] = [];
+      const host: BlooketPublicationDependencies = { ...s.host,
+        pacer: { acquire: async signal => {
+          calls.push("pace");
+          return s.host.pacer.acquire(signal);
+        } },
+        blooket: { ...s.host.blooket,
+          sets: { ...s.host.blooket.sets, get: async (...args) => {
+            calls.push("metadata");
+            assert.equal(calls.filter(call => call === "metadata").length, 1);
+            assert.ok(calls.includes("pace"));
+            return s.host.blooket.sets.get(...args);
+          } },
+          questions: { list: async (...args) => {
+            calls.push("questions");
+            return s.host.blooket.questions!.list(...args);
+          } },
+        },
+        writes: { execute: async (...args) => {
+          assert.deepEqual(calls.slice(-2), ["metadata", "questions"]);
+          calls.push("write");
+          return s.host.writes.execute(...args);
+        } },
+      };
+      const result = value(await executeBlooketPublicationCommand(request,
+        host));
+      assert.equal(result["phase"], "advanced");
+      assert.equal(calls.filter(call => call === "metadata").length, 1);
+      assert.equal(s.writes(), append ? 3 : 2);
+    }));
+
+  test(`${append ? "append" : "new quiz"} stops at final metadata failure`,
+    () => fixture(async s => {
+      const request = append ? await appendFixture(s) :
+        command("step", s.revision);
+      if (!append) value(await executeBlooketPublicationCommand(request,
+        s.host));
+      let paced = false;
+      const host: BlooketPublicationDependencies = { ...s.host,
+        pacer: { acquire: async signal => {
+          paced = true;
+          return s.host.pacer.acquire(signal);
+        } },
+        blooket: { ...s.host.blooket, sets: {
+          ...s.host.blooket.sets, get: async () => {
+            assert.equal(paced, true);
+            return { ok: false, code: "blooket-browser-failed" };
+          },
+        } },
+      };
+      const result = await executeBlooketPublicationCommand(request, host);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.issues[0]?.path,
+        "$.publication.verification-baseline");
+      assert.equal(s.writes(), append ? 2 : 1);
+      const files = await publicationFiles(s.root,
+        append ? "extension" : "fixture");
+      await assert.rejects(readFile(files.attempt), { code: "ENOENT" });
+    }));
+}
+
 test("append refuses metadata changed during pacing before the journal",
   () => fixture(async s => {
     const request = await appendFixture(s);

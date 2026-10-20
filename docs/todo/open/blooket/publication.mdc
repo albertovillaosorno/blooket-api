@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-20, a fresh unclaimed backend tab completed a canonical metadata
+read. The next append preflight encountered HTTP 429 on another native Edit
+Info request before any image upload or question Save. Publication now avoids
+redundant planning/early metadata requests and checks metadata once after
+pacing and media admission, immediately before the final question baseline
+and attempt journal.
+
+Both initial creation and append keep this final gate.
+Regression coverage requires one late metadata read and no journal or mutation
+on a failed read; existing privacy and question conflict cases remain enforced.
+This change is not yet live image-publication acceptance.
+
 On 2026-10-20, live canonical preflight lost its bridge while the local
 workspace announced during a Blooket navigation. The announcement mistook a
 pending URL for a missing backend, created a replacement tab and retired the

@@ -436,6 +436,7 @@ async function captureVerificationBaseline(
   verifier: BlooketWriteVerificationPort | undefined,
   operation: Parameters<BlooketWriteVerificationPort["captureBaseline"]>[0],
   checkpoint: BlooketWriteCheckpoint,
+  phase: "before-pacing" | "before-attempt",
   required = false,
 ): Promise<CapturedVerificationBaseline> {
   const missing = (): CapturedVerificationBaseline => required ? {
@@ -453,6 +454,7 @@ async function captureVerificationBaseline(
     captured = await verifier.captureBaseline(
       operation,
       { remoteSetId: checkpoint.remoteSetId },
+      phase,
     );
   } catch {
     return {
@@ -621,6 +623,7 @@ async function executePersistedBlooketWriteLocked(
     verifier,
     prepared.operation,
     prepared.checkpoint,
+    "before-pacing",
     options.requireVerificationBaseline,
   );
   if (!baseline.ok) {
@@ -728,6 +731,7 @@ async function executePersistedBlooketWriteLocked(
     verifier,
     prepared.operation,
     prepared.checkpoint,
+    "before-attempt",
     options.requireVerificationBaseline,
   );
   if (!currentBaseline.ok) {
