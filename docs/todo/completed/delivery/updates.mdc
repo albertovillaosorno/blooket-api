@@ -76,6 +76,10 @@ The local Settings update check and authenticated same-origin download endpoint
 use exact GitHub repository/tag/asset selection, GitHub's `sha256:` digest,
 exclusive private archive staging and fail-closed size/redirect tests.
 
+A 2026-10-20 regression additionally preserves Linux updates when the newest
+GitHub tag contains only a Mac archive: the selector chooses the newest newer
+Linux-compatible tagged asset. The Mac selector keeps its existing behavior.
+
 The focused `github_tests.ts` tests validate the downloaded archive bytes and
 failure outcomes without touching installed applications. The localhost server
 synthetic integration tests exercise the update action and CSRF protection.
