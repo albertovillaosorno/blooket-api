@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { browserOpeningEnvironment } from
+import { browserOpeningEnvironment, browserLaunchCommand } from
   "../../../../src/platforms/browser-opening/adapter-outbound/open.ts";
 
 test("browser opening excludes application and tunnel credentials", () => {
@@ -55,4 +55,28 @@ test("browser opening excludes application and tunnel credentials", () => {
     DESKTOP_STARTUP_ID: "synthetic-startup",
     DBUS_SESSION_BUS_ADDRESS: "unix:path=/fixture",
   });
+});
+
+// Opening Firefox explicitly must never interpret an environment value as a
+// command, executable path, URL, or injected flag.
+test("Firefox preference does not alter Linux's default browser", () => {
+  const target = "http://127.0.0.1:2607/";
+  assert.deepEqual(browserLaunchCommand("linux", undefined, target), {
+    executable: "/usr/bin/xdg-open", args: [target],
+  });
+  assert.deepEqual(browserLaunchCommand("linux", "firefox", target), {
+    executable: "/usr/bin/firefox", args: [target],
+  });
+  assert.deepEqual(browserLaunchCommand("darwin", "firefox", target), {
+    executable: "/usr/bin/open", args: ["-a", "Firefox", target],
+  });
+  assert.deepEqual(browserLaunchCommand("darwin", "default", target), {
+    executable: "/usr/bin/open", args: [target],
+  });
+  for (const value of ["", " FIREFOX", "firefox --private-window",
+    "../firefox", "/usr/bin/firefox", "chrome", "firefox\n--profile", "0"])
+    assert.throws(() => browserLaunchCommand("linux", value, target),
+      /browser-opening-unsupported-preference/u);
+  assert.throws(() => browserLaunchCommand("win32", "firefox", target),
+    /browser-opening-unsupported/u);
 });
