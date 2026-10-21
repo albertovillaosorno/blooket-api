@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A separate 2026-10-21 red-to-green drift regression found five independently
+injected question-read functions that still admitted clicks and positive
+read observations behind visible native HTML dialogs and ARIA alertdialogs.
+All now reject the visible human-owned overlay before enumerating, opening,
+inspecting or closing a question panel. The sanitized suite proves no Save
+is attempted; the disconnected browser session did not provide new live
+provider DOM evidence.
+
 A 2026-10-21 red-to-green provider-drift regression found that the eight
 isolated capability helpers blocked visible ARIA alertdialogs but still
 admitted a visible native `dialog[open]` without ARIA attributes. Their
