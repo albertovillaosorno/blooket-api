@@ -32,7 +32,8 @@
 export type BlooketQuestionWriteStage =
   | "no-owner" | "unavailable" | "replaced-document" | "detached-form"
   | "interrupted" | "opening" | "awaiting-controls" | "controls-prepared"
-  | "awaiting-finalization" | "ready-for-save" | "submit-attempted";
+  | "awaiting-finalization" | "ready-for-save" | "submit-attempted"
+  | "post-submit-interrupted";
 
 export interface BlooketQuestionWriteStageRead {
   readonly kind: "blooket-question-write-stage";
@@ -69,7 +70,8 @@ export function inspectBlooketQuestionWriteStage():
     // A submit latch is set synchronously *before* the single provider click.
     // It remains evidence of an attempted write even if React unmounts the
     // form immediately afterwards. It is never proof of remote persistence.
-    if (own("submitted") === true) return result("submit-attempted");
+    if (own("submitted") === true) return result(
+      own("dirty") === true ? "post-submit-interrupted" : "submit-attempted");
     if (own("dirty") === true) return result("interrupted");
     const form = own("form");
     const question = own("question");

@@ -76,8 +76,14 @@ It must execute in the **same Chrome extension isolated scripting world** as
 the admitted Add Question host. A normal page-world DevTools probe that returns
 `no-owner` does **not** prove the extension's owner was absent. Likewise,
 `ready-for-save` is never authority to click Save, and `submit-attempted` is
-never proof of server persistence. Only canonical journal recovery and fresh
-remote verification can decide whether to resume or close an uncertain write.
+never proof of server persistence. If trusted browser interaction follows the
+original Save attempt, `post-submit-interrupted` preserves both facts: the
+submission latch remains, but the user-modified form is no longer a valid
+owner for an auxiliary fresh read.
+
+Neither the previous 429 nor the current Save button grants replay authority.
+Only canonical journal recovery and fresh remote verification can decide
+whether to resume or close an uncertain write.
 
 Do not reload the extension or navigate away from a pending teacher form just
 to obtain a stage diagnostic. If the authorized controller cannot inspect its

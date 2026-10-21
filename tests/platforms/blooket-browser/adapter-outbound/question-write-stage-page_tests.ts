@@ -134,6 +134,15 @@ test("missing and replaced owner states do not invent readiness", () => {
   });
 });
 
+test("post-submit human edits block detached read ownership", () => {
+  const watch = { ...bound(), submitted: true, dirty: true,
+    setId: "set-fixture" };
+  withWatch(watch, () => {
+    assert.equal(inspectBlooketQuestionWriteStage().stage,
+      "post-submit-interrupted");
+  });
+});
+
 test("human interrupts are diagnostic stops, not permission to replay", () => {
   const watch = bound();
   watch["dirty"] = true;
