@@ -19,8 +19,9 @@ and verified a two-question image/typing quiz without controller Save.
 This does not promise uninterrupted operation or universal platform support.
 Provider-read stops remain recoverable, updates use verified downloads with
 manual installation, and native Mac/Safari and remote ChatGPT-client acceptance
-remain in ongoing maintenance. Only that maintenance task is open in
-[TODO.md](TODO.md); completed records retain the dated acceptance evidence.
+remain in ongoing maintenance. [TODO.md](TODO.md) also tracks the requested
+save/paste media follow-up; completed records retain the dated acceptance
+evidence for publication and delivery.
 
 The project is independent of Blooket and is not endorsed by the platform.
 
@@ -29,6 +30,12 @@ The project is independent of Blooket and is not endorsed by the platform.
 - A localhost browser workspace with English and Spanish interfaces.
 - A photo/GIF library with optimized canonical media and mirrored YAML
   metadata. Temporary intake bytes are discarded after canonicalization.
+  Save and prepare persists the rendered media in the selected media folder,
+  and the gallery displays that saved rendition rather than the edit source.
+  Names are unique within a library, without overwriting an existing image.
+
+  Animated GIF paste prefers original bytes or a direct `.gif` URL over a
+  flattened clipboard preview when available.
 - An editor with zoom buttons and slider, dragging, saturation, contrast,
   blurred or solid backgrounds, color picking, undo/redo, and prepared exports.
 - Explicit GIF export FPS, defaulting to 10, with bounded duration, frames,

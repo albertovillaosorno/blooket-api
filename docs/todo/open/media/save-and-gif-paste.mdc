@@ -1,0 +1,79 @@
+---
+schema_version: 1
+id: "blooket-18"
+status: "active"
+priority: "p0"
+horizon: "foundations"
+order: 160
+area: "media"
+task: "TODO - Automatic prepared-media saves and animated GIF paste"
+legacy_task: "Owner-requested media follow-up"
+depends_on:
+  - "blooket-06"
+  - "blooket-07"
+contracts:
+  - "docs/technical/adr/teacher-settings-and-media-library.md"
+  - "docs/technical/adr/image-processing-engine.md"
+scope:
+  - "src/ui/teacher-workspace/"
+  - "src/api/browser-service/"
+  - "src/api/teacher-library/"
+  - "src/media/image-renditions/"
+validation:
+  - "npm run roadmap:check"
+  - "jig validate --root ."
+---
+
+# TODO - Automatic prepared-media saves and animated GIF paste
+
+## Objective
+
+Finish the teacher's save/paste workflow without a separate manual download.
+
+## Acceptance
+
+- **Save and prepare** automatically persists the actual prepared rendition in
+  the media folder selected in Settings. Reloading retains it; the download
+  link is optional convenience, not the persistence step. Confirm the current
+  behavior before changing it, and preserve existing media and recipes.
+- Pasting an animated GIF preserves its animation through import, preview and
+  prepared output. Prefer original animated bytes or the admitted direct GIF
+  source over a clipboard thumbnail. If the clipboard provides only a static
+  preview, explain how to paste the original GIF link/file rather than silently
+  claiming the animation was preserved.
+- Image names are unique in each library, rejecting both new uploads and
+  conflicting renames without silently replacing existing user media.
+  Canonical editable originals remain recoverable, but the gallery and
+  prepared preview show the saved rendition by default.
+
+Use one real save/reload check and one animated paste/export check, plus focused
+regression coverage for any actual fix. Do not expand this task into an
+exhaustive browser or native-platform validation project.
+
+## Evidence
+
+On 2026-10-21 the library application tests confirmed that `Save and
+prepare` already persists the rendered bytes under the configured media
+root's `renditions/` folder, without requiring a Download click. The actual
+UI problem was that gallery cards still requested the unprepared source
+`/media/:id`; cards now select the revision-checked prepared resource.
+The original canonical source remains safely retained for re-editing.
+
+Clipboard regressions found the static preview winning over an available
+animated GIF. The picker now prefers actual `image/gif` bytes, or a validated
+direct `.gif` URL when the only bitmap is a static PNG preview. Browser
+clipboard formats differ, so a PNG without original GIF bytes/link cannot be
+magically converted back into animation; the UI provides EN/ES guidance.
+
+Human-visible image names are now unique per library under case, surrounding
+whitespace and Unicode NFC normalization. Imports and renames reject
+collisions under the existing library lock without overwriting media.
+
+Unit tests verify each behavior. A two-frame animated GIF has additionally
+passed actual native import, prepare, filesystem persistence, and metadata
+reload with both frames intact. A live browser clipboard paste/preview and
+UI reload check are still required before closing this task.
+
+On 2026-10-21, the owner requested automatic saving under the configured media
+folder and reported that pasted GIFs became still images. This records the
+request and observed symptom; no reproduction or completed fix is claimed.
