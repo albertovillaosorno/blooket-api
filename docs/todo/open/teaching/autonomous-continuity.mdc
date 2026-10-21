@@ -77,3 +77,10 @@ The authenticated Chrome for Testing session separately returned a canonical
 for the existing private quiz, each with one multiple-choice and one typing
 question. This supports current read interoperability, not proof of a new
 uninterrupted AI-authored publication.
+
+The same checkpoint discipline now applies to nonadvancing results returned
+from an ordinary publication step. A synthetic `ready`, `recovered` or
+foreign/rolled-back `wait` cannot become a usable UI resume point.
+Only genuine provider waits, sign-in requirements or human challenges
+may pause, with an unchanged frozen journal (or no initial snapshot).
+This blocks duplicate-save confusion without adding busy retries.
