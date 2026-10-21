@@ -374,6 +374,11 @@ export async function executeBlooketPublicationCommand(
       captureBaseline: async (...args: Parameters<
         typeof baseVerifier.captureBaseline>) => {
         const [operation, target, phase] = args;
+        // This is the frozen original binding, not a fresh remote claim.
+        // Replacement cannot progress until the mandatory post-pacing read
+        // matches it, including the selected prior row and every other row.
+        if (plan.schemaVersion === 3 && phase === "before-pacing")
+          return { ok: true as const, baseline: plan.target.baseline };
         // Native Edit Info performs a provider request. Avoid redundant
         // early requests, but always check fresh metadata after pacing and
         // media admission, before capturing the final question collection.
@@ -598,7 +603,7 @@ export async function executeBlooketPublicationCommand(
     // unrelated existing quiz if the user or provider switched edit routes.
     // Check prior questions here. The final baseline capture checks exact
     // remote metadata after pacing/media; an unknown route grants no write.
-    if (attempt.kind === "missing" &&
+    if (plan.schemaVersion !== 3 && attempt.kind === "missing" &&
         (checkpoint.nextOperationIndex > 0 || plan.schemaVersion !== 1) &&
         checkpoint.nextOperationIndex < plan.operations.length) {
       const expected = desiredPlan.operations[0];
@@ -614,24 +619,18 @@ export async function executeBlooketPublicationCommand(
         if (existing.kind !== "questions")
           return success({ ...progress, phase: existing.kind,
             state: existing.state });
-        if (plan.schemaVersion === 3) {
-          if (!sameBlooketWriteVerificationBaseline(plan.target.baseline,
-              questionBaselineFor(existing.value)))
-            return fail("blooket-publication-remote-conflict");
-        } else {
-          const completed = plan.schemaVersion === 2
-            ? plan.target.baseline.itemCount + checkpoint.nextOperationIndex
-            : checkpoint.nextOperationIndex - 1;
-          const prior = desiredPlan.operations.slice(1, completed + 1);
-          if (!matchesQuestions(existing.value, prior, checkpoint.remoteSetId,
-                expectedMedia) || (plan.schemaVersion === 2 &&
-                !sameBlooketWriteVerificationBaseline(plan.target.baseline,
-                  questionBaselineFor(existing.value.slice(0,
-                    plan.target.baseline.itemCount)))))
-            return fail("blooket-publication-remote-conflict");
-          if (plan.schemaVersion === 2)
-            expectedAppendBaseline = questionBaselineFor(existing.value);
-        }
+        const completed = plan.schemaVersion === 2
+          ? plan.target.baseline.itemCount + checkpoint.nextOperationIndex
+          : checkpoint.nextOperationIndex - 1;
+        const prior = desiredPlan.operations.slice(1, completed + 1);
+        if (!matchesQuestions(existing.value, prior, checkpoint.remoteSetId,
+              expectedMedia) || (plan.schemaVersion === 2 &&
+              !sameBlooketWriteVerificationBaseline(plan.target.baseline,
+                questionBaselineFor(existing.value.slice(0,
+                  plan.target.baseline.itemCount)))))
+          return fail("blooket-publication-remote-conflict");
+        if (plan.schemaVersion === 2)
+          expectedAppendBaseline = questionBaselineFor(existing.value);
       }
     }
     if (plan.schemaVersion !== 1 && attempt.kind === "missing" &&
