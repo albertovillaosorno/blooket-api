@@ -32,7 +32,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  publishTextDraft, publicationStopReason, waitForPublicationReadCooldown,
+  publishTextDraft, publicationStopReason, recoveredPublicationAction,
+  waitForPublicationReadCooldown,
 } from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
@@ -178,6 +179,32 @@ test("oversized remote plan cannot start a second UI write",
     return state("ready", 0, 10_001);
   }), /publication-progress-invalid/u);
   assert.deepEqual(calls, ["blooket.publication.status"]);
+});
+
+test("manual recovery action requires matching frozen journal evidence",
+  () => {
+  const before = state("reconciliation-required", 1, 3);
+  const next = state("recovered", 2, 3);
+  assert.equal(recoveredPublicationAction(before, next, ID), "publish");
+  assert.equal(recoveredPublicationAction(
+    state("reconciliation-required", 2, 3),
+    state("recovered", 3, 3), ID), "verify");
+  assert.equal(recoveredPublicationAction(before,
+    state("reconciliation-required", 1, 3), ID), null);
+  for (const patch of [
+    { revision: "b".repeat(64) }, { remoteSetId: "foreign-set" },
+    { completedOperations: 3 }, { completedOperations: 1 },
+    { totalOperations: 4 }, { published: true },
+  ]) assert.throws(() => recoveredPublicationAction(before,
+    { ...next, ...patch }, ID), /publication-progress-invalid/u);
+  const getter = { ...next };
+  let invoked = false;
+  Object.defineProperty(getter, "remoteSetId", {
+    enumerable: true, get() { invoked = true; return "synthetic-set"; },
+  });
+  assert.throws(() => recoveredPublicationAction(before, getter, ID),
+    /publication-progress-invalid/u);
+  assert.equal(invoked, false);
 });
 
 test("one UI publish intent advances and verifies each durable operation",

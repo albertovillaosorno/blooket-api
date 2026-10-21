@@ -148,3 +148,11 @@ Stop, falsely implying active success or progress. The visual controller now
 ignores progress callbacks after its abort signal and always displays Paused
 for any late successful command response. Subsequent writes remain gated by
 a new explicit teacher click and canonical status refresh.
+
+A separate 2026-10-21 Studio red-to-green regression found that its direct
+read-only Reconcile button could expose Resume or Verify after an incomplete
+`recovered` response with no draft identity or matching frozen checkpoint.
+The action is now admitted only after strict own-field decoding and exact
+revision, remote set, operation count and draft identity checks. The next
+explicit teacher click still rereads canonical status before any mutation.
+Invalid or inconclusive recovery offers only a fresh status Refresh.

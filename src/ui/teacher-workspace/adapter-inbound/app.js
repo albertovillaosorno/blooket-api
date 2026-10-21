@@ -8,7 +8,8 @@ import {
   readClipboardImage,
 } from "./library.js";
 import {
-  publishTextDraft, publicationStopReason, waitForPublicationReadCooldown,
+  publishTextDraft, publicationStopReason, recoveredPublicationAction,
+  waitForPublicationReadCooldown,
 } from "./publication.js";
 import {
   publicationFormValues, readPublicationFormValues,
@@ -2247,6 +2248,8 @@ async function loadQuizzes() {
           controller.abort();
           cancel.disabled = true;
         });
+        const preceding = latest;
+        let recoveryChoice = null;
         try {
           if (action === "publish") {
             latest = await publishTextDraft(
@@ -2264,6 +2267,10 @@ async function loadQuizzes() {
               ? "blooket.publication.reconcile"
               : "blooket.publication.verify";
             latest = await command(name, { draftId: id }, controller.signal);
+            if (action === "reconcile" && !controller.signal.aborted)
+              recoveryChoice = recoveredPublicationAction(
+                preceding, latest, id,
+              );
           }
           state.textContent = controller.signal.aborted
             ? t("publicationPaused") : publicationLabel(latest);
@@ -2279,13 +2286,10 @@ async function loadQuizzes() {
           // If that probe proved a recovered checkpoint, a separate teacher
           // click can resume under a newly checked canonical status.
           if (action === "reconcile" && !controller.signal.aborted &&
-              latest?.phase === "recovered") {
-            const complete = latest.completedOperations ===
-              latest.totalOperations;
+              recoveryChoice !== null) {
+            const complete = recoveryChoice === "verify";
             add(complete ? "verifyDraft" : "resumePublication",
-              complete ? "verify" : "publish", () => {
-                void finish(complete ? "verify" : "publish");
-              });
+              recoveryChoice, () => { void finish(recoveryChoice); });
           }
           add("publicationRefresh", "refresh", () => {
             void refreshState().catch(report);
