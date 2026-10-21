@@ -184,6 +184,40 @@ test("navigation does not reload a getter-supplied previous route",
   assert.equal(page.updates(), 0);
 });
 
+test("untrustworthy clocks never authorize read navigation",
+  async () => {
+  for (const tick of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY, -1]) {
+    const page = fixture();
+    const result = await confirmBlooketReadNavigation(
+      page.tabs, 7, page.previous, SETS, 8_000,
+      page.pause, page.documentOrigin, () => tick,
+    );
+    assert.equal(result, undefined);
+    assert.equal(page.gets(), 0);
+    assert.equal(page.reloads(), 0);
+    assert.equal(page.updates(), 0);
+  }
+});
+
+test("clock corruption during source validation never reloads teacher tab",
+  async () => {
+  const page = fixture();
+  let invalid = false;
+  const observed = async (url: string) => {
+    const result = await page.documentOrigin(url);
+    invalid = true;
+    return result;
+  };
+  const result = await confirmBlooketReadNavigation(
+    page.tabs, 7, page.previous, SETS, 8_000,
+    page.pause, observed, () => invalid ? Number.NaN : page.now(),
+  );
+  assert.equal(result, undefined);
+  assert.equal(page.reloads(), 0);
+  assert.equal(page.updates(), 0);
+});
+
 test("an already loaded route reloads before a fresh read", async () => {
   const page = fixture();
   const result = await confirmBlooketReadNavigation(
