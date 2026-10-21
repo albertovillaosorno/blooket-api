@@ -161,6 +161,7 @@ On 2026-10-21, red-to-green broker regressions showed that nonfinite or
 regressing time samples could dispatch a pending browser job, or accept an
 expired saved-state reply. A second regression exposed a clock failure during
 client pruning after an initially valid poll, which still granted a lease.
+
 The broker now poisons its monotonic clock for the rest of that instance,
 retiring queued jobs, declining dispatch and refusing stale completions rather
 than ever replaying a potentially committed Save. A separate red-to-green
