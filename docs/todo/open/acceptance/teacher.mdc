@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, red-to-green regressions found that the asynchronous visible
+question-controls editor could continue filling React inputs after a native
+`dialog[open]` or ARIA alert dialog appeared, despite the outer Add Question
+action rejecting those overlays. The injected controls preflight, repeated
+ownership checks and final read-only echo now stop on those human surfaces.
+Tests confirm that a dialog appearing during type selection prevents further
+form changes. No remote Save or authenticated provider edit was performed.
+
 On 2026-10-21, additional provider-drift regressions showed that Add Question
 opening, preparation, image selection and submission did not recognize visible
 native `dialog[open]` and `role="alertdialog"` human stops. The independent
