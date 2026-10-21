@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 sanitized provider-drift regression found that a visible
+`role="alertdialog"` without `aria-modal` did not stop the native page-leave
+guard. The read-only gate now refuses navigation during such a human prompt,
+while preserving the existing visibility checks and hidden-alert behavior.
+This is a portable fail-closed compatibility test, not proof of a changed
+live provider DOM or a newly verified remote Save.
+
 A previous concurrent `npm run validate` run reported an intermittent
 `owned-launcher-service-did-not-drain` failure in the silent supervised
 launcher integration test; the same test passed isolated. The test now uses
