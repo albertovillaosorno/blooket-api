@@ -69,6 +69,12 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+A 2026-10-21 red-to-green Studio regression rejected a `ready` journal
+claiming zero completed operations while already binding a remote set ID.
+Such contradictory first-step evidence now stops before Create Set rather
+than risking duplicate publication. This is a synthetic orchestration
+invariant, not live proof of an unattended publication.
+
 A second red-to-green UI regression on 2026-10-21 found that an initial
 `not-started` reply could still include a frozen revision or positive plan
 size without a journal. The Studio orchestration now refuses *any* frozen
