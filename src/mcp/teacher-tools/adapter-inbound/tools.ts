@@ -180,6 +180,17 @@ const tools = [
     false,
   ),
   tool(
+    "library_image_prepare",
+    "library.image.prepare",
+    "Prepare a library image using its stable ID and current record " +
+      "revision. Uses the teacher's existing image recipe and canvas; " +
+      "accepts no paths or editing overrides. Read the record after " +
+      "enrichment to obtain its current revision. Returns prepared " +
+      "rendition metadata; publication independently validates its bytes.",
+    { id, revision: { type: "integer", minimum: 1 } },
+    false,
+  ),
+  tool(
     "library_enrich",
     "library.enrich",
     "Save detected source language, normalized English name/description, " +

@@ -43,6 +43,9 @@ verification and recovery via the canonical CLI. The explicit
 `library_image_import` tool admits small canonical base64 image bytes supplied
 by the client (up to 675 KB), returning a stable media ID that is safe to reuse
 after a lost response.
+After enrichment, `library_image_prepare` prepares that stable ID at its
+current revision using the existing teacher recipe. Import, normalization and
+preparation can therefore finish through MCP without a local editor step.
 
 Chat attachments are not automatically forwarded to MCP; larger assets can be
 imported through the local Studio UI. Media search returns bounded pages and a

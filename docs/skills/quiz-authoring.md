@@ -60,6 +60,11 @@ An admitted question image replaces `image: null` with exactly:
 ```
 
 The asset must have a current prepared rendition below 2,500,000 bytes.
+
+For explicitly supplied small image bytes, use `library_image_import`, enrich
+the record, then call `library_image_prepare` with its current revision.
+These tools do not receive chat attachments automatically and accept no paths.
+
 The service rechecks its recipe revision, format and bytes before upload.
 Covers, answer images and audio remain unsupported in publication; do not
 silently omit them. Chat attachments do not arrive in the library automatically:

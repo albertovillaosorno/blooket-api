@@ -78,8 +78,11 @@ supply admitted base64, direct the teacher to import the file using the local
 Studio UI and then search by original metadata. Larger files belong in the
 local intake.
 
-Do not interpret import as prepared Blooket media; the ordinary
-recipe preparation and remote verification requirements still apply.
+Import alone does not prepare Blooket media. Enrich the imported record,
+then call `library_image_prepare` with its stable ID and current revision.
+This uses the teacher's existing recipe and canvas without asking for local
+paths or editing overrides. Read `library_get` to confirm current prepared
+metadata; publication still checks the actual rendition and remote result.
 
 Canonical asset filenames are internal service details; do not ask
 the teacher to manage them or choose filesystem paths.

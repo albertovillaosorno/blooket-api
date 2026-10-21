@@ -71,6 +71,47 @@ test("registered MCP image bytes import through CLI with stable replay ID",
     assert.equal(found.ok, true);
     assert.equal(found.value.records.length, 1);
     assert.equal(found.value.records[0].id, firstResult.value.id);
+    assert.equal(found.value.records[0].prepared, null);
+    const enriched = await callTeacherTool("library_enrich", {
+      id: firstResult.value.id, revision: 1,
+      name: "Small original photo", description: "A blue fixture image.",
+      language: "en", topics: ["fixture"],
+    }, root);
+    assert.equal(enriched.isError, false);
+    const enrichedRecord = JSON.parse(enriched.content[0]!.text).value;
+    const prepared = await callTeacherTool("library_image_prepare", {
+      id: firstResult.value.id, revision: enrichedRecord.revision,
+    }, root);
+    assert.equal(prepared.isError, false);
+    const preparedRecord = JSON.parse(prepared.content[0]!.text).value;
+    assert.equal(preparedRecord.id, firstResult.value.id);
+    assert.equal(preparedRecord.revision, enrichedRecord.revision);
+    assert.equal(preparedRecord.prepared.recipeRevision,
+      enrichedRecord.revision);
+    assert.ok(preparedRecord.prepared.bytes > 0);
+    assert.ok(preparedRecord.prepared.bytes < 2_500_000);
+    const saved = await callTeacherTool("library_get", {
+      id: firstResult.value.id,
+    }, root);
+    const savedRecord = JSON.parse(saved.content[0]!.text).value;
+    assert.deepEqual(savedRecord.prepared, preparedRecord.prepared);
+    assert.equal(savedRecord.original.name, input.name);
+    assert.equal(savedRecord.original.description, input.description);
+    assert.equal(savedRecord.normalizationStatus, "completed");
+    const stale = await callTeacherTool("library_image_prepare", {
+      id: firstResult.value.id, revision: 1,
+    }, root);
+    assert.equal(stale.isError, true);
+    for (const invalid of [
+      { id: "../private", revision: 2 },
+      { id: firstResult.value.id, revision: "2" },
+      { id: firstResult.value.id, revision: 2, path: "private.jpg" },
+      { id: firstResult.value.id, revision: 0 },
+    ]) {
+      const rejected = await callTeacherTool("library_image_prepare",
+        invalid, root);
+      assert.equal(rejected.isError, true);
+    }
     const denied = await callTeacherTool("library_image_import", {
       ...input, path: "private.png",
     }, root);
