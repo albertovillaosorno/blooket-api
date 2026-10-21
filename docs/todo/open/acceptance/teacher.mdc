@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, a red-to-green Studio publication regression showed that
+getter-backed, inherited and extra progress fields could cross the UI
+command boundary. A mutable progress callback could also retarget the
+checkpoint and let verification run against a different set. The UI now
+snapshots exact own data fields and reports independent copies, without
+changing the canonical journal or repeating any Blooket Save. These are
+portable synthetic tests, not new live provider acceptance.
+
 On 2026-10-21, the separate autonomous image/typing quiz passed fresh canonical
 verification at 15:56 and 16:00 UTC with three operations complete. Both
 questions were saved by the product. Functional tasks blooket-11 and

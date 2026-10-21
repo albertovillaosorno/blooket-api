@@ -33,7 +33,29 @@
 // A smaller UI-only limit would interrupt valid long quizzes every 128 writes.
 const MAX_UI_STEPS = 10_000;
 
+const PROGRESS_FIELDS = new Set([
+  "draftId", "revision", "remoteSetId", "phase", "published",
+  "completedOperations", "totalOperations", "state", "reason",
+  "verifiedAt",
+]);
+
 function progress(value, draftId) {
+  // Command replies cross a trust boundary. Snapshot only exact own JSON-like
+  // fields, never run accessors or inherit a forged publication checkpoint.
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value) ||
+        (Object.getPrototypeOf(value) !== Object.prototype &&
+          Object.getPrototypeOf(value) !== null))
+      throw Error("publication-progress-invalid");
+    const fields = Object.getOwnPropertyDescriptors(value);
+    if (Reflect.ownKeys(fields).some(key => {
+      const descriptor = fields[key];
+      return typeof key !== "string" || !PROGRESS_FIELDS.has(key) ||
+        !descriptor?.enumerable || !Object.hasOwn(descriptor, "value");
+    })) throw Error("publication-progress-invalid");
+    value = Object.fromEntries(Object.entries(fields).map(([key, field]) =>
+      [key, field.value]));
+  } catch { throw Error("publication-progress-invalid"); }
   if (!value || typeof value !== "object" || Array.isArray(value) ||
       value.draftId !== draftId || typeof value.phase !== "string" ||
       typeof value.published !== "boolean" ||
@@ -89,10 +111,13 @@ export async function publishTextDraft(
       typeof revision !== "string" || !/^[a-f0-9]{64}$/u.test(revision))
     throw Error("invalid-publication-request");
   const payload = { draftId };
+  // UI progress listeners may mutate presentation objects. They must never
+  // alter the authoritative checkpoint compared before subsequent writes.
+  const report = value => onProgress({ ...value });
   let current = progress(await send(
     "blooket.publication.status", payload,
   ), draftId);
-  onProgress(current);
+  report(current);
   if (current.published !== false) throw Error("publication-progress-invalid");
   if (!["not-started", "ready", "writes-complete",
     "reconciliation-required"].includes(current.phase))
@@ -121,7 +146,7 @@ export async function publishTextDraft(
       verified.completedOperations !== current.completedOperations ||
       verified.completedOperations !== verified.totalOperations
     )) throw Error("publication-progress-invalid");
-    onProgress(verified);
+    report(verified);
     return verified;
   };
   if (current.phase === "reconciliation-required") {
@@ -135,7 +160,7 @@ export async function publishTextDraft(
     if (reconciled.published !== false)
       throw Error("publication-progress-invalid");
     if (reconciled.phase !== "recovered") {
-      onProgress(reconciled);
+      report(reconciled);
       return reconciled;
     }
     if (reconciled.revision !== frozenRevision ||
@@ -147,7 +172,7 @@ export async function publishTextDraft(
         !reconciled.remoteSetId)
       throw Error("publication-progress-invalid");
     current = reconciled;
-    onProgress(current);
+    report(current);
     if (current.completedOperations === current.totalOperations)
       return await verify();
   }
@@ -173,7 +198,7 @@ export async function publishTextDraft(
             next.remoteSetId !== current.remoteSetId) ||
           (current.phase === "not-started" && next.remoteSetId != null))
         throw Error("publication-progress-invalid");
-      onProgress(next);
+      report(next);
       if (cancelled()) return { ...next, phase: "paused" };
       const reconciled = progress(await send(
         "blooket.publication.reconcile", payload,
@@ -181,7 +206,7 @@ export async function publishTextDraft(
       if (reconciled.published !== false)
         throw Error("publication-progress-invalid");
       if (reconciled.phase !== "recovered") {
-        onProgress(reconciled);
+        report(reconciled);
         return reconciled;
       }
       if (reconciled.revision !== next.revision ||
@@ -194,7 +219,7 @@ export async function publishTextDraft(
       recoveredByProbe = true;
     }
     if (next.phase !== "advanced" && !recoveredByProbe) {
-      onProgress(next);
+      report(next);
       return next;
     }
     // The first Create Set receipt must bind a real set; later steps cannot
@@ -209,7 +234,7 @@ export async function publishTextDraft(
           next.totalOperations !== current.totalOperations))
       throw Error("publication-progress-invalid");
     current = next;
-    onProgress(current);
+    report(current);
     if (current.completedOperations === current.totalOperations)
       return await verify();
   }
