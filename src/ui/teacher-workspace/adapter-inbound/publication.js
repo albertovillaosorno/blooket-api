@@ -62,6 +62,12 @@ function progress(value, draftId) {
       (value.published && value.phase !== "verified") ||
       (value.phase === "verified" && !value.published))
     throw Error("publication-progress-invalid");
+  // Provider stop metadata is presentation-only. Reject nonprimitive values
+  // rather than letting an arbitrary nested object leak into the UI or
+  // travel alongside a writable snapshot.
+  for (const field of ["state", "reason", "verifiedAt"])
+    if (value[field] !== undefined && typeof value[field] !== "string")
+      throw Error("publication-progress-invalid");
   // A plan without a journal cannot already own saved operations or a set.
   // Refuse contradictory preflight data before the first remote write.
   if (value.phase === "not-started" && (

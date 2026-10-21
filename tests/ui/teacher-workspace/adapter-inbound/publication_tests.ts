@@ -82,6 +82,24 @@ test("transport callbacks cannot retarget a later verify or reconciliation",
   }
 });
 
+test("malformed progress diagnostics never reach the next writer",
+  async () => {
+  for (const patch of [
+    { state: { kind: "rate-limited" } },
+    { reason: { kind: "ambiguous-attempt" } },
+    { verifiedAt: 42 },
+    { state: 17 },
+    { reason: false },
+  ]) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return { ...state("ready", 1, 2), ...patch };
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status"]);
+  }
+});
+
 test("accessor or inherited progress cannot authorize a publication write",
   async () => {
   for (const variant of ["accessor", "inherited", "extra", "symbol"] as const) {
