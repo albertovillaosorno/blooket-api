@@ -1456,6 +1456,50 @@ test("Edit Info read survives the recovered sidebar mount transition", () => {
 });
 
 
+test("only an untouched pending metadata read permits recovery reload", () => {
+  const { document } = base();
+  const form = node("FORM");
+  const id = node("INPUT");
+  id.value = "fixture";
+  const title = node("INPUT");
+  title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  form.selectors['input[type="hidden"][name="setId"]'] = [id];
+  form.selectors['input#title[name="title"]'] = [title];
+  document.selectors["form#question-set-form"] = [form];
+  document.selectors["main button"] = [node("BUTTON", "Edit Info")];
+  page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    assert.equal(isBlooketDetailPanelClosed("fixture", true), false);
+    const world = globalThis as typeof globalThis & {
+      __blooketDetailEditWatch?: {
+        document: unknown; setId: string; dirty: boolean;
+        dispose: () => void;
+      };
+    };
+    const watch: NonNullable<typeof world.__blooketDetailEditWatch> = {
+      document, setId: "fixture", dirty: false,
+      dispose: () => { delete world.__blooketDetailEditWatch; } };
+    world.__blooketDetailEditWatch = watch;
+    const injected = Function("return (" +
+      isBlooketDetailPanelClosed.toString() + ")")();
+    assert.equal(injected("fixture", true), true);
+    assert.equal(world.__blooketDetailEditWatch, watch);
+    watch.dirty = true;
+    assert.equal(injected("fixture", true), false);
+    watch.dirty = false;
+    watch.setId = "other";
+    assert.equal(injected("fixture", true), false);
+    watch.setId = "fixture";
+    watch.document = {};
+    assert.equal(injected("fixture", true), false);
+    watch.document = document;
+    document.selectors['input#question[name="question"]'] = [node("INPUT")];
+    assert.equal(injected("fixture", true), false);
+    delete document.selectors['input#question[name="question"]'];
+    title.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    assert.equal(injected("fixture", true), false);
+  });
+});
+
 test("My Sets refuses filtered and fragmented collection routes", () => {
   const { document, main } = base();
   main.selectors["article"] = [card()];

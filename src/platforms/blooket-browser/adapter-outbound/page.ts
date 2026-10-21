@@ -592,7 +592,9 @@ export function closeBlooketDetailPanel(
   }
 }
 
-export function isBlooketDetailPanelClosed(setId: string): boolean {
+export function isBlooketDetailPanelClosed(
+  setId: string, pendingRead = false,
+): boolean {
   try {
     const url = new URL(location.href);
     if (url.origin !== "https://dashboard.blooket.com" ||
@@ -652,7 +654,37 @@ export function isBlooketDetailPanelClosed(setId: string): boolean {
     const buttons = Array.from(document.querySelectorAll(
       "main button",
     )).filter(button => button.textContent?.trim() === "Edit Info");
-    return buttons.length === 1 && visible(buttons[0]!);
+    if (buttons.length !== 1 || !visible(buttons[0]!)) return false;
+    if (pendingRead) {
+      // A failed read-only opener can leave a watch without mounting its
+      // panel. Only that untouched owner permits a recovery reload; this
+      // observation never clears the watch or confirms saved metadata.
+      const world = globalThis as typeof globalThis & {
+        __blooketDetailEditWatch?: {
+          document: Document; setId: string; dirty: boolean
+        };
+      };
+      const watch = world.__blooketDetailEditWatch;
+      if (!watch || watch.document !== document || watch.setId !== setId ||
+          watch.dirty !== false || [
+            "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
+            "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+          ].some(key => Object.hasOwn(globalThis, key)) ||
+          document.querySelector('input#question[name="question"]'))
+        return false;
+      const active = document.activeElement;
+      if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" ||
+          active?.tagName === "SELECT" ||
+          (active as HTMLElement | null)?.isContentEditable === true ||
+          active?.getAttribute("role") === "textbox") return false;
+      const editable = [
+        'input:not([type="hidden"]), textarea, select,',
+        '[contenteditable="true"]',
+      ].join(" ");
+      if (Array.from(forms[0].querySelectorAll(editable)).some(visible))
+        return false;
+    }
+    return true;
   } catch {
     return false;
   }

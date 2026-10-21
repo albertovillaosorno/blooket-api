@@ -114,12 +114,15 @@ test(
   let detailSidebarProxyReads = 0;
   let detailCancelSucceeds = true;
   let detailClosedSucceeds = true;
+  let detailPendingRecoverySafe = false;
+  let detailPendingRecoveryChecks = 0;
   let detailMalformedReply = false;
   let detailPanelProxy = false;
   let detailPanelProxyReads = 0;
   let detailDrifts = false;
   let detailReadCount = 0;
   let detailPanelFailuresRemaining = 0;
+  let expireDetailRead = false;
   let detailSecondReadHasHiddenField = false;
   let detailReadWrongId = false;
   let detailSwitchTabAfterScript = false;
@@ -608,8 +611,13 @@ test(
           if (detailCancelSucceeds) detailCancelObserved = true;
           return [{ result: detailCancelSucceeds }];
         }
-        if (func.name === "isBlooketDetailPanelClosed")
+        if (func.name === "isBlooketDetailPanelClosed") {
+          if (args?.[1] === true) {
+            detailPendingRecoveryChecks++;
+            return [{ result: detailPendingRecoverySafe }];
+          }
           return [{ result: detailClosedSucceeds }];
+        }
         if (func.name === "openBlooketDetailPanel") {
           if (args?.[0] === "created-set-fixture")
             return [{ result: true }];
@@ -847,6 +855,12 @@ test(
         if (operation.kind === "sets.get") {
           if (detailPanelFailuresRemaining > 0) {
             detailPanelFailuresRemaining--;
+            if (expireDetailRead) {
+              expireDetailRead = false;
+              // Cross the polling cutoff without expiring the reserved
+              // cleanup window, which must still re-check tab ownership.
+              Date.now = () => realNow() + 6_500;
+            }
             return [{ result: {
               ok: false, code: "blooket-browser-failed",
             } }];
@@ -1747,6 +1761,34 @@ test(
       name === "openBlooketDetailPanel").length, 1);
     assert.equal(scripts.slice(beforeSlowPanel).includes(
       "closeBlooketDetailPanel"), true);
+    // An Edit Info read that never mounts the panel can reclaim only an
+    // unchanged, exact owner. A mismatched or dirty owner cannot reload.
+    detailPanelFailuresRemaining = 500;
+    expireDetailRead = true;
+    detailPendingRecoverySafe = true;
+    detailPendingRecoveryChecks = 0;
+    const beforeRecoveryReload = readReloads;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    Date.now = realNow;
+    assert.equal(detailPendingRecoveryChecks, 2);
+    // The normal fresh-document navigation reload still occurs once.
+    // The second reload is the independently guarded orphan cleanup.
+    assert.equal(readReloads, beforeRecoveryReload + 2);
+    detailPanelFailuresRemaining = 500;
+    expireDetailRead = true;
+    detailPendingRecoverySafe = false;
+    const beforeDeniedReload = readReloads;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    Date.now = realNow;
+    assert.equal(detailPendingRecoveryChecks, 3);
+    // Denied cleanup does not add a second reload to the initial read.
+    assert.equal(readReloads, beforeDeniedReload + 1);
+    detailPanelFailuresRemaining = 0;
+    detailPendingRecoveryChecks = 0;
     detailSidebarProxy = true;
     const beforeProxyPanel = scripts.length;
     assert.equal((await expectReply({ kind: "sets.get",

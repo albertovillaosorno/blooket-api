@@ -722,7 +722,7 @@ async function readPage(
       // Edit Info can take seconds to return even on a successful response.
       // Poll only observations within the existing read budget, reserving
       // time for confirmation and Cancel. Never repeat the native opener.
-      while (Date.now() < readDeadline - 500) {
+      while (Date.now() < readDeadline - 2_000) {
         if (!await ownsDetailRoute())
           throw new Error("browser-details-unavailable");
         const result = await script(
@@ -793,8 +793,22 @@ async function readPage(
       // confuse local unsaved edits with independently fetched remote state.
       // Never inject cleanup into a tab the teacher has navigated away from.
       let closed = false;
-      if (!cancellationEvidence)
+      if (!cancellationEvidence) {
+        // Abort only an untouched read opener whose panel never appeared.
+        // Reload retires that native document and its pending read; it never
+        // retries an opener, changes a quiz, or claims a successful read.
+        if (await ownsDetailRoute().catch(() => false) &&
+            await script(current, browser,
+              isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+              [operation.setId, true]).catch(() => false) === true &&
+            await ownsDetailRoute().catch(() => false) &&
+            await script(current, browser,
+              isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+              [operation.setId, true]).catch(() => false) === true &&
+            await ownsDetailRoute().catch(() => false))
+          await browser.tabs.reload(current.tabId, { bypassCache: true });
         throw new Error("browser-details-unconfirmed");
+      }
       if (await ownsDetailRoute().catch(() => false)) {
         const canceled = await script(
           current, browser,
