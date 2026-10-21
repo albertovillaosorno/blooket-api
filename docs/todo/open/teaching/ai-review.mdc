@@ -90,11 +90,12 @@ existing read-only Reconcile button; neither a status refresh nor Reconcile
 silently launches a writer. This is portable evidence, not uninterrupted
 live provider acceptance.
 
-A 2026-10-21 red-to-green Studio regression rejected a `ready` journal
-claiming zero completed operations while already binding a remote set ID.
-Such contradictory first-step evidence now stops before Create Set rather
-than risking duplicate publication. This is a synthetic orchestration
-invariant, not live proof of an unattended publication.
+A subsequent 2026-10-21 regression corrected a mistaken initial-state
+guard: `ready` with zero completed operations and an existing remote set
+is valid for append or replacement plans. Studio now preserves that target
+binding while rejecting any later retarget. The canonical plan, rather
+than a UI heuristic, distinguishes Create Set from existing-set edits.
+This is a portable correction, not live acceptance.
 
 A second red-to-green UI regression on 2026-10-21 found that an initial
 `not-started` reply could still include a frozen revision or positive plan
