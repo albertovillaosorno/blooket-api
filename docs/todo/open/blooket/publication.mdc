@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A 2026-10-21 navigation regression established that an invalid clock
+could still authorize a reload of the teacher's original tab. A monotonic,
+finite deadline gate now prevents navigation, read authority transfer, and
+invalid poll waits when the clock is unavailable. This is synthetic proof
+that a failed read cannot become an authorized same-route reload.
+
 The per-question inspector also accepted a saved row after a nonfinite
 initial clock sample. Its inner read clock now refuses impossible or
 regressing samples for the full inspection, including the caller's own

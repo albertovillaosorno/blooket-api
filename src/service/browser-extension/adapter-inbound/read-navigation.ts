@@ -112,13 +112,30 @@ export async function confirmBlooketReadNavigation(
   readDeadline: number,
   pause: (ms: number) => Promise<void>,
   documentOrigin: (url: string) => Promise<unknown>,
-  now: () => number = Date.now,
+  clock: () => number = Date.now,
   approvedSourceOrigin?: number,
   onConfirmedTargetOrigin?: (origin: number) => void,
   safeBeforeNavigation?: () => Promise<boolean>,
 ): Promise<ReadTab | undefined> {
+  // Chrome route mutations must not proceed on an invalid or regressing
+  // deadline clock. A later plausible sample cannot repair this same read.
+  let lastTick = -Infinity;
+  let invalidClock = false;
+  const now = () => {
+    if (invalidClock) return Infinity;
+    try {
+      const tick = clock();
+      if (!Number.isFinite(tick) || tick < 0 || tick < lastTick) {
+        invalidClock = true;
+        return Infinity;
+      }
+      lastTick = tick;
+      return tick;
+    } catch { invalidClock = true; return Infinity; }
+  };
+  if (!Number.isFinite(readDeadline)) return undefined;
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
-  if (now() >= deadline) return undefined;
+  if (!Number.isFinite(deadline) || now() >= deadline) return undefined;
   previous = snapshotBlooketReadTab(previous) ?? {};
   let previousOrigin: number | undefined;
   if (target) {
@@ -199,7 +216,9 @@ export async function confirmBlooketReadNavigation(
         return finalTab;
       }
     }
-    await pause(Math.min(POLL_MS, deadline - now()));
+    const remaining = deadline - now();
+    if (!Number.isFinite(remaining) || remaining <= 0) return undefined;
+    await pause(Math.min(POLL_MS, remaining));
   }
   return undefined;
 }
