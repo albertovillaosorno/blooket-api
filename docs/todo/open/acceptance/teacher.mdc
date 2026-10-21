@@ -157,6 +157,15 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, red-to-green broker regressions showed that nonfinite or
+regressing time samples could dispatch a pending browser job, or accept an
+expired saved-state reply. A second regression exposed a clock failure during
+client pruning after an initially valid poll, which still granted a lease.
+The broker now poisons its monotonic clock for the rest of that instance,
+retiring queued jobs, declining dispatch and refusing stale completions rather
+than ever replaying a potentially committed Save. No actual provider write
+was made: these are sanitized, local bridge tests.
+
 A 2026-10-21 red-to-green authentication-host regression found that the
 credential submission gate could accept a `NaN` or backward-moving deadline
 sample after preparing the exact login form. The host now refuses invalid

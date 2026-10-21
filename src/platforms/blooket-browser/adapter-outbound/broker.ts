@@ -117,7 +117,24 @@ export function createBlooketBrowserBridgeBroker(
   if (Buffer.byteLength(token, "utf8") < 32 || token.length > 1_024) {
     throw new Error("invalid-browser-bridge-token");
   }
-  const now = options.now ?? Date.now;
+  // A corrupted or regressing clock cannot grant an extension lease or
+  // certify a late Save receipt. Once time becomes untrustworthy, retire this
+  // broker; a new pairing and broker must establish a fresh deadline origin.
+  const clock = options.now ?? Date.now;
+  let previousTick = -Infinity;
+  let clockInvalid = false;
+  const now = (): number => {
+    if (clockInvalid) return Infinity;
+    try {
+      const tick = clock();
+      if (!Number.isFinite(tick) || tick < 0 || tick < previousTick) {
+        clockInvalid = true;
+        return Infinity;
+      }
+      previousTick = tick;
+      return tick;
+    } catch { clockInvalid = true; return Infinity; }
+  };
   const pending = new Map<string, PendingJob>();
   let closed = false;
   let lastPollAt = 0;
@@ -179,7 +196,7 @@ export function createBlooketBrowserBridgeBroker(
 
     request: async (command) => {
       pruneClients();
-      if (closed || activeClients.size > 1 ||
+      if (closed || !Number.isFinite(now()) || activeClients.size > 1 ||
           pending.size >= maxPending) {
         return {
           ok: false,
@@ -199,9 +216,11 @@ export function createBlooketBrowserBridgeBroker(
       if (Buffer.byteLength(JSON.stringify({ ok: true, job: request })) >
           MAX_DELIVERY_JSON_BYTES)
         return { ok: false, code: "blooket-browser-failed" };
+      const startedAt = now();
+      if (!Number.isFinite(startedAt))
+        return { ok: false, code: "blooket-browser-unavailable" };
       return await new Promise<BlooketBrowserBridgeTransportResult>(
         (resolve) => {
-          const startedAt = now();
           const write = request.command.kind === "sets.create" ||
             request.command.kind === "questions.create" ||
             request.command.kind === "questions.replace";
@@ -229,7 +248,21 @@ export function createBlooketBrowserBridgeBroker(
       if (closed || !authenticated(candidate)) return null;
       if (client !== undefined && incompatibleClients.has(client)) return null;
       lastPollAt = now();
+      if (!Number.isFinite(lastPollAt)) {
+        for (const id of [...pending.keys()])
+          settle(id, { ok: false, code: "blooket-browser-unavailable" });
+        return null;
+      }
       pruneClients();
+      // Pruning may read the injected clock again. Never dispatch a lease
+      // using the earlier valid sample after that second read poisoned it.
+      const leaseAt = now();
+      if (!Number.isFinite(leaseAt)) {
+        for (const id of [...pending.keys()])
+          settle(id, { ok: false, code: "blooket-browser-unavailable" });
+        return null;
+      }
+      lastPollAt = leaseAt;
       if (client !== undefined &&
           (activeClients.has(client) || activeClients.size < 16))
         activeClients.set(client, lastPollAt);
