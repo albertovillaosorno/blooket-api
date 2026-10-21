@@ -163,3 +163,10 @@ cross-draft or cross-set reply. It now compares the complete frozen draft,
 revision, set and operation count, and requires the server's verified-at field
 for a successful claim. A genuinely inconclusive rate-limited read still
 presents its own wait status; no additional Save is issued.
+
+A fourth red-to-green 2026-10-21 Studio regression demonstrated that merely
+refreshing local publication status could display `publicationVerified` from
+a forged `published: true` response, despite no fresh Blooket read. Quizzes
+now decodes its local status as a strict not-started, ready, writes-complete
+or reconciliation-required checkpoint with `published: false`, matching the
+registered canonical command. Fresh Verify alone may show completion.

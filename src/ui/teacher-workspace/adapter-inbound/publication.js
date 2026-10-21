@@ -109,6 +109,26 @@ function progress(value, draftId) {
   return value;
 }
 
+// Reading a local status can describe saved progress but cannot itself
+// certify a fresh remote verification. The UI may expose actions only from
+// a complete canonical journal snapshot, never from an invented status.
+export function publicationStatusForView(incoming, draftId) {
+  const status = progress(incoming, draftId);
+  if (status.published !== false ||
+      !["not-started", "ready", "writes-complete",
+        "reconciliation-required"].includes(status.phase) ||
+      (status.phase !== "not-started" &&
+        (typeof status.revision !== "string" ||
+         !/^[a-f0-9]{64}$/u.test(status.revision) ||
+         status.remoteSetId === undefined ||
+         status.totalOperations < 1 ||
+         (status.completedOperations > 0 &&
+          (typeof status.remoteSetId !== "string" ||
+           !status.remoteSetId)))))
+    throw Error("publication-progress-invalid");
+  return status;
+}
+
 // An independent Reconcile button may offer Resume only after a complete,
 // read-only recovered checkpoint proves this exact frozen operation. The
 // subsequent user click re-reads canonical status before any new Save.

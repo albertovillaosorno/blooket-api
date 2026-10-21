@@ -34,7 +34,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { publicationStopReason, recoveredPublicationAction,
-  verifiedPublicationResult, waitForPublicationReadCooldown } from
+  verifiedPublicationResult, publicationStatusForView,
+  waitForPublicationReadCooldown } from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 test("an uncertain throttled Save has a distinct waiting label", async () => {
@@ -141,6 +142,7 @@ async function quizFixture(options: {
   readonly holdReconcile?: boolean;
   readonly holdVerify?: boolean;
   readonly writesCompleteAtStart?: boolean;
+  readonly forgedVerifiedStatus?: boolean;
   readonly pauseDuringPublish?: boolean;
 } = {}) {
   const source = await readFile(new URL(
@@ -179,6 +181,7 @@ async function quizFixture(options: {
     publicationStopReason: () => "unknown",
     recoveredPublicationAction,
     verifiedPublicationResult,
+    publicationStatusForView,
     waitForPublicationReadCooldown,
     publishTextDraft: async (_id: unknown, _rev: unknown,
       _send: unknown, _progress: unknown, isCancelled: () => boolean,
@@ -222,7 +225,12 @@ async function quizFixture(options: {
           return await statusRefresh.promise;
         if (statusReads === 3 && options.holdThirdStatus)
           return await thirdStatus.promise;
-        return options.writesCompleteAtStart
+        return options.forgedVerifiedStatus
+          ? { draftId: "synthetic", revision: "a".repeat(64),
+            phase: "verified", published: true,
+            completedOperations: 2, totalOperations: 2,
+            remoteSetId: "synthetic-set", verifiedAt: "stale" }
+          : options.writesCompleteAtStart
           ? { draftId: "synthetic", revision: "a".repeat(64),
             phase: "writes-complete", completedOperations: 2,
             totalOperations: 2, remoteSetId: "synthetic-set",
@@ -233,8 +241,9 @@ async function quizFixture(options: {
             totalOperations: options.reconcileOutcome === "recovered" ?
               3 : 2, remoteSetId: "synthetic-set",
             published: false }
-          : { phase: "ready", completedOperations: 0,
-            totalOperations: 2, published: false };
+          : { draftId: "synthetic", revision: "a".repeat(64),
+            phase: "ready", completedOperations: 0,
+            totalOperations: 2, remoteSetId: null, published: false };
       }
       throw Error("unexpected fixture command");
     },
@@ -255,6 +264,15 @@ async function quizFixture(options: {
 async function flush() {
   for (let i = 0; i < 6; i++) await Promise.resolve();
 }
+
+test("status alone never advertises verified publication",
+  async () => {
+  const ui = await quizFixture({ forgedVerifiedStatus: true });
+  assert.notEqual(ui.root.children[0]?.children[2]?.textContent,
+    "publicationVerified");
+  assert.equal(ui.root.findAction("publish"), undefined);
+  assert.equal(ui.root.findAction("verify"), undefined);
+});
 
 test("uncertain journals offer read-only reconcile and explicit resume",
   async () => {
@@ -496,7 +514,8 @@ test("older status requests cannot re-enable Publish after Verify",
   const initialRefresh = ui.root.findAction("refresh");
   initialRefresh?.handlers.get("click")?.();
   initialRefresh?.handlers.get("click")?.();
-  ui.thirdStatus.resolve({ phase: "writes-complete", published: false,
+  ui.thirdStatus.resolve({ draftId: "synthetic",
+    revision: "a".repeat(64), phase: "writes-complete", published: false,
     completedOperations: 2, totalOperations: 2,
     remoteSetId: "synthetic-set" });
   await flush();
