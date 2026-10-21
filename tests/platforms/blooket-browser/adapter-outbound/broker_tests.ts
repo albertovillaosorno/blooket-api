@@ -181,6 +181,90 @@ test("broker normalizes caller arrays before serializing a question job",
   },
 );
 
+test("untrusted clock samples never dispatch or confirm a browser job",
+  async () => {
+  const token = TOKEN;
+  for (const bad of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY, -1]) {
+    let tick = 1_000;
+    const broker = createBlooketBrowserBridgeBroker({ token,
+      now: () => tick });
+    try {
+      const pending = broker.request({ kind: "sets.list" });
+      tick = bad;
+      assert.equal(broker.next(token), null,
+        "a corrupted lease clock cannot grant a browser request");
+      assert.deepEqual(await pending, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+      assert.equal(broker.status().pending, 0);
+      tick = 2_000;
+      assert.deepEqual(await broker.request({ kind: "sets.list" }), {
+        ok: false, code: "blooket-browser-unavailable",
+      }, "a clock repaired after poisoning cannot grant authority");
+    } finally { broker.close(); }
+  }
+});
+
+test("a clock failing while pruning browser clients cannot lease a job",
+  async () => {
+  let tick = 1_000;
+  let reads = 0;
+  let breakDuringPoll = false;
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN,
+    now: () => {
+      if (breakDuringPoll && ++reads === 2) return Number.NaN;
+      return tick;
+    } });
+  try {
+    // Identified client forces pruneClients to consume a second clock sample.
+    broker.next(TOKEN, "chrome-extension://owner-fixture");
+    const pending = broker.request({ kind: "sets.list" });
+    breakDuringPoll = true;
+    reads = 0;
+    assert.equal(broker.next(TOKEN, "chrome-extension://owner-fixture"),
+      null);
+    assert.deepEqual(await pending, {
+      ok: false, code: "blooket-browser-unavailable",
+    });
+    assert.equal(broker.status().pending, 0);
+  } finally { broker.close(); }
+});
+
+test("late or regressed broker clocks cannot accept a saved-state receipt",
+  async () => {
+  for (const bad of [Number.NaN, 900]) {
+    let tick = 1_000;
+    const broker = createBlooketBrowserBridgeBroker({ token: TOKEN,
+      now: () => tick });
+    try {
+      const pending = broker.request({ kind: "sets.list" });
+      const dispatched = broker.next(TOKEN);
+      assert.ok(dispatched);
+      tick = bad;
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: dispatched.id, ok: true,
+        value: { completeness: "complete", items: [] },
+      }), false, "an untrusted clock cannot certify provider read-back");
+      assert.deepEqual(await pending, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally { broker.close(); }
+  }
+});
+
+test("broker fails a request before allocating a job on clock failure",
+  async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN,
+    now: () => { throw Error("untrusted clock"); } });
+  try {
+    assert.deepEqual(await broker.request({ kind: "sets.list" }), {
+      ok: false, code: "blooket-browser-unavailable",
+    });
+    assert.equal(broker.status().pending, 0);
+  } finally { broker.close(); }
+});
+
 test("broker correlation never invokes an extension reply ID getter",
   async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
