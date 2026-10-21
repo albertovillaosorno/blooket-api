@@ -80,6 +80,10 @@ finalized controls before admitting an auxiliary remote read. Impossible or
 accessor-backed latch data is rejected without running getter code. This
 hardening does not retry Save or establish new real provider acceptance.
 
+The companion 429 probe now also refuses an incomplete form stage, invalid
+clock evidence, and opaque response statuses rather than falsely diagnosing
+a real Save. This remains a read-only wait signal, never permission to retry.
+
 A portable regression on 2026-10-21 exercised an Edit Info read whose
 original opener never mounted its native panel. The reader now attempts to
 reclaim only an unchanged, document-bound metadata watch with no competing
