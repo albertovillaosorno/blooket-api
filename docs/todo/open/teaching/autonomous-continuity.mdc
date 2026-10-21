@@ -1,0 +1,55 @@
+---
+schema_version: 1
+id: "blooket-19"
+status: "active"
+priority: "p1"
+horizon: "publication"
+order: 165
+area: "teaching"
+task: "TODO - Uninterrupted autonomous quiz authoring assurance"
+legacy_task: "Owner-requested autonomous continuation after blooket-12"
+depends_on:
+  - "blooket-11"
+  - "blooket-12"
+contracts:
+  - "docs/technical/adr/blooket-write-plans.md"
+  - "docs/technical/adr/canonical-dependency-direction.md"
+scope:
+  - "src/ui/teacher-workspace/"
+  - "src/api/blooket-write-execution/"
+  - "src/service/browser-extension/"
+  - "src/mcp/teacher-tools/"
+validation:
+  - "npm run check"
+  - "npm run roadmap:check"
+  - "npm test"
+  - "jig validate --root ."
+---
+
+# TODO - Uninterrupted autonomous quiz authoring assurance
+
+## Objective
+
+Make the admitted end-to-end AI-to-quiz flow genuinely autonomous in routine
+conditions, with safe recovery from provider delay and observable progress.
+
+## Acceptance
+
+Prove a registered-tool journey from a teacher request through drafted content,
+explicit admitted media intake, creation or supported edits, and independently
+fresh Blooket verification, without a controller using Blooket Save or other
+routine editing controls. The account can require a human for actual sign-in,
+CAPTCHA, MFA, a real provider restriction or renewed permission; these stops
+must never silently retry an uncertain mutation.
+
+Demonstrate cancellation, read-only recovery and target identity preservation
+when the provider is delayed. Distinguish portable regressions from actual
+Chrome for Testing evidence and do not overwrite older publication journals.
+
+## Evidence
+
+The completed `blooket-12` milestone has dated positive authenticated local
+MCP/CLI creation, image/typing content and text replacement verification.
+This follow-up narrows to uninterrupted autonomous behavior and current
+Chrome for Testing behavior after those completed functional checkpoints.
+It is a new task, not reopening or rewriting the completed milestone.

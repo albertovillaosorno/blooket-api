@@ -8,17 +8,15 @@ acceptance standard: finish usable end-to-end behavior first, then iterate.
 Never relax authentication, data preservation, safe updates, or honest evidence.
 The final ongoing maintenance task is intentionally never auto-completed.
 
-## P0 - Media library usability
+## P1 - Autonomous teacher workflow
 
-### TODO - Automatic prepared-media saves and animated GIF paste
+### TODO - Uninterrupted autonomous quiz authoring assurance
 
-Show the persisted prepared media instead of the source image, preserve
-animation when pasting GIFs instead of importing a static preview, and reject
-duplicate library names. Retain the canonical editable source for recovery.
+Improve the end-to-end teacher authoring journey through the registered
+MCP/CLI path, preserving explicit user authority, verified remote receipts,
+read-only recovery, and progress without routine human workarounds.
 
-[Record](docs/todo/open/media/save-and-gif-paste.mdc)
-
-## P2 - Blooket publication
+[Record](docs/todo/open/teaching/autonomous-continuity.mdc)
 
 ## P4 - Continuous maintenance (never auto-complete)
 
