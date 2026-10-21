@@ -188,6 +188,9 @@ test("unowned, challenged, ambiguous, or edited forms never start fetching",
       (state: ReturnType<typeof setup>) => {
         state.extra['[role="alertdialog"]'] = [node("DIV")];
       },
+      (state: ReturnType<typeof setup>) => {
+        state.extra["dialog[open]"] = [node("DIALOG")];
+      },
     ];
     for (const mutate of variants) await fixture(async state => {
       mutate(state);
@@ -195,6 +198,17 @@ test("unowned, challenged, ambiguous, or edited forms never start fetching",
       assert.equal(state.calls.length, 0);
     });
   },
+);
+
+test("native modal appearing mid-transfer invalidates image evidence",
+  async () => fixture(async state => {
+  state.response = async () => {
+    state.extra["dialog[open]"] = [node("DIALOG")];
+    return new Response(png);
+  };
+  assert.deepEqual(await serialized("fixture", 1, 1_000), failed);
+  assert.equal(state.calls.length, 1);
+}),
 );
 
 test("a prompt appearing during an image read invalidates its receipt",

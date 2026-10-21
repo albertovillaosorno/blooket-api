@@ -186,6 +186,20 @@ test("visible alertdialogs are human stops, not write-ready editors",
   });
 });
 
+test("native open dialog is a compatibility human stop", () => {
+  withEditor(page => {
+    page.document.selectors["dialog[open]"] = [new Node("DIALOG")];
+    assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+      "human-stop");
+    Object.defineProperty(globalThis, "getComputedStyle", {
+      configurable: true,
+      value: () => ({ display: "none", visibility: "visible" }),
+    });
+    assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+      "shape-compatible");
+  });
+});
+
 test("multiple choice answer-slot IDs cannot silently be renumbered", () => {
   withEditor(page => {
     page.fields[1]!.id = "answer-7";

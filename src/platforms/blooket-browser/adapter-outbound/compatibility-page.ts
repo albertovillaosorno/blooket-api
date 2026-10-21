@@ -81,7 +81,11 @@ export function inspectBlooketQuestionEditorCompatibility():
     const alertDialogs = Array.from(document.querySelectorAll(
       '[role="alertdialog"]',
     ));
+    const nativeDialogs = Array.from(document.querySelectorAll(
+      'dialog[open]',
+    ));
     if (challengeFrames.some(isVisible) || alertDialogs.some(isVisible) ||
+        nativeDialogs.some(isVisible) ||
         organizationHeadings.some(heading => isVisible(heading) &&
           heading.textContent?.trim() === "Select your organization"))
       return result("human-stop");

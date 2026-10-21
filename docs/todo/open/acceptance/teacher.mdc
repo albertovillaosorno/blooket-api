@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 native-dialog regression found that the content-free editor
+compatibility probe could claim `shape-compatible` while a `dialog[open]`
+required the teacher's attention. A saved-question image read could likewise
+confirm a digest after an open dialog appeared during transfer. Both now
+refuse those receipts, retaining positive behavior once the dialog is hidden.
+This is synthetic fail-closed coverage of standard HTML, not new provider
+acceptance or evidence of an actual changed Blooket DOM.
+
 A 2026-10-21 red-to-green navigation regression covered native HTML
 `dialog[open]`: an active browser-native modal need not set an explicit ARIA
 role or attribute, and navigating away can discard a teacher decision. The
