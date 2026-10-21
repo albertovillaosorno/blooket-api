@@ -136,8 +136,24 @@ export function createExtensionCapabilityInspectionHost(
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
-  now: () => number = Date.now,
+  clock: () => number = Date.now,
 ) {
+  // One invalid or regressing clock sample invalidates this entire native
+  // inspection. Its deadline can no longer authorize a read or route update.
+  let previousTick = -Infinity;
+  let invalidClock = false;
+  const now = () => {
+    if (invalidClock) return Infinity;
+    try {
+      const tick = clock();
+      if (!Number.isFinite(tick) || tick < 0 || tick < previousTick) {
+        invalidClock = true;
+        return Infinity;
+      }
+      previousTick = tick;
+      return tick;
+    } catch { invalidClock = true; return Infinity; }
+  };
   const script = async (
     func: (...args: never[]) => unknown,
     args: unknown[] = [],
@@ -649,7 +665,9 @@ async function restore(
   if (current.pendingUrl !== undefined ||
       (current.url !== url && !ownedRoutes.includes(current.url ?? "")))
     return false;
-  if (now() >= deadline) {
+  const checkedClock = now();
+  if (!Number.isFinite(checkedClock)) return false;
+  if (checkedClock >= deadline) {
     // Only an unclaimed My Sets route can be restored after the deadline.
     // A previously claimed document cannot be checked at this point.
     if (sourceDocument) return false;

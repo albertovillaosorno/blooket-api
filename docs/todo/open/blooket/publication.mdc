@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A 2026-10-21 red-to-green regression found that the owned capability
+inspector itself could certify a read after an invalid or regressing clock
+sample. It now rejects such samples for the entire native inspection and
+never restores the teacher route under a nonfinite time source. This is
+portable fail-closed coverage, not additional live provider acceptance.
+
 A 2026-10-21 navigation regression established that an invalid clock
 could still authorize a reload of the teacher's original tab. A monotonic,
 finite deadline gate now prevents navigation, read authority transfer, and
