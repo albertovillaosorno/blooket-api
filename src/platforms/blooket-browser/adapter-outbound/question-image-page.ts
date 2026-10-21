@@ -98,6 +98,8 @@ export async function inspectOpenedBlooketQuestionImage(
       )).some(visible) || Array.from(document.querySelectorAll(
         '[role="alertdialog"]',
       )).some(visible) || Array.from(document.querySelectorAll(
+        'dialog[open]',
+      )).some(visible) || Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
       )).some(node => visible(node) &&
         node.textContent?.trim() === "Select your organization")) return false;
