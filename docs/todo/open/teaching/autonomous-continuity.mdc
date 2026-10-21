@@ -214,3 +214,10 @@ uses status, read-only reconcile and fresh verify without dispatching a
 second questions.create. The test asserts the final two-question remote
 collection and exact mutation sequence. No authenticated Blooket data was
 written to produce this evidence.
+
+The autonomous and manual Verify presentation paths now share strict
+validation of the canonical server's UTC ISO timestamp. A nonempty arbitrary
+label or an impossible calendar date cannot serve as a remote verification
+receipt; neither check trusts a timestamp alone without the exact frozen
+journal identity. The prior synthetic tests passed malformed timestamps;
+current red-to-green tests reject them.

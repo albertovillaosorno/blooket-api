@@ -109,6 +109,17 @@ function progress(value, draftId) {
   return value;
 }
 
+// The canonical server emits the moment of two independent remote reads as
+// Date#toISOString(). An arbitrary nonempty label cannot certify that proof.
+function hasVerifiedTimestamp(value) {
+  if (typeof value !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
+        .test(value)) return false;
+  const moment = Date.parse(value);
+  return Number.isFinite(moment) &&
+    new Date(moment).toISOString() === value;
+}
+
 // Reading a local status can describe saved progress but cannot itself
 // certify a fresh remote verification. The UI may expose actions only from
 // a complete canonical journal snapshot, never from an invented status.
@@ -158,8 +169,7 @@ export function verifiedPublicationResult(previous, incoming, draftId) {
   const before = progress(previous, draftId);
   const after = progress(incoming, draftId);
   const success = after.phase === "verified" &&
-    after.published === true && typeof after.verifiedAt === "string" &&
-    after.verifiedAt.length > 0;
+    after.published === true && hasVerifiedTimestamp(after.verifiedAt);
   const paused = ["wait", "session-required", "human-action-required"]
     .includes(after.phase) && after.published === false;
   if (before.phase !== "writes-complete" || before.published !== false ||
@@ -283,8 +293,7 @@ export async function publishTextDraft(
           throw Error("publication-progress-invalid");
         // Only the product's matching fresh receipt may claim success.
         if (verified.published && (
-          typeof verified.verifiedAt !== "string" ||
-          !verified.verifiedAt.trim() ||
+          !hasVerifiedTimestamp(verified.verifiedAt) ||
           verified.revision !== frozenRevision ||
           typeof current.remoteSetId !== "string" ||
           !current.remoteSetId ||
