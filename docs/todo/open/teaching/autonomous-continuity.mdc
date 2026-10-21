@@ -221,3 +221,10 @@ label or an impossible calendar date cannot serve as a remote verification
 receipt; neither check trusts a timestamp alone without the exact frozen
 journal identity. The prior synthetic tests passed malformed timestamps;
 current red-to-green tests reject them.
+
+A later red-to-green progress regression rejected contradictory phase metadata:
+ordinary `ready`, `advanced` or `verified` receipts cannot carry a provider
+challenge `state`, a `write-not-confirmed` reconciliation reason or an
+out-of-phase verification timestamp. Native stop metadata is accepted only
+with its corresponding bounded stop phase. This prevents mislabeling an
+uncertain read as another authorized mutation or as verified success.
