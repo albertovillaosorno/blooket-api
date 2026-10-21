@@ -33,6 +33,17 @@ For an authorized new quiz, save the validated draft with
 result before continuing. Each step performs at most one remote mutation; a
 completed write sequence is not final publication proof.
 
+After explicit authorization to publish this saved draft, advance confirmed
+`advanced` steps automatically while completed operations are below the
+frozen total. Do not ask for routine confirmation between already-authorized
+steps. Never repeat a Save whose acknowledgement is missing: stop on
+`reconciliation-required`, run read-only reconciliation first and resume only
+when it proves the exact next checkpoint.
+
+Stop without new writes on provider wait, sign-in, human challenge, identity
+conflict or cancellation. When all writes finish, run the separate fresh
+verification before claiming success.
+
 Use `blooket_publication_status` after a disconnect. An uncertain result or
 `reconciliation-required` phase requires `blooket_publication_reconcile`;
 never blindly retry or create a replacement draft to evade its journal.

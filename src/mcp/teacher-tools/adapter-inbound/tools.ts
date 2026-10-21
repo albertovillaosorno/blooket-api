@@ -276,9 +276,12 @@ const tools = [
     action === "step"
       ? "Publish an admitted saved draft in Blooket, one journaled " +
         "set/question write per call. Supply its saved revision. " +
-        "Inspect progress; never retry an uncertain write blindly. " +
-        "Prepared question images use stable library IDs. Resume append " +
-        "work here after its initial append call."
+        "Once the teacher authorizes the saved draft, continue confirmed " +
+        "steps automatically, with no routine confirmation between them; " +
+        "stop on uncertain results, provider waits and human gates. " +
+        "Never blindly replay an uncertain Save. Prepared question images " +
+        "use stable library IDs. Resume append work here after its " +
+        "initial append call, then verify fresh remote state."
       : action === "replace"
         ? "Edit exactly one existing text question without changing its type " +
           "or answer count. Supply the exact set ID and saved full desired " +

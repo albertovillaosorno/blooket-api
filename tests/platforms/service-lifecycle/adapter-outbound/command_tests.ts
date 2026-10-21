@@ -77,6 +77,11 @@ test("MCP annotations distinguish recoverable journals from remote Save",
   }
   assert.equal(registered.get("blooket_publication_verify")
     ?.readOnlyHint, true);
+  const step = listTeacherTools().find(tool =>
+    tool.name === "blooket_publication_step");
+  assert.ok(step);
+  assert.match(step.description, /continue confirmed steps automatically/u);
+  assert.match(step.description, /stop on uncertain results/u);
 });
 
 test("teacher tool advertises scoped publication capability preflight", () => {
