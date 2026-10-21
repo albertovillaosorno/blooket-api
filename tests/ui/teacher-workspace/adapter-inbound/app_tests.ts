@@ -77,6 +77,8 @@ test("localized publication errors identify repairable single-row edits",
     "publicationStopEditUnsupported");
   assert.equal(label(Error("blooket-write-baseline-not-captured")),
     "publicationStopVerification");
+  assert.equal(label(Error("blooket-browser-failed")),
+    "publicationStopVerification");
   for (const key of ["publicationStopSingleEdit",
     "publicationStopEditUnsupported", "publicationStopVerification"]) {
     assert.equal(source.split(key + ":").length - 1, 2,
