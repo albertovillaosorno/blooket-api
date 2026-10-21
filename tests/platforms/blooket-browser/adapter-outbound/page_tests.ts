@@ -697,9 +697,10 @@ test(
   },
 );
 
-test("native and ARIA dialogs cannot certify saved My Sets content",
+test("native and ARIA modal dialogs cannot certify saved My Sets content",
   () => {
-  for (const selector of ['dialog[open]', '[role="alertdialog"]']) {
+  for (const selector of ['dialog[open]', '[role="alertdialog"]',
+    '[role="dialog"][aria-modal="true"]']) {
     const { document, main } = base();
     main.selectors["article"] = [card()];
     const modal = node("DIALOG");

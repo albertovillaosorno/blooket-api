@@ -158,6 +158,9 @@ export function inspectBlooketPage(
     const humanDialog = [
       ...Array.from(document.querySelectorAll('dialog[open]')),
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"]',
+      )),
     ].some(visible);
     if (operation.kind === "session.observe" && visibleChallenges)
       return { ok: true, value: "security-challenge" };

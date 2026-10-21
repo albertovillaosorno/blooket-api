@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A related 2026-10-21 read-only provider regression found that a visible
+ordinary ARIA modal (`role="dialog"`, `aria-modal="true"`) without a special
+organization heading could still certify My Sets cards, and the bootstrap
+collector could read packet text behind that modal or a password overlay.
+Both readers now refuse these states, while CSS-hidden former modal panels
+do not block a clean saved-state collection. The tests use fictional DOM
+fixtures only and do not claim a new live Blooket event.
+
 A second 2026-10-21 red-to-green transport regression found that a
 numerically finite but astronomically large broker clock could yield an
 unrepresentable write-lease deadline. The broker previously queued the Save
