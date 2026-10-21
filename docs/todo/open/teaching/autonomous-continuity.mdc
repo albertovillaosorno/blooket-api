@@ -156,3 +156,10 @@ The action is now admitted only after strict own-field decoding and exact
 revision, remote set, operation count and draft identity checks. The next
 explicit teacher click still rereads canonical status before any mutation.
 Invalid or inconclusive recovery offers only a fresh status Refresh.
+
+A third 2026-10-21 red-to-green Studio regression found that the standalone
+Verify action could display `publicationVerified` after a malformed,
+cross-draft or cross-set reply. It now compares the complete frozen draft,
+revision, set and operation count, and requires the server's verified-at field
+for a successful claim. A genuinely inconclusive rate-limited read still
+presents its own wait status; no additional Save is issued.

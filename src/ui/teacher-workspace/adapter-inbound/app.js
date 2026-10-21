@@ -9,6 +9,7 @@ import {
 } from "./library.js";
 import {
   publishTextDraft, publicationStopReason, recoveredPublicationAction,
+  verifiedPublicationResult,
   waitForPublicationReadCooldown,
 } from "./publication.js";
 import {
@@ -2271,6 +2272,8 @@ async function loadQuizzes() {
               recoveryChoice = recoveredPublicationAction(
                 preceding, latest, id,
               );
+            if (action === "verify" && !controller.signal.aborted)
+              latest = verifiedPublicationResult(preceding, latest, id);
           }
           state.textContent = controller.signal.aborted
             ? t("publicationPaused") : publicationLabel(latest);

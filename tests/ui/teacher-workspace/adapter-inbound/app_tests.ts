@@ -34,7 +34,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { publicationStopReason, recoveredPublicationAction,
-  waitForPublicationReadCooldown } from
+  verifiedPublicationResult, waitForPublicationReadCooldown } from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 test("an uncertain throttled Save has a distinct waiting label", async () => {
@@ -139,6 +139,8 @@ async function quizFixture(options: {
   readonly uncertainAtStart?: boolean;
   readonly reconcileOutcome?: "recovered" | "reconciliation-required";
   readonly holdReconcile?: boolean;
+  readonly holdVerify?: boolean;
+  readonly writesCompleteAtStart?: boolean;
   readonly pauseDuringPublish?: boolean;
 } = {}) {
   const source = await readFile(new URL(
@@ -154,6 +156,7 @@ async function quizFixture(options: {
   const thirdStatus = deferred<unknown>();
   const finished = deferred<unknown>();
   const reconcileResponse = deferred<unknown>();
+  const verifyResponse = deferred<unknown>();
   const secondList = deferred<string[]>();
   const thirdList = deferred<string[]>();
   let listReads = 0, statusReads = 0;
@@ -175,6 +178,7 @@ async function quizFixture(options: {
     report: (error: unknown) => { reported.push(error); },
     publicationStopReason: () => "unknown",
     recoveredPublicationAction,
+    verifiedPublicationResult,
     waitForPublicationReadCooldown,
     publishTextDraft: async (_id: unknown, _rev: unknown,
       _send: unknown, _progress: unknown, isCancelled: () => boolean,
@@ -203,6 +207,8 @@ async function quizFixture(options: {
       };
       if (name === "blooket.publication.reconcile" &&
           options.holdReconcile) return await reconcileResponse.promise;
+      if (name === "blooket.publication.verify" && options.holdVerify)
+        return await verifyResponse.promise;
       if (name === "blooket.publication.reconcile" &&
           options.reconcileOutcome)
         return { draftId: "synthetic", revision: "a".repeat(64),
@@ -216,7 +222,12 @@ async function quizFixture(options: {
           return await statusRefresh.promise;
         if (statusReads === 3 && options.holdThirdStatus)
           return await thirdStatus.promise;
-        return options.uncertainAtStart
+        return options.writesCompleteAtStart
+          ? { draftId: "synthetic", revision: "a".repeat(64),
+            phase: "writes-complete", completedOperations: 2,
+            totalOperations: 2, remoteSetId: "synthetic-set",
+            published: false }
+          : options.uncertainAtStart
           ? { draftId: "synthetic", revision: "a".repeat(64),
             phase: "reconciliation-required", completedOperations: 1,
             totalOperations: options.reconcileOutcome === "recovered" ?
@@ -234,7 +245,7 @@ async function quizFixture(options: {
     };
   await api.loadQuizzes();
   return { root, calls, reported, statusRefresh, thirdStatus, finished,
-    reconcileResponse,
+    reconcileResponse, verifyResponse,
     secondList, thirdList, loadQuizzes: api.loadQuizzes,
     isCancelled: () => cancelled?.(),
     cooldownObserved: () => cooldownObserved,
@@ -297,6 +308,50 @@ test("inconclusive read-only recovery never exposes a write action",
   assert.equal(ui.root.findAction("publish"), undefined);
   assert.equal(ui.calls.includes("publishTextDraft"), false);
   assert.ok(ui.root.findAction("refresh"));
+});
+
+test("direct Verify refuses stale or cross-set claims of success",
+  async () => {
+  const canonical = {
+    draftId: "synthetic", revision: "a".repeat(64),
+    phase: "verified", completedOperations: 2, totalOperations: 2,
+    remoteSetId: "synthetic-set", published: true,
+    verifiedAt: "2026-10-21T12:00:00.000Z",
+  };
+  for (const invalid of [
+    { ...canonical, draftId: "another-draft" },
+    { ...canonical, remoteSetId: "foreign-set" },
+    { ...canonical, revision: "b".repeat(64) },
+    { ...canonical, completedOperations: 1 },
+    { ...canonical, verifiedAt: "" },
+    { ...canonical, verifiedAt: undefined },
+    { phase: "verified", published: true },
+  ]) {
+    const ui = await quizFixture({ writesCompleteAtStart: true,
+      holdVerify: true });
+    ui.root.findAction("verify")?.handlers.get("click")?.();
+    ui.verifyResponse.resolve(invalid);
+    await flush();
+    assert.notEqual(ui.root.children[0]?.children[2]?.textContent,
+      "publicationVerified");
+    assert.ok(ui.root.findAction("refresh"));
+  }
+  const ui = await quizFixture({ writesCompleteAtStart: true,
+    holdVerify: true });
+  ui.root.findAction("verify")?.handlers.get("click")?.();
+  ui.verifyResponse.resolve(canonical);
+  await flush();
+  assert.equal(ui.root.children[0]?.children[2]?.textContent,
+    "publicationVerified");
+  const waiting = await quizFixture({ writesCompleteAtStart: true,
+    holdVerify: true });
+  waiting.root.findAction("verify")?.handlers.get("click")?.();
+  waiting.verifyResponse.resolve({ ...canonical, phase: "wait",
+    published: false, state: "rate-limited", verifiedAt: undefined });
+  await flush();
+  assert.equal(waiting.root.children[0]?.children[2]?.textContent,
+    "publicationRateLimited");
+  assert.equal(waiting.root.findAction("publish"), undefined);
 });
 
 test("malformed recovered response never enables Verify or Resume",
