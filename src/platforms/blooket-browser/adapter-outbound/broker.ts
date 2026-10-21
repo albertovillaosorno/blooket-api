@@ -324,7 +324,9 @@ export function createBlooketBrowserBridgeBroker(
       if (typeof value !== "object" || value === null) return false;
       // An untrusted extension reply may contain an ID accessor. Never
       // execute it merely to select a pending browser mutation attempt.
-      const id = Object.getOwnPropertyDescriptor(value, "id");
+      let id: PropertyDescriptor | undefined;
+      try { id = Object.getOwnPropertyDescriptor(value, "id"); }
+      catch { return false; }
       if (!id || !id.enumerable || !("value" in id) ||
           typeof id.value !== "string") return false;
       const job = pending.get(id.value);
