@@ -312,6 +312,34 @@ test("Stop during a pending read-only recovery never enables Resume",
   assert.ok(ui.root.findAction("refresh"));
 });
 
+test("a late successful Publish reply after Stop cannot claim verification",
+  async () => {
+  const ui = await quizFixture();
+  ui.root.findAction("publish")?.handlers.get("click")?.();
+  ui.root.findAction("stop")?.handlers.get("click")?.();
+  ui.finished.resolve({ phase: "verified", published: true });
+  await flush();
+  assert.equal(ui.root.children[0]?.children[2]?.textContent,
+    "publicationPaused");
+  assert.equal(ui.root.findAction("verify"), undefined);
+  assert.equal(ui.root.findAction("publish"), undefined);
+});
+
+test("late recovered Reconcile after Stop cannot claim progress in Studio",
+  async () => {
+  const ui = await quizFixture({ uncertainAtStart: true,
+    holdReconcile: true });
+  ui.root.findAction("reconcile")?.handlers.get("click")?.();
+  ui.root.findAction("stop")?.handlers.get("click")?.();
+  ui.reconcileResponse.resolve({ phase: "recovered", published: false,
+    completedOperations: 2, totalOperations: 3,
+    remoteSetId: "synthetic-set" });
+  await flush();
+  assert.equal(ui.root.children[0]?.children[2]?.textContent,
+    "publicationPaused");
+  assert.equal(ui.root.findAction("publish"), undefined);
+});
+
 test("late Quizzes refresh never hides Stop during publication", async () => {
   const ui = await quizFixture();
   const refresh = ui.root.findAction("refresh");
