@@ -443,6 +443,20 @@ export async function inspectPreparationAdmission(
   };
 }
 
+// Human-visible names are unique in one library even though assets use UUIDs.
+// Normalize canonically and case-fold so differing accents' byte forms,
+// capitalization or surrounding whitespace cannot create duplicates.
+function libraryNameKey(name: string): string {
+  return name.normalize("NFC").trim().toLocaleLowerCase();
+}
+function requireUniqueLibraryName(
+  records: readonly LibraryMetadata[], name: string, exceptId?: string,
+): void {
+  if (records.some(record => record.id !== exceptId &&
+      libraryNameKey(record.original.name) === libraryNameKey(name)))
+    throw new Error("filename-already-exists");
+}
+
 export async function importLibraryImage(
   root: string,
   input: unknown,
@@ -479,9 +493,9 @@ export async function importLibraryImage(
   return await withLibraryLock(library, async () => {
     const id = stableId ?? randomUUID();
     const asset = "photos/" + id + "." + compacted.value.format;
+    const records = await listLibrary(library);
     if (stableId !== undefined) {
-      const existing = (await listLibrary(library))
-        .find(item => item.id === id);
+      const existing = records.find(item => item.id === id);
       if (existing !== undefined) {
         if (existing.original.name !== request["name"] ||
             existing.original.description !== request["description"] ||
@@ -494,6 +508,7 @@ export async function importLibraryImage(
         return existing;
       }
     }
+    requireUniqueLibraryName(records, request["name"] as string);
     const path = await safeLibraryPath(library, asset, true);
     // A crash may leave bytes without metadata. Do not overwrite those
     // uncertain bytes when an explicit MCP import is replayed.
@@ -547,12 +562,12 @@ export async function editLibraryImage(
     throw new Error("invalid-original-metadata");
   const library = preferences.mediaRoot;
   return await withLibraryLock(library, async () => {
-    const record = (await listLibrary(library)).find(
-      (item) => item.id === request["id"],
-    );
+    const records = await listLibrary(library);
+    const record = records.find((item) => item.id === request["id"]);
     if (!record) throw new Error("media-not-found");
     if (record.revision !== request["revision"])
       throw new Error("revision-conflict");
+    requireUniqueLibraryName(records, original["name"] as string, record.id);
     const changed =
       original["name"] !== record.original.name ||
       original["description"] !== record.original.description;

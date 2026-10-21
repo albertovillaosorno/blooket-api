@@ -223,14 +223,21 @@ test(
         edited.revision,
       );
       assert.ok(prepared.prepared!.bytes < 2_500_000);
+      // Save and prepare already persists the exact result in the configured
+      // media root, independently of a separate browser Download click.
+      const persisted = await readPreparedLibraryImage(
+        library, record.id, prepared.revision,
+      );
+      assert.equal(persisted.file, prepared.prepared!.file);
+      assert.deepEqual(await readFile(join(library, persisted.file)),
+        persisted.bytes);
       assert.equal((await loadPreferences(root)).defaults.width, 1280);
       const canonical = await readFile(join(library, record.asset));
       assert.notDeepEqual(canonical, Buffer.from(bytes));
       const sharp = await loadSharp();
       assert.equal((await sharp(canonical).metadata()).format, "webp");
-      const duplicateName = await importLibraryImage(root, input);
-      assert.notEqual(duplicateName.id, record.id);
-      assert.notEqual(duplicateName.asset, record.asset);
+      await assert.rejects(importLibraryImage(root, input),
+        /filename-already-exists/u);
       await assert.rejects(
         editLibraryImage(root, {
           id: record.id,
@@ -245,6 +252,34 @@ test(
     }
   },
 );
+test("import and rename reject duplicate human-visible image names",
+  async () => {
+  const { root, input } = await setup();
+  try {
+    const first = await importLibraryImage(root, input);
+    for (const name of [input.name, " mi foto ", "MI FOTO",
+      "Mi foto".normalize("NFD")]) {
+      await assert.rejects(importLibraryImage(root, { ...input, name }),
+        /filename-already-exists/u);
+    }
+    const accented = await importLibraryImage(root,
+      { ...input, name: "Café" });
+    await assert.rejects(importLibraryImage(root,
+      { ...input, name: "Cafe\u0301" }),
+    /filename-already-exists/u);
+    assert.equal(accented.original.name, "Café");
+    const other = await importLibraryImage(root,
+      { ...input, name: "Different" });
+    await assert.rejects(editLibraryImage(root, {
+      id: other.id, revision: other.revision, edit: other.edit,
+      original: { name: " MI FOTO ", description: "changed" },
+    }), /filename-already-exists/u);
+    assert.equal((await listLibrary(
+      (await loadPreferences(root)).mediaRoot)).length, 3);
+    assert.equal(first.original.name, input.name);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test(
   "AI metadata requests cannot choose filenames or " +
     "replace original fields",
@@ -730,6 +765,7 @@ test(
       const jpeg = await sharp(bytes).jpeg().toBuffer();
       const jpg = await importLibraryImage(root, {
         ...input,
+        name: "Mi foto JPEG",
         base64: Buffer.from(jpeg).toString("base64"),
       });
       assert.notEqual(jpg.id, png.id);
