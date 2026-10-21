@@ -96,6 +96,8 @@ export async function inspectOpenedBlooketQuestionImage(
       if (Array.from(document.querySelectorAll(
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
       )).some(visible) || Array.from(document.querySelectorAll(
+        '[role="alertdialog"]',
+      )).some(visible) || Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
       )).some(node => visible(node) &&
         node.textContent?.trim() === "Select your organization")) return false;

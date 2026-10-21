@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 synthetic image-read regression found that an owned question
+media GET could still return a positive prepared-byte identity if a visible
+`alertdialog` appeared before or during the async transfer. The page helper
+now rechecks that human gate on each existing ownership observation and
+refuses the digest, without revealing URLs or retrying Save. This is portable
+fail-closed evidence, not a new Blooket upload or live receipt.
+
 The same 2026-10-21 alertdialog drift scenario also fooled the independent
 read-only question-editor compatibility probe into reporting `shape-compatible`
 during a visible human decision prompt. It now reports `human-stop` until that
