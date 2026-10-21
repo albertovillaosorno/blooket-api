@@ -77,6 +77,15 @@ export function inspectBlooketPage(
         return true;
       }
     });
+    // An identity login can remain mounted behind a human prompt, just like
+    // saved dashboard cards. That is not evidence of a usable login form.
+    const humanDialog = [
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"]',
+      )),
+    ].some(visible);
     // Cloudflare can replace its headings during manual verification,
     // including after the checkbox was clicked. The exact document title
     // at either admitted Blooket origin is still a provider security stop;
@@ -94,6 +103,8 @@ export function inspectBlooketPage(
     ) {
       if (visibleChallenges)
         return { ok: true, value: "security-challenge" };
+      if (humanDialog)
+        return { ok: true, value: "unexpected-page" };
       if (url.pathname !== "/login")
         return { ok: true, value: "unexpected-page" };
       const headings = Array.from(
@@ -153,15 +164,7 @@ export function inspectBlooketPage(
       ),
     ).some((heading) => visible(heading) &&
       heading.textContent?.trim() === "Select your organization");
-    // A visible HTML dialog or ARIA alertdialog can retain a teacher decision
-    // even while the old authenticated My Sets cards remain mounted.
-    const humanDialog = [
-      ...Array.from(document.querySelectorAll('dialog[open]')),
-      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
-      ...Array.from(document.querySelectorAll(
-        '[role="dialog"][aria-modal="true"]',
-      )),
-    ].some(visible);
+
     if (operation.kind === "session.observe" && visibleChallenges)
       return { ok: true, value: "security-challenge" };
     if (operation.kind === "session.observe" && organizationPrompt)
