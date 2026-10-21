@@ -64,11 +64,29 @@ export async function inspectDetachedBlooketCapabilities(
   pause: (ms: number) => Promise<void>,
   now: () => number = Date.now,
 ): Promise<ExtensionCapabilityInspectionResult> {
-  const started = now();
+  // Invalid or regressing clock readings cannot prove that a capability
+  // inspection completed within the broker lease. Once invalid, the whole
+  // temporary read must fail even if later samples appear plausible.
+  let lastTick = -Infinity;
+  let validClock = true;
+  const checkedNow = () => {
+    if (!validClock) return Infinity;
+    try {
+      const tick = now();
+      if (!Number.isFinite(tick) || tick < 0 || tick < lastTick) {
+        validClock = false;
+        return Infinity;
+      }
+      lastTick = tick;
+      return tick;
+    } catch { validClock = false; return Infinity; }
+  };
+  const started = checkedNow();
   if (!Number.isFinite(started)) return failed();
   // Include background-tab loading and capability inspection under the
   // same deadline; the localhost bridge expects a bounded read reply.
   const deadline = started + 8_000;
+  if (!Number.isFinite(deadline)) return failed();
   let tabId: number | undefined;
   let completed = false;
   let result: ExtensionCapabilityInspectionResult = failed();
@@ -79,7 +97,7 @@ export async function inspectDetachedBlooketCapabilities(
     // The capability host still performs its own native document checks;
     // this outer probe never assumes a complete tab means hydrated content.
     let ready = false;
-    for (let poll = 0; poll < 50 && now() - started < 3_000; poll++) {
+    for (let poll = 0; poll < 50 && checkedNow() - started < 3_000; poll++) {
       const tab = snapshotBlooketReadTab(
         await chrome.tabs.get(tabId!),
       );
@@ -89,12 +107,12 @@ export async function inspectDetachedBlooketCapabilities(
       if (load === "ready") { ready = true; break; }
       await pause(50);
     }
-    if (!ready || now() - started >= 3_000) return failed();
+    if (!ready || checkedNow() - started >= 3_000) return failed();
     const host = createExtensionCapabilityInspectionHost(
-      chrome, tabId!, pause, now,
+      chrome, tabId!, pause, checkedNow,
     );
     result = await host.inspect({ textOnly, deadline });
-    if (now() >= deadline) return failed();
+    if (checkedNow() >= deadline) return failed();
   } catch { return failed(); }
   finally {
     if (tabId !== undefined) {

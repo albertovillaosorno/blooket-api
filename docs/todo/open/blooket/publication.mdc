@@ -73,6 +73,11 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A second 2026-10-21 red-to-green regression found the same invalid-clock
+admission in temporary capability scans. Their outer clock now rejects
+nonfinite and backward samples, bounds inner page inspection and refuses
+receipts if cleanup or time evidence fails, without touching the teacher tab.
+
 A 2026-10-21 detached-read regression proved that a nonfinite or
 backward-moving clock could evade a read deadline. The isolated auxiliary
 question reader now rejects that clock before opening a tab or verifying a
