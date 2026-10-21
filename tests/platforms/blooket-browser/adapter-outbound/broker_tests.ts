@@ -337,6 +337,46 @@ test("broker correlation never invokes an extension reply ID getter",
   },
 );
 
+test("a hostile reply proxy cannot crash browser job correlation",
+  async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const pending = broker.request({ kind: "sets.list" });
+    const job = broker.next(TOKEN);
+    assert.ok(job);
+    const hostile = new Proxy({}, {
+      getOwnPropertyDescriptor() { throw Error("untrusted proxy trap"); },
+    });
+    assert.equal(broker.complete(TOKEN, hostile), false);
+    assert.equal(broker.status().pending, 1);
+    assert.equal(broker.complete(TOKEN, {
+      schemaVersion: 1, id: job.id, ok: true,
+      value: { items: [], completeness: "complete" },
+    }), true);
+    assert.deepEqual(await pending, {
+      ok: true, value: { items: [], completeness: "complete" },
+    });
+  } finally { broker.close(); }
+});
+
+test("a decoded reply with hostile reflection fails its own lease closed",
+  async () => {
+  const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
+  try {
+    const pending = broker.request({ kind: "sets.list" });
+    const job = broker.next(TOKEN);
+    assert.ok(job);
+    const hostile = new Proxy({ id: job.id }, {
+      ownKeys() { throw Error("untrusted reflection trap"); },
+    });
+    assert.equal(broker.complete(TOKEN, hostile), false);
+    assert.deepEqual(await pending, {
+      ok: false, code: "blooket-browser-failed",
+    });
+    assert.equal(broker.status().pending, 0);
+  } finally { broker.close(); }
+});
+
 test("pairing reset revokes old access and settles pending jobs", async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN });
   const pending = broker.request({ kind: "sets.list" });

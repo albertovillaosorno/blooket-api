@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green transport test found that a caller-supplied
+reply proxy could throw from `getOwnPropertyDescriptor("id")`, escaping the
+browser broker's synchronous correlation boundary instead of returning a
+stable rejection. Correlation now catches that hostile reflection before
+selecting any lease, leaving the legitimate pending request intact. A
+separate test covers a trap during subsequent response decoding and requires
+the identified lease to fail closed. Neither test uses real account traffic.
+
 A 2026-10-21 identity-origin regression found that an otherwise valid public
 login form could report `signed-out` despite an open native dialog, ordinary
 ARIA modal or `alertdialog`. The session reader now reports `unexpected-page`
