@@ -3,6 +3,8 @@ import {
   sampleLibrary,
   representativeSolidColor,
   clipboardImageUrl,
+  preferredPasteSource,
+  preparedMediaUrl,
   readClipboardImage,
 } from "./library.js";
 import { publishTextDraft, publicationStopReason } from "./publication.js";
@@ -151,7 +153,9 @@ const words = {
     quizzes: "Quizzes",
     settings: "Configuración",
     yourSpace: "Tu espacio de enseñanza",
-    libraryHelp: "Tus fotos y GIF, listos para el próximo quiz.",
+    libraryHelp:
+      "Imágenes preparadas para tus quizzes. Para pegar un GIF animado, " +
+      "usa el archivo original o su enlace directo .gif.",
     addImage: "Agregar imagen",
     pasteImage: "Pegar",
     shuffleLibrary: "Otra selección",
@@ -514,7 +518,9 @@ const words = {
     quizzes: "Quizzes",
     settings: "Settings",
     yourSpace: "Your teaching space",
-    libraryHelp: "Your photos and GIFs, ready for the next quiz.",
+    libraryHelp:
+      "Prepared images for your quizzes. To paste an animated GIF, use " +
+      "the original file or its direct .gif link.",
     addImage: "Add image",
     pasteImage: "Paste",
     shuffleLibrary: "Another selection",
@@ -1001,7 +1007,7 @@ function renderGallery() {
     const card = document.createElement("button");
     card.className = "media-card";
     const image = document.createElement("img");
-    image.src = "/media/" + record.id;
+    image.src = preparedMediaUrl(record);
     image.alt = record.original.name;
     image.loading = "lazy";
     const caption = document.createElement("div");
@@ -1308,13 +1314,13 @@ window.addEventListener("paste", (event) => {
     event.target.closest?.("input,textarea,[contenteditable=true]")
   )
     return;
-  const image = [...(event.clipboardData?.files ?? [])].find((file) =>
-    file.type.startsWith("image/"),
+  const source = preferredPasteSource(
+    event.clipboardData?.files ?? [],
+    event.clipboardData?.getData("text/plain"),
   );
-  const url = clipboardImageUrl(event.clipboardData?.getData("text/plain"));
-  if (!image && !url) return;
+  if (!source) return;
   event.preventDefault();
-  void pasteSource(image ? { image } : { url });
+  void pasteSource(source);
 });
 function openEditor(record, sourceUrl) {
   if (editorBusy) {

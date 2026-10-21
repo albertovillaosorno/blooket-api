@@ -95,10 +95,48 @@ export function clipboardImageUrl(text) {
   }
 }
 
+export function clipboardGifUrl(text) {
+  const url = clipboardImageUrl(text);
+  if (!url) return null;
+  try { return /\.gif$/iu.test(new URL(url).pathname) ? url : null; }
+  catch { return null; }
+}
+
+export function preferredPasteSource(files, text) {
+  const images = [...files].filter(file => file.type.startsWith("image/"));
+  const originalGif = images.find(file => file.type === "image/gif");
+  if (originalGif) return { image: originalGif };
+  // A pasted PNG can be a browser-rendered thumbnail of a linked GIF.
+  const gifUrl = clipboardGifUrl(text);
+  if (gifUrl) return { url: gifUrl };
+  if (images.length) return { image: images[0] };
+  const url = clipboardImageUrl(text);
+  return url ? { url } : null;
+}
+
+export function preparedMediaUrl(record) {
+  return "/media/" + record.id +
+    (record.prepared?.recipeRevision === record.revision
+      ? "?variant=prepared&revision=" + record.revision : "");
+}
+
 export async function readClipboardImage(clipboard) {
   if (clipboard.read) {
     const items = await clipboard.read();
-    const supported = ["image/png", "image/gif", "image/jpeg", "image/webp"];
+    // Some clipboard providers expose a static PNG preview alongside the
+    // original animated GIF. Prefer the native GIF bytes across all items.
+    for (const item of items)
+      if (item.types.includes("image/gif"))
+        return { image: await item.getType("image/gif") };
+    // An explicitly linked GIF retains animation even when the clipboard's
+    // only bitmap is a flattened PNG preview.
+    for (const item of items) {
+      if (!item.types.includes("text/plain")) continue;
+      const text = await (await item.getType("text/plain")).text();
+      const gifUrl = clipboardGifUrl(text);
+      if (gifUrl) return { url: gifUrl };
+    }
+    const supported = ["image/png", "image/jpeg", "image/webp"];
     for (const item of items) {
       const type = supported.find((candidate) =>
         item.types.includes(candidate),
