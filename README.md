@@ -11,9 +11,11 @@ MCP gateway.
 
 **This is a working development prototype.** Canonical CLI/MCP publication
 has created and freshly verified a private set with a question image and a
-subsequent appended text question in the authorized Chrome session. Editing an
-existing question, unattended multi-question publication, native Safari,
-production updates, and recipient-ChatGPT acceptance remain unfinished.
+subsequent appended text question in the authorized Chrome session. One
+existing text-only question replacement has also passed fresh remote
+verification, but unattended multi-question publication, broader edits,
+native Safari, production updates and recipient-ChatGPT acceptance remain
+unfinished.
 The project is independent of Blooket and is not endorsed by the platform.
 
 ## What works today
