@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-12"
-status: "active"
+status: "completed"
 priority: "p1"
 horizon: "publication"
 order: 120
@@ -68,6 +68,34 @@ pre-publication gate. Translate remaining states and actionable errors into
 English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
+
+The complete registered-tool authoring journey has now produced a real,
+private two-question image/typing quiz. Its image was explicitly imported,
+enriched and prepared through MCP, preserving the original Spanish metadata
+and producing a current-revision 24,434-byte rendition.
+
+The product created the set and saved both questions without controller Save
+or editorial approval. Following a recoverable read preflight stop, fresh
+canonical verification returned `published: true` with three of three
+operations complete on 2026-10-21 at 15:56 UTC.
+
+A separate real autonomous text replacement was freshly verified at 03:32 UTC.
+The Quizzes panel's prior recovered journey verified at 03:59 UTC, with its
+controller-assisted throttle recovery explicitly distinguished from autonomous
+writes. The current companion and local service are now loaded and connected.
+
+Registered tools cross the actual CLI/service/authenticated-browser boundary.
+This is local registered-tool acceptance, not proof that arbitrary chat
+attachments automatically reach MCP or that a remote OAuth client was tested.
+Native Mac/Safari and ChatGPT-client assurance remain in blooket-15.
+
+Focused orchestration checks cover progress, cancellation, safe reconciliation,
+first-step append/replacement binding, refusal of changed identity and separate
+verification. Transient provider-read stops remain visible and recoverable;
+completion does not promise an uninterrupted UI run under external throttling.
+
+The dated evidence below is historical; earlier pending implementation notes
+do not supersede this completed functional checkpoint.
 
 A 2026-10-21 red-to-green Studio regression found that a canonical
 `blooket-browser-failed` read stop appeared as a generic pause. Recognized
@@ -262,6 +290,10 @@ Blooket draft authority.
 
 ## Blockers
 
-Canonical external publication entrypoints and admitted media upload remain
-functional work. No teacher approval is required before an otherwise admitted
-publication; human intervention is reserved for genuine validation boundaries.
+No blocker remains for admitted AI authoring, explicit small-image intake,
+preparation, canonical publication, correction and separate fresh verification.
+Larger local imports and unsupported media retain their documented boundaries.
+
+Additional UI polish, uninterrupted-run assurance under provider throttling,
+remote ChatGPT-client testing and theoretical Apple compatibility remain in
+blooket-15, which intentionally stays active.

@@ -12,20 +12,6 @@ The final ongoing maintenance task is intentionally never auto-completed.
 
 ## P2 - Blooket publication
 
-### TODO - Journaled quiz publication
-
-Publish and edit real quizzes from canonical CLI/MCP tools, verify the remote
-result, and recover safely when interrupted.
-
-[Record](docs/todo/open/blooket/publication.mdc)
-
-### TODO - Autonomous AI quiz publication
-
-Make the teacher's AI-to-Blooket request actually publish and verify a quiz,
-including supported media, progress, and recoverable human stops.
-
-[Record](docs/todo/open/teaching/ai-review.mdc)
-
 ## P4 - Continuous maintenance (never auto-complete)
 
 ### TODO - Ongoing compatibility assurance and product hardening

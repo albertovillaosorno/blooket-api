@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-11"
-status: "active"
+status: "completed"
 priority: "p1"
 horizon: "publication"
 order: 110
@@ -72,6 +72,29 @@ account limits, and unsupported types. The existing private UI test is useful
 evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
+
+Completion acceptance was confirmed on 2026-10-21 at 15:56 UTC through the
+canonical CLI: the private image/typing quiz returned `published: true`,
+`phase: verified` and all three operations complete. Both questions were
+saved by the product; no controller Save was used for this quiz.
+
+The current committed companion was loaded through the supported reload and
+the exact local service was restarted with no pending jobs. Verification
+checked the frozen metadata, ordered content, question types, 15/40-second
+timers and prepared image identity after fresh remote reads.
+
+Earlier positive canonical creation, MCP append and autonomous text replacement
+provide independent create/edit evidence. Real retained-journal recovery and
+portable interruption, conflict, media and cancellation checks cover the
+failure paths; historical ambiguous attempts remain preserved without replay.
+
+This closes admitted canonical publication. It does not claim an uninterrupted
+zero-stop UI run, support for rejected media variants, native Apple acceptance
+or an external ChatGPT OAuth client connection. Those assurance and UX cases
+remain in the owner's evergreen task blooket-15.
+
+The dated evidence below records earlier checkpoints and limitations; its
+previous pending statements are historical, not current completion blockers.
 
 A 2026-10-21 red-to-green regression found that the owned capability
 inspector itself could certify a read after an invalid or regressing clock
@@ -1545,23 +1568,13 @@ rule evaluation limitation remains explicit in the development handoff.
 
 ## Blockers
 
-The earlier question-read preflight and retained-form blockers were resolved
-on 2026-10-21: the current companion was loaded, the owner-authorized test edit
-was recovered and another canonical replacement was freshly verified without
-controller Save. Those observations are recorded above.
+No blocker remains for the admitted canonical create, append and bounded
+text-replacement workflow. The latest fresh verification confirms the real
+two-question image/typing result; older uncertain journals are preserved.
 
-Canonical private Create Set, typing and multiple-choice questions, and a
-prepared question image and a registered-MCP append have real fresh
-verification. Uninterrupted multi-question publication remains pending.
-Existing-question replacement has fresh canonical verification after read-only
-reconciliation.
-
-Historical HTTP 429 attempts retain their journals without replay.
-Computer Use reads and keyboard activation work in the current Chrome;
-native clicks/screenshots still time out independently of product publication.
-
-Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
-and does not block this functional record.
+Native Mac/Safari/ChatGPT-client assurance and smoother recovery of transient
+provider reads belong to blooket-15. Unsupported operations continue to fail
+visibly, and actual login or interactive challenges retain their human stops.
 
 
 On 2026-10-09, prepared-media admission began copying every byte buffer and
