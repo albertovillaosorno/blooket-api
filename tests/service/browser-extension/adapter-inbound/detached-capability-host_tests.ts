@@ -66,6 +66,8 @@ function fixture(options: {
   readonly uncommittedForMs?: number;
   readonly initialBlankForMs?: number;
   readonly pendingDestination?: string;
+  readonly invalidClockAt?: number;
+  readonly invalidClockValue?: number;
 } = {}) {
   const events: string[] = [];
   let url = MY_SETS, removed = false, now = 1_000, scans = 0;
@@ -217,13 +219,34 @@ function fixture(options: {
     },
   };
   const pause = async (ms: number) => { now += Math.max(ms, 1); };
+  let clockCalls = 0;
+  const readClock = () => ++clockCalls === options.invalidClockAt
+    ? (options.invalidClockValue ?? Number.NaN) : now;
   const inspect = async (textOnly = true) =>
     await inspectDetachedBlooketCapabilities(
-      chrome, textOnly, pause, () => now,
+      chrome, textOnly, pause, readClock,
     );
   return { events, inspect, removed: () => removed,
     elapsed: () => now - 1_000 };
 }
+
+test("untrusted capability read clocks cannot grant a provider receipt",
+  async () => {
+  for (const value of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY, -1]) {
+    const beforeTab = fixture({ invalidClockAt: 1,
+      invalidClockValue: value });
+    assert.deepEqual(await beforeTab.inspect(),
+      { ok: false, code: "blooket-browser-failed" });
+    assert.equal(beforeTab.events.includes("create"), false);
+    const afterTab = fixture({ invalidClockAt: 2,
+      invalidClockValue: value });
+    assert.deepEqual(await afterTab.inspect(),
+      { ok: false, code: "blooket-browser-failed" });
+    assert.deepEqual(afterTab.events, ["create", "remove"]);
+    assert.equal(afterTab.removed(), true);
+  }
+});
 
 test("getter-supplied detached capability route cannot authorize scripts",
   async () => {
