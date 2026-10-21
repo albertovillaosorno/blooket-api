@@ -292,6 +292,7 @@ const words = {
       "biblioteca. Cada guardado requiere confirmación de Blooket; " +
       "las portadas, las imágenes en respuestas y el audio siguen pendientes.",
     publishDraft: "Publicar y verificar",
+    resumePublication: "Reanudar solo tras reconciliar",
     stopPublication: "Detener publicación",
     reconcileDraft: "Reconciliar sin reenviar",
     verifyDraft: "Verificar en Blooket",
@@ -652,6 +653,7 @@ const words = {
       "Each save needs Blooket confirmation; covers, answer images and " +
       "audio remain unavailable.",
     publishDraft: "Publish and verify",
+    resumePublication: "Resume only after reconciliation",
     stopPublication: "Stop publication",
     reconcileDraft: "Reconcile without replay",
     verifyDraft: "Verify on Blooket",
@@ -2260,10 +2262,17 @@ async function loadQuizzes() {
       };
       if (latest.phase === "not-started" || latest.phase === "ready")
         add("publishDraft", "publish", () => { void finish("publish"); });
-      else if (latest.phase === "reconciliation-required")
+      else if (latest.phase === "reconciliation-required") {
+        // Reconcile remains strictly read-only. The separate resume button
+        // is an explicit teacher publication intent, and its orchestrator
+        // requires exact recovered evidence before another write.
         add("reconcileDraft", "reconcile", () => {
           void finish("reconcile");
         });
+        add("resumePublication", "publish", () => {
+          void finish("publish");
+        });
+      }
       else if (latest.phase === "writes-complete")
         add("verifyDraft", "verify", () => { void finish("verify"); });
       add("publicationRefresh", "refresh", () => {

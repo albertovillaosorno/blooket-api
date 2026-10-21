@@ -130,6 +130,7 @@ async function quizFixture(options: {
   readonly holdThirdList?: boolean;
   readonly holdSecondStatus?: boolean;
   readonly holdThirdStatus?: boolean;
+  readonly uncertainAtStart?: boolean;
 } = {}) {
   const source = await readFile(new URL(
     "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
@@ -163,6 +164,7 @@ async function quizFixture(options: {
     publicationStopReason: () => "unknown",
     publishTextDraft: async (_id: unknown, _rev: unknown,
       _send: unknown, _progress: unknown, isCancelled: () => boolean) => {
+      calls.push("publishTextDraft");
       cancelled = isCancelled;
       return await finished.promise;
     },
@@ -185,8 +187,12 @@ async function quizFixture(options: {
           return await statusRefresh.promise;
         if (statusReads === 3 && options.holdThirdStatus)
           return await thirdStatus.promise;
-        return { phase: "ready", completedOperations: 0,
-          totalOperations: 2, published: false };
+        return options.uncertainAtStart
+          ? { phase: "reconciliation-required", completedOperations: 1,
+            totalOperations: 2, remoteSetId: "synthetic-set",
+            published: false }
+          : { phase: "ready", completedOperations: 0,
+            totalOperations: 2, published: false };
       }
       throw Error("unexpected fixture command");
     },
@@ -204,6 +210,34 @@ async function quizFixture(options: {
 async function flush() {
   for (let i = 0; i < 6; i++) await Promise.resolve();
 }
+
+test("uncertain journals offer read-only reconcile and explicit resume",
+  async () => {
+  const ui = await quizFixture({ uncertainAtStart: true });
+  const reconcile = ui.root.findAction("reconcile");
+  const resume = ui.root.findAction("publish");
+  assert.ok(reconcile && resume,
+    "resume requires an explicit teacher click");
+  assert.equal(ui.calls.includes("publishTextDraft"), false);
+  resume.handlers.get("click")?.();
+  assert.ok(ui.root.findAction("stop"));
+  assert.equal(ui.calls.filter(x => x === "publishTextDraft").length, 1);
+  ui.finished.resolve({ phase: "reconciliation-required", published: false });
+  await flush();
+  assert.equal(ui.root.findAction("stop"), undefined);
+});
+
+test("the standalone Reconcile button does not start publication",
+  async () => {
+  const ui = await quizFixture({ uncertainAtStart: true });
+  const reconcile = ui.root.findAction("reconcile");
+  assert.ok(reconcile);
+  reconcile.handlers.get("click")?.();
+  await flush();
+  assert.ok(ui.calls.includes("blooket.publication.reconcile"));
+  assert.equal(ui.calls.includes("publishTextDraft"), false);
+  assert.equal(ui.root.findAction("stop"), undefined);
+});
 
 test("late Quizzes refresh never hides Stop during publication", async () => {
   const ui = await quizFixture();
