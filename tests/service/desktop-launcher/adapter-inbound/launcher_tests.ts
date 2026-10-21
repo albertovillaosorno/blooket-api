@@ -253,7 +253,10 @@ test("launcher stop cannot claim drained while a separate writer remains",
 );
 
 test("launcher stop refuses oversized and invalid local bootstrap replies",
-  async () => {
+  // Two scenarios intentionally exhaust the launcher's five-second drain
+  // deadline. Child process startup and four concurrent test files need a
+  // separate upper bound; a killed test child must never count as refusal.
+  { timeout: 40_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "launcher-stop-safe-"));
   let mode: "oversized" | "bad-csrf" | "valid" | "stale-pid" =
     "oversized";
@@ -313,7 +316,7 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
       launcher, "--stop",
     ], {
       env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
-      timeout: 8_000, maxBuffer: 8192,
+      timeout: 16_000, maxBuffer: 8192,
     }), (error: unknown) => {
       assert.ok(error instanceof Error && "code" in error &&
         error.code === 1 && "stdout" in error && error.stdout === "" &&
@@ -333,7 +336,7 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
       launcher, "--stop",
     ], {
       env: { PATH: process.env["PATH"], BLOOKET_DATA_HOME: root },
-      timeout: 8_000, maxBuffer: 8192,
+      timeout: 16_000, maxBuffer: 8192,
     }), { code: 1 });
     assert.equal(stopped, 2);
     await assert.rejects(lstat(join(root, "service-runtime.json")),

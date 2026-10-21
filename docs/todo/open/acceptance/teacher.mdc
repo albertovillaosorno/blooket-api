@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A subsequent 2026-10-21 concurrent suite exposed a different false negative
+in the launcher tests: a deliberately non-draining stale-PID service exhausted
+the test subprocess's eight-second timeout (`code: null`) instead of letting
+the real launcher report its expected unsafe-stop refusal (`code: 1`).
+The fixture now allows bounded scheduling overhead beyond the real five-second
+closure observation, and still rejects a missing/incorrect exit code. It does
+not relax the launcher's actual shutdown proof or kill an unknown service.
+
 A 2026-10-21 synthetic image-read regression found that an owned question
 media GET could still return a positive prepared-byte identity if a visible
 `alertdialog` appeared before or during the async transfer. The page helper
