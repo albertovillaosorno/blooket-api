@@ -177,3 +177,10 @@ a later transient error left an obsolete Publish control visible. The Quizzes
 view now removes all stale actions after a missing or invalid status and
 provides only the read-only Refresh button. A newly validated journal can
 restore an explicit action; the failure itself never schedules a Save.
+
+A 2026-10-21 red-to-green orchestration regression found that automated
+`publication.verify` could report success without the canonical
+`verifiedAt` evidence, although standalone Verify already required that
+field. All automated positive results now require a nonblank verification
+timestamp in addition to an exact immutable journal and target. Negative
+verification stops remain read-only and do not imply a new Save.
