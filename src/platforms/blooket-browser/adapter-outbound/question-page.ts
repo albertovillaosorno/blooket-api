@@ -82,7 +82,19 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    // Chrome may expose human confirmation as a visible native dialog
+    // without ARIA, or as a role=alertdialog. Never adopt its controls.
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByHumanDialog)
       return failed();
     // A teacher-owned edit modal must not be mistaken for an unoccupied page.
     if (document.querySelector('input#question[name="question"]'))
@@ -210,7 +222,19 @@ export function openBlooketQuestionPanel(
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    // Chrome may expose human confirmation as a visible native dialog
+    // without ARIA, or as a role=alertdialog. Never adopt its controls.
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByHumanDialog)
       return false;
     // Do not click another question while the teacher is editing a modal.
     if (document.querySelector('input#question[name="question"]'))
@@ -354,7 +378,19 @@ export function inspectOpenedBlooketQuestion(
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    // Chrome may expose human confirmation as a visible native dialog
+    // without ARIA, or as a role=alertdialog. Never adopt its controls.
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByHumanDialog)
       return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
@@ -617,7 +653,19 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    // Chrome may expose human confirmation as a visible native dialog
+    // without ARIA, or as a role=alertdialog. Never adopt its controls.
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByHumanDialog)
       return false;
     if (
       location.origin !== "https://dashboard.blooket.com" ||
@@ -739,7 +787,19 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge)
+    // Chrome may expose human confirmation as a visible native dialog
+    // without ARIA, or as a role=alertdialog. Never adopt its controls.
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByHumanDialog)
       return false;
     return (
       location.origin === "https://dashboard.blooket.com" &&
