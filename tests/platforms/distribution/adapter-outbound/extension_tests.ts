@@ -205,11 +205,12 @@ test(
           readyState: "complete",
           scripts: [{ textContent: bootstrap + "self.__next_f.push(" +
             JSON.stringify([1, source]) + ")" }],
-          querySelectorAll: () => [{
-            getAttribute: (name: string) => name === "src" ?
-              "https://ac.blooket.com/dashboard/" + build +
-              "/_next/static/chunks/fixture.js" : null,
-          }],
+          querySelectorAll: (selector: string) =>
+            selector === "script[src],link[href]" ? [{
+              getAttribute: (name: string) => name === "src" ?
+                "https://ac.blooket.com/dashboard/" + build +
+                "/_next/static/chunks/fixture.js" : null,
+            }] : [],
         },
       });
       assert.deepEqual(injected(libraryPage.captureBlooketLibraryModel)(),
