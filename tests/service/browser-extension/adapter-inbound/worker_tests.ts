@@ -67,6 +67,7 @@ test(
   let incompatibleStatus = false;
   let incompatiblePoll = false;
   let unsafeReadSource = false;
+  let interruptedReadPanel = false;
   let submittedReadOwner = false;
   let submittedReadDirty = false;
   let submittedBoundSet = "set-fixture";
@@ -670,6 +671,12 @@ test(
           }];
         }
         if (func.name === "closeBlooketQuestionPanel") {
+          if (unsafeReadSource) {
+            if (!interruptedReadPanel || args[0] !== "set-fixture")
+              return [{ result: false }];
+            interruptedReadPanel = false;
+            unsafeReadSource = false;
+          }
           assert.deepEqual(args, ["set-fixture"]);
           return [{ result: questionPanelCloses }];
         }
@@ -1403,11 +1410,31 @@ test(
     }
     assert.deepEqual(scripts.slice(beforeUnsafeRead), [
       "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "closeBlooketQuestionPanel",
       "inspectBlooketDocumentOrigin", "inspectBlooketQuestionWriteStage",
       "inspectBlooketSubmittedQuestionOwner", "inspectBlooketPage",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "closeBlooketQuestionPanel",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
+      "inspectBlooketDocumentOrigin", "closeBlooketQuestionPanel",
     ]);
+    // A new CLI read reclaims its own interrupted inspection panel without
+    // foregrounding the browser, submitting a form or acquiring a new tab.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    interruptedReadPanel = true;
+    const beforeRecovery = scripts.length;
+    const focusBeforeRecovery = foregroundedTabs.length;
+    const createsBeforeRecovery = creates;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, true);
+    assert.equal(interruptedReadPanel, false);
+    assert.equal(unsafeReadSource, false);
+    assert.equal(foregroundedTabs.length, focusBeforeRecovery);
+    assert.equal(creates, createsBeforeRecovery);
+    assert.ok(!scripts.slice(beforeRecovery).includes(
+      "runBlooketAddQuestionPageAction"));
+    unsafeReadSource = true;
     // One exact submitted owner may inspect in a separate background tab.
     // The original teacher editor must not be navigated or reloaded.
     tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
