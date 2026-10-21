@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, the authenticated, already connected Chrome for Testing
+session returned a successful canonical read-only `questions list` reply
+for the owner's existing private quiz: exactly two rows (multiple-choice
+and typing), with zero reported issues. The extension bridge was connected
+without pending jobs or duplicate clients. No Save or account change was
+performed. This is live read interoperability only; it does not prove the
+newly built extension was reloaded or verify new write behavior.
+
 The 2026-10-21 Linux extension-build integration test initially failed
 after adding the password-overlay guard: its synthetic DOM returned a build
 link for every selector, including `input[type="password"]`. The fixture
