@@ -69,6 +69,13 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+A second red-to-green UI regression on 2026-10-21 found that an initial
+`not-started` reply could still include a frozen revision or positive plan
+size without a journal. The Studio orchestration now refuses *any* frozen
+plan, set, or checkpoint metadata in this preflight state before the first
+remote step. This is a portable fail-closed result, not proof of new live
+publication.
+
 On 2026-10-21, an actual UI error-path regression confirmed that known
 single-question correction errors were classified as unknown generic stops.
 The Studio now explains a required one-row change and unsupported edit types

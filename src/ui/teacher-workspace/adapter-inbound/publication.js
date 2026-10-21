@@ -43,9 +43,10 @@ function progress(value, draftId) {
   // A plan without a journal cannot already own saved operations or a set.
   // Refuse contradictory preflight data before the first remote write.
   if (value.phase === "not-started" && (
-    (value.completedOperations !== undefined &&
-      value.completedOperations !== 0) ||
-    (value.remoteSetId !== undefined && value.remoteSetId !== null)))
+    value.completedOperations !== undefined ||
+    value.totalOperations !== undefined ||
+    value.remoteSetId !== undefined ||
+    value.revision !== undefined))
     throw Error("publication-progress-invalid");
   // Before a snapshot exists, human/challenge/rate-limit outcomes omit counts.
   // They are recoverable stops, never authorization for another write.

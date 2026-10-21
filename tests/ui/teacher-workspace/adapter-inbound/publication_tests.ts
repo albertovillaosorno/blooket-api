@@ -240,7 +240,14 @@ test("impossible initial publication status cannot start a Blooket write",
   for (const invalid of [
     { draftId: ID, phase: "not-started", published: false,
       remoteSetId: "unexpected-set" },
+    { draftId: ID, phase: "not-started", published: false,
+      remoteSetId: null },
+    { draftId: ID, phase: "not-started", published: false,
+      revision: REV },
     { ...state("not-started", 1, 3) },
+    { ...state("not-started", 0, 3) },
+    { draftId: ID, phase: "not-started", published: false,
+      completedOperations: 0, totalOperations: 1 },
   ]) {
     const calls: string[] = [];
     await assert.rejects(publishTextDraft(ID, REV, async name => {
