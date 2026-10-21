@@ -66,8 +66,9 @@ function progress(value, draftId) {
       value.completedOperations === value.totalOperations) ||
     (value.phase === "writes-complete" &&
       value.completedOperations !== value.totalOperations) ||
-    (value.phase === "ready" && value.completedOperations === 0 &&
-      value.remoteSetId != null) ||
+    // Append and replacement plans own a remote set before their first
+    // mutation. Only the canonical frozen plan can distinguish them from
+    // Create Set, so preserve that binding and reject any later retarget.
     (value.completedOperations > 0 &&
       (typeof value.remoteSetId !== "string" || !value.remoteSetId))
   )) throw Error("publication-progress-invalid");

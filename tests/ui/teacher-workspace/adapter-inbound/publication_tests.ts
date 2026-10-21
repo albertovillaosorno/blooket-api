@@ -311,7 +311,6 @@ test("impossible ready states never authorize a new publication step",
   async () => {
   for (const invalid of [
     state("ready", 3, 3),
-    { ...state("ready", 0, 3), remoteSetId: "already-created" },
     { ...state("ready", 1, 3), remoteSetId: null },
     state("writes-complete", 2, 3),
     { ...state("writes-complete", 3, 3), remoteSetId: null },
@@ -323,6 +322,39 @@ test("impossible ready states never authorize a new publication step",
     }), /publication-progress-invalid/u);
     assert.deepEqual(calls, ["blooket.publication.status"]);
   }
+});
+
+test("ready append or replacement targets keep their existing set binding",
+  async () => {
+  const calls: string[] = [];
+  const existing = { ...state("ready", 0, 1),
+    remoteSetId: "existing-set" };
+  const advanced = { ...state("advanced", 1, 1),
+    remoteSetId: "existing-set" };
+  const verified = { ...state("verified", 1, 1),
+    remoteSetId: "existing-set" };
+  const replies = [existing, advanced, verified];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.published, true);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step", "blooket.publication.verify"]);
+});
+
+test("first append or replacement step cannot switch the existing set",
+  async () => {
+  const calls: string[] = [];
+  const replies = [{ ...state("ready", 0, 1),
+    remoteSetId: "existing-set" },
+    { ...state("advanced", 1, 1), remoteSetId: "another-set" }];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }), /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
 });
 
 test("impossible initial publication status cannot start a Blooket write",
