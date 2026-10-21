@@ -73,6 +73,25 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-21 at 03:23 UTC, the owner explicitly requested recovery of the
+stuck test form. A separate fresh Chrome page showed the old saved row, and
+one explicit controller Save completed the prepared edit. A fresh product
+reconciliation advanced the retained journal without replay; separate canonical
+verification returned `published: true` with two questions and preserved image
+bytes.
+
+This is controller-assisted recovery, not autonomous replacement acceptance.
+The original journal was not deleted or overwritten.
+
+A red-to-green regression then counted four full pre-write collection reads
+for a replacement. The canonical command now uses the frozen original binding
+before pacing and performs its mandatory fresh metadata/full collection check
+after pacing and media admission. The initial freeze plus final preflight are
+two reads; late concurrent changes still stop before journaling.
+
+Post-write independent verification is unchanged. A new autonomous edit remains
+required.
+
 On 2026-10-21, the owner's new screenshot still showed the previously
 submitted question form open with a Save button. The same Chrome extension
 isolated-world read-only probe showed the original submit latch and same native

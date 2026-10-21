@@ -2594,3 +2594,45 @@ test("replacement checks metadata before opening its write journal", () =>
     const paths = await publicationFiles(s.root, "replacement");
     await assert.rejects(readFile(paths.attempt), { code: "ENOENT" });
   }));
+
+
+test("replacement reads its collection only at freezing and final preflight",
+  () => fixture(async s => {
+    const request = await replacementFixture(s);
+    let reads = 0, readsBeforeWrite = 0;
+    const host = { ...s.host, blooket: { ...s.host.blooket,
+      questions: { list: async (...args:
+        Parameters<typeof s.host.blooket.questions.list>) => {
+        reads++;
+        return await s.host.blooket.questions.list(...args);
+      } },
+    }, writes: { execute: async (...args:
+      Parameters<typeof s.host.writes.execute>) => {
+      readsBeforeWrite = reads;
+      return await s.host.writes.execute(...args);
+    } } };
+    const result = value(await executeBlooketPublicationCommand(request, host));
+    assert.equal(result["phase"], "advanced");
+    assert.equal(readsBeforeWrite, 2);
+    assert.equal(s.questions.length, 2);
+  }));
+
+
+test("a late concurrent row change blocks replacement before its journal", () =>
+  fixture(async s => {
+    const request = await replacementFixture(s);
+    const writes = s.writes();
+    const host = { ...s.host, pacer: {
+      acquire: async (signal?: AbortSignal) => {
+        const lease = await s.host.pacer!.acquire(signal);
+        Object.assign(s.questions[0]!, { question: "Concurrent change." });
+        return lease;
+      },
+    } };
+    const result = await executeBlooketPublicationCommand(request, host);
+    assert.equal(result.ok, false);
+    assert.equal(s.writes(), writes);
+    assert.equal(s.questions[1]?.question, "Type moon.");
+    const paths = await publicationFiles(s.root, "replacement");
+    await assert.rejects(readFile(paths.attempt), { code: "ENOENT" });
+  }));
