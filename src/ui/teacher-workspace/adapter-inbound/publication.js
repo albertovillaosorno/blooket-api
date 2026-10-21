@@ -86,9 +86,9 @@ export async function publishTextDraft(
     "blooket.publication.status", payload,
   ), draftId);
   onProgress(current);
-  if (current.phase === "reconciliation-required") return current;
   if (current.published !== false) throw Error("publication-progress-invalid");
-  if (!["not-started", "ready", "writes-complete"].includes(current.phase))
+  if (!["not-started", "ready", "writes-complete",
+    "reconciliation-required"].includes(current.phase))
     return current;
   // A started publication owns an immutable snapshot revision. Do not use
   // a separately edited draft revision to resume that frozen write plan.
@@ -117,9 +117,36 @@ export async function publishTextDraft(
     onProgress(verified);
     return verified;
   };
+  if (current.phase === "reconciliation-required") {
+    // A resumed intent may inspect its existing uncertain journal once.
+    // Reconcile uses fresh reads, never another Save. Only an exact
+    // recovered checkpoint grants the next numbered mutation.
+    if (cancelled()) return { ...current, phase: "paused" };
+    const reconciled = progress(await send(
+      "blooket.publication.reconcile", payload,
+    ), draftId);
+    if (reconciled.published !== false)
+      throw Error("publication-progress-invalid");
+    if (reconciled.phase !== "recovered") {
+      onProgress(reconciled);
+      return reconciled;
+    }
+    if (reconciled.revision !== frozenRevision ||
+        reconciled.totalOperations !== current.totalOperations ||
+        reconciled.completedOperations !== current.completedOperations + 1 ||
+        (current.remoteSetId != null &&
+          reconciled.remoteSetId !== current.remoteSetId) ||
+        typeof reconciled.remoteSetId !== "string" ||
+        !reconciled.remoteSetId)
+      throw Error("publication-progress-invalid");
+    current = reconciled;
+    onProgress(current);
+    if (current.completedOperations === current.totalOperations)
+      return await verify();
+  }
   if (current.phase === "writes-complete") return await verify();
-  if (current.phase !== "not-started" && current.phase !== "ready")
-    return current;
+  if (current.phase !== "not-started" && current.phase !== "ready" &&
+      current.phase !== "recovered") return current;
   for (let index = 0; index < MAX_UI_STEPS; index++) {
     if (cancelled()) return { ...current, phase: "paused" };
     let next = progress(await send("blooket.publication.step", {

@@ -161,7 +161,66 @@ test("an existing ambiguous journal never opens another write", async () => {
     return state("reconciliation-required", 0);
   });
   assert.equal(result.phase, "reconciliation-required");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile"]);
+});
+
+test("an existing recovered journal resumes only its next unfinished step",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("reconciliation-required", 1),
+    state("recovered", 2), state("advanced", 3), state("verified", 3)];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.published, true);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile", "blooket.publication.step",
+    "blooket.publication.verify"]);
+});
+
+test("an existing journal finishing on recovery verifies without Save",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("reconciliation-required", 2),
+    state("recovered", 3), state("verified", 3)];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.published, true);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile", "blooket.publication.verify"]);
+});
+
+test("an existing ambiguous journal can be canceled before remote probing",
+  async () => {
+  const calls: string[] = [];
+  let cancelled = false;
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return state("reconciliation-required", 1);
+  }, () => { cancelled = true; }, () => cancelled);
+  assert.equal(result.phase, "paused");
   assert.deepEqual(calls, ["blooket.publication.status"]);
+});
+
+test("a preexisting ambiguous journal cannot change identity on recovery",
+  async () => {
+  for (const patch of [{ remoteSetId: "other-set" },
+    { revision: "b".repeat(64) }, { completedOperations: 3 },
+    { totalOperations: 4 }, { phase: "verified", published: true }]) {
+    const calls: string[] = [];
+    const replies = [state("reconciliation-required", 1),
+      { ...state("recovered", 2), ...patch }];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return replies.shift();
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.reconcile"]);
+  }
 });
 
 test("cancellation between steps never calls another Blooket writer",
