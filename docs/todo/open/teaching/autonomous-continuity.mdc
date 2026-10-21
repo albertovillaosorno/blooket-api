@@ -206,3 +206,11 @@ read-only. It is now explicitly non-destructive and idempotent, unlike the
 non-idempotent `step`, `append` and `replace` mutations. An integration test
 checks every relevant annotation to avoid unnecessary AI-client warnings or
 unsafe claims about remote Save replay.
+
+The multi-process MCP integration was extended to lose exactly one browser
+acknowledgement **after** its simulated Add Question Save persisted. The
+canonical append returns an uncertain journal; the uninterrupted owner then
+uses status, read-only reconcile and fresh verify without dispatching a
+second questions.create. The test asserts the final two-question remote
+collection and exact mutation sequence. No authenticated Blooket data was
+written to produce this evidence.
