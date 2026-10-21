@@ -1148,7 +1148,7 @@ test(
   "human and security overlays block every Add Question page action",
   () => {
   for (const blocked of ["verification", "password", "organization",
-    "captcha"] as const) {
+    "captcha", "native-dialog", "alertdialog"] as const) {
     const page = fixture();
     if (blocked === "verification")
       Object.assign(page.document, { title: "Just a moment..." });
@@ -1162,6 +1162,10 @@ test(
       page.document.selectors[
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
       ] = [node("IFRAME")];
+    if (blocked === "native-dialog")
+      page.document.selectors['dialog[open]'] = [node("DIALOG")];
+    if (blocked === "alertdialog")
+      page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
     withPage(page.document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
@@ -1179,6 +1183,23 @@ test(
   },
 );
 
+
+test("hidden native and ARIA dialogs do not block an owned question opener",
+  () => {
+  const page = fixture();
+  closedQuestionEditor(page);
+  const native = node("DIALOG");
+  const alert = node("DIV");
+  native.visibility = "hidden";
+  alert.visibility = "hidden";
+  page.document.selectors['dialog[open]'] = [native];
+  page.document.selectors['[role="alertdialog"]'] = [alert];
+  withPage(page.document,
+    "https://dashboard.blooket.com/edit?id=set-fixture", () => {
+    assert.equal(openBlooketAddQuestionPanel("set-fixture"), true);
+    assert.equal(page.add.clicked, 1);
+  });
+});
 
 test(
   "stale Add Question controls cannot replace a lost dashboard shell",
@@ -1589,7 +1610,8 @@ test("hidden image-envelope fields cannot reach provider File controls",
 
 test("Add Question admission rejects drift after visible preparation",
   () => {
-  const variants = ["form", "raw", "challenge", "security", "sidebar"] as const;
+  const variants = ["form", "raw", "challenge", "security", "sidebar",
+    "native-dialog"] as const;
   for (const kind of variants) {
     const page = fixture();
     const changeProvider = () => {
@@ -1601,6 +1623,8 @@ test("Add Question admission rejects drift after visible preparation",
         page.document.selectors[
           'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
         ] = [node("IFRAME")];
+      if (kind === "native-dialog")
+        page.document.selectors['dialog[open]'] = [node("DIALOG")];
       if (kind === "security")
         Object.assign(page.document, { title: "Just a moment..." });
       if (kind === "sidebar")
@@ -1623,7 +1647,7 @@ test("prepared image change cannot confirm a replaced or challenged form",
   () => {
   const image = { format: "png" as const, base64: "iVBORw0KGgoA" };
   for (const kind of ["human", "question", "challenge", "sidebar",
-    "counter"] as const) {
+    "counter", "native-dialog"] as const) {
     withImagePage((page, interact) => {
       assert.equal(runBlooketAddQuestionPageAction(
         "open-image", "set-fixture"), true);
@@ -1639,6 +1663,8 @@ test("prepared image change cannot confirm a replaced or challenged form",
           page.document.selectors[
             'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
           ] = [node("IFRAME")];
+        if (kind === "native-dialog")
+          page.document.selectors['dialog[open]'] = [node("DIALOG")];
         if (kind === "sidebar")
           page.document.selectors['nav a[href="/my-sets"]'] = [];
         if (kind === "counter") page.counter.textContent = "1 Question";
