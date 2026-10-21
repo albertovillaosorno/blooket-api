@@ -63,6 +63,25 @@ test("resumption uses immutable journal revision after local draft changes",
   ]);
 });
 
+test("transport callbacks cannot retarget a later verify or reconciliation",
+  async () => {
+  for (const mode of ["verify", "reconcile"] as const) {
+    const sent: unknown[] = [];
+    const replies = mode === "verify"
+      ? [state("writes-complete", 3), state("verified", 3)]
+      : [state("reconciliation-required", 2),
+        state("recovered", 3), state("verified", 3)];
+    const result = await publishTextDraft(ID, REV, async (name, payload) => {
+      sent.push({ name, draftId: payload.draftId });
+      payload.draftId = "foreign-draft";
+      return replies.shift();
+    });
+    assert.equal(result.published, true);
+    assert.ok(sent.every((call: { draftId: string }) =>
+      call.draftId === ID), "no later call may use a mutated payload");
+  }
+});
+
 test("accessor or inherited progress cannot authorize a publication write",
   async () => {
   for (const variant of ["accessor", "inherited", "extra", "symbol"] as const) {

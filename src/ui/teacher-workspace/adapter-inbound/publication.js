@@ -110,7 +110,9 @@ export async function publishTextDraft(
       !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(draftId) ||
       typeof revision !== "string" || !/^[a-f0-9]{64}$/u.test(revision))
     throw Error("invalid-publication-request");
-  const payload = { draftId };
+  // No sender may retain and mutate a reusable command payload between
+  // independent status, reconciliation and verification requests.
+  const payload = () => ({ draftId });
   // UI progress listeners may mutate presentation objects. They must never
   // alter the authoritative checkpoint compared before subsequent writes.
   const report = value => onProgress({ ...value });
@@ -128,7 +130,7 @@ export async function publishTextDraft(
       throw Error("publication-progress-invalid");
   };
   let current = progress(await send(
-    "blooket.publication.status", payload,
+    "blooket.publication.status", payload(),
   ), draftId);
   report(current);
   if (current.published !== false) throw Error("publication-progress-invalid");
@@ -146,7 +148,7 @@ export async function publishTextDraft(
   const verify = async () => {
     if (cancelled()) return { ...current, phase: "paused" };
     const verified = progress(await send(
-      "blooket.publication.verify", payload,
+      "blooket.publication.verify", payload(),
     ), draftId);
     // Inconclusive verification must also retain the frozen set and count;
     // a blocked provider read cannot relabel the local owner or checkpoint.
@@ -178,7 +180,7 @@ export async function publishTextDraft(
     // recovered checkpoint grants the next numbered mutation.
     if (cancelled()) return { ...current, phase: "paused" };
     const reconciled = progress(await send(
-      "blooket.publication.reconcile", payload,
+      "blooket.publication.reconcile", payload(),
     ), draftId);
     if (reconciled.published !== false)
       throw Error("publication-progress-invalid");
@@ -225,7 +227,7 @@ export async function publishTextDraft(
       report(next);
       if (cancelled()) return { ...next, phase: "paused" };
       const reconciled = progress(await send(
-        "blooket.publication.reconcile", payload,
+        "blooket.publication.reconcile", payload(),
       ), draftId);
       if (reconciled.published !== false)
         throw Error("publication-progress-invalid");
