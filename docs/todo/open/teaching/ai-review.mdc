@@ -72,8 +72,9 @@ English and Spanish, preserving quiz and original-media language independently.
 On 2026-10-21, an actual UI error-path regression confirmed that known
 single-question correction errors were classified as unknown generic stops.
 The Studio now explains a required one-row change and unsupported edit types
-in both supported UI languages, while uncertain remote baselines remain a
-conflict stop. This improves repair guidance without invoking Blooket.
+in both supported UI languages. An unverifiable remote baseline now has
+its own explanatory stop instead of an unproven concurrent-edit claim.
+This improves repair guidance without invoking Blooket.
 
 A 2026-10-21 red-to-green UI regression found that a contradictory initial
 `not-started` status could claim a remote set ID or a completed operation.

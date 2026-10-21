@@ -317,6 +317,9 @@ const words = {
       "La extensión requiere actualización o recarga antes de publicar.",
     publicationStopConflict:
       "El quiz remoto o el borrador cambió. Revisa y no repitas la escritura.",
+    publicationStopVerification:
+      "No se pudo verificar el estado remoto. Conserva el borrador y " +
+      "revisa la sesión antes de continuar. No reenvíes un guardado incierto.",
     publicationStopMedia:
       "La publicación de este contenido multimedia aún no está admitida.",
     publicationStopBusy:
@@ -673,6 +676,9 @@ const words = {
       "The browser companion needs an update or reload before publication.",
     publicationStopConflict:
       "The remote quiz or draft changed. Inspect it; do not replay the write.",
+    publicationStopVerification:
+      "The remote state could not be verified. Keep the draft and check " +
+      "the session before continuing. Do not replay an uncertain Save.",
     publicationStopMedia:
       "Publication of this media content is not yet supported.",
     publicationStopBusy:
@@ -2137,6 +2143,7 @@ function publicationFailureText(error) {
     "sign-in": "publicationStopSignIn",
     extension: "publicationStopExtension",
     conflict: "publicationStopConflict",
+    verification: "publicationStopVerification",
     media: "publicationStopMedia",
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",

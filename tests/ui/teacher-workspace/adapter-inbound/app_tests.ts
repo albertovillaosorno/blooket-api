@@ -76,9 +76,9 @@ test("localized publication errors identify repairable single-row edits",
   assert.equal(label(Error("blooket-publication-edit-unsupported")),
     "publicationStopEditUnsupported");
   assert.equal(label(Error("blooket-write-baseline-not-captured")),
-    "publicationStopConflict");
+    "publicationStopVerification");
   for (const key of ["publicationStopSingleEdit",
-    "publicationStopEditUnsupported"]) {
+    "publicationStopEditUnsupported", "publicationStopVerification"]) {
     assert.equal(source.split(key + ":").length - 1, 2,
       "both Spanish and English must explain the stop");
   }
