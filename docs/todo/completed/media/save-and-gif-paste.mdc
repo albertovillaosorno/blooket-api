@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-18"
-status: "active"
+status: "completed"
 priority: "p0"
 horizon: "foundations"
 order: 160
@@ -77,3 +77,13 @@ UI reload check are still required before closing this task.
 On 2026-10-21, the owner requested automatic saving under the configured media
 folder and reported that pasted GIFs became still images. This records the
 request and observed symptom; no reproduction or completed fix is claimed.
+
+## Completion
+
+Owner explicitly requested closure on 2026-10-21 after the native GIF
+import/prepare/reload integration and unique-name tests passed. The saved
+prepared rendition is now the default gallery URL; an editable canonical
+source remains internally. Pasting prefers animated GIF bytes and direct GIF
+links. Live browser clipboard behavior was not independently confirmed.
+
+Follow-up browser/client assurance belongs to ongoing blooket-15.
