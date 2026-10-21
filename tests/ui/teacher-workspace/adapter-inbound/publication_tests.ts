@@ -874,8 +874,10 @@ test("publication error labels classify only owned safe codes", () => {
     Error("blooket-publication-edit-unsupported")), "edit-unsupported");
   assert.equal(publicationStopReason(
     Error("blooket-write-baseline-not-captured")), "verification");
+  assert.equal(publicationStopReason(
+    Error("blooket-browser-unavailable")), "connection");
   for (const code of ["blooket-browser-failed",
-    "blooket-browser-unavailable", "blooket-browser-navigation-timeout"])
+    "blooket-browser-navigation-timeout"])
     assert.equal(publicationStopReason(Error(code)), "verification");
   for (const code of ["mutation-task-start-budget-exhausted",
     "mutation-task-duration-exhausted"])

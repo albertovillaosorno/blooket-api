@@ -116,3 +116,12 @@ and a human challenge or other wait does not trigger a retry.
 Crucially, no uncertain `publication.step` is ever repeated: a recovered Save
 must first be proved by the canonical journal's fresh provider reads. This is
 not a claim of currently available authenticated Chrome verification.
+
+The current authenticated development browser was unavailable to the product
+bridge (HTTP bootstrap reported disconnected; the canonical session read
+returned `blooket-browser-unavailable`, and the existing DevTools port refused
+connection). A red-to-green UI regression now distinguishes this actionable
+connection stop from ordinary remote verification failures, with ES/EN
+instructions to reuse the existing profile, retain journals and never repeat
+an uncertain Save. No browser reload, account write or replacement login was
+performed in this session.
