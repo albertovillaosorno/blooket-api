@@ -69,6 +69,12 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+A 2026-10-21 red-to-green UI regression found that a contradictory initial
+`not-started` status could claim a remote set ID or a completed operation.
+The publication orchestration now refuses both before issuing its first
+`blooket.publication.step`, preserving the canonical journal as authority.
+This is a portable fail-closed guarantee, not unattended live acceptance.
+
 On 2026-10-21, registered MCP image import, enrichment and preparation ran
 through actual CLI subprocesses against the development library. The new
 `library_image_prepare` returned a 24,434-byte current-revision rendition;
