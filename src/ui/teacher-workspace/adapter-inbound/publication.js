@@ -131,6 +131,31 @@ export function recoveredPublicationAction(previous, incoming, draftId) {
     ? "verify" : "publish";
 }
 
+// A standalone Verify click is a read-only observation, not permission to
+// change the frozen target. Never label a foreign or malformed receipt as
+// published, even when its transport reply says "verified".
+export function verifiedPublicationResult(previous, incoming, draftId) {
+  const before = progress(previous, draftId);
+  const after = progress(incoming, draftId);
+  const success = after.phase === "verified" &&
+    after.published === true && typeof after.verifiedAt === "string" &&
+    after.verifiedAt.length > 0;
+  const paused = ["wait", "session-required", "human-action-required"]
+    .includes(after.phase) && after.published === false;
+  if (before.phase !== "writes-complete" || before.published !== false ||
+      before.completedOperations !== before.totalOperations ||
+      typeof before.revision !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(before.revision) ||
+      typeof before.remoteSetId !== "string" || !before.remoteSetId ||
+      after.revision !== before.revision ||
+      after.remoteSetId !== before.remoteSetId ||
+      after.totalOperations !== before.totalOperations ||
+      after.completedOperations !== before.completedOperations ||
+      !(success || paused))
+    throw Error("publication-progress-invalid");
+  return after;
+}
+
 // A browser cooldown is never a mutation retry. A stopped teacher intent
 // releases the delay immediately rather than leaving Stop pending for 5 s.
 export async function waitForPublicationReadCooldown(
