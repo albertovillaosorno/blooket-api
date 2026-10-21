@@ -68,6 +68,7 @@ test(
   let incompatiblePoll = false;
   let unsafeReadSource = false;
   let submittedReadOwner = false;
+  let submittedReadDirty = false;
   let submittedBoundSet = "set-fixture";
   let detachedSourceOwnerLost = false;
   let detachedSourceChallenge = false;
@@ -478,10 +479,12 @@ test(
         scripts.push(func.name);
         if (func.name === "inspectBlooketQuestionWriteStage")
           return [{ result: { kind: "blooket-question-write-stage",
-            stage: submittedReadOwner ? "submit-attempted" : "no-owner" } }];
+            stage: submittedReadDirty && submittedReadOwner
+              ? "post-submit-interrupted"
+              : submittedReadOwner ? "submit-attempted" : "no-owner" } }];
         if (func.name === "inspectBlooketSubmittedQuestionOwner") {
           assert.equal(args.length, 1);
-          return [{ result: submittedReadOwner &&
+          return [{ result: submittedReadOwner && !submittedReadDirty &&
             args[0] === submittedBoundSet }];
         }
         if (func.name === "inspectBlooketSessionDocumentOrigin") {
@@ -1397,6 +1400,24 @@ test(
     assert.equal(readReloads, beforeDetachedReloads);
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=set-fixture");
+    // The exact source latch remains submitted after a later trusted edit.
+    // It no longer owns a stable snapshot or a detachable read capability.
+    submittedReadDirty = true;
+    const beforeDirtyRead = detachedCreated;
+    assert.equal((await expectReply({
+      kind: "questions.list", setId: "set-fixture",
+    })).ok, false);
+    assert.equal(detachedCreated, beforeDirtyRead);
+    const beforeDirtyCapability = capabilityTabsCreated;
+    assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
+    assert.equal((await expectReply({
+      kind: "capabilities.inspect-text",
+    })).ok, false);
+    assert.equal(capabilityTabsCreated, beforeDirtyCapability);
+    assert.equal(readReloads, beforeDetachedReloads);
+    assert.equal(tabUrl,
+      "https://dashboard.blooket.com/edit?id=set-fixture");
+    submittedReadDirty = false;
     // Text capability admission is also non-mutating, but must inspect in
     // a temporary tab rather than navigating away from a submitted editor.
     const beforeDetachedCapabilities = readReloads;
