@@ -142,7 +142,7 @@ test("signed-out preflight without snapshot shows a recoverable stop",
   assert.deepEqual(reports, ["not-started", "session-required"]);
 });
 
-test("an ambiguous journal stops UI automation without replay", async () => {
+test("an inconclusive journal probe stops without another write", async () => {
   const calls: string[] = [];
   const result = await publishTextDraft(ID, REV, async name => {
     calls.push(name);
@@ -151,7 +151,7 @@ test("an ambiguous journal stops UI automation without replay", async () => {
   });
   assert.equal(result.phase, "reconciliation-required");
   assert.deepEqual(calls, ["blooket.publication.status",
-    "blooket.publication.step"]);
+    "blooket.publication.step", "blooket.publication.reconcile"]);
 });
 
 test("an existing ambiguous journal never opens another write", async () => {
@@ -398,4 +398,57 @@ test("publication error labels classify only owned safe codes", () => {
   assert.equal(publicationStopReason({
     message: "blooket-authentication-required",
   }), "unknown");
+});
+
+
+test("one intent can reconcile a lost question reply and finish publication",
+  async () => {
+  const names: string[] = [];
+  const replies = [
+    { draftId: ID, phase: "not-started", published: false },
+    state("advanced", 1), state("reconciliation-required", 1),
+    state("recovered", 2), state("advanced", 3), state("verified", 3),
+  ];
+  const result = await publishTextDraft(ID, REV, async name => {
+    names.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.published, true);
+  assert.deepEqual(names, ["blooket.publication.status",
+    "blooket.publication.step", "blooket.publication.step",
+    "blooket.publication.reconcile", "blooket.publication.step",
+    "blooket.publication.verify"]);
+});
+
+
+test("cancellation before recovery stops reads and writes", async () => {
+  const names: string[] = [];
+  let cancelled = false;
+  const result = await publishTextDraft(ID, REV, async name => {
+    names.push(name);
+    return name.endsWith("status") ? state("ready", 1)
+      : state("reconciliation-required", 1);
+  }, observed => {
+    if (observed.phase === "reconciliation-required") cancelled = true;
+  }, () => cancelled);
+  assert.equal(result.phase, "paused");
+  assert.deepEqual(names, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
+test("a recovery probe cannot retarget, skip a write or claim verification",
+  async () => {
+  for (const patch of [{ remoteSetId: "other-set" },
+    { revision: "b".repeat(64) }, { completedOperations: 3 },
+    { totalOperations: 4 }, { phase: "verified", published: true }]) {
+    const names: string[] = [];
+    const replies = [state("ready", 1), state("reconciliation-required", 1),
+      { ...state("recovered", 2), ...patch }];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      names.push(name);
+      return replies.shift();
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(names, ["blooket.publication.status",
+      "blooket.publication.step", "blooket.publication.reconcile"]);
+  }
 });

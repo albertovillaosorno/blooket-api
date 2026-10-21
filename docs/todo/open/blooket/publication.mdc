@@ -73,6 +73,22 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-21 at 03:32 UTC, a second canonical replacement edited the existing
+second question to a new prompt and 40-second timer without controller Save.
+The step retained an uncertain journal; separate read-only reconciliation
+confirmed it and a subsequent canonical verify returned `published: true`.
+The private set still had two questions and identical first-question image
+bytes. The active extension directory had been stale; the current committed
+worker was built, loaded through the supported reload command and admitted by
+an actual scoped capability read before this mutation.
+
+The Quizzes orchestration now performs one canonical read-only reconciliation
+when a newly sent step has an uncertain reply. Only an exact one-operation
+recovery for the same draft/revision/set can continue. Inconclusive results,
+initial ambiguous journals, cancellation and genuine human stops never cause
+another automatic write. Live uninterrupted multi-question UI acceptance is
+still pending; portable tests cover continuation and refusal cases.
+
 On 2026-10-21 at 03:23 UTC, the owner explicitly requested recovery of the
 stuck test form. A separate fresh Chrome page showed the old saved row, and
 one explicit controller Save completed the prepared edit. A fresh product
@@ -1449,8 +1465,8 @@ verified owner-safe browser state and fresh canonical question read-back.
 
 Canonical private Create Set, typing and multiple-choice questions, and a
 prepared question image and a registered-MCP append have real fresh
-verification. Uninterrupted multi-question publication and replacement of
-existing questions remain pending. Historical HTTP 429 attempts retain their
+verification. Uninterrupted multi-question publication remains pending. Existing-question
+replacement has fresh canonical verification after read-only reconciliation. Historical HTTP 429 attempts retain their
 journals without
 replay. Computer Use reads and keyboard activation work in the current Chrome;
 native clicks/screenshots still time out independently of product publication.
