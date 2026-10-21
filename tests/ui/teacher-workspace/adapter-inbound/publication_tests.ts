@@ -558,6 +558,41 @@ test("a preexisting ambiguous journal cannot change identity on recovery",
   }
 });
 
+test("Stop during an in-flight publication command ignores its late reply",
+  async () => {
+  for (const mode of ["status", "step", "reconcile", "verify"] as const) {
+    let release!: (result: unknown) => void;
+    const blocked = new Promise<unknown>(resolve => { release = resolve; });
+    const names: string[] = [];
+    const reports: string[] = [];
+    let stopped = false;
+    const initial = mode === "status" ? state("ready", 1, 2) :
+      mode === "reconcile" ? state("reconciliation-required", 1, 2) :
+      mode === "verify" ? state("writes-complete", 2, 2) :
+      state("ready", 1, 2);
+    const awaited = publishTextDraft(ID, REV, async name => {
+      names.push(name);
+      if (name.endsWith(mode)) return await blocked;
+      return initial;
+    }, value => { reports.push(value.phase); }, () => stopped);
+    for (let turn = 0; turn < 10 &&
+         !names.some(name => name.endsWith(mode)); turn++)
+      await Promise.resolve();
+    assert.ok(names.some(name => name.endsWith(mode)), mode);
+    stopped = true;
+    release(mode === "verify" ? state("verified", 2, 2) :
+      mode === "reconcile" ? state("recovered", 2, 2) :
+      mode === "step" ? state("advanced", 2, 2) : initial);
+    const result = await awaited;
+    assert.equal(result.phase, "paused", mode);
+    assert.equal(result.published, false, mode);
+    assert.equal(names.length, mode === "status" ? 1 : 2, mode);
+    assert.equal(reports.includes("verified"), false, mode);
+    assert.equal(reports.includes("advanced"), false, mode);
+    assert.equal(reports.includes("recovered"), false, mode);
+  }
+});
+
 test("cancellation between steps never calls another Blooket writer",
   async () => {
   const calls: string[] = [];

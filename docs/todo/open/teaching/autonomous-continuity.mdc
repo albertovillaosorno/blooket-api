@@ -131,3 +131,12 @@ closure using its abort signal while the bounded read-only cooldown was
 pending. Stop immediately resolved the timer, removed the active Stop control
 and exposed only the next safe status refresh. No write or additional sender
 invocation was introduced during cancellation.
+
+On 2026-10-21, a red-to-green Stop regression exercised delayed replies
+from each of status, one in-flight publication.step, read-only reconciliation
+and final verification. Previously Stop could return `paused` but still
+report a late `advanced`, `recovered` or `verified` state to UI listeners.
+After the correction, no late response is reported or used for a subsequent
+command once the explicit teacher intent is canceled. Stop does not abort an
+already submitted remote Save or promise it was undone: any ambiguity stays
+in the canonical journal for a separately authorized read-only recovery.
