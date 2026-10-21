@@ -39,8 +39,14 @@ The project is independent of Blooket and is not endorsed by the platform.
 
 Registered MCP tools retrieve teacher instructions, search/read/enrich media,
 manage skills and drafts, and expose guarded quiz publication, status,
-verification and recovery via the canonical CLI. Media search returns bounded
-pages and a continuation cursor. **Saving a draft does not publish a quiz**;
+verification and recovery via the canonical CLI. The explicit
+`library_image_import` tool admits small canonical base64 image bytes supplied
+by the client (up to 675 KB), returning a stable media ID that is safe to reuse
+after a lost response.
+
+Chat attachments are not automatically forwarded to MCP; larger assets can be
+imported through the local Studio UI. Media search returns bounded pages and a
+continuation cursor. **Saving a draft does not publish a quiz**;
 only a completed, freshly verified remote operation does.
 
 Linux x64 and macOS ARM64 are both intended personal-use targets. The Linux

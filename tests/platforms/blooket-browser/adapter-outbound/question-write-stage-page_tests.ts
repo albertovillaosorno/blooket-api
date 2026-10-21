@@ -241,7 +241,13 @@ test("a post-submit 429 requires exact owner, route and request timing", () => {
         responseStatus: 429, startTime: 8_400, name: address });
       assert.equal(probe("set-fixture"), false);
       entries.push({ entryType: "resource", initiatorType: "fetch",
-        responseStatus: 429, startTime: 8_600, name: address });
+        responseStatus: 429, startTime: Number.NaN, name: address });
+      assert.equal(probe("set-fixture"), false,
+        "invalid timing evidence cannot diagnose a provider throttle");
+      entries[entries.length - 1]!.startTime = 10_001;
+      assert.equal(probe("set-fixture"), false,
+        "future timing evidence cannot predate this observation");
+      entries[entries.length - 1]!.startTime = 8_600;
       assert.equal(probe("set-fixture"), true);
       assert.equal(probe("another-set"), false);
       watch.setId = "different-set";
