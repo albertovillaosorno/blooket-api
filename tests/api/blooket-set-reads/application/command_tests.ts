@@ -187,6 +187,25 @@ test("incompatible extension reads give actionable canonical diagnostics",
     assert.equal(lists, 1);
   });
 
+test("failed reads advise preserving an uncertain native editor",
+  async () => {
+  const fixture = dependencies("edit");
+  const result = await executeCommand(
+    envelope("blooket.questions.list", { setId: "fixture" }), undefined,
+    { ...fixture.ports, questions: { list: async () => ({
+      ok: false, code: "blooket-browser-failed",
+    }) } },
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.deepEqual(result.issues, [{
+    path: "$.blooket", code: "blooket-browser-failed",
+    message: "The browser could not confirm the remote read. An open " +
+      "editor or provider failure may block it. Preserve the form and " +
+      "journal; inspect the connected tab without repeating Save.",
+  }]);
+});
+
 test("canonical text-only preflight delegates the explicit safe scope",
   async () => {
   const fixture = dependencies("my-sets");

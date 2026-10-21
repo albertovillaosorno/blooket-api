@@ -116,7 +116,13 @@ function fail(operationId: string, code: string) {
             ? "The Blooket extension and workspace use incompatible read " +
               "formats. Update or reload the Blooket API extension, " +
               "then retry the read."
-          : "The Blooket read could not be confirmed. Check the local browser.",
+          : code === "blooket-browser-failed"
+            ? "The browser could not confirm the remote read. An open " +
+              "editor or provider failure may block it. Preserve the " +
+              "form and journal; inspect the connected tab without " +
+              "repeating Save."
+            : "The Blooket read could not be confirmed. " +
+              "Check the local browser.",
     },
   ]);
 }
