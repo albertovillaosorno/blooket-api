@@ -112,6 +112,10 @@ and the current observation. `PerformanceResourceTiming.responseStatus` is
 cross-origin status exposure. Missing, impossible or unsupported timing
 status is inconclusive, not an assumed 429 and never retry permission.
 
+The same diagnostic also requires finalized, prepared native question controls;
+an arbitrary submitted flag is insufficient. One finite monotonic clock sample
+bounds every candidate fetch in that observation.
+
 The question host checks a linked 429 when a post-Save observation is lost,
 invalid, or briefly unclassified. It preserves an explicit sign-out,
 organization prompt or security challenge instead of masking it with stale

@@ -162,10 +162,13 @@ export function inspectBlooketPostSubmitRateLimit(setId: string): boolean {
         ? field.value : undefined;
     };
     const started = own("submitStartMs");
+    const now = performance.now();
     if (own("document") !== document || own("setId") !== setId ||
         own("submitted") !== true || own("dirty") !== false ||
+        own("prepared") !== true || own("finalized") !== true ||
         typeof started !== "number" || !Number.isFinite(started) ||
-        started < 0 || started > performance.now()) return false;
+        !Number.isFinite(now) || started < 0 || started > now)
+      return false;
     const entries = performance.getEntriesByType("resource");
     // An evicted or huge timing buffer is inconclusive, never permission to
     // retry. We do not request headers, bodies, parameters or credentials.
@@ -176,7 +179,7 @@ export function inspectBlooketPostSubmitRateLimit(setId: string): boolean {
           (entry as PerformanceResourceTiming).responseStatus !== 429 ||
           !Number.isFinite(entry.startTime) ||
           entry.startTime < started ||
-          entry.startTime > performance.now()) return false;
+          entry.startTime > now) return false;
       const requested = new URL(entry.name);
       return requested.origin === url.origin &&
         requested.pathname === url.pathname &&

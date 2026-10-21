@@ -247,13 +247,15 @@ test("a post-submit 429 requires exact owner, route and request timing", () => {
   const address = "https://dashboard.blooket.com/edit?id=set-fixture";
   const entries: { entryType: string; initiatorType: string;
     responseStatus: number; startTime: number; name: string }[] = [];
+  let clock = 10_000;
   Object.defineProperty(globalThis, "location", { configurable: true,
     value: new URL(address) });
   Object.defineProperty(globalThis, "performance", { configurable: true,
-    value: { now: () => 10_000,
+    value: { now: () => clock,
       getEntriesByType: () => entries } });
   try {
     const watch = { ...bound(), submitted: true, dirty: false,
+      prepared: true, finalized: true,
       setId: "set-fixture", submitStartMs: 8_000 };
     withWatch(watch, () => {
       const probe = Function("return (" +
@@ -279,6 +281,23 @@ test("a post-submit 429 requires exact owner, route and request timing", () => {
       assert.equal(probe("set-fixture"), false,
         "future timing evidence cannot predate this observation");
       entries[entries.length - 1]!.startTime = 8_600;
+      assert.equal(probe("set-fixture"), true);
+      watch.prepared = false;
+      assert.equal(probe("set-fixture"), false,
+        "a nonprepared Save latch cannot explain an unrelated 429");
+      watch.prepared = true;
+      watch.finalized = false;
+      assert.equal(probe("set-fixture"), false);
+      watch.finalized = true;
+      assert.equal(probe("set-fixture"), true);
+      clock = Number.NaN;
+      assert.equal(probe("set-fixture"), false,
+        "unknown clock time cannot attribute a provider status");
+      clock = 10_000;
+      entries[entries.length - 1]!.responseStatus = 0;
+      assert.equal(probe("set-fixture"), false,
+        "opaque cross-origin responses cannot be classified as 429");
+      entries[entries.length - 1]!.responseStatus = 429;
       assert.equal(probe("set-fixture"), true);
       assert.equal(probe("another-set"), false);
       watch.setId = "different-set";
