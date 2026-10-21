@@ -235,6 +235,22 @@ test("impossible ready states never authorize a new publication step",
   }
 });
 
+test("impossible initial publication status cannot start a Blooket write",
+  async () => {
+  for (const invalid of [
+    { draftId: ID, phase: "not-started", published: false,
+      remoteSetId: "unexpected-set" },
+    { ...state("not-started", 1, 3) },
+  ]) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return invalid;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status"]);
+  }
+});
+
 test("a missing first Create Set identity never advances to Add Question",
   async () => {
   const calls: string[] = [];
