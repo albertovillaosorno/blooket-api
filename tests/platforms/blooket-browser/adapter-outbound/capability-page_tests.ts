@@ -837,7 +837,8 @@ test(
 
 test("capability probes refuse a human prompt or missing session", () => {
   for (const mode of [
-    "organization", "challenge", "alertdialog", "password-overlay",
+    "organization", "challenge", "alertdialog", "native-dialog",
+    "password-overlay",
     "missing-shell",
     "interstitial", "hidden-main", "duplicate-main", "hidden-navigation",
     "duplicate-navigation", "hidden-logout", "duplicate-logout",
@@ -854,6 +855,8 @@ test("capability probes refuse a human prompt or missing session", () => {
       ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
     } else if (mode === "alertdialog") {
       page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
+    } else if (mode === "native-dialog") {
+      page.document.selectors['dialog[open]'] = [node("DIALOG")];
     } else if (mode === "password-overlay") {
       page.document.selectors['input[type="password"]'] = [node("INPUT")];
     } else if (mode === "interstitial") {
@@ -1151,10 +1154,25 @@ test("a hidden alertdialog does not mask an otherwise safe probe",
   });
 });
 
+test("hidden native dialogs do not block an authenticated capability read",
+  () => {
+  const page = fixture();
+  const dialog = node("DIALOG");
+  dialog.computedStyle = { display: "none", visibility: "visible" };
+  page.document.selectors['dialog[open]'] = [dialog];
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+  });
+});
+
 test("temporary human stops permanently revoke read-owned capability panels",
   () => {
   const causes = ["captcha", "organization", "alertdialog",
-    "interstitial", "password", "lost-shell"] as const;
+    "native-dialog", "interstitial", "password", "lost-shell"] as const;
   for (const cause of causes) {
     const page = fixture();
     withPage(page.document, () => {
@@ -1166,6 +1184,7 @@ test("temporary human stops permanently revoke read-owned capability panels",
       const selector = cause === "captcha"
         ? 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
         : cause === "alertdialog" ? '[role="alertdialog"]'
+        : cause === "native-dialog" ? 'dialog[open]'
         : cause === "organization"
           ? '[role="dialog"][aria-modal="true"] h3'
           : cause === "password" ? 'input[type="password"]'

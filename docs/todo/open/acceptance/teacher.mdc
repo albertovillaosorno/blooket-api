@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green provider-drift regression found that the eight
+isolated capability helpers blocked visible ARIA alertdialogs but still
+admitted a visible native `dialog[open]` without ARIA attributes. Their
+self-contained human-stop checks now cover both selector classes before
+opening, observing or closing read-owned controls; hidden dialogs do not
+block legitimate reads. This is synthetic compatibility coverage, not
+acceptance from a live provider build.
+
 A 2026-10-21 native-dialog regression found that the content-free editor
 compatibility probe could claim `shape-compatible` while a `dialog[open]`
 required the teacher's attention. A saved-question image read could likewise
