@@ -120,5 +120,7 @@ export async function inspectDetachedBlooketCapabilities(
       catch { /* An orphaned read tab never confirms a capability. */ }
     }
   }
-  return completed ? result : failed();
+  // An owned tab removed after the read deadline is still not a timely
+  // capability receipt; certify cleanup and freshness together.
+  return completed && checkedNow() < deadline ? result : failed();
 }

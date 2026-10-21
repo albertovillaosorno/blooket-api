@@ -234,5 +234,7 @@ export async function inspectDetachedBlooketQuestions(
       } catch { /* A leaked temporary tab cannot confirm a read. */ }
     }
   }
-  return closed ? answer : failed();
+  // A cleanup awaited past the shared deadline cannot resurrect a stale
+  // positive read, even if the temporary browser tab was finally removed.
+  return closed && withinBudget() ? answer : failed();
 }

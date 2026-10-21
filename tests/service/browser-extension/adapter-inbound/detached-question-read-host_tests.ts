@@ -46,7 +46,8 @@ type Behavior = "normal" | "redirect" | "challenge" | "drift" |
   "challenge-after-shell" | "accessor-state" | "challenge-after-scan" |
   "hidden-ok-after-scan" | "uncommitted" |
   "pending-after-shell" | "pending-after-scan" |
-  "create-accessor" | "get-accessor" | "initial-blank" | "stuck-blank";
+  "create-accessor" | "get-accessor" | "initial-blank" | "stuck-blank" |
+  "late-cleanup";
 
 function fixture(behavior: Behavior = "normal") {
   const events: string[] = [];
@@ -101,6 +102,7 @@ function fixture(behavior: Behavior = "normal") {
         assert.equal(id, temporaryTabId);
         events.push("remove");
         if (behavior === "no-cleanup") throw Error("not-removed");
+        if (behavior === "late-cleanup") ms = 8_000;
         closed = true;
       },
     },
@@ -179,6 +181,15 @@ test("accessor-supplied create ID cannot authorize reading or deleting tabs",
   });
   assert.deepEqual(page.events, ["create"]);
   assert.equal(page.closed(), false);
+});
+
+test("cleanup finishing beyond the read deadline revokes positive evidence",
+  async () => {
+  const page = fixture("late-cleanup");
+  assert.deepEqual(await page.inspect(),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.closed(), true);
+  assert.equal(page.events.filter(x => x === "remove").length, 1);
 });
 
 test("fresh detached empty read is complete and closes only its own tab",
