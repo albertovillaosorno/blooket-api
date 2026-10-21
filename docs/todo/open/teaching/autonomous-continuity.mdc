@@ -92,3 +92,10 @@ the canonical orchestrator re-reads the immutable snapshot first.
 An inconclusive read never exposes that action. A late recovered reply after
 Stop also cannot re-enable a publication button; a separate fresh Refresh
 is needed if the teacher later elects to continue.
+
+A concurrent full validation exposed an over-tight synthetic fixture budget:
+`capabilities.inspect-text` may own a bounded eight-second detached tab
+inspection, while the worker test required a reply within three seconds.
+The unchanged read completed when the worker test ran alone (six of six
+passed). The fixture now allows twelve seconds for this explicit capability
+operation, without extending product read deadlines or changing write safety.

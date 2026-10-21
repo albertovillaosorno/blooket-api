@@ -1129,8 +1129,12 @@ test(
   async function expectReply(command) {
     const request = job(command);
     jobs.push(request);
+    // Detached capability reads have their own bounded eight-second tab
+    // deadline. Concurrent test-file scheduling may delay a reply beyond
+    // the ordinary three-second synthetic worker request budget.
     const deadline = realNow() +
-      (command.kind === "session.observe" ? 8_000 : 3_000);
+      (command.kind === "capabilities.inspect-text" ? 12_000 :
+        command.kind === "session.observe" ? 8_000 : 3_000);
     while (!replies.some((reply) => reply.id === request.id)) {
       assert.ok(realNow() < deadline, "worker did not settle its request");
       await pause(20);
