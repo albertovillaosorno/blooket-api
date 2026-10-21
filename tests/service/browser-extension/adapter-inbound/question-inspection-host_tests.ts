@@ -55,6 +55,8 @@ const validQuestion = {
 };
 
 interface Scenario {
+  readonly clockAnomaly?: "nonfinite-first" | "backward-first" |
+    "throw-first";
   readonly initial?: unknown;
   readonly listReplies?: readonly unknown[];
   readonly lateQuestionAtMs?: number;
@@ -195,6 +197,16 @@ function synthetic(options: Scenario = {}) {
       },
     },
   };
+  let clockCalls = 0;
+  const readClock = () => {
+    if (++clockCalls === 1) {
+      if (options.clockAnomaly === "nonfinite-first") return Number.NaN;
+      if (options.clockAnomaly === "backward-first") return -1;
+      if (options.clockAnomaly === "throw-first")
+        throw Error("clock failed");
+    }
+    return tick;
+  };
   const host = createExtensionQuestionInspectionHost(
     port,
     7,
@@ -203,7 +215,7 @@ function synthetic(options: Scenario = {}) {
       if (ms === 0 && options.switchOnSecondReadYield)
         currentUrl = "https://dashboard.blooket.com/create";
     },
-    () => tick,
+    readClock,
   );
   return {
     host,
@@ -608,6 +620,17 @@ test(
   assert.equal(page.calls.includes("openBlooketQuestionPanel"), false);
   },
 );
+
+test("unreliable clocks never authorize a saved question modal read",
+  async () => {
+  for (const clockAnomaly of ["nonfinite-first", "backward-first",
+    "throw-first"] as const) {
+    const f = synthetic({ clockAnomaly });
+    assert.deepEqual(await f.host.inspect(FIXTURE_SET, 8_000),
+      { ok: false, code: "blooket-browser-failed" });
+    assert.equal(f.calls.includes("openBlooketQuestionPanel"), false);
+  }
+});
 
 test("question-list hydration respects the shared read deadline", async () => {
   const unavailable = { ok: false, code: "blooket-browser-failed" };

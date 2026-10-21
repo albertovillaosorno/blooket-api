@@ -103,8 +103,24 @@ export function createExtensionQuestionInspectionHost(
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
-  now: () => number = Date.now,
+  clock: () => number = Date.now,
 ) {
+  // A missed deadline due to NaN or a regressed sample must never admit
+  // a fresh remote receipt. Keep the entire inspection untrusted after it.
+  let lastTick = -Infinity;
+  let clockInvalid = false;
+  const now = () => {
+    if (clockInvalid) return Infinity;
+    try {
+      const tick = clock();
+      if (!Number.isFinite(tick) || tick < 0 || tick < lastTick) {
+        clockInvalid = true;
+        return Infinity;
+      }
+      lastTick = tick;
+      return tick;
+    } catch { clockInvalid = true; return Infinity; }
+  };
   const script = async (
     func: (...args: never[]) => unknown,
     args: unknown[],

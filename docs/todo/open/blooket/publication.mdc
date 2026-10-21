@@ -73,6 +73,11 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+The per-question inspector also accepted a saved row after a nonfinite
+initial clock sample. Its inner read clock now refuses impossible or
+regressing samples for the full inspection, including the caller's own
+read deadline. All three fixes are bounded portable regression evidence.
+
 A second 2026-10-21 red-to-green regression found the same invalid-clock
 admission in temporary capability scans. Their outer clock now rejects
 nonfinite and backward samples, bounds inner page inspection and refuses
