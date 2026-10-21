@@ -219,12 +219,17 @@ export function createBlooketBrowserBridgeBroker(
       const startedAt = now();
       if (!Number.isFinite(startedAt))
         return { ok: false, code: "blooket-browser-unavailable" };
+      const write = request.command.kind === "sets.create" ||
+        request.command.kind === "questions.create" ||
+        request.command.kind === "questions.replace";
+      const lifetimeMs = write ? writeTimeoutMs : timeoutMs;
+      const expiresAt = startedAt + lifetimeMs;
+      // An otherwise finite but absurd clock may not represent even one
+      // future lease due to float precision. Never queue an unbounded Save.
+      if (!Number.isFinite(expiresAt) || expiresAt <= startedAt)
+        return { ok: false, code: "blooket-browser-unavailable" };
       return await new Promise<BlooketBrowserBridgeTransportResult>(
         (resolve) => {
-          const write = request.command.kind === "sets.create" ||
-            request.command.kind === "questions.create" ||
-            request.command.kind === "questions.replace";
-          const lifetimeMs = write ? writeTimeoutMs : timeoutMs;
           const timer = setTimeout(() => {
             settle(id, {
               ok: false,
@@ -237,7 +242,7 @@ export function createBlooketBrowserBridgeBroker(
             resolve,
             timer,
             createdAt: startedAt,
-            expiresAt: startedAt + lifetimeMs,
+            expiresAt,
             dispatched: false,
           });
         },

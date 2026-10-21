@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A second 2026-10-21 red-to-green transport regression found that a
+numerically finite but astronomically large broker clock could yield an
+unrepresentable write-lease deadline. The broker previously queued the Save
+without a meaningful future expiry. It now rejects non-advancing/nonfinite
+lease endpoints before allocating a job; deterministic synthetic tests cover
+the precise failure without performing Blooket writes. The legacy-client
+classification also no longer repeats its idempotent set insertion.
+
 A 2026-10-21 red-to-green initial My Sets model-capture regression found
 that a complete Next.js packet envelope could be collected while a visible
 native dialog, ARIA alertdialog or human challenge occupied the same page.

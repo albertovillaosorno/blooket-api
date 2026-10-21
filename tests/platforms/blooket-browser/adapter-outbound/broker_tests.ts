@@ -181,6 +181,26 @@ test("broker normalizes caller arrays before serializing a question job",
   },
 );
 
+test("unrepresentable broker expiry cannot queue a remote operation",
+  async () => {
+  for (const huge of [Number.MAX_VALUE, 2 ** 100]) {
+    const broker = createBlooketBrowserBridgeBroker({ token: TOKEN,
+      now: () => huge });
+    const pending = broker.request({ kind: "sets.create", title: "Fixture",
+      description: "", private: true });
+    try {
+      assert.equal(broker.status().pending, 0,
+        "a clock that cannot advance by the lease duration must not queue");
+      assert.deepEqual(await pending, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally {
+      broker.close();
+      await pending;
+    }
+  }
+});
+
 test("untrusted clock samples never dispatch or confirm a browser job",
   async () => {
   const token = TOKEN;
