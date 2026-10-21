@@ -75,6 +75,14 @@ test("registered MCP image bytes import through CLI with stable replay ID",
       ...input, path: "private.png",
     }, root);
     assert.equal(denied.isError, true);
+    // These look like Base64 to a forgiving decoder but are not canonical.
+    // Refuse them before the image worker or any new library side effect.
+    for (const base64 of ["====", "AB==", "AAB="]) {
+      const rejected = await callTeacherTool("library_image_import", {
+        ...input, base64,
+      }, root);
+      assert.equal(rejected.isError, true);
+    }
     const afterDenied = await callTeacherTool("library_search", {
       query: "Original photo", limit: 10,
     }, root);
