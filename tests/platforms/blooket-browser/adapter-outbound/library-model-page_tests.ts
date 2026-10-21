@@ -46,7 +46,7 @@ function fixture(options: {
   readonly url?: string;
   readonly readyState?: string;
   readonly prompt?: "native" | "alert" | "challenge" | "hidden" |
-    "late-alert";
+    "late-alert" | "modal" | "password";
 } = {}) {
   let overlayChecks = 0;
   const values = {
@@ -65,7 +65,11 @@ function fixture(options: {
                 "/_next/static/css/fixture.css" : null,
           }));
         if (selector === "dialog[open]") overlayChecks++;
-        if (options.prompt === "late-alert" &&
+        if (options.prompt === "modal" && selector ===
+              '[role="dialog"][aria-modal="true"]' ||
+            options.prompt === "password" && selector ===
+              'input[type="password"]' ||
+            options.prompt === "late-alert" &&
             selector === '[role="alertdialog"]' && overlayChecks >= 2 ||
             options.prompt === "native" && selector === "dialog[open]" ||
             (options.prompt === "alert" || options.prompt === "hidden") &&
@@ -109,7 +113,7 @@ test("initial combined bootstrap and later packets retain exact model text",
 test("provider human dialogs and challenges cannot authorize model capture",
   () => {
   for (const prompt of ["native", "alert", "challenge",
-    "late-alert"] as const)
+    "late-alert", "modal", "password"] as const)
     assert.equal(fixture({ prompt }), null);
   assert.deepEqual(fixture({ prompt: "hidden" }),
     { build: BUILD, source: "0:{}\n1:{}\n" });

@@ -37,8 +37,11 @@ export function captureBlooketLibraryModel():
         document.title === "Just a moment...") return null;
     // The underlying My Sets scripts can remain mounted behind a human
     // decision surface. Their presence is not permission to certify a read.
-    const blocked = () => [
+    const blocked = () => document.querySelectorAll(
+      'input[type="password"]',
+    ).length > 0 || [
       'dialog[open]', '[role="alertdialog"]',
+      '[role="dialog"][aria-modal="true"]',
       'iframe[src*="recaptcha"],iframe[src*="hcaptcha"]',
     ].some(selector => Array.from(document.querySelectorAll(selector))
       .some(element => {
