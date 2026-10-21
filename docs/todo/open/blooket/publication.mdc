@@ -73,6 +73,22 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-21, the owner supplied a screenshot of a private two-question
+image/typing set with its image still visible and a 40-second Typing card.
+The local service remained connected and `session inspect` returned `edit`,
+but independent canonical set/question reads failed with the stable
+`blooket-browser-failed` code. A content-free main-world DOM probe saw no
+visible modal, question input or metadata editor. The extension's isolated
+read owner and provider response remain unverified; the screenshot does not
+resolve that read failure or authorize another Save.
+
+A red-to-green pacing regression found that nonfinite or rolled-back native
+read clocks could admit a provider metadata action or strand its exclusive
+lease after a release-clock exception. The read pacer now refuses invalid
+clock/budget samples, releases its local lease safely, and fails closed until
+a trustworthy fresh worker owns subsequent actions. These are portable
+hardening tests, not evidence of an additional remote write.
+
 A 2026-10-21 provider-surface regression found that the native Edit Info
 panel could be reported closed while an independent question edit owner
 remained active. The read-only closure probe now refuses competing editor
