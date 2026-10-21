@@ -64,3 +64,16 @@ Studio now preserves the exact immutable checkpoint for every
 inconclusive read response and never presents `ready` as recovery from an
 uncertain Save. Legitimate unchanged rate-limit waits remain admitted.
 This is portable safety evidence, not another remote mutation.
+
+A separate red-to-green regression found that the Studio command sender could
+mutate a reused `draftId` payload during the first status call, causing later
+reconciliation or verification to target an unrelated draft. Each canonical
+command now receives a fresh argument object. Tests retain the proper draft
+identity through both the completed-checkpoint verification path and the
+read-only recovery path, without performing provider writes.
+
+The authenticated Chrome for Testing session separately returned a canonical
+`my-sets` state and two consecutive successful read-only question collections
+for the existing private quiz, each with one multiple-choice and one typing
+question. This supports current read interoperability, not proof of a new
+uninterrupted AI-authored publication.
