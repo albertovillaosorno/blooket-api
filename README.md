@@ -623,8 +623,9 @@ resubmission, and fresh reads verified its answer, exact matching and time.
 Prepared question images are admitted by stable library ID; covers, answer
 images and audio remain refused. On October 20, canonical creation of a
 private quiz with a prepared question image passed separate fresh verification,
-including exact saved image bytes. Existing-question replacement now has a
-canonical route with portable coverage; its live acceptance remains pending.
+including exact saved image bytes. Existing-question replacement has a
+canonical route and live text-only verification; broader edits remain
+unsupported.
 
 Canonical `publication append <draft-id> <revision> <set-id>` and
 `blooket_publication_append` extend an existing set. The saved draft describes
@@ -645,8 +646,9 @@ remain unchanged. The selected question keeps its type and answer count;
 selected-row images/audio and deletion/reordering are refused before a write.
 
 One native Edit/Save uses the same pacing, durable journal, read-only recovery
-and separate final verification. It never falls back to Add Question. Live
-replacement acceptance remains pending.
+and separate final verification. It never falls back to Add Question. One
+text-only replacement passed independent remote verification after journal
+reconciliation; uninterrupted autonomous correction remains pending.
 
 An October 15 Chrome test identified omitted null fields in injected MC input;
 JSON text now preserves them and real native preparation passes. The next
