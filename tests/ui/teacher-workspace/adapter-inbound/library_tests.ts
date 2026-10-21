@@ -35,6 +35,8 @@ import {
   sampleLibrary,
   representativeSolidColor,
   clipboardImageUrl,
+  preferredPasteSource,
+  preparedMediaUrl,
   readClipboardImage,
 } from "../../../../src/ui/teacher-workspace/adapter-inbound/library.js";
 
@@ -109,6 +111,50 @@ test("GIF color considers later frames within the five-frame bound", () => {
   assert.equal(representativeSolidColor(new Uint8Array(1281)), null);
 });
 
+test("prepared gallery URLs display saved output rather than the source",
+  () => {
+  const record = { id: "fixture", revision: 2,
+    prepared: { recipeRevision: 2, file: "renditions/a/2.gif" } };
+  assert.equal(preparedMediaUrl(record),
+    "/media/fixture?variant=prepared&revision=2");
+  assert.equal(preparedMediaUrl({ ...record, revision: 3 }),
+    "/media/fixture");
+  assert.equal(preparedMediaUrl({ ...record, prepared: null }),
+    "/media/fixture");
+});
+
+test("clipboard paste retains linked GIF instead of flattened PNG",
+  async () => {
+  const still = new Blob(["still"], { type: "image/png" });
+  const gif = new Blob(["animation"], { type: "image/gif" });
+  const link = "https://images.example.test/animation.gif?size=large";
+  assert.deepEqual(preferredPasteSource([still], link), { url: link });
+  assert.deepEqual(preferredPasteSource([still, gif], link), { image: gif });
+  assert.deepEqual(preferredPasteSource([still], "https://example.test/a.png"),
+    { image: still });
+  assert.deepEqual(preferredPasteSource([], "not-an-image"), null);
+  assert.deepEqual(await readClipboardImage({ read: async () => [
+    { types: ["image/png"], getType: async () => still },
+    { types: ["text/plain"],
+      getType: async () => new Blob([link], { type: "text/plain" }) },
+  ] }), { url: link });
+});
+
+test("clipboard prefers original GIF bytes to a PNG preview",
+  async () => {
+  const png = new Blob(["still"], { type: "image/png" });
+  const gif = new Blob(["animated"], { type: "image/gif" });
+  for (const items of [
+    [{ types: ["image/png", "image/gif"],
+      getType: async (type: string) => type === "image/gif" ? gif : png }],
+    [{ types: ["image/png"], getType: async () => png },
+      { types: ["image/gif"], getType: async () => gif }],
+  ]) {
+    assert.deepEqual(await readClipboardImage({ read: async () => items }),
+      { image: gif });
+  }
+});
+
 test(
   "clipboard chooses an image before text and admits only web image URLs",
   async () => {
@@ -121,7 +167,7 @@ test(
         { types: ["image/png"], getType: async () => image },
       ],
     }),
-    { image },
+    { url: "https://images.example.test/a.gif" },
   );
   assert.deepEqual(
     await readClipboardImage({
