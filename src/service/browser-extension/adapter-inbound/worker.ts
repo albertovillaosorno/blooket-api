@@ -797,16 +797,23 @@ async function readPage(
         // Abort only an untouched read opener whose panel never appeared.
         // Reload retires that native document and its pending read; it never
         // retries an opener, changes a quiz, or claims a successful read.
-        if (await ownsDetailRoute().catch(() => false) &&
-            await script(current, browser,
-              isBlooketDetailPanelClosed as (...args: never[]) => unknown,
-              [operation.setId, true]).catch(() => false) === true &&
-            await ownsDetailRoute().catch(() => false) &&
-            await script(current, browser,
-              isBlooketDetailPanelClosed as (...args: never[]) => unknown,
-              [operation.setId, true]).catch(() => false) === true &&
-            await ownsDetailRoute().catch(() => false))
-          await browser.tabs.reload(current.tabId, { bypassCache: true });
+        const initial = await ownsDetailRoute().catch(() => false) &&
+          await script(current, browser,
+            isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+            [operation.setId, true]).catch(() => false) === true;
+        if (initial) {
+          // React can mount the pending editor on the next browser task.
+          // Do not interpret two immediate same-tick samples as independent
+          // evidence that the teacher has no unsaved metadata form.
+          await pause(100);
+          if (Date.now() < readDeadline - 500 &&
+              await ownsDetailRoute().catch(() => false) &&
+              await script(current, browser,
+                isBlooketDetailPanelClosed as (...args: never[]) => unknown,
+                [operation.setId, true]).catch(() => false) === true &&
+              await ownsDetailRoute().catch(() => false))
+            await browser.tabs.reload(current.tabId, { bypassCache: true });
+        }
         throw new Error("browser-details-unconfirmed");
       }
       if (await ownsDetailRoute().catch(() => false)) {

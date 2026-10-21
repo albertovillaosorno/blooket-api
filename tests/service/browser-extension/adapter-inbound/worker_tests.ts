@@ -116,6 +116,7 @@ test(
   let detailClosedSucceeds = true;
   let detailPendingRecoverySafe = false;
   let detailPendingRecoveryChecks = 0;
+  let detailPanelMountsAfterFirstProbe = false;
   let detailMalformedReply = false;
   let detailPanelProxy = false;
   let detailPanelProxyReads = 0;
@@ -614,6 +615,11 @@ test(
         if (func.name === "isBlooketDetailPanelClosed") {
           if (args?.[1] === true) {
             detailPendingRecoveryChecks++;
+            if (detailPanelMountsAfterFirstProbe &&
+                detailPendingRecoveryChecks === 1) {
+              detailPanelMountsAfterFirstProbe = false;
+              setTimeout(() => { detailPendingRecoverySafe = false; }, 10);
+            }
             return [{ result: detailPendingRecoverySafe }];
           }
           return [{ result: detailClosedSucceeds }];
@@ -1787,6 +1793,20 @@ test(
     assert.equal(detailPendingRecoveryChecks, 3);
     // Denied cleanup does not add a second reload to the initial read.
     assert.equal(readReloads, beforeDeniedReload + 1);
+    detailPanelFailuresRemaining = 500;
+    expireDetailRead = true;
+    detailPendingRecoverySafe = true;
+    detailPendingRecoveryChecks = 0;
+    detailPanelMountsAfterFirstProbe = true;
+    const beforeHydratedPanel = readReloads;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    Date.now = realNow;
+    // A pending panel that mounts on the next browser task is never
+    // discarded after only an immediately repeated DOM observation.
+    assert.equal(detailPendingRecoveryChecks, 2);
+    assert.equal(readReloads, beforeHydratedPanel + 1);
     detailPanelFailuresRemaining = 0;
     detailPendingRecoveryChecks = 0;
     detailSidebarProxy = true;
