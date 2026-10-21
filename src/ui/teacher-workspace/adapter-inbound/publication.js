@@ -280,6 +280,8 @@ export async function publishTextDraft(
           throw Error("publication-progress-invalid");
         // Only the product's matching fresh receipt may claim success.
         if (verified.published && (
+          typeof verified.verifiedAt !== "string" ||
+          !verified.verifiedAt.trim() ||
           verified.revision !== frozenRevision ||
           typeof current.remoteSetId !== "string" ||
           !current.remoteSetId ||

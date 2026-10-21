@@ -43,6 +43,8 @@ const state = (phase: string, done: number, total = 3) => ({
   draftId: ID, revision: REV, phase, completedOperations: done,
   totalOperations: total, remoteSetId: done === 0 ? null : "synthetic-set",
   published: phase === "verified",
+  ...(phase === "verified" ? { verifiedAt: "2026-10-21T18:00:00.000Z" }
+    : {}),
 });
 
 test("resumption uses immutable journal revision after local draft changes",
@@ -891,6 +893,21 @@ test("final verify rejects a different revision, set, or operation count",
     await assert.rejects(publishTextDraft(ID, REV, async name => {
       calls.push(name);
       return name.endsWith("status") ? confirmed : reply;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.verify"]);
+  }
+});
+
+test("automated verified receipt must contain a fresh verification timestamp",
+  async () => {
+  for (const verifiedAt of [undefined, "", " "]) {
+    const calls: string[] = [];
+    const proof = { ...state("verified", 3), verifiedAt };
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return name.endsWith("status")
+        ? state("writes-complete", 3) : proof;
     }), /publication-progress-invalid/u);
     assert.deepEqual(calls, ["blooket.publication.status",
       "blooket.publication.verify"]);
