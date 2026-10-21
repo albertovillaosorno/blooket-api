@@ -919,7 +919,8 @@ test("final verify rejects a different revision, set, or operation count",
 
 test("automated verified receipt must contain a fresh verification timestamp",
   async () => {
-  for (const verifiedAt of [undefined, "", " "]) {
+  for (const verifiedAt of [undefined, "", " ", "verified",
+    "2026-02-30T12:00:00.000Z", "2026-10-21T12:00:00Z"]) {
     const calls: string[] = [];
     const proof = { ...state("verified", 3), verifiedAt };
     await assert.rejects(publishTextDraft(ID, REV, async name => {
