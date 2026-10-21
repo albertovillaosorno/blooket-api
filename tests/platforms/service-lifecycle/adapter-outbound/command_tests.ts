@@ -351,6 +351,7 @@ test("MCP publication crosses CLI service and journaled browser transport",
     const questions: Record<string, unknown>[] = [];
     const mutations: string[] = [];
     let confirmationInspections = 0;
+    let loseNextQuestionReceipt = false;
     const poll = setInterval(() => {
       const job = bridge.next(bridge.pairingToken());
       if (!job) return;
@@ -398,9 +399,13 @@ test("MCP publication crosses CLI service and journaled browser transport",
         }
         default: throw new Error("Unexpected publication bridge command.");
       }
-      assert.ok(bridge.complete(bridge.pairingToken(), {
-        schemaVersion: 1, id: job.id, ok: true, value,
-      }));
+      const lostReceipt = loseNextQuestionReceipt &&
+        request.kind === "questions.create";
+      if (lostReceipt) loseNextQuestionReceipt = false;
+      assert.ok(bridge.complete(bridge.pairingToken(), lostReceipt
+        ? { schemaVersion: 1, id: job.id, ok: false,
+          code: "blooket-browser-failed" }
+        : { schemaVersion: 1, id: job.id, ok: true, value }));
     }, 5);
     try {
       await writeFile(join(root, "service-runtime.json"), JSON.stringify({
@@ -466,6 +471,7 @@ test("MCP publication crosses CLI service and journaled browser transport",
         },
       }, "cli:append-draft", root);
       assert.ok(extension.ok);
+      loseNextQuestionReceipt = true;
       const appended = await callTeacherTool("blooket_publication_append", {
         draftId: "append-fixture", remoteSetId: "synthetic-created",
         expectedRevision: (extension.value as { revision: string }).revision,
@@ -476,23 +482,28 @@ test("MCP publication crosses CLI service and journaled browser transport",
       );
       assert.ok(appendEnvelope.ok && appendEnvelope.value.ok);
       if (appendEnvelope.ok && appendEnvelope.value.ok)
-        assert.deepEqual(appendEnvelope.value.value, {
-          draftId: "append-fixture",
-          revision: (extension.value as { revision: string }).revision,
-          remoteSetId: "synthetic-created", completedOperations: 1,
-          totalOperations: 1, published: false, phase: "advanced",
+        assert.equal((appendEnvelope.value.value as { phase: string }).phase,
+          "reconciliation-required");
+      // The provider saved the row but its ACK was lost. Resume through
+      // canonical read-only reconciliation instead of replaying Add Question.
+      const recoveryCalls: string[] = [];
+      const recovered = await publishTextDraft("append-fixture",
+        (extension.value as { revision: string }).revision,
+        async (name, payload) => {
+          recoveryCalls.push(name);
+          const response = await callTeacherTool(name.replaceAll(".", "_"),
+            payload, root);
+          assert.equal(response.isError, false, response.content[0]?.text);
+          const decoded = decodeResultEnvelope(
+            JSON.parse(response.content[0]!.text));
+          assert.ok(decoded.ok && decoded.value.ok);
+          if (!decoded.ok || !decoded.value.ok)
+            throw Error("unexpected-tool-result");
+          return decoded.value.value;
         });
-      const checkedAppend = await callTeacherTool("blooket_publication_verify",
-        { draftId: "append-fixture" }, root);
-      assert.equal(checkedAppend.isError, false,
-        checkedAppend.content[0]?.text);
-      const checked = decodeResultEnvelope(
-        JSON.parse(checkedAppend.content[0]!.text),
-      );
-      assert.ok(checked.ok && checked.value.ok);
-      if (checked.ok && checked.value.ok)
-        assert.equal((checked.value.value as { published: boolean }).published,
-          true);
+      assert.equal(recovered.published, true);
+      assert.deepEqual(recoveryCalls, ["blooket.publication.status",
+        "blooket.publication.reconcile", "blooket.publication.verify"]);
       assert.deepEqual(mutations,
         ["sets.create", "questions.create", "questions.create"]);
       assert.equal(questions.length, 2);
