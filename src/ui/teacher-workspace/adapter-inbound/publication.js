@@ -163,8 +163,9 @@ export async function publishTextDraft(
           next.completedOperations !== current.completedOperations ||
           (current.totalOperations !== 0 &&
             next.totalOperations !== current.totalOperations) ||
-          (current.remoteSetId != null &&
-            next.remoteSetId !== current.remoteSetId))
+          (current.remoteSetId !== undefined &&
+            next.remoteSetId !== current.remoteSetId) ||
+          (current.phase === "not-started" && next.remoteSetId != null))
         throw Error("publication-progress-invalid");
       onProgress(next);
       if (cancelled()) return { ...next, phase: "paused" };
