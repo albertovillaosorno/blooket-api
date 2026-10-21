@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+The 2026-10-21 Linux extension-build integration test initially failed
+after adding the password-overlay guard: its synthetic DOM returned a build
+link for every selector, including `input[type="password"]`. The fixture
+now returns build resources only for its exact resource query. The injected
+compiled Chrome module, Firefox packaging and model reader all pass again;
+no production safety check was weakened.
+
 A 2026-10-21 red-to-green detached-read regression found that question and
 capability probes could return positive evidence even when removal of their
 own temporary Chrome tab completed after the shared read deadline. Both
