@@ -1451,24 +1451,19 @@ rule evaluation limitation remains explicit in the development handoff.
 
 ## Blockers
 
-On 2026-10-20, a connected canonical replacement preflight returned
-`blooket-browser-failed` while reading saved questions, before opening a
-new publication attempt or sending Save.
-
-A separate read-only browser probe found an open modal in the existing
-Blooket tab. Its ownership and unsaved
-state are not proven, so extension reload, modal dismissal and replacement
-retries were deliberately withheld; historical uncertain journals remain.
-The newly tested detached `about:blank` transition fix has not yet been
-accepted by a freshly loaded authenticated companion. Resume only from a
-verified owner-safe browser state and fresh canonical question read-back.
+The earlier question-read preflight and retained-form blockers were resolved
+on 2026-10-21: the current companion was loaded, the owner-authorized test edit
+was recovered and another canonical replacement was freshly verified without
+controller Save. Those observations are recorded above.
 
 Canonical private Create Set, typing and multiple-choice questions, and a
 prepared question image and a registered-MCP append have real fresh
-verification. Uninterrupted multi-question publication remains pending. Existing-question
-replacement has fresh canonical verification after read-only reconciliation. Historical HTTP 429 attempts retain their
-journals without
-replay. Computer Use reads and keyboard activation work in the current Chrome;
+verification. Uninterrupted multi-question publication remains pending.
+Existing-question replacement has fresh canonical verification after read-only
+reconciliation.
+
+Historical HTTP 429 attempts retain their journals without replay.
+Computer Use reads and keyboard activation work in the current Chrome;
 native clicks/screenshots still time out independently of product publication.
 
 Safari, macOS, and ChatGPT-specific hardening belongs only to task blooket-15
