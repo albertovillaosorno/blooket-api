@@ -76,10 +76,18 @@ test("image intake rejects paths and oversized payloads", () => {
     { ...request, path: "private.png" },
     { ...request, base64: "aGVsbG8" },
     { ...request, base64: "aGVsbG8=\n" },
+    { ...request, base64: "====" },
+    { ...request, base64: "AB==" },
+    { ...request, base64: "AAB=" },
+    { ...request, base64: "AA=A" },
     { ...request, base64: "A".repeat(900_004) },
     { ...request, name: "" },
   ]) assert.throws(
     () => decodeLibraryCommand("library.image.import", bad),
     /invalid-image-import|unknown-or-missing-field/u,
   );
+  for (const encoded of ["AA==", "AAA=", "/w==", "////"]) {
+    assert.equal(decodeLibraryCommand("library.image.import",
+      { ...request, base64: encoded }).base64, encoded);
+  }
 });

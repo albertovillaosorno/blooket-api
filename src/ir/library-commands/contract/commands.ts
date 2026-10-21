@@ -121,9 +121,7 @@ export function decodeLibraryCommand(
     if (!string(value["name"], 200) || !value["name"].trim() ||
         !string(value["description"], 10_000) ||
         !string(value["base64"], 900_000) ||
-        value["base64"].length === 0 ||
-        value["base64"].length % 4 !== 0 ||
-        !/^[A-Za-z0-9+/]*={0,2}$/u.test(value["base64"]))
+        !canonicalImageBase64(value["base64"]))
       throw new Error("invalid-image-import");
     return { kind: "image-import", name: value["name"],
       description: value["description"], base64: value["base64"] };
@@ -184,6 +182,21 @@ export function decodeLibraryCommand(
     expectedRevision,
   };
 }
+function canonicalImageBase64(value: string): boolean {
+  // A permissive decoder may ignore invalid padding or nonzero unused bits.
+  // Reject aliases at the IR boundary before they reach any image worker.
+  if (value.length === 0 || value.length % 4 !== 0 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u
+        .test(value)) return false;
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+    "abcdefghijklmnopqrstuvwxyz0123456789+/";
+  if (value.endsWith("=="))
+    return alphabet.indexOf(value[value.length - 3]!) % 16 === 0;
+  if (value.endsWith("="))
+    return alphabet.indexOf(value[value.length - 2]!) % 4 === 0;
+  return true;
+}
+
 function language(value: unknown): value is string {
   return (
     string(value, 35) &&
