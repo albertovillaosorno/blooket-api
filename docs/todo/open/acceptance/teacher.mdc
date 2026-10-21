@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green detached-read regression found that question and
+capability probes could return positive evidence even when removal of their
+own temporary Chrome tab completed after the shared read deadline. Both
+hosts now require a trustworthy clock and remaining time after cleanup;
+late cleanup invalidates the receipt, despite successfully closing only the
+owned tab. These are synthetic Chrome-port tests, not new account reads.
+
 A 2026-10-21 red-to-green transport test found that a caller-supplied
 reply proxy could throw from `getOwnPropertyDescriptor("id")`, escaping the
 browser broker's synchronous correlation boundary instead of returning a

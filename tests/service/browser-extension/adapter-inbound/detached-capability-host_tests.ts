@@ -48,6 +48,7 @@ function fixture(options: {
   readonly sourceRedirect?: boolean;
   readonly unstableLists?: boolean;
   readonly failedCleanup?: boolean;
+  readonly cleanupLatencyMs?: number;
   readonly pending?: boolean;
   readonly interruptedDrawer?: boolean;
   readonly lateMySets?: boolean;
@@ -125,6 +126,7 @@ function fixture(options: {
         assert.equal(id, 84);
         events.push("remove");
         if (options.failedCleanup) throw Error("not-removed");
+        now += options.cleanupLatencyMs ?? 0;
         removed = true;
       },
     },
@@ -229,6 +231,15 @@ function fixture(options: {
   return { events, inspect, removed: () => removed,
     elapsed: () => now - 1_000 };
 }
+
+test("capability cleanup after the deadline cannot certify the read",
+  async () => {
+  const page = fixture({ cleanupLatencyMs: 9_000 });
+  assert.deepEqual(await page.inspect(),
+    { ok: false, code: "blooket-browser-failed" });
+  assert.equal(page.removed(), true);
+  assert.equal(page.events.filter(x => x === "remove").length, 1);
+});
 
 test("untrusted capability read clocks cannot grant a provider receipt",
   async () => {
