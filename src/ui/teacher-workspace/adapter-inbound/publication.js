@@ -163,7 +163,11 @@ export async function publishTextDraft(
   const readWithCooldown = async (name, validate) => {
     for (let attempt = 0; attempt < 2; attempt++) {
       if (cancelled()) return { cancelled: true };
-      const reply = progress(await send(name, payload()), draftId);
+      const rawReply = await send(name, payload());
+      // Stop does not interrupt a committed provider request. Ignore its
+      // eventual UI receipt rather than reporting progress after Stop.
+      if (cancelled()) return { cancelled: true };
+      const reply = progress(rawReply, draftId);
       validate(reply);
       if (attempt === 0 && reply.phase === "wait" &&
           reply.state === "rate-limited") {
@@ -177,9 +181,10 @@ export async function publishTextDraft(
     }
     throw Error("publication-progress-invalid");
   };
-  let current = progress(await send(
-    "blooket.publication.status", payload(),
-  ), draftId);
+  const initialReply = await send("blooket.publication.status", payload());
+  if (cancelled()) return { draftId, phase: "paused", published: false,
+    completedOperations: 0, totalOperations: 0 };
+  let current = progress(initialReply, draftId);
   report(current);
   if (current.published !== false) throw Error("publication-progress-invalid");
   if (!["not-started", "ready", "writes-complete",
@@ -259,9 +264,13 @@ export async function publishTextDraft(
       current.phase !== "recovered") return current;
   for (let index = 0; index < MAX_UI_STEPS; index++) {
     if (cancelled()) return { ...current, phase: "paused" };
-    let next = progress(await send("blooket.publication.step", {
+    const stepReply = await send("blooket.publication.step", {
       draftId, expectedRevision: frozenRevision,
-    }), draftId);
+    });
+    // An in-flight mutation may have persisted despite Stop. Never replay
+    // it, verify it implicitly, or report its late reply as fresh progress.
+    if (cancelled()) return { ...current, phase: "paused" };
+    let next = progress(stepReply, draftId);
     // One publication step cannot prove final remote verification.
     if (next.published !== false) throw Error("publication-progress-invalid");
     let recoveredByProbe = false;
