@@ -188,13 +188,18 @@ export function publicationStopReason(error) {
     "blooket-browser-incompatible"].includes(code)) return "extension";
   if (["blooket-publication-remote-conflict",
     "blooket-remote-state-changed", "blooket-publication-draft-conflict",
-    "blooket-publication-capabilities-changed"].includes(code))
+    "blooket-publication-capabilities-changed",
+    "blooket-write-baseline-not-captured"].includes(code))
     return "conflict";
   if (["blooket-publication-media-unsupported",
     "blooket-media-not-prepared", "blooket-media-stale",
     "blooket-media-invalid", "blooket-media-unavailable"].includes(code))
     return "media";
   if (code === "blooket-publication-busy") return "busy";
+  if (code === "blooket-publication-single-edit-required")
+    return "single-edit";
+  if (code === "blooket-publication-edit-unsupported")
+    return "edit-unsupported";
   if (code === "blooket-publication-invalid-draft") return "content";
   if (["publication-storage-unavailable", "publication-lock-release-failed",
     "publication-snapshot-invalid",
