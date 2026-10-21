@@ -253,6 +253,32 @@ test("late or regressed broker clocks cannot accept a saved-state receipt",
   }
 });
 
+test("a receipt decoded after its lease expires never certifies completion",
+  async () => {
+  for (const afterDecode of [25_000, Number.NaN, 900]) {
+    let tick = 1_000;
+    let clockCalls = 0;
+    let advancing = false;
+    const broker = createBlooketBrowserBridgeBroker({ token: TOKEN,
+      now: () => advancing && ++clockCalls === 2 ? afterDecode : tick });
+    try {
+      const pending = broker.request({ kind: "sets.list" });
+      const lease = broker.next(TOKEN);
+      assert.ok(lease);
+      advancing = true;
+      clockCalls = 0;
+      const accepted = broker.complete(TOKEN, {
+        schemaVersion: 1, id: lease.id, ok: true,
+        value: { completeness: "complete", items: [] },
+      });
+      assert.equal(accepted, false, "decoded late receipts are not proof");
+      assert.deepEqual(await pending, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally { broker.close(); }
+  }
+});
+
 test("broker fails a request before allocating a job on clock failure",
   async () => {
   const broker = createBlooketBrowserBridgeBroker({ token: TOKEN,
