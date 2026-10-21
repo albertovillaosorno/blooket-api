@@ -340,6 +340,9 @@ test("impossible ready states never authorize a new publication step",
   async () => {
   for (const invalid of [
     state("ready", 3, 3),
+    { ...state("ready", 0, 3), remoteSetId: "" },
+    { ...state("ready", 0, 3), remoteSetId: 42 },
+    { ...state("ready", 0, 3), remoteSetId: [] },
     { ...state("ready", 1, 3), remoteSetId: null },
     state("writes-complete", 2, 3),
     { ...state("writes-complete", 3, 3), remoteSetId: null },

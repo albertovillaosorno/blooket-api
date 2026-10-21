@@ -48,6 +48,12 @@ function progress(value, draftId) {
     value.remoteSetId !== undefined ||
     value.revision !== undefined))
     throw Error("publication-progress-invalid");
+  // A new set has a null binding; existing-target append and replacement
+  // plans have an exact nonempty remote ID. Never accept a forged or empty
+  // binding merely because no operation has completed yet.
+  if (value.remoteSetId !== undefined && value.remoteSetId !== null &&
+      (typeof value.remoteSetId !== "string" || !value.remoteSetId))
+    throw Error("publication-progress-invalid");
   // Before a snapshot exists, human/challenge/rate-limit outcomes omit counts.
   // They are recoverable stops, never authorization for another write.
   const noCounts = value.completedOperations === undefined &&
