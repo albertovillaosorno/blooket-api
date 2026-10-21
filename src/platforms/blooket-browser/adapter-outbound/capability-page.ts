@@ -86,13 +86,19 @@ export function canLeaveBlooketPageForRead(): boolean {
     const dialogs = Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"]',
     ));
+    // A native dialog opened with showModal is modal without explicit ARIA
+    // attributes. A visible dialog[open] may hold an unsaved human decision.
+    const nativeDialogs = Array.from(document.querySelectorAll(
+      'dialog[open]',
+    ));
     // Some security and consent gates use the ARIA alertdialog role without
     // the dialog role or an explicit aria-modal attribute. Never navigate
     // a teacher away from such a visible human-decision surface.
     const alerts = Array.from(document.querySelectorAll(
       '[role="alertdialog"]',
     ));
-    if (dialogs.some(visible) || alerts.some(visible)) return false;
+    if (dialogs.some(visible) || nativeDialogs.some(visible) ||
+        alerts.some(visible)) return false;
     if (document.querySelector('input#question[name="question"]') ||
         document.querySelector('aside[data-drawer-open="true"]'))
       return false;

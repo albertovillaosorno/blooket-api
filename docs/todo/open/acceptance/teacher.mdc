@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green navigation regression covered native HTML
+`dialog[open]`: an active browser-native modal need not set an explicit ARIA
+role or attribute, and navigating away can discard a teacher decision. The
+capability read-leave guard now stops for visible open dialogs, while hidden
+or dismissed native dialogs do not block ordinary reads. This is portable
+synthetic compatibility evidence, not a claim of observed provider DOM drift.
+
 A subsequent 2026-10-21 concurrent suite exposed a different false negative
 in the launcher tests: a deliberately non-draining stale-PID service exhausted
 the test subprocess's eight-second timeout (`code: null`) instead of letting
