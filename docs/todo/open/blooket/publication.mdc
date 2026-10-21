@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A portable regression on 2026-10-21 exercised an Edit Info read whose
+original opener never mounted its native panel. The reader now attempts to
+reclaim only an unchanged, document-bound metadata watch with no competing
+editor, active text input, or visible editable metadata controls. Two fresh
+owner observations must agree before the recovery reload.
+
+A denied cleanup retains its original error: it does not cancel the user's
+form, retry the provider opener, or confirm saved metadata. The extension
+worker test counts normal fresh-document navigation separately from this
+optional cleanup reload. This is simulated recovery evidence, not a successful
+live Blooket edit or permission to repeat any uncertain Save.
+
 On 2026-10-21 at 03:59 UTC, the real Quizzes panel completed a private
 image/typing quiz and separate registered MCP verification confirmed all three
 operations with `published: true`. Two provider 429 stops required explicit
