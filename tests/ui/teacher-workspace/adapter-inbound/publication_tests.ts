@@ -31,7 +31,9 @@
 //
 import test from "node:test";
 import assert from "node:assert/strict";
-import { publishTextDraft, publicationStopReason } from
+import {
+  publishTextDraft, publicationStopReason, waitForPublicationReadCooldown,
+} from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 const ID = "synthetic-draft";
@@ -268,6 +270,135 @@ test("an existing ambiguous journal never opens another write", async () => {
   assert.equal(result.phase, "reconciliation-required");
   assert.deepEqual(calls, ["blooket.publication.status",
     "blooket.publication.reconcile"]);
+});
+
+test("read-only cooldown is bounded and immediately abortable",
+  async () => {
+  const stopped = new AbortController();
+  stopped.abort();
+  assert.equal(await waitForPublicationReadCooldown(stopped.signal, 5_000),
+    false);
+  const active = new AbortController();
+  const delayed = waitForPublicationReadCooldown(active.signal, 5_000);
+  active.abort();
+  assert.equal(await delayed, false);
+  assert.equal(await waitForPublicationReadCooldown(
+    new AbortController().signal, 0), true);
+  assert.equal(await waitForPublicationReadCooldown(
+    new AbortController().signal, Number.NaN), false);
+  assert.equal(await waitForPublicationReadCooldown(
+    new AbortController().signal, 5_001), false);
+});
+
+test("one bounded read-only retry completes a throttled final verify",
+  async () => {
+  const calls: string[] = [];
+  let waits = 0;
+  const replies = [state("writes-complete", 3),
+    { ...state("wait", 3), state: "rate-limited" },
+    state("verified", 3)];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, () => {}, () => false, async () => { waits++; return true; });
+  assert.equal(result.published, true);
+  assert.equal(waits, 1);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.verify", "blooket.publication.verify"]);
+});
+
+test("rate-limited recovery probes can resume without another Save",
+  async () => {
+  const calls: string[] = [];
+  let waits = 0;
+  const replies = [state("reconciliation-required", 1),
+    { ...state("wait", 1), state: "rate-limited" },
+    state("recovered", 2), state("advanced", 3), state("verified", 3)];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, () => {}, () => false, async () => { waits++; return true; });
+  assert.equal(result.published, true);
+  assert.equal(waits, 1);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile", "blooket.publication.reconcile",
+    "blooket.publication.step", "blooket.publication.verify"]);
+});
+
+test("a throttled lost-Save read recovers before exactly one next step",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("ready", 1, 3),
+    state("reconciliation-required", 1, 3),
+    { ...state("wait", 1, 3), state: "rate-limited" },
+    state("recovered", 2, 3), state("advanced", 3, 3),
+    state("verified", 3, 3)];
+  let waits = 0;
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, () => {}, () => false, async () => { waits++; return true; });
+  assert.equal(result.published, true);
+  assert.equal(waits, 1);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step", "blooket.publication.reconcile",
+    "blooket.publication.reconcile", "blooket.publication.step",
+    "blooket.publication.verify"]);
+});
+
+test("a second rate limit stops read-only retries without busy polling",
+  async () => {
+  const calls: string[] = [];
+  let waits = 0;
+  const replies = [state("writes-complete", 3),
+    { ...state("wait", 3), state: "rate-limited" },
+    { ...state("wait", 3), state: "rate-limited" }];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, () => {}, () => false, async () => { waits++; return true; });
+  assert.equal(result.phase, "wait");
+  assert.equal(waits, 1);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.verify", "blooket.publication.verify"]);
+});
+
+test("Stop during read-only cooldown prevents the next probe",
+  async () => {
+  let stopped = false;
+  const calls: string[] = [];
+  const replies = [state("writes-complete", 3),
+    { ...state("wait", 3), state: "rate-limited" }];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, () => {}, () => stopped,
+  async () => { stopped = true; return true; });
+  assert.equal(result.phase, "paused");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.verify"]);
+});
+
+test("human challenge and non-throttle waits do not retry provider reads",
+  async () => {
+  for (const patch of [
+    { phase: "human-action-required", state: "security-challenge" },
+    { phase: "wait", state: "unknown" },
+  ]) {
+    let waits = 0;
+    const calls: string[] = [];
+    const replies = [state("writes-complete", 3),
+      { ...state("wait", 3), ...patch }];
+    const result = await publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return replies.shift();
+    }, () => {}, () => false,
+    async () => { waits++; return true; });
+    assert.equal(result.phase, patch.phase);
+    assert.equal(waits, 0);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.verify"]);
+  }
 });
 
 test("an existing recovered journal resumes only its next unfinished step",
