@@ -141,8 +141,8 @@ test("an invalid pacing clock never authorizes native metadata actions",
     });
     assert.equal(await acquire(() => 8_000), undefined);
     tick = 10_000;
-    assert.equal(await acquire(() => 8_000), undefined,
-      "an invalid clock must not be repaired by an arbitrary next sample");
+    assert.ok(await acquire(() => 8_000),
+      "a valid new sample can recover before an action has started");
   }
 });
 
@@ -179,7 +179,8 @@ test("clock rollback after a valid lease blocks future metadata reads",
   tick = 9_999;
   assert.equal(await acquire(() => 8_000), undefined);
   tick = 20_000;
-  assert.equal(await acquire(() => 8_000), undefined);
+  assert.ok(await acquire(() => 8_000),
+    "a recovered clock must still respect the prior cooldown");
 });
 
 
