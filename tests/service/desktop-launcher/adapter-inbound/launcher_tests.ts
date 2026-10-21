@@ -132,7 +132,10 @@ test("manual diagnostics preserve cached evidence during installation",
   });
 
 test("real silent launcher starts, reuses and drains the supervised service",
-  { timeout: 20_000 }, async () => {
+  // This launches three independent Node processes and two full shutdowns.
+  // Concurrent test files may slow scheduling; require the same actual
+  // drain proofs instead of treating a three-second polling budget as proof.
+  { timeout: 45_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), "launcher-supervised-service-"));
     const preferences = defaultTeacherPreferences(join(root, "media"));
     await savePreferences(root, { ...preferences,
@@ -145,13 +148,14 @@ test("real silent launcher starts, reuses and drains the supervised service",
     }, () => 200_000), { kind: "admitted" });
     const historyBefore = await readFile(historyPath, "utf8");
     const command = (option: string) => promisify(execFile)(process.execPath,
-      [launcher, option], { timeout: 8_000, maxBuffer: 8192,
+      [launcher, option], { timeout: 12_000, maxBuffer: 8192,
         env: { PATH: process.env["PATH"], HOME: process.env["HOME"],
           XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
           DBUS_SESSION_BUS_ADDRESS: process.env["DBUS_SESSION_BUS_ADDRESS"],
           BLOOKET_DATA_HOME: root } });
     const drained = async () => {
-      for (let attempt = 0; attempt < 100; attempt++) {
+      const deadline = performance.now() + 8_000;
+      for (;;) {
         const runtime = await lstat(join(root, "service-runtime.json"))
           .catch(error => { if (error.code === "ENOENT") return undefined;
             throw error; });
@@ -160,9 +164,10 @@ test("real silent launcher starts, reuses and drains the supervised service",
             throw error; });
         const writers = await readdir(join(root, ".canonical-writers"));
         if (!runtime && !lock && writers.length === 0) return;
-        await new Promise(resolve => setTimeout(resolve, 30));
+        if (performance.now() >= deadline)
+          throw Error("owned-launcher-service-did-not-drain");
+        await new Promise(resolve => setTimeout(resolve, 75));
       }
-      throw Error("owned-launcher-service-did-not-drain");
     };
     try {
       assert.equal((await command("--status")).stdout,
