@@ -185,6 +185,9 @@ test("unowned, challenged, ambiguous, or edited forms never start fetching",
           node("H3", "Select your organization"),
         ];
       },
+      (state: ReturnType<typeof setup>) => {
+        state.extra['[role="alertdialog"]'] = [node("DIV")];
+      },
     ];
     for (const mutate of variants) await fixture(async state => {
       mutate(state);
@@ -192,6 +195,17 @@ test("unowned, challenged, ambiguous, or edited forms never start fetching",
       assert.equal(state.calls.length, 0);
     });
   },
+);
+
+test("a prompt appearing during an image read invalidates its receipt",
+  async () => fixture(async state => {
+  state.response = async () => {
+    state.extra['[role="alertdialog"]'] = [node("DIV")];
+    return new Response(png);
+  };
+  assert.deepEqual(await serialized("fixture", 1, 1_000), failed);
+  assert.equal(state.calls.length, 1);
+}),
 );
 
 test("tiny or endless chunks cannot accumulate unbounded stream metadata",
