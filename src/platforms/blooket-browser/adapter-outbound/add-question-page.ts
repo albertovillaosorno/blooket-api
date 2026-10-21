@@ -346,9 +346,20 @@ export function runBlooketAddQuestionPageAction(
       return bounds.width > 0 && bounds.height > 0 &&
         heading.textContent?.trim() === "Select your organization";
     });
+    // Native and ARIA alert dialogs may be human gates without role=dialog.
+    // Recheck after DOM and File events, not just at the first admission.
+    const humanDialogVisible = (): boolean => [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
     if (document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]') !== null ||
-        challenge || organizationPrompt)
+        challenge || organizationPrompt || humanDialogVisible())
       return opens || probes ? false : failed();
     if (
       action !== "open-replacement" &&
@@ -684,7 +695,8 @@ export function runBlooketAddQuestionPageAction(
         )).some(visibleStop) || Array.from(document.querySelectorAll(
           '[role="dialog"][aria-modal="true"] h3',
         )).some(node => visibleStop(node) &&
-          node.textContent?.trim() === "Select your organization"))
+          node.textContent?.trim() === "Select your organization") ||
+          humanDialogVisible())
           return failed();
         return { ok: true };
       }
@@ -753,7 +765,8 @@ export function runBlooketAddQuestionPageAction(
       )).some(visibleStop) || Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
       )).some(node => visibleStop(node) &&
-        node.textContent?.trim() === "Select your organization"))
+        node.textContent?.trim() === "Select your organization") ||
+        humanDialogVisible())
         return failed();
       watch.prepared = true;
       watch.finalized = !hasImage || action === "finalize-image";

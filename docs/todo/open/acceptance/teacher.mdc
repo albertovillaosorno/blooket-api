@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, additional provider-drift regressions showed that Add Question
+opening, preparation, image selection and submission did not recognize visible
+native `dialog[open]` and `role="alertdialog"` human stops. The independent
+injected action now refuses them at admission and after form/file events,
+without clicking Save or replacing a teacher-owned editor. A hidden former
+prompt does not block a safe question opener. This is sanitized synthetic
+coverage and does not assert a new authenticated remote mutation.
+
 On 2026-10-21, provider-drift fixtures exposed that Create Set preparation,
 submission and redirect verification did not stop for visible native
 `dialog[open]` and ARIA `alertdialog` surfaces without explicit modal markup.
