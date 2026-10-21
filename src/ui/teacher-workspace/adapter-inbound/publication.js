@@ -239,6 +239,9 @@ export async function publishTextDraft(
       if (attempt === 0 && reply.phase === "wait" &&
           reply.state === "rate-limited") {
         report(reply);
+        // Stop may be triggered synchronously by the progress callback.
+        // Do not start a timer after that teacher intent was revoked.
+        if (cancelled()) return { cancelled: true };
         const allowed = await waitForReadRetry();
         if (cancelled()) return { cancelled: true };
         if (allowed) continue;

@@ -184,3 +184,9 @@ A 2026-10-21 red-to-green orchestration regression found that automated
 field. All automated positive results now require a nonblank verification
 timestamp in addition to an exact immutable journal and target. Negative
 verification stops remain read-only and do not imply a new Save.
+
+A second 2026-10-21 red-to-green test found that a synchronous teacher Stop
+from a rate-limit progress callback still allowed the UI to start its next
+read-only cooldown timer. The orchestrator now checks cancellation immediately
+after the callback, so no timer or provider retry is scheduled under a revoked
+intent. Existing interrupted Save receipts remain journaled and un-replayed.

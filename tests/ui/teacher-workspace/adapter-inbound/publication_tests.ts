@@ -392,6 +392,24 @@ test("a second rate limit stops read-only retries without busy polling",
     "blooket.publication.verify", "blooket.publication.verify"]);
 });
 
+test("Stop in a throttled progress callback skips cooldown entirely",
+  async () => {
+  let stopped = false;
+  let waits = 0;
+  const calls: string[] = [];
+  const replies = [state("writes-complete", 3),
+    { ...state("wait", 3), state: "rate-limited" }];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, value => { if (value.phase === "wait") stopped = true; },
+  () => stopped, async () => { waits++; return true; });
+  assert.equal(result.phase, "paused");
+  assert.equal(waits, 0, "Stop must not schedule an unnecessary cooldown");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.verify"]);
+});
+
 test("Stop during read-only cooldown prevents the next probe",
   async () => {
   let stopped = false;
