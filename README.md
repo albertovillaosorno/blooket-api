@@ -562,6 +562,11 @@ inside the extension's isolated page context; the extension discovers already
 open workspace tabs when it starts. It connects automatically and opens its own
 Blooket tab without changing the teacher's existing tabs.
 
+That dedicated tab is reserved for automation. By default, a later CLI read
+recovers its own question-inspection panel even after accidental clicks or
+typing, discarding unsaved edits in that read panel. Use your other tabs for
+manual editing. Recovery never submits a form or replays an uncertain Save.
+
 There is no connection form, pairing code, or Blooket credential entry in the
 extension. Its popup shows readiness and shortcuts to the workspace and Blooket.
 The connection follows the workspace's actual port and reconnects after a

@@ -252,7 +252,7 @@ export function openBlooketQuestionPanel(
         editStyle.display === "none" || editStyle.visibility !== "visible" ||
         (buttons[0] as HTMLButtonElement).disabled ||
         buttons[0]!.getAttribute("aria-disabled") === "true") return false;
-    // A question reader owns this modal only until the teacher interacts.
+    // The dedicated automation tab owns this read modal through cleanup.
     // Injected helpers use the same isolated browser world, not a page-global
     // DOM attribute that a provider script could forge.
     const world = globalThis as typeof globalThis & {
@@ -669,8 +669,13 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
       };
     };
     const watch = world.__blooketQuestionEditWatch;
-    if (!watch || watch.document !== document || watch.setId !== setId ||
-        watch.dirty) return false;
+    if (!watch || watch.document !== document || watch.setId !== setId)
+      return false;
+    // Incidental input does not transfer an automation-owned read panel.
+    // Cancel discards only that panel's transient edits, never a pending Save.
+    if (["__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+      "__blooketDetailEditWatch", "__blooketCapabilityEditWatch"]
+      .some(key => Object.hasOwn(globalThis, key))) return false;
     // A different question modal is not ours, even when the set ID is equal.
     // Only its ordinal is inspected here; the untrusted draft is never sent
     // back to the extension during cancellation.

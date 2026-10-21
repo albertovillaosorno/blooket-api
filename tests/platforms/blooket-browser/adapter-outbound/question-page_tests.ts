@@ -849,15 +849,25 @@ test("all injected question actions work without imported closures", () => {
       correctAnswers: ["sun"], answerTypes: ["exactly"],
       image: "", audio: "",
     });
-    // A real pointer or form event in the isolated world transfers ownership
-    // to the teacher, even if the serialized question JSON is unchanged.
+    // The dedicated automation tab cancels its own read modal even after
+    // accidental interaction. It never submits those transient edits.
     document.dispatchTrusted("pointerdown");
-    assert.equal(close("fixture"), false);
-    assert.equal(closed, 1);
+    assert.equal(close("fixture"), true);
+    assert.equal(closed, 2);
+    assert.equal(open("fixture", 1), true);
     document.dispatchTrusted("change");
-    assert.equal(close("fixture"), false);
-    assert.equal(closed, 1);
-    assert.equal(opened, 2);
+    Object.defineProperty(globalThis, "__blooketAddQuestionFormWatch", {
+      configurable: true, value: { submitted: true },
+    });
+    try {
+      assert.equal(close("fixture"), false);
+      assert.equal(closed, 2);
+    } finally {
+      Reflect.deleteProperty(globalThis, "__blooketAddQuestionFormWatch");
+    }
+    assert.equal(close("fixture"), true);
+    assert.equal(closed, 3);
+    assert.equal(opened, 3);
   });
 });
 

@@ -44,6 +44,8 @@ import {
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { createExtensionQuestionInspectionHost } from
   "./question-inspection-host.ts";
+import { closeBlooketQuestionPanel, isBlooketQuestionPanelClosed } from
+  "../../../platforms/blooket-browser/adapter-outbound/question-page.ts";
 import { inspectDetachedBlooketQuestions } from
   "./detached-question-read-host.ts";
 import {
@@ -404,6 +406,43 @@ async function read(
     return await readPage(current, browser, operation, readDeadline);
   } finally { release(); }
 }
+// Recover a prior read in our dedicated automation tab, including accidental
+// clicks or typing. The page helper requires its isolated read-owner latch;
+// foreign editors and pending write latches can never be canceled here.
+async function canLeaveAutomationPage(
+  current: Connection,
+  browser: ReturnType<typeof ownedBrowser>,
+): Promise<unknown> {
+  const safe = await script(current, browser,
+    canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+  if (safe !== false) return safe;
+  const tab = await browser.tabs.get(current.tabId);
+  if (!tab.url || tab.status !== "complete" ||
+      tab.pendingUrl !== undefined) return false;
+  const url = new URL(tab.url);
+  const id = url.searchParams.get("id");
+  if (url.origin !== "https://dashboard.blooket.com" ||
+      url.pathname !== "/edit" || url.hash ||
+      url.searchParams.size !== 1 || !id) return false;
+  const origin = await script(current, browser,
+    inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [tab.url]);
+  if (typeof origin !== "number" || !Number.isFinite(origin) || origin <= 0)
+    return false;
+  if (await script(current, browser,
+    closeBlooketQuestionPanel as (...args: never[]) => unknown, [id]) !== true)
+    return false;
+  await pause(100);
+  const after = await browser.tabs.get(current.tabId);
+  if (after.url !== tab.url || after.status !== "complete" ||
+      after.pendingUrl !== undefined || await script(current, browser,
+        inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+        [tab.url]) !== origin || await script(current, browser,
+        isBlooketQuestionPanelClosed as (...args: never[]) => unknown,
+        [id]) !== true) return false;
+  return await script(current, browser,
+    canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+}
+
 async function readPage(
   current: Connection,
   browser: ReturnType<typeof ownedBrowser>,
@@ -444,8 +483,7 @@ async function readPage(
     const sourceOrigin = await script(current, browser,
       inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
       [tab.url]);
-    const canLeave = await script(current, browser,
-      canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+    const canLeave = await canLeaveAutomationPage(current, browser);
     if (canLeave !== true && typeof sourceOrigin === "number" &&
         Number.isFinite(sourceOrigin) && sourceOrigin > 0 &&
         Date.now() < readDeadline) {
@@ -510,10 +548,7 @@ async function readPage(
         Date.now() >= readDeadline)
       throw new Error("browser-navigation-unsafe");
     approvedSourceOrigin = nativeSource;
-    const safe = await script(
-      current, browser,
-      canLeaveBlooketPageForRead as (...args: never[]) => unknown,
-    );
+    const safe = await canLeaveAutomationPage(current, browser);
     const checked = await browser.tabs.get(current.tabId);
     if (safe !== true || checked.status !== "complete" ||
         checked.url !== tab.url || checked.pendingUrl !== undefined ||
@@ -1100,8 +1135,7 @@ async function detachedEditRead(
       url.pathname !== "/edit" || url.hash ||
       url.searchParams.size !== 1 || !setId || setId.length > 512)
     return undefined;
-  const canLeave = await script(current, browser,
-    canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+  const canLeave = await canLeaveAutomationPage(current, browser);
   if (canLeave === true && !(operation === "capabilities" && textOnly))
     return undefined;
   if (canLeave !== true && canLeave !== false) return failed();
