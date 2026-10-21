@@ -78,8 +78,11 @@ can advance; an inconclusive result, cancellation or mismatched evidence
 stops without another Save.
 
 The lost first Create Set acknowledgement is covered explicitly: recovered
-set identity resumes at Add Question, never repeats Create Set. This is
-portable orchestration evidence, not uninterrupted live provider acceptance.
+set identity resumes at Add Question, never repeats Create Set. Studio now
+exposes a separate explicit Resume-after-reconciliation action alongside its
+existing read-only Reconcile button; neither a status refresh nor Reconcile
+silently launches a writer. This is portable evidence, not uninterrupted
+live provider acceptance.
 
 A 2026-10-21 red-to-green Studio regression rejected a `ready` journal
 claiming zero completed operations while already binding a remote set ID.
