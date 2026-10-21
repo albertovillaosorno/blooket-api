@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A companion 2026-10-21 red-to-green drift regression found that a visible
+`alertdialog` did not revoke the capability probe's owned Add Question/Audio
+controls. All eight independent Chrome-injected capability functions now
+refuse new clicks and read-owned Cancel after that human gate appears;
+nonvisible alerts do not block ordinary hydration. Each function retains its
+self-contained scripting boundary. This is portable provider-surface
+hardening, not a new claim about current Blooket UI or remote persistence.
+
 A 2026-10-21 sanitized provider-drift regression found that a visible
 `role="alertdialog"` without `aria-modal` did not stop the native page-leave
 guard. The read-only gate now refuses navigation during such a human prompt,

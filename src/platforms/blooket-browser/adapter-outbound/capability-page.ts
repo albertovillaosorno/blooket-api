@@ -158,7 +158,18 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -299,7 +310,18 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -433,7 +455,18 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -578,7 +611,18 @@ export function inspectBlooketAudioCapabilityDrawer(
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -746,7 +790,18 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -888,7 +943,18 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -1018,7 +1084,18 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
@@ -1154,7 +1231,18 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
       const bounds = frame.getBoundingClientRect();
       return bounds.width > 0 && bounds.height > 0;
     });
-    if (!authenticated || blockedByOrganization || blockedByChallenge) {
+    // A provider can render a human gate as alertdialog without aria-modal.
+    // Never click or cancel read-owned controls under that visible prompt.
+    const blockedByAlert = Array.from(document.querySelectorAll(
+      '[role="alertdialog"]',
+    )).some((panel) => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
+    if (!authenticated || blockedByOrganization || blockedByChallenge ||
+        blockedByAlert) {
       const pending = (globalThis as typeof globalThis & {
         __blooketCapabilityEditWatch?: {
           document: Document; dirty: boolean;
