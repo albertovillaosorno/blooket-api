@@ -818,7 +818,8 @@ test(
 
 test("capability probes refuse a human prompt or missing session", () => {
   for (const mode of [
-    "organization", "challenge", "password-overlay", "missing-shell",
+    "organization", "challenge", "alertdialog", "password-overlay",
+    "missing-shell",
     "interstitial", "hidden-main", "duplicate-main", "hidden-navigation",
     "duplicate-navigation", "hidden-logout", "duplicate-logout",
   ] as const) {
@@ -832,6 +833,8 @@ test("capability probes refuse a human prompt or missing session", () => {
       page.document.selectors[
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
       ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+    } else if (mode === "alertdialog") {
+      page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
     } else if (mode === "password-overlay") {
       page.document.selectors['input[type="password"]'] = [node("INPUT")];
     } else if (mode === "interstitial") {
@@ -1114,10 +1117,25 @@ test("hidden Audio drawers are not capability evidence", () => {
   });
 });
 
+test("a hidden alertdialog does not mask an otherwise safe probe",
+  () => {
+  const page = fixture();
+  const alert = node("DIV");
+  page.document.selectors['[role="alertdialog"]'] = [alert];
+  alert.computedStyle = { display: "none", visibility: "visible" };
+  withPage(page.document, () => {
+    assert.equal(openBlooketCapabilityQuestionPanel("set-fixture"), true);
+    page.document.selectors['input#question[name="question"]'] = [
+      page.question,
+    ];
+    assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
+  });
+});
+
 test("temporary human stops permanently revoke read-owned capability panels",
   () => {
-  const causes = ["captcha", "organization", "interstitial",
-    "password", "lost-shell"] as const;
+  const causes = ["captcha", "organization", "alertdialog",
+    "interstitial", "password", "lost-shell"] as const;
   for (const cause of causes) {
     const page = fixture();
     withPage(page.document, () => {
@@ -1128,6 +1146,7 @@ test("temporary human stops permanently revoke read-owned capability panels",
       assert.equal(isBlooketCapabilityQuestionPanelReady("set-fixture"), true);
       const selector = cause === "captcha"
         ? 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+        : cause === "alertdialog" ? '[role="alertdialog"]'
         : cause === "organization"
           ? '[role="dialog"][aria-modal="true"] h3'
           : cause === "password" ? 'input[type="password"]'
