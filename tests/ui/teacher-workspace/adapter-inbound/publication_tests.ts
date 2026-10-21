@@ -142,6 +142,35 @@ test("signed-out preflight without snapshot shows a recoverable stop",
   assert.deepEqual(reports, ["not-started", "session-required"]);
 });
 
+test("an uncertain first Create Set cannot invent a remote binding",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("ready", 0, 2),
+    { ...state("reconciliation-required", 0, 2),
+      remoteSetId: "unverified-set" }];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }), /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
+test("an unstarted first operation cannot claim an uncertain set ID",
+  async () => {
+  const calls: string[] = [];
+  const replies = [{ draftId: ID, phase: "not-started",
+    published: false },
+    { ...state("reconciliation-required", 0, 2),
+      remoteSetId: "unverified-set" }];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }), /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
 test("an inconclusive journal probe stops without another write", async () => {
   const calls: string[] = [];
   const result = await publishTextDraft(ID, REV, async name => {
