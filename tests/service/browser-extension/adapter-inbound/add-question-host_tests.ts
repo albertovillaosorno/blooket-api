@@ -283,6 +283,29 @@ test("invalid native question text never enters browser orchestration",
   }
 });
 
+test("provider cooldown starts after Save, before saved-state verification",
+  async () => {
+  for (const options of [{}, { postSubmit429: true,
+    mismatchReadBack: true }, { prepareFails: true }]) {
+    const fake = fakeChrome(options);
+    let released = 0;
+    await createExtensionAddQuestionHost(fake.chrome, 7,
+      async () => undefined, () => {
+        released++;
+        fake.calls.push("provider-cooldown-start");
+      }).addQuestion(input);
+    const submit = fake.calls.indexOf(
+      "runBlooketAddQuestionPageAction:submit");
+    const cooldown = fake.calls.indexOf("provider-cooldown-start");
+    assert.equal(released, options.prepareFails ? 0 : 1);
+    if (submit >= 0) {
+      assert.ok(cooldown > submit);
+      const verification = fake.calls.indexOf("inspectBlooketPage", submit);
+      assert.ok(verification > cooldown);
+    }
+  }
+});
+
 test("a post-Save 429 stops as rate-limited without a second Save",
   async () => {
   const fake = fakeChrome({ mismatchReadBack: true,
