@@ -114,6 +114,19 @@ export async function publishTextDraft(
   // UI progress listeners may mutate presentation objects. They must never
   // alter the authoritative checkpoint compared before subsequent writes.
   const report = value => onProgress({ ...value });
+  // A read-only probe that cannot prove recovery must preserve the existing
+  // frozen checkpoint. "ready" or a foreign target is never a safe signal
+  // to resume an uncertain Save.
+  const preserveUncertain = (before, after) => {
+    if (!["reconciliation-required", "wait", "human-action-required",
+      "session-required"].includes(after.phase) ||
+        after.published !== false ||
+        after.revision !== before.revision ||
+        after.totalOperations !== before.totalOperations ||
+        after.completedOperations !== before.completedOperations ||
+        after.remoteSetId !== before.remoteSetId)
+      throw Error("publication-progress-invalid");
+  };
   let current = progress(await send(
     "blooket.publication.status", payload,
   ), draftId);
@@ -135,6 +148,16 @@ export async function publishTextDraft(
     const verified = progress(await send(
       "blooket.publication.verify", payload,
     ), draftId);
+    // Inconclusive verification must also retain the frozen set and count;
+    // a blocked provider read cannot relabel the local owner or checkpoint.
+    if (!verified.published && (
+      !["wait", "human-action-required", "session-required"].includes(
+        verified.phase) ||
+      verified.revision !== frozenRevision ||
+      verified.remoteSetId !== current.remoteSetId ||
+      verified.totalOperations !== current.totalOperations ||
+      verified.completedOperations !== current.completedOperations))
+      throw Error("publication-progress-invalid");
     // The product owns fresh provider verification. Presentation may show
     // success only if its receipt still belongs to this frozen plan and set.
     if (verified.published && (
@@ -160,6 +183,7 @@ export async function publishTextDraft(
     if (reconciled.published !== false)
       throw Error("publication-progress-invalid");
     if (reconciled.phase !== "recovered") {
+      preserveUncertain(current, reconciled);
       report(reconciled);
       return reconciled;
     }
@@ -206,6 +230,7 @@ export async function publishTextDraft(
       if (reconciled.published !== false)
         throw Error("publication-progress-invalid");
       if (reconciled.phase !== "recovered") {
+        preserveUncertain(next, reconciled);
         report(reconciled);
         return reconciled;
       }

@@ -278,6 +278,75 @@ test("inconclusive preexisting recovery performs no new write",
     "blooket.publication.reconcile"]);
 });
 
+test("ambiguous recovery cannot silently change the frozen checkpoint",
+  async () => {
+  const patches = [
+    { revision: "b".repeat(64) },
+    { completedOperations: 0 },
+    { totalOperations: 4 },
+    { remoteSetId: "foreign-set" },
+    { phase: "ready" },
+  ];
+  for (const patch of patches) {
+    const calls: string[] = [];
+    const responses = [state("reconciliation-required", 1),
+      { ...state("reconciliation-required", 1), ...patch }];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return responses.shift();
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.reconcile"]);
+  }
+});
+
+test("inconclusive recovery may stop at a stable provider wait",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("reconciliation-required", 1),
+    { ...state("wait", 1), state: "rate-limited" }];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.phase, "wait");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile"]);
+});
+
+test("read-only final verification cannot retarget on a provider stop",
+  async () => {
+  for (const patch of [
+    { remoteSetId: "foreign-set" },
+    { revision: "b".repeat(64) },
+    { completedOperations: 1 },
+    { totalOperations: 4 },
+  ]) {
+    const calls: string[] = [];
+    const responses = [state("writes-complete", 3),
+      { ...state("wait", 3), state: "rate-limited", ...patch }];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return responses.shift();
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.verify"]);
+  }
+});
+
+test("a mid-step inconclusive recovery cannot report an unrelated set",
+  async () => {
+  const replies = [state("ready", 1), state("reconciliation-required", 1),
+    { ...state("wait", 1), remoteSetId: "foreign-set" }];
+  const calls: string[] = [];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }), /publication-progress-invalid/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step", "blooket.publication.reconcile"]);
+});
+
 test("an existing journal finishing on recovery verifies without Save",
   async () => {
   const calls: string[] = [];
