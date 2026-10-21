@@ -27,7 +27,7 @@
 // - Usage:
 //   - Wire into Quizzes after an explicit user publication request.
 // - Defaults:
-//   - Unknown phases, cancellation, and uncertain attempts stop immediately.
+//   - Uncertain writes get one read-only probe; only proven recovery continues.
 //
 // The canonical write plan and durable mutation budget bound publication.
 // A smaller UI-only limit would interrupt valid long quizzes every 128 writes.
@@ -112,12 +112,43 @@ export async function publishTextDraft(
     return current;
   for (let index = 0; index < MAX_UI_STEPS; index++) {
     if (cancelled()) return { ...current, phase: "paused" };
-    const next = progress(await send("blooket.publication.step", {
+    let next = progress(await send("blooket.publication.step", {
       draftId, expectedRevision: frozenRevision,
     }), draftId);
     // One publication step cannot prove final remote verification.
     if (next.published !== false) throw Error("publication-progress-invalid");
-    if (next.phase !== "advanced") {
+    let recoveredByProbe = false;
+    if (next.phase === "reconciliation-required") {
+      // A lost Save reply is not permission for another Save. The canonical
+      // reconciler may prove this exact operation through fresh remote reads.
+      if (next.revision !== frozenRevision ||
+          next.completedOperations !== current.completedOperations ||
+          (current.totalOperations !== 0 &&
+            next.totalOperations !== current.totalOperations) ||
+          (current.remoteSetId != null &&
+            next.remoteSetId !== current.remoteSetId))
+        throw Error("publication-progress-invalid");
+      onProgress(next);
+      if (cancelled()) return { ...next, phase: "paused" };
+      const reconciled = progress(await send(
+        "blooket.publication.reconcile", payload,
+      ), draftId);
+      if (reconciled.published !== false)
+        throw Error("publication-progress-invalid");
+      if (reconciled.phase !== "recovered") {
+        onProgress(reconciled);
+        return reconciled;
+      }
+      if (reconciled.revision !== next.revision ||
+          reconciled.totalOperations !== next.totalOperations ||
+          reconciled.completedOperations !== next.completedOperations + 1 ||
+          (next.remoteSetId != null &&
+            reconciled.remoteSetId !== next.remoteSetId))
+        throw Error("publication-progress-invalid");
+      next = reconciled;
+      recoveredByProbe = true;
+    }
+    if (next.phase !== "advanced" && !recoveredByProbe) {
       onProgress(next);
       return next;
     }
