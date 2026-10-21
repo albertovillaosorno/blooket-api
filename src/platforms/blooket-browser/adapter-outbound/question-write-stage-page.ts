@@ -124,8 +124,16 @@ export function inspectBlooketSubmittedQuestionOwner(
       const data = Object.getOwnPropertyDescriptor(watch, key);
       return data?.enumerable && "value" in data ? data.value : undefined;
     };
+    // Detached fresh reads are exceptional: a synthetic or stale submitted
+    // flag alone cannot prove that the native Save action was attempted.
+    // The real owned click latches this monotonic timestamp synchronously.
+    const started = own("submitStartMs");
+    const now = performance.now();
     return own("document") === document && own("setId") === setId &&
-      own("submitted") === true && own("dirty") === false;
+      own("submitted") === true && own("dirty") === false &&
+      own("prepared") === true && own("finalized") === true &&
+      typeof started === "number" && Number.isFinite(started) &&
+      Number.isFinite(now) && started >= 0 && started <= now;
   } catch { return false; }
 }
 
