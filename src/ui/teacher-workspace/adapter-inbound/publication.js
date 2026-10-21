@@ -66,6 +66,8 @@ function progress(value, draftId) {
       value.completedOperations === value.totalOperations) ||
     (value.phase === "writes-complete" &&
       value.completedOperations !== value.totalOperations) ||
+    (value.phase === "ready" && value.completedOperations === 0 &&
+      value.remoteSetId != null) ||
     (value.completedOperations > 0 &&
       (typeof value.remoteSetId !== "string" || !value.remoteSetId))
   )) throw Error("publication-progress-invalid");
