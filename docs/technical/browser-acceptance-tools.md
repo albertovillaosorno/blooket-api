@@ -106,6 +106,12 @@ An earlier, foreign-set, non-fetch, or unrelated 429 cannot explain the Save.
 A true result means **wait and reconcile without replay**, not success or
 proof that a rejected request can never complete later.
 
+The evidence must have a finite start time between the original Save latch
+and the current observation. `PerformanceResourceTiming.responseStatus` is
+[not broadly available][resource-status] and can report `0` for blocked
+cross-origin status exposure. Missing, impossible or unsupported timing
+status is inconclusive, not an assumed 429 and never retry permission.
+
 The question host checks a linked 429 when a post-Save observation is lost,
 invalid, or briefly unclassified. It preserves an explicit sign-out,
 organization prompt or security challenge instead of masking it with stale
@@ -282,3 +288,6 @@ for portable functionality or browser publication fixes.
 
 <!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
 [chrome-scripting]: https://developer.chrome.com/docs/extensions/reference/api/scripting
+
+<!-- jig-ignore-next-line: Keep the exact official source URL intact. -->
+[resource-status]: https://developer.mozilla.org/en-US/docs/Web/API/PerformanceResourceTiming/responseStatus

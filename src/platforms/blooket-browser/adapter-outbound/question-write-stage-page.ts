@@ -166,7 +166,9 @@ export function inspectBlooketPostSubmitRateLimit(setId: string): boolean {
       if (entry.entryType !== "resource" ||
           (entry as PerformanceResourceTiming).initiatorType !== "fetch" ||
           (entry as PerformanceResourceTiming).responseStatus !== 429 ||
-          entry.startTime < started) return false;
+          !Number.isFinite(entry.startTime) ||
+          entry.startTime < started ||
+          entry.startTime > performance.now()) return false;
       const requested = new URL(entry.name);
       return requested.origin === url.origin &&
         requested.pathname === url.pathname &&
