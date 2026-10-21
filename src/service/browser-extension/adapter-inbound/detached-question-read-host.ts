@@ -78,8 +78,25 @@ export async function inspectDetachedBlooketQuestions(
   pause: (ms: number) => Promise<void>,
   now: () => number = Date.now,
 ): Promise<DetachedQuestionReadResult> {
+  // A nonfinite or backward-moving clock is not evidence that a saved
+  // read finished before its deadline. Once invalid, fail this entire scan.
+  let previousTick = -Infinity;
+  let clockValid = true;
+  const withinBudget = () => {
+    if (!clockValid) return false;
+    try {
+      const tick = now();
+      if (!Number.isFinite(tick) || tick < 0 || tick < previousTick ||
+          tick >= deadline) {
+        clockValid = false;
+        return false;
+      }
+      previousTick = tick;
+      return true;
+    } catch { clockValid = false; return false; }
+  };
   if (!setId || setId.length > 512 || /[\x00-\x1f\x7f]/u.test(setId) ||
-      !Number.isFinite(deadline) || now() >= deadline)
+      !Number.isFinite(deadline) || !withinBudget())
     return failed();
   const target = "https://dashboard.blooket.com/edit?id=" +
     encodeURIComponent(setId);
@@ -93,7 +110,7 @@ export async function inspectDetachedBlooketQuestions(
     // A newly opened background tab can still be hydrating after Chrome
     // reports complete. The existing reader owns further bounded retries.
     let loaded = false;
-    for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
+    for (let attempt = 0; attempt < 40 && withinBudget(); attempt++) {
       const tab = snapshotBlooketReadTab(
         await chrome.tabs.get(createdId!),
       );
@@ -103,7 +120,7 @@ export async function inspectDetachedBlooketQuestions(
       if (load === "ready") { loaded = true; break; }
       await pause(100);
     }
-    if (!loaded || now() >= deadline) return failed();
+    if (!loaded || !withinBudget()) return failed();
     const script = async (
       func: (...args: never[]) => unknown, args: unknown[],
     ): Promise<unknown> => {
@@ -128,12 +145,12 @@ export async function inspectDetachedBlooketQuestions(
       [target],
     );
     if (typeof origin !== "number" || !Number.isFinite(origin) ||
-        origin <= 0 || now() >= deadline) return failed();
+        origin <= 0 || !withinBudget()) return failed();
     // Chrome's complete document can precede React's authenticated Edit
     // shell. Poll only a precise transitional page within the same native
     // document. Login, challenges and malformed replies stop immediately.
     let ready = false;
-    for (let attempt = 0; attempt < 40 && now() < deadline; attempt++) {
+    for (let attempt = 0; attempt < 40 && withinBudget(); attempt++) {
       const tab = snapshotBlooketReadTab(
         await chrome.tabs.get(createdId!),
       );
@@ -169,12 +186,12 @@ export async function inspectDetachedBlooketQuestions(
       if (status.value !== "unexpected-page") return failed();
       await pause(100);
     }
-    if (!ready || now() >= deadline) return failed();
+    if (!ready || !withinBudget()) return failed();
     const host = createExtensionQuestionInspectionHost(
       chrome, createdId!, pause, now,
     );
     answer = await host.inspect(setId, deadline, origin);
-    if (!answer.ok || now() >= deadline) return failed();
+    if (!answer.ok || !withinBudget()) return failed();
     // A challenge can replace React's Edit shell in the same native document
     // after all cards were read. Never certify a stale page just because its
     // URL and performance.timeOrigin have not changed.
@@ -207,7 +224,7 @@ export async function inspectDetachedBlooketQuestions(
     );
     if (check.status !== "complete" || check.url !== target ||
         check.pendingUrl !== undefined ||
-        finalOrigin !== origin || now() >= deadline) return failed();
+        finalOrigin !== origin || !withinBudget()) return failed();
   } catch { return failed(); }
   finally {
     if (createdId !== undefined) {
