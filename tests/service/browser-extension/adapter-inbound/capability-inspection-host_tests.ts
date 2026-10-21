@@ -232,6 +232,33 @@ function fixture(options: {
 
 const noPause = async () => {};
 
+test("a transient nonfinite capability clock cannot become a saved read",
+  async () => {
+  for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY]) {
+    const page = fixture();
+    let calls = 0;
+    const result = await createExtensionCapabilityInspectionHost(
+      page.chrome, 7, noPause,
+      () => ++calls === 2 ? invalid : 1_000,
+    ).inspect({ textOnly: true });
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.deepEqual(page.navigations, [],
+      "an untrustworthy clock must not navigate the teacher's tab");
+  }
+});
+
+test("a regressing capability clock cannot certify a provider probe",
+  async () => {
+  const page = fixture();
+  let calls = 0;
+  const result = await createExtensionCapabilityInspectionHost(
+    page.chrome, 7, noPause, () => ++calls < 3 ? 1_000 : 900,
+  ).inspect({ textOnly: true });
+  assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+  assert.deepEqual(page.navigations, []);
+});
+
 test("invalid upstream capability deadline stops before tab access",
   async () => {
   for (const deadline of [0, -1, NaN, Infinity, Date.now() - 1]) {
