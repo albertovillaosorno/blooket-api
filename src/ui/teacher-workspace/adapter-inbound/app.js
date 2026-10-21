@@ -9,7 +9,7 @@ import {
 } from "./library.js";
 import {
   publishTextDraft, publicationStopReason, recoveredPublicationAction,
-  verifiedPublicationResult,
+  verifiedPublicationResult, publicationStatusForView,
   waitForPublicationReadCooldown,
 } from "./publication.js";
 import {
@@ -2224,7 +2224,7 @@ async function loadQuizzes() {
         throw error;
       }
       if (obsolete()) return;
-      latest = observed;
+      latest = publicationStatusForView(observed, id);
       state.textContent = publicationLabel(latest);
       actions.replaceChildren();
       const add = (label, name, callback) => {
