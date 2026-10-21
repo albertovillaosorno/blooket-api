@@ -84,3 +84,11 @@ foreign/rolled-back `wait` cannot become a usable UI resume point.
 Only genuine provider waits, sign-in requirements or human challenges
 may pause, with an unchanged frozen journal (or no initial snapshot).
 This blocks duplicate-save confusion without adding busy retries.
+
+Studio now presents a direct explicit Resume action after read-only recovery
+of an incomplete plan instead of requiring an additional status Refresh.
+This does not automatically send Save: the teacher must click Resume, and
+the canonical orchestrator re-reads the immutable snapshot first.
+An inconclusive read never exposes that action. A late recovered reply after
+Stop also cannot re-enable a publication button; a separate fresh Refresh
+is needed if the teacher later elects to continue.

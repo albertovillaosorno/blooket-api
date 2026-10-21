@@ -133,6 +133,8 @@ async function quizFixture(options: {
   readonly holdSecondStatus?: boolean;
   readonly holdThirdStatus?: boolean;
   readonly uncertainAtStart?: boolean;
+  readonly reconcileOutcome?: "recovered" | "reconciliation-required";
+  readonly holdReconcile?: boolean;
 } = {}) {
   const source = await readFile(new URL(
     "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
@@ -146,6 +148,7 @@ async function quizFixture(options: {
   const statusRefresh = deferred<unknown>();
   const thirdStatus = deferred<unknown>();
   const finished = deferred<unknown>();
+  const reconcileResponse = deferred<unknown>();
   const secondList = deferred<string[]>();
   const thirdList = deferred<string[]>();
   let listReads = 0, statusReads = 0;
@@ -183,6 +186,14 @@ async function quizFixture(options: {
       if (name === "drafts.get") return {
         revision: "r", document: { title: "Synthetic quiz" },
       };
+      if (name === "blooket.publication.reconcile" &&
+          options.holdReconcile) return await reconcileResponse.promise;
+      if (name === "blooket.publication.reconcile" &&
+          options.reconcileOutcome)
+        return { phase: options.reconcileOutcome, published: false,
+          completedOperations: options.reconcileOutcome === "recovered" ?
+            2 : 1, totalOperations: options.reconcileOutcome === "recovered"
+              ? 3 : 2, remoteSetId: "synthetic-set" };
       if (name === "blooket.publication.status") {
         statusReads++;
         if (statusReads === 2 && options.holdSecondStatus !== false)
@@ -191,7 +202,8 @@ async function quizFixture(options: {
           return await thirdStatus.promise;
         return options.uncertainAtStart
           ? { phase: "reconciliation-required", completedOperations: 1,
-            totalOperations: 2, remoteSetId: "synthetic-set",
+            totalOperations: options.reconcileOutcome === "recovered" ?
+              3 : 2, remoteSetId: "synthetic-set",
             published: false }
           : { phase: "ready", completedOperations: 0,
             totalOperations: 2, published: false };
@@ -205,6 +217,7 @@ async function quizFixture(options: {
     };
   await api.loadQuizzes();
   return { root, calls, reported, statusRefresh, thirdStatus, finished,
+    reconcileResponse,
     secondList, thirdList, loadQuizzes: api.loadQuizzes,
     isCancelled: () => cancelled?.() };
 }
@@ -239,6 +252,49 @@ test("the standalone Reconcile button does not start publication",
   assert.ok(ui.calls.includes("blooket.publication.reconcile"));
   assert.equal(ui.calls.includes("publishTextDraft"), false);
   assert.equal(ui.root.findAction("stop"), undefined);
+});
+
+test("successful read-only recovery offers explicit one-click resume",
+  async () => {
+  const ui = await quizFixture({ uncertainAtStart: true,
+    reconcileOutcome: "recovered" });
+  ui.root.findAction("reconcile")?.handlers.get("click")?.();
+  await flush();
+  assert.ok(ui.root.findAction("publish"),
+    "recovered progress should offer resume without an extra Refresh");
+  assert.equal(ui.calls.includes("publishTextDraft"), false);
+  ui.root.findAction("publish")?.handlers.get("click")?.();
+  assert.equal(ui.calls.filter(name => name === "publishTextDraft").length, 1);
+  ui.finished.resolve({ phase: "paused", published: false });
+  await flush();
+});
+
+test("inconclusive read-only recovery never exposes a write action",
+  async () => {
+  const ui = await quizFixture({ uncertainAtStart: true,
+    reconcileOutcome: "reconciliation-required" });
+  ui.root.findAction("reconcile")?.handlers.get("click")?.();
+  await flush();
+  assert.equal(ui.root.findAction("publish"), undefined);
+  assert.equal(ui.calls.includes("publishTextDraft"), false);
+  assert.ok(ui.root.findAction("refresh"));
+});
+
+test("Stop during a pending read-only recovery never enables Resume",
+  async () => {
+  const ui = await quizFixture({ uncertainAtStart: true,
+    holdReconcile: true });
+  ui.root.findAction("reconcile")?.handlers.get("click")?.();
+  assert.ok(ui.root.findAction("stop"));
+  ui.root.findAction("stop")?.handlers.get("click")?.();
+  ui.reconcileResponse.resolve({ phase: "recovered", published: false,
+    completedOperations: 2, totalOperations: 3,
+    remoteSetId: "synthetic-set" });
+  await flush();
+  assert.equal(ui.root.findAction("publish"), undefined);
+  assert.equal(ui.root.findAction("verify"), undefined);
+  assert.equal(ui.calls.includes("publishTextDraft"), false);
+  assert.ok(ui.root.findAction("refresh"));
 });
 
 test("late Quizzes refresh never hides Stop during publication", async () => {

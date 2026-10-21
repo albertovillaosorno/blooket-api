@@ -2261,6 +2261,18 @@ async function loadQuizzes() {
           // A lost browser result must not automatically enable another step.
           // The teacher requests a fresh status read before another action.
           actions.replaceChildren();
+          // A manual read-only reconciliation must never write on its own.
+          // If that probe proved a recovered checkpoint, a separate teacher
+          // click can resume under a newly checked canonical status.
+          if (action === "reconcile" && !controller.signal.aborted &&
+              latest?.phase === "recovered") {
+            const complete = latest.completedOperations ===
+              latest.totalOperations;
+            add(complete ? "verifyDraft" : "resumePublication",
+              complete ? "verify" : "publish", () => {
+                void finish(complete ? "verify" : "publish");
+              });
+          }
           add("publicationRefresh", "refresh", () => {
             void refreshState().catch(report);
           });
