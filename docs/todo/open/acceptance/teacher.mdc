@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, provider-drift fixtures exposed that Create Set preparation,
+submission and redirect verification did not stop for visible native
+`dialog[open]` and ARIA `alertdialog` surfaces without explicit modal markup.
+The independent injected Create Set stages now reject those prompts, including
+when they appear after an earlier ownership claim or during form preparation.
+The sanitized tests require zero Save clicks under a new human gate. These
+are portable synthetic protections, not evidence of a live provider change.
+
 On 2026-10-21, red-to-green broker regressions showed that nonfinite or
 regressing time samples could dispatch a pending browser job, or accept an
 expired saved-state reply. A second regression exposed a clock failure during

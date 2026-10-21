@@ -617,7 +617,7 @@ test("an edit redirect behind a password prompt is not a receipt", () => {
 test("human overlays block Create Set preparation and submission", () => {
   const input = { title: "Synthetic", description: "", private: true };
   for (const reason of ["verification", "password", "organization",
-    "captcha"] as const) {
+    "captcha", "native-dialog", "alertdialog"] as const) {
     const page = fixture(true);
     withPage(page.document, "https://dashboard.blooket.com/create", () => {
       assert.deepEqual(prepareBlooketCreateSetForm(input), { ok: true });
@@ -633,6 +633,10 @@ test("human overlays block Create Set preparation and submission", () => {
         page.document.selectors[
           'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
         ] = [node("IFRAME")];
+      if (reason === "native-dialog")
+        page.document.selectors['dialog[open]'] = [node("DIALOG")];
+      if (reason === "alertdialog")
+        page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
       assert.equal(submitBlooketCreateSetForm(input).ok, false);
       assert.equal(page.form.selectors["button"]?.[0]?.clicked, 0);
       assert.equal(prepareBlooketCreateSetForm(input).ok, false);
@@ -675,8 +679,9 @@ test("closed account menu permits the observed Create Set form", () => {
   });
 });
 
-test("Create Set redirects reject new organization and CAPTCHA prompts", () => {
-  for (const kind of ["organization", "captcha"] as const) {
+test("Create Set redirects refuse every active human-stop overlay", () => {
+  for (const kind of ["organization", "captcha", "native-dialog",
+    "alertdialog"] as const) {
     const document = node("DOCUMENT");
     if (kind === "organization")
       document.selectors['[role="dialog"][aria-modal="true"] h3'] = [
@@ -686,6 +691,10 @@ test("Create Set redirects reject new organization and CAPTCHA prompts", () => {
       document.selectors[
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
       ] = [node("IFRAME")];
+    if (kind === "native-dialog")
+      document.selectors['dialog[open]'] = [node("DIALOG")];
+    if (kind === "alertdialog")
+      document.selectors['[role="alertdialog"]'] = [node("DIV")];
     withPage(document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.deepEqual(observeBlooketCreateSetSuccess(), {
@@ -796,6 +805,11 @@ test("Create Set watch refuses stale and ambiguous forms", () => {
     // A previously seen human modal revokes the old document owner.
     assert.equal(runBlooketCreateSetOwnership("check"), false);
     dialog.visibility = "visible";
+    assert.equal(runBlooketCreateSetOwnership("check"), false);
+    page.document.selectors['dialog[open]'] = [node("DIALOG")];
+    assert.equal(runBlooketCreateSetOwnership("claim"), false);
+    page.document.selectors['dialog[open]'] = [];
+    page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
     assert.equal(runBlooketCreateSetOwnership("check"), false);
   });
 });

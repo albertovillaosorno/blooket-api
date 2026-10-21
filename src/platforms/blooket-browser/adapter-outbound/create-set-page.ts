@@ -88,9 +88,19 @@ export function prepareBlooketCreateSetForm(
       return bounds.width > 0 && bounds.height > 0 &&
         heading.textContent?.trim() === "Select your organization";
     });
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
     if (document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]') !== null ||
-        blockedByChallenge || blockedByOrganization)
+        blockedByChallenge || blockedByOrganization ||
+        blockedByHumanDialog)
       return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
@@ -263,7 +273,10 @@ export function prepareBlooketCreateSetForm(
       )).some(readyControl) || Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
       )).some(node => readyControl(node) &&
-        node.textContent?.trim() === "Select your organization"))
+        node.textContent?.trim() === "Select your organization") ||
+          [...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+            ...Array.from(document.querySelectorAll('dialog[open]'))]
+            .some(readyControl))
         return false;
       const currentButtons = Array.from(form.querySelectorAll("button"))
         .filter(button => button.textContent?.trim() === "Create Set");
@@ -365,9 +378,19 @@ export function submitBlooketCreateSetForm(
       return bounds.width > 0 && bounds.height > 0 &&
         heading.textContent?.trim() === "Select your organization";
     });
+    const blockedByHumanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
     if (document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]') !== null ||
-        blockedByChallenge || blockedByOrganization)
+        blockedByChallenge || blockedByOrganization ||
+        blockedByHumanDialog)
       return failed();
     if (
       location.origin !== "https://dashboard.blooket.com" ||
@@ -524,9 +547,18 @@ export function observeBlooketCreateSetSuccess():
       return bounds.width > 0 && bounds.height > 0 &&
         heading.textContent?.trim() === "Select your organization";
     });
+    const humanDialog = [
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ].some(panel => {
+      const bounds = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    });
     if (document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]') !== null ||
-        challenge || organization)
+        challenge || organization || humanDialog)
       return failed();
     const url = new URL(location.href);
     if (
@@ -566,9 +598,13 @@ export function runBlooketCreateSetOwnership(
         location.pathname !== "/create" || location.search || location.hash ||
         document.title === "Just a moment..." ||
         document.querySelector('input[type="password"]')) return revoke();
-    const dialogs = Array.from(document.querySelectorAll(
-      '[role="dialog"][aria-modal="true"]',
-    ));
+    const dialogs = [
+      ...Array.from(document.querySelectorAll(
+        '[role="dialog"][aria-modal="true"]',
+      )),
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+    ];
     const visibleStop = (node: Element): boolean => {
       const bounds = node.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return false;
