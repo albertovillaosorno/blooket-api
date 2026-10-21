@@ -78,7 +78,7 @@ export function createExtensionSessionAuthenticationHost(
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
-  now: () => number = Date.now,
+  clock: () => number = Date.now,
 ) {
   const script = async (
     func: (...args: never[]) => unknown,
@@ -113,7 +113,26 @@ export function createExtensionSessionAuthenticationHost(
       input: BlooketLoginPageInput,
     ): Promise<ExtensionSessionAuthenticationResult> => {
       try {
-        const deadline = now() + LOGIN_BUDGET_MS;
+        // Credential-bearing scripts must never run under a nonfinite or
+        // regressing deadline clock, including immediately before Submit.
+        let previous = -Infinity;
+        let clockInvalid = false;
+        const now = () => {
+          if (clockInvalid) return Infinity;
+          try {
+            const value = clock();
+            if (!Number.isFinite(value) || value < 0 || value < previous) {
+              clockInvalid = true;
+              return Infinity;
+            }
+            previous = value;
+            return value;
+          } catch { clockInvalid = true; return Infinity; }
+        };
+        const start = now();
+        if (!Number.isFinite(start)) return browserFailure();
+        const deadline = start + LOGIN_BUDGET_MS;
+        if (!Number.isFinite(deadline)) return browserFailure();
         let loginOrigin: number | null = null;
         const readyTab = async () => {
           if (now() >= deadline) return false;
