@@ -38,6 +38,7 @@ export const LIBRARY_COMMANDS = [
   "library.get",
   "library.enrich",
   "library.image.import",
+  "library.image.prepare",
   "skills.list",
   "skills.get",
   "skills.put",
@@ -58,6 +59,8 @@ export type LibraryPayload =
   | { readonly kind: "get"; readonly id: string }
   | { readonly kind: "image-import"; readonly name: string;
       readonly description: string; readonly base64: string }
+  | { readonly kind: "image-prepare"; readonly id: string;
+      readonly revision: number }
   | {
       readonly kind: "enrich";
       readonly id: string;
@@ -128,6 +131,14 @@ export function decodeLibraryCommand(
   }
   if (!logicalId(value["id"])) throw new Error("invalid-logical-id");
   const id = value["id"];
+  if (name === "library.image.prepare") {
+    keys(value, ["id", "revision"]);
+    if (!Number.isSafeInteger(value["revision"]) ||
+        Number(value["revision"]) < 1)
+      throw new Error("invalid-prepare-revision");
+    return { kind: "image-prepare", id,
+      revision: value["revision"] as number };
+  }
   if (name.endsWith(".get")) {
     keys(value, ["id"]);
     return { kind: "get", id };

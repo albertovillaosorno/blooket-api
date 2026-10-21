@@ -131,6 +131,15 @@ export async function executeLibraryCommand(
     return await withCanonicalDataWriter(root, async () => {
       const preferences = await loadPreferences(root);
       await initializeLibrary(preferences.mediaRoot);
+      if (payload.kind === "image-prepare") {
+        const record = await prepareLibraryImage(
+          root, payload.id, payload.revision,
+        );
+        return commandSuccess(command.operationId, {
+          id: record.id, revision: record.revision,
+          prepared: record.prepared,
+        });
+      }
       if (payload.kind === "image-import") {
         const digest = createHash("sha256")
           .update(Buffer.from(payload.base64, "base64"))
