@@ -350,10 +350,10 @@ export function publicationStopReason(error) {
     "blooket-media-invalid", "blooket-media-unavailable"].includes(code))
     return "media";
   if (code === "blooket-publication-busy") return "busy";
+  if (code === "blooket-browser-unavailable") return "connection";
   if (["blooket-write-baseline-not-captured",
-    "blooket-browser-failed", "blooket-browser-unavailable",
-    "blooket-browser-navigation-timeout"].includes(code))
-    return "verification";
+    "blooket-browser-failed", "blooket-browser-navigation-timeout"
+  ].includes(code)) return "verification";
   if (code === "blooket-publication-single-edit-required")
     return "single-edit";
   if (code === "blooket-publication-edit-unsupported")

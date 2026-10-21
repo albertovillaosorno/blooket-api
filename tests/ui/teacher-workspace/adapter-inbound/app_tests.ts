@@ -79,8 +79,11 @@ test("localized publication errors identify repairable single-row edits",
     "publicationStopVerification");
   assert.equal(label(Error("blooket-browser-failed")),
     "publicationStopVerification");
+  assert.equal(label(Error("blooket-browser-unavailable")),
+    "publicationStopConnection");
   for (const key of ["publicationStopSingleEdit",
-    "publicationStopEditUnsupported", "publicationStopVerification"]) {
+    "publicationStopEditUnsupported", "publicationStopVerification",
+    "publicationStopConnection"]) {
     assert.equal(source.split(key + ":").length - 1, 2,
       "both Spanish and English must explain the stop");
   }

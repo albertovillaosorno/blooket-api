@@ -327,6 +327,9 @@ const words = {
     publicationStopVerification:
       "No se pudo verificar el estado remoto. Conserva el borrador y " +
       "revisa la sesión antes de continuar. No reenvíes un guardado incierto.",
+    publicationStopConnection:
+      "No hay conexión con la extensión del navegador. Abre la sesión " +
+      "existente, revisa el estado y conserva el journal; no reenvíes Save.",
     publicationStopMedia:
       "La publicación de este contenido multimedia aún no está admitida.",
     publicationStopBusy:
@@ -689,6 +692,9 @@ const words = {
     publicationStopVerification:
       "The remote state could not be verified. Keep the draft and check " +
       "the session before continuing. Do not replay an uncertain Save.",
+    publicationStopConnection:
+      "The browser companion is disconnected. Reconnect the existing " +
+      "session and refresh status; keep the journal and do not replay Save.",
     publicationStopMedia:
       "Publication of this media content is not yet supported.",
     publicationStopBusy:
@@ -2154,6 +2160,7 @@ function publicationFailureText(error) {
     extension: "publicationStopExtension",
     conflict: "publicationStopConflict",
     verification: "publicationStopVerification",
+    connection: "publicationStopConnection",
     media: "publicationStopMedia",
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",
