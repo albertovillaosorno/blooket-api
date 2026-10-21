@@ -9,6 +9,21 @@ extension alone does not establish loaded-worker or publication acceptance.
 
 ## Latest functional checkpoint (2026-10-21)
 
+Canonical verification at 15:56 and 16:00 UTC confirmed the separate autonomous
+image/typing quiz with all three operations complete and `published: true`.
+The product saved both questions without controller Save; the current
+companion was loaded and the exact local service restarted before verification.
+
+Tasks blooket-11 and blooket-12 are now completed under
+`docs/todo/completed/`. Browserless agents should continue with blooket-15,
+including intermittent provider-read stops, controller attachment and
+uninterrupted-run assurance; never replay the retained historical attempts.
+
+One later registered-MCP verification encountered a recoverable browser-read
+failure; the independent canonical CLI verification subsequently succeeded at
+16:00 UTC. Neither an unsuccessful read nor an earlier successful write grants
+permission to repeat Save. The bounded live results below remain distinct.
+
 Canonical creation with a prepared question image, MCP append and an autonomous
 text replacement have positive fresh remote verification. The Quizzes panel
 also completed a private two-question image/typing journey; separate registered

@@ -75,7 +75,13 @@ fresh verification without controller Save. The panel also completed and
 verified a two-question image/typing quiz after assisted provider-throttle
 recovery.
 
-This is not uninterrupted autonomous publication evidence.
+On October 21, the product saved another two-question image/typing quiz
+without controller Save. Fresh canonical verification at 15:56 and 16:00 UTC
+confirmed all three operations and the frozen prepared image. Admitted
+publication and AI authoring are complete; ongoing maintenance stays open.
+
+These journeys include recoverable provider-read stops. They do not promise
+uninterrupted operation under throttling or automatic chat-attachment transfer.
 
 Non-empty collection completeness, pagination, public set details, and
 unsupported media variants remain unknown or pending. Keep these limits

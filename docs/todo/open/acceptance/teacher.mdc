@@ -157,6 +157,16 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, the separate autonomous image/typing quiz passed fresh canonical
+verification at 15:56 and 16:00 UTC with three operations complete. Both
+questions were saved by the product. Functional tasks blooket-11 and
+blooket-12 moved to completed records; this evergreen task remains active.
+
+Intermittent provider-read failure still needs compatibility work: one
+registered-MCP verification failed between those successful CLI checks.
+Preserve that distinction, the strict read gates and historical journals;
+never infer a failed mutation or authorize Save replay from a failed read.
+
 On 2026-10-20, a red-to-green browser-lifecycle regression found that a newly
 created detached read tab could report Chrome's initial `about:blank` with
 `status: complete` before its requested URL became visible. The shared reader
