@@ -109,8 +109,30 @@ function progress(value, draftId) {
   return value;
 }
 
+// A browser cooldown is never a mutation retry. A stopped teacher intent
+// releases the delay immediately rather than leaving Stop pending for 5 s.
+export async function waitForPublicationReadCooldown(
+  signal, delayMs = 5_000,
+) {
+  if (signal?.aborted || !Number.isSafeInteger(delayMs) ||
+      delayMs < 0 || delayMs > 5_000) return false;
+  return await new Promise(resolve => {
+    let timer;
+    const finish = ok => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", stop);
+      resolve(ok);
+    };
+    const stop = () => finish(false);
+    signal?.addEventListener("abort", stop, { once: true });
+    if (signal?.aborted) { stop(); return; }
+    timer = setTimeout(() => finish(!signal?.aborted), delayMs);
+  });
+}
+
 export async function publishTextDraft(
   draftId, revision, send, onProgress = () => {}, cancelled = () => false,
+  waitForReadRetry = async () => false,
 ) {
   if (typeof draftId !== "string" ||
       !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/u.test(draftId) ||
@@ -135,6 +157,26 @@ export async function publishTextDraft(
         after.remoteSetId !== before.remoteSetId)
       throw Error("publication-progress-invalid");
   };
+  // Rate limiting may interrupt a *read-only* recovery or final verify.
+  // Exactly one opt-in, cancelable cooldown retry is allowed. It can never
+  // repeat publication.step, which might have already submitted a Save.
+  const readWithCooldown = async (name, validate) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (cancelled()) return { cancelled: true };
+      const reply = progress(await send(name, payload()), draftId);
+      validate(reply);
+      if (attempt === 0 && reply.phase === "wait" &&
+          reply.state === "rate-limited") {
+        report(reply);
+        const allowed = await waitForReadRetry();
+        if (cancelled()) return { cancelled: true };
+        if (allowed) continue;
+        return { reply, reported: true };
+      }
+      return { reply, reported: false };
+    }
+    throw Error("publication-progress-invalid");
+  };
   let current = progress(await send(
     "blooket.publication.status", payload(),
   ), draftId);
@@ -153,46 +195,50 @@ export async function publishTextDraft(
   // Only the separate fresh remote verify command may claim publication.
   const verify = async () => {
     if (cancelled()) return { ...current, phase: "paused" };
-    const verified = progress(await send(
-      "blooket.publication.verify", payload(),
-    ), draftId);
-    // Inconclusive verification must also retain the frozen set and count;
-    // a blocked provider read cannot relabel the local owner or checkpoint.
-    if (!verified.published && (
-      !["wait", "human-action-required", "session-required"].includes(
-        verified.phase) ||
-      verified.revision !== frozenRevision ||
-      verified.remoteSetId !== current.remoteSetId ||
-      verified.totalOperations !== current.totalOperations ||
-      verified.completedOperations !== current.completedOperations))
-      throw Error("publication-progress-invalid");
-    // The product owns fresh provider verification. Presentation may show
-    // success only if its receipt still belongs to this frozen plan and set.
-    if (verified.published && (
-      verified.revision !== frozenRevision ||
-      typeof current.remoteSetId !== "string" ||
-      !current.remoteSetId ||
-      verified.remoteSetId !== current.remoteSetId ||
-      verified.totalOperations !== current.totalOperations ||
-      verified.completedOperations !== current.completedOperations ||
-      verified.completedOperations !== verified.totalOperations
-    )) throw Error("publication-progress-invalid");
-    report(verified);
-    return verified;
+    const observed = await readWithCooldown(
+      "blooket.publication.verify", verified => {
+        // Inconclusive verification retains the same frozen checkpoint.
+        if (!verified.published && (
+          !["wait", "human-action-required", "session-required"].includes(
+            verified.phase) ||
+          verified.revision !== frozenRevision ||
+          verified.remoteSetId !== current.remoteSetId ||
+          verified.totalOperations !== current.totalOperations ||
+          verified.completedOperations !== current.completedOperations))
+          throw Error("publication-progress-invalid");
+        // Only the product's matching fresh receipt may claim success.
+        if (verified.published && (
+          verified.revision !== frozenRevision ||
+          typeof current.remoteSetId !== "string" ||
+          !current.remoteSetId ||
+          verified.remoteSetId !== current.remoteSetId ||
+          verified.totalOperations !== current.totalOperations ||
+          verified.completedOperations !== current.completedOperations ||
+          verified.completedOperations !== verified.totalOperations))
+          throw Error("publication-progress-invalid");
+      },
+    );
+    if (observed.cancelled) return { ...current, phase: "paused" };
+    if (!observed.reported) report(observed.reply);
+    return observed.reply;
   };
+  const reconcile = async before => await readWithCooldown(
+    "blooket.publication.reconcile", reply => {
+      if (reply.published !== false)
+        throw Error("publication-progress-invalid");
+      if (reply.phase !== "recovered") preserveUncertain(before, reply);
+    },
+  );
   if (current.phase === "reconciliation-required") {
     // A resumed intent may inspect its existing uncertain journal once.
     // Reconcile uses fresh reads, never another Save. Only an exact
     // recovered checkpoint grants the next numbered mutation.
     if (cancelled()) return { ...current, phase: "paused" };
-    const reconciled = progress(await send(
-      "blooket.publication.reconcile", payload(),
-    ), draftId);
-    if (reconciled.published !== false)
-      throw Error("publication-progress-invalid");
+    const observation = await reconcile(current);
+    if (observation.cancelled) return { ...current, phase: "paused" };
+    const reconciled = observation.reply;
     if (reconciled.phase !== "recovered") {
-      preserveUncertain(current, reconciled);
-      report(reconciled);
+      if (!observation.reported) report(reconciled);
       return reconciled;
     }
     if (reconciled.revision !== frozenRevision ||
@@ -232,14 +278,11 @@ export async function publishTextDraft(
         throw Error("publication-progress-invalid");
       report(next);
       if (cancelled()) return { ...next, phase: "paused" };
-      const reconciled = progress(await send(
-        "blooket.publication.reconcile", payload(),
-      ), draftId);
-      if (reconciled.published !== false)
-        throw Error("publication-progress-invalid");
+      const observation = await reconcile(next);
+      if (observation.cancelled) return { ...next, phase: "paused" };
+      const reconciled = observation.reply;
       if (reconciled.phase !== "recovered") {
-        preserveUncertain(next, reconciled);
-        report(reconciled);
+        if (!observation.reported) report(reconciled);
         return reconciled;
       }
       if (reconciled.revision !== next.revision ||

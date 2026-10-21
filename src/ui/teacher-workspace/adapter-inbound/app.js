@@ -7,7 +7,9 @@ import {
   preparedMediaUrl,
   readClipboardImage,
 } from "./library.js";
-import { publishTextDraft, publicationStopReason } from "./publication.js";
+import {
+  publishTextDraft, publicationStopReason, waitForPublicationReadCooldown,
+} from "./publication.js";
 import {
   publicationFormValues, readPublicationFormValues,
 } from "./pacing-settings.js";
@@ -2245,6 +2247,7 @@ async function loadQuizzes() {
               (name, payload) => command(name, payload, controller.signal),
               observed => { state.textContent = publicationLabel(observed); },
               () => controller.signal.aborted,
+              () => waitForPublicationReadCooldown(controller.signal),
             );
           } else {
             const name = action === "reconcile"

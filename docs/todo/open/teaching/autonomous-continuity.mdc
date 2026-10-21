@@ -106,3 +106,13 @@ frozen progress snapshot without failing validation before its next write.
 The presentation boundary now requires string diagnostic values and refuses
 object or numeric forms. The fix does not interpret external provider HTML or
 infer any remote receipt.
+
+On 2026-10-21, portable red-to-green tests added a bounded, explicitly
+opted-in five-second cooldown for a **read-only** `reconcile` or `verify`
+after a rate-limited reply. The Studio uses an abortable timer so Stop exits
+immediately. Only one retry is possible, a second limit returns the stop,
+and a human challenge or other wait does not trigger a retry.
+
+Crucially, no uncertain `publication.step` is ever repeated: a recovered Save
+must first be proved by the canonical journal's fresh provider reads. This is
+not a claim of currently available authenticated Chrome verification.
