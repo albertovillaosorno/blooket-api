@@ -63,6 +63,45 @@ test("resumption uses immutable journal revision after local draft changes",
   ]);
 });
 
+test("accessor or inherited progress cannot authorize a publication write",
+  async () => {
+  for (const variant of ["accessor", "inherited", "extra", "symbol"] as const) {
+    const status = { ...state("ready", 0) } as Record<string | symbol,
+      unknown>;
+    let getterCalls = 0;
+    if (variant === "accessor") Object.defineProperty(status, "phase", {
+      enumerable: true, get() { getterCalls++; return "ready"; },
+    });
+    if (variant === "inherited") {
+      delete status["phase"];
+      Object.setPrototypeOf(status, { phase: "ready" });
+    }
+    if (variant === "extra") status["unexpected"] = "not-canonical";
+    if (variant === "symbol") status[Symbol("unexpected")] = "owned";
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return status;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status"]);
+    assert.equal(getterCalls, 0);
+  }
+});
+
+test("a publication progress callback cannot retarget a validated journal",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("ready", 1, 2),
+    { ...state("advanced", 2, 2), remoteSetId: "changed-set" }];
+  await assert.rejects(publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  }, value => { value.remoteSetId = "changed-set"; }),
+  /publication-progress-invalid|Cannot assign/u);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
+});
+
 test("a malformed frozen revision stops before another mutation", async () => {
   const names: string[] = [];
   await assert.rejects(publishTextDraft(ID, REV, async name => {
