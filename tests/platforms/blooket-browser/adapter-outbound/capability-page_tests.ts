@@ -368,6 +368,25 @@ test("visible alertdialog prompts block navigation without a dialog role",
   });
 });
 
+test("native open dialog blocks route change without ARIA attributes",
+  () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  const native = node("DIALOG");
+  page.document.selectors["dialog[open]"] = [native];
+  withPage(page.document, () => {
+    assert.equal(injected(), false);
+    native.computedStyle = { display: "none", visibility: "visible" };
+    assert.equal(injected(), true);
+    native.computedStyle = { display: "block", visibility: "visible" };
+    assert.equal(injected(), false);
+    page.document.selectors["dialog[open]"] = [];
+    assert.equal(injected(), true);
+  });
+});
+
 test("read navigation respects computed modal visibility", () => {
   const page = fixture();
   const dialog = node("DIV");
