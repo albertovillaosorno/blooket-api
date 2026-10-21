@@ -35,21 +35,48 @@ export function createDetailReadPacer(ports: {
 }) {
   let occupied = false;
   let nextAt = 0;
+  let observedAt = 0;
+  let clockInvalid = false;
+  const now = (): number | undefined => {
+    if (clockInvalid) return undefined;
+    try {
+      const value = ports.now();
+      if (!Number.isFinite(value) || value < observedAt || value < 0) {
+        clockInvalid = true;
+        return undefined;
+      }
+      observedAt = value;
+      return value;
+    } catch {
+      clockInvalid = true;
+      return undefined;
+    }
+  };
   return async (remaining: () => number) => {
-    if (occupied) return undefined;
+    if (occupied || clockInvalid) return undefined;
     occupied = true;
     let admitted = false;
     try {
-      const delay = Math.max(0, Math.ceil(nextAt - ports.now()));
-      if (!Number.isFinite(delay) || delay >= remaining()) return undefined;
+      const started = now();
+      if (started === undefined) return undefined;
+      const delay = Math.max(0, Math.ceil(nextAt - started));
+      const budget = remaining();
+      if (!Number.isFinite(delay) || !Number.isFinite(budget) ||
+          budget <= 0 || delay >= budget) return undefined;
       if (delay > 0) await ports.wait(delay);
-      if (ports.now() < nextAt || remaining() <= 0) return undefined;
+      const checked = now();
+      const left = remaining();
+      if (checked === undefined || checked < nextAt ||
+          !Number.isFinite(left) || left <= 0) return undefined;
       admitted = true;
       let released = false;
       return () => {
         if (released) return;
         released = true;
-        nextAt = ports.now() + 5_000;
+        // A failed clock on release cannot strand the exclusive lease or
+        // silently erase provider pacing. Refuse future native actions.
+        const finished = now();
+        nextAt = finished === undefined ? Infinity : finished + 5_000;
         occupied = false;
       };
     } finally {

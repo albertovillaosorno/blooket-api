@@ -128,3 +128,79 @@ test("an overlapping job cannot pass a waiting admission", async () => {
   finishWait();
   assert.ok(await next);
 });
+
+
+test("an invalid pacing clock never authorizes native metadata actions",
+  async () => {
+  for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY, -1]) {
+    let tick = invalid;
+    const acquire = createDetailReadPacer({
+      now: () => tick,
+      wait: async () => { throw Error("an invalid clock must not wait"); },
+    });
+    assert.equal(await acquire(() => 8_000), undefined);
+    tick = 10_000;
+    assert.equal(await acquire(() => 8_000), undefined,
+      "an invalid clock must not be repaired by an arbitrary next sample");
+  }
+});
+
+test("a failed release-clock sample frees the lease but blocks new reads",
+  async () => {
+  let tick = 1_000;
+  let throwClock = false;
+  const acquire = createDetailReadPacer({
+    now: () => {
+      if (throwClock) throw Error("clock lost");
+      return tick;
+    },
+    wait: async () => {},
+  });
+  const release = await acquire(() => 8_000);
+  assert.ok(release);
+  throwClock = true;
+  assert.doesNotThrow(release);
+  throwClock = false;
+  tick = 8_000;
+  assert.equal(await acquire(() => 8_000), undefined);
+});
+
+test("clock rollback after a valid lease blocks future metadata reads",
+  async () => {
+  let tick = 10_000;
+  const acquire = createDetailReadPacer({
+    now: () => tick,
+    wait: async ms => { tick += ms; },
+  });
+  const release = await acquire(() => 8_000);
+  assert.ok(release);
+  release();
+  tick = 9_999;
+  assert.equal(await acquire(() => 8_000), undefined);
+  tick = 20_000;
+  assert.equal(await acquire(() => 8_000), undefined);
+});
+
+
+test("nonfinite or exhausted remaining budgets cannot admit a detail read",
+  async () => {
+  for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY, -1, 0]) {
+    const acquire = createDetailReadPacer({
+      now: () => 2_000,
+      wait: async () => { throw Error("unexpected wait"); },
+    });
+    assert.equal(await acquire(() => invalid), undefined);
+    assert.ok(await acquire(() => 8_000),
+      "the refused preflight must not strand the exclusive slot");
+  }
+  let budget = 8_000;
+  let tick = 1_000;
+  const acquire = createDetailReadPacer({
+    now: () => tick,
+    wait: async ms => { tick += ms; budget = Number.NaN; },
+  });
+  (await acquire(() => budget))!();
+  assert.equal(await acquire(() => budget), undefined);
+});
