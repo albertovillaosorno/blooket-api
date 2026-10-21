@@ -90,7 +90,10 @@ export async function prepareBlooketQuestionControls(
       !Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"] h3',
       )).some(node => visible(node) &&
-        node.textContent?.trim() === "Select your organization"));
+        node.textContent?.trim() === "Select your organization") &&
+      ![...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+        ...Array.from(document.querySelectorAll('dialog[open]'))]
+        .some(visible));
   };
   const pause = async (): Promise<void> =>
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -526,7 +529,10 @@ export function inspectBlooketPreparedQuestionEcho(
     )).some(visible) || Array.from(document.querySelectorAll(
       '[role="dialog"][aria-modal="true"] h3',
     )).some(node => visible(node) &&
-      node.textContent?.trim() === "Select your organization"))
+      node.textContent?.trim() === "Select your organization") ||
+      [...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+        ...Array.from(document.querySelectorAll('dialog[open]'))]
+        .some(visible))
       return false;
     const unique = (selector: string): HTMLElement | null => {
       const elements = Array.from(form.querySelectorAll(selector));

@@ -498,6 +498,29 @@ test("visible editor events generate typing state without hidden overrides",
     assert.equal(await serialized(input), false);
   }));
 
+test("human dialogs refuse visible question control writes and echo",
+  async () => {
+  for (const selector of ['dialog[open]', '[role="alertdialog"]']) {
+    await withEditor(async page => {
+      page.document.selectors[selector] = [new Control()];
+      assert.equal(await prepareBlooketQuestionControls(input), false);
+      assert.equal(page.prompt.value, "");
+      assert.equal(page.picker.clicked, 0);
+      assert.equal(inspectBlooketPreparedQuestionEcho(input), false);
+    });
+  }
+});
+
+test("a dialog appearing after the type picker prevents further input",
+  async () => withEditor(async page => {
+  page.picker.onClick = () => {
+    page.document.selectors['dialog[open]'] = [new Control()];
+  };
+  assert.equal(await prepareBlooketQuestionControls(input), false);
+  assert.equal(page.prompt.value, "");
+  assert.equal(page.watch.controlsPrepared, false);
+}));
+
 test("invalid native typing values never partially fill the editor",
   async () => {
   const invalid: BlooketQuestionPageInput[] = [
