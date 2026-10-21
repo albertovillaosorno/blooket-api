@@ -73,6 +73,16 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-21, the owner's new screenshot still showed the previously
+submitted question form open with a Save button. The same Chrome extension
+isolated-world read-only probe showed the original submit latch and same native
+document, but also `dirty: true` after subsequent trusted interaction.
+Canonical question reads were refused while that changed form remained open.
+
+A red-to-green synthetic regression now reports `post-submit-interrupted`
+instead of just `submit-attempted`. It does not authorize a new Save, leave
+the editor, resolve the journal or count the question as remotely edited.
+
 On 2026-10-20, a read-only Chrome extension-isolated-world probe found the
 prior replacement form's `submit-attempted` latch. Only one provider `fetch`
 was recorded after Save; its observed response status was HTTP 429, matching
