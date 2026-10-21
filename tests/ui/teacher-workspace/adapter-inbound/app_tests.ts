@@ -33,7 +33,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
-import { publicationStopReason } from
+import { publicationStopReason, waitForPublicationReadCooldown } from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 test("an uncertain throttled Save has a distinct waiting label", async () => {
@@ -138,6 +138,7 @@ async function quizFixture(options: {
   readonly uncertainAtStart?: boolean;
   readonly reconcileOutcome?: "recovered" | "reconciliation-required";
   readonly holdReconcile?: boolean;
+  readonly pauseDuringPublish?: boolean;
 } = {}) {
   const source = await readFile(new URL(
     "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
@@ -156,6 +157,8 @@ async function quizFixture(options: {
   const thirdList = deferred<string[]>();
   let listReads = 0, statusReads = 0;
   let cancelled: (() => boolean) | undefined;
+  let cooldownObserved = 0;
+  let cooldownResult: boolean | undefined;
   const calls: string[] = [];
   const reported: unknown[] = [];
   const document = {
@@ -170,10 +173,17 @@ async function quizFixture(options: {
     JSON,
     report: (error: unknown) => { reported.push(error); },
     publicationStopReason: () => "unknown",
+    waitForPublicationReadCooldown,
     publishTextDraft: async (_id: unknown, _rev: unknown,
-      _send: unknown, _progress: unknown, isCancelled: () => boolean) => {
+      _send: unknown, _progress: unknown, isCancelled: () => boolean,
+      waitForRetry: () => Promise<boolean>) => {
       calls.push("publishTextDraft");
       cancelled = isCancelled;
+      if (options.pauseDuringPublish) {
+        cooldownObserved++;
+        cooldownResult = await waitForRetry();
+        return { phase: "paused", published: false };
+      }
       return await finished.promise;
     },
     command: async (name: string) => {
@@ -222,7 +232,9 @@ async function quizFixture(options: {
   return { root, calls, reported, statusRefresh, thirdStatus, finished,
     reconcileResponse,
     secondList, thirdList, loadQuizzes: api.loadQuizzes,
-    isCancelled: () => cancelled?.() };
+    isCancelled: () => cancelled?.(),
+    cooldownObserved: () => cooldownObserved,
+    cooldownResult: () => cooldownResult };
 }
 
 async function flush() {
@@ -389,6 +401,22 @@ test("older status requests cannot re-enable Publish after Verify",
   assert.equal(ui.root.findAction("publish"), undefined);
 });
 
+
+test("Stop cancels a rate-limit cooldown without delaying the UI",
+  async () => {
+  const ui = await quizFixture({ pauseDuringPublish: true });
+  ui.root.findAction("publish")?.handlers.get("click")?.();
+  assert.equal(ui.cooldownObserved(), 1);
+  const stop = ui.root.findAction("stop");
+  assert.ok(stop);
+  stop.handlers.get("click")?.();
+  await flush();
+  assert.equal(ui.cooldownResult(), false);
+  assert.equal(ui.root.findAction("stop"), undefined);
+  assert.ok(ui.root.findAction("refresh"));
+  assert.deepEqual(ui.calls.filter(name => name === "publishTextDraft"),
+    ["publishTextDraft"]);
+});
 
 test("Stop signals cancellation and is disabled until task settles",
   async () => {
