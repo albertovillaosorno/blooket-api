@@ -47,6 +47,8 @@ import {
   callTeacherTool,
   listTeacherTools,
 } from "../../../../src/mcp/teacher-tools/adapter-inbound/tools.ts";
+import { publishTextDraft } from
+  "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 import { decodeResultEnvelope } from
   "../../../../src/ir/wire-envelopes/contract/result-envelope.ts";
 
@@ -396,34 +398,33 @@ test("MCP publication crosses CLI service and journaled browser transport",
       }, "cli:publication-draft", root);
       assert.ok(saved.ok);
       const expectedRevision = (saved.value as { revision: string }).revision;
-      for (let index = 0; index < 2; index++) {
-        const reply = await callTeacherTool("blooket_publication_step", {
-          draftId: "publication-fixture", expectedRevision,
-        }, root);
-        assert.equal(reply.isError, false, reply.content[0]?.text);
-        const envelope = decodeResultEnvelope(
-          JSON.parse(reply.content[0]!.text),
-        );
-        assert.ok(envelope.ok && envelope.value.ok);
-        if (envelope.ok && envelope.value.ok) {
-          const progress = envelope.value.value as {
-            completedOperations: number; published: boolean };
-          assert.equal(progress.completedOperations, index + 1);
-          assert.equal(progress.published, false);
-        }
-        assert.equal(mutations.length, index + 1);
-      }
-      const verified = await callTeacherTool("blooket_publication_verify", {
-        draftId: "publication-fixture",
-      }, root);
-      assert.equal(verified.isError, false, verified.content[0]?.text);
-      const envelope = decodeResultEnvelope(
-        JSON.parse(verified.content[0]!.text),
-      );
-      assert.ok(envelope.ok && envelope.value.ok);
-      if (envelope.ok && envelope.value.ok)
-        assert.equal((envelope.value.value as { published: boolean }).published,
-          true);
+      // Exercise one uninterrupted UI intent through actual registered MCP
+      // tools, CLI subprocesses, the service and synthetic extension jobs.
+      // No test code clicks Save or manually calls publication.step twice.
+      const calls: string[] = [];
+      const reports: string[] = [];
+      const verified = await publishTextDraft("publication-fixture",
+        expectedRevision, async (name, payload) => {
+          calls.push(name);
+          const reply = await callTeacherTool(name.replaceAll(".", "_"),
+            name.endsWith(".step") ? { ...payload, expectedRevision }
+              : payload, root);
+          assert.equal(reply.isError, false, reply.content[0]?.text);
+          const result = decodeResultEnvelope(
+            JSON.parse(reply.content[0]!.text));
+          assert.ok(result.ok && result.value.ok);
+          if (!result.ok || !result.value.ok)
+            throw Error("unexpected-tool-result");
+          return result.value.value;
+        }, value => { reports.push(value.phase); });
+      assert.equal(verified.published, true);
+      assert.equal(verified.phase, "verified");
+      assert.ok(typeof verified.verifiedAt === "string");
+      assert.deepEqual(calls, ["blooket.publication.status",
+        "blooket.publication.step", "blooket.publication.step",
+        "blooket.publication.verify"]);
+      assert.deepEqual(reports, ["not-started", "advanced", "advanced",
+        "verified"]);
       assert.deepEqual(mutations, ["sets.create", "questions.create"]);
       assert.equal(confirmationInspections, 3);
       assert.equal(JSON.stringify(verified).includes(bridge.pairingToken()),
