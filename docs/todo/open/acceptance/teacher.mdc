@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green authentication-host regression found that the
+credential submission gate could accept a `NaN` or backward-moving deadline
+sample after preparing the exact login form. The host now refuses invalid
+or regressed clock samples for the entire explicit login attempt; no
+credential-bearing script or Submit can be newly authorized after such a
+failure. Synthetic tests contain only fictional credentials and do not
+constitute a live sign-in or provider acceptance.
+
 A separate 2026-10-21 red-to-green drift regression found five independently
 injected question-read functions that still admitted clicks and positive
 read observations behind visible native HTML dialogs and ARIA alertdialogs.

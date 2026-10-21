@@ -119,6 +119,29 @@ function fixture(options: {
   return { chrome, calls, argumentsSeen, now: () => tick };
 }
 
+test("invalid or regressed login clocks never submit credentials",
+  async () => {
+  for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+    const page = fixture({});
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => {}, () => invalid,
+    ).authenticate(credentials);
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.calls.includes("submit"), false);
+  }
+  for (const invalid of [Number.NaN, 900]) {
+    const page = fixture({});
+    let samples = 0;
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async () => {},
+      () => ++samples < 17 ? 1_000 : invalid,
+    ).authenticate(credentials);
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.calls.includes("submit"), false,
+      "a clock failure after form preparation must prevent credential submit");
+  }
+});
+
 test("host prepares verifies and submits exactly once", async () => {
   const page = fixture({ preparedPolls: [false, true] });
   const host = createExtensionSessionAuthenticationHost(
