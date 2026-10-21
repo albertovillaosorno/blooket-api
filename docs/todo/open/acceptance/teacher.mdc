@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+On 2026-10-21, a read-only provider-drift regression showed that a visible
+native `dialog[open]` or ARIA `alertdialog` could coexist with authenticated
+My Sets cards and still produce an apparently complete saved collection.
+The dashboard inspector now reports `unexpected-page` for session reads and
+refuses set reads under those prompts, while a hidden prompt is nonblocking.
+No provider data was changed; this evidence comes from synthetic DOM fixtures.
+
 On 2026-10-21, red-to-green regressions found that the asynchronous visible
 question-controls editor could continue filling React inputs after a native
 `dialog[open]` or ARIA alert dialog appeared, despite the outer Add Question

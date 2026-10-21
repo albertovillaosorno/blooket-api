@@ -153,10 +153,18 @@ export function inspectBlooketPage(
       ),
     ).some((heading) => visible(heading) &&
       heading.textContent?.trim() === "Select your organization");
+    // A visible HTML dialog or ARIA alertdialog can retain a teacher decision
+    // even while the old authenticated My Sets cards remain mounted.
+    const humanDialog = [
+      ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+    ].some(visible);
     if (operation.kind === "session.observe" && visibleChallenges)
       return { ok: true, value: "security-challenge" };
     if (operation.kind === "session.observe" && organizationPrompt)
       return { ok: true, value: "organization-prompt" };
+    if (operation.kind === "session.observe" && humanDialog)
+      return { ok: true, value: "unexpected-page" };
     // Only the exact public identity login form can prove "signed-out".
     // A dashboard password control is an unknown authentication overlay, not
     // permission to read cached set cards or submit credentials automatically.
@@ -205,7 +213,7 @@ export function inspectBlooketPage(
     }
     if (
       visibleChallenges ||
-      organizationPrompt ||
+      organizationPrompt || humanDialog ||
       !authenticatedShell
     )
       return failed();

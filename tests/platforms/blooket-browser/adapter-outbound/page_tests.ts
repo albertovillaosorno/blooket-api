@@ -697,6 +697,26 @@ test(
   },
 );
 
+test("native and ARIA dialogs cannot certify saved My Sets content",
+  () => {
+  for (const selector of ['dialog[open]', '[role="alertdialog"]']) {
+    const { document, main } = base();
+    main.selectors["article"] = [card()];
+    const modal = node("DIALOG");
+    document.selectors[selector] = [modal];
+    page(document, "https://dashboard.blooket.com/my-sets", () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "unexpected-page",
+      });
+      assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+      modal.visibility = "hidden";
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "my-sets",
+      });
+    });
+  }
+});
+
 test("CSS-hidden organization headings are not human-stop evidence",
   () => {
   const { document, main } = base();
