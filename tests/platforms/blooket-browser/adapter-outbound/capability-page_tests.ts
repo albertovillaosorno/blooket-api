@@ -350,6 +350,24 @@ test("read navigation preserves unfamiliar teacher URL state", () => {
   });
 });
 
+test("visible alertdialog prompts block navigation without a dialog role",
+  () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  const alert = node("DIV");
+  page.document.selectors['[role="alertdialog"]'] = [alert];
+  withPage(page.document, () => {
+    assert.equal(injected(), false,
+      "a modal alert need not use role=dialog or aria-modal=true");
+    alert.computedStyle = { display: "none", visibility: "visible" };
+    assert.equal(injected(), true);
+    alert.computedStyle = { display: "flex", visibility: "visible" };
+    assert.equal(injected(), false);
+  });
+});
+
 test("read navigation respects computed modal visibility", () => {
   const page = fixture();
   const dialog = node("DIV");
