@@ -180,6 +180,36 @@ test("an existing recovered journal resumes only its next unfinished step",
     "blooket.publication.verify"]);
 });
 
+test("a lost initial Create Set acknowledgement cannot create a duplicate",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("reconciliation-required", 0, 2),
+    state("recovered", 1, 2), state("advanced", 2, 2),
+    state("verified", 2, 2)];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.published, true);
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile", "blooket.publication.step",
+    "blooket.publication.verify"]);
+});
+
+test("inconclusive preexisting recovery performs no new write",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("reconciliation-required", 0, 2),
+    state("reconciliation-required", 0, 2)];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.phase, "reconciliation-required");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.reconcile"]);
+});
+
 test("an existing journal finishing on recovery verifies without Save",
   async () => {
   const calls: string[] = [];
