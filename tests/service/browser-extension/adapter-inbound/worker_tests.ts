@@ -177,10 +177,15 @@ test(
   const priorPerformanceNow =
     Object.getOwnPropertyDescriptor(performance, "now");
   let readClock = 0;
+  let providerClockUnavailable = false;
   // The pacing policy has deterministic deadline tests of its own. Keep this
   // transport fixture fast while preserving its real relay/deadline timers.
   Object.defineProperty(performance, "now", {
-    configurable: true, value: () => { readClock += 5_000; return readClock; },
+    configurable: true, value: () => {
+      if (providerClockUnavailable) return Number.NaN;
+      readClock += 5_000;
+      return readClock;
+    },
   });
   let holdReadScript = false;
   let reportReadScript!: () => void;
@@ -1997,6 +2002,17 @@ test(
     assert.ok(scripts.includes("closeBlooketQuestionPanel"));
     assert.ok(scripts.includes("isBlooketQuestionPanelClosed"));
 
+    // Native Edit Info reads and writes share the same provider action
+    // cooldown. Failed admission must stop before opening any write form.
+    const beforeDeniedCreate = scripts.length;
+    providerClockUnavailable = true;
+    const deniedCreate = await expectReply({
+      kind: "sets.create", title: "Synthetic created set",
+      description: "Created through bridge fixture", private: true,
+    });
+    providerClockUnavailable = false;
+    assert.equal(deniedCreate.ok, false);
+    assert.equal(scripts.length, beforeDeniedCreate);
     const created = await expectReply({
       kind: "sets.create",
       title: "Synthetic created set",

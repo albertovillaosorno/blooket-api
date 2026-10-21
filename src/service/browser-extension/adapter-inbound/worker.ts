@@ -195,7 +195,7 @@ const AUTOMATIC_VERIFICATION_GRACE_MS = 6_000;
 const pendingChallengeAttention = new WeakSet<Connection>();
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
-const admitDetailRead = createDetailReadPacer({
+const admitProviderAction = createDetailReadPacer({
   now: () => performance.now(), wait: pause,
 });
 
@@ -398,7 +398,7 @@ async function read(
     return readPage(current, browser, operation, readDeadline);
   // Edit Info performs a native server action even though we only read it.
   // Pace complete read jobs without retrying an action or extending its budget.
-  const release = await admitDetailRead(() => readDeadline - Date.now());
+  const release = await admitProviderAction(() => readDeadline - Date.now());
   if (!release) throw new Error("browser-details-unavailable");
   try {
     return await readPage(current, browser, operation, readDeadline);
@@ -1220,11 +1220,23 @@ async function relay(current: Connection, activeGeneration: number) {
             : job.command.kind === "capabilities.inspect" ||
                 job.command.kind === "capabilities.inspect-text"
               ? 9_000 : 8_000;
-        const jobBrowser = ownedBrowser(
-          current, activeGeneration, Date.now() + budgetMs,
-        );
+        const deadline = Date.now() + budgetMs;
+        const jobBrowser = ownedBrowser(current, activeGeneration, deadline);
         let result: unknown = { ok: false, code: "blooket-browser-failed" };
+        let releaseAction: (() => void) | undefined;
         try {
+          if (job.command.kind === "sets.create" ||
+              job.command.kind === "questions.create" ||
+              job.command.kind === "questions.replace") {
+            // Native Edit Info also sends a provider server action. The
+            // application mutation lease precedes that final metadata read,
+            // so it cannot space the following Save from the read itself.
+            releaseAction = await admitProviderAction(
+              () => deadline - Date.now(),
+            );
+            if (!releaseAction || !isOwner())
+              throw new Error("browser-action-unavailable");
+          }
           if (job.command.kind === "writes.inspect-replacement") {
             result = { ok: true, value: {
               questionReplacement: "single-row-reload-v1",
@@ -1329,7 +1341,7 @@ async function relay(current: Connection, activeGeneration: number) {
         } catch {
           if (!isOwner()) return;
           status = "blooket-attention-required";
-        }
+        } finally { releaseAction?.(); }
         // An old relay cannot change the new connection's popup status.
         if (!isOwner()) return;
         // Popup status tracks the last *confirmed* session observation.

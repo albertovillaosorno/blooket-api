@@ -7,6 +7,30 @@ extension alone does not establish loaded-worker or publication acceptance.
 
 [browser-tools]: browser-acceptance-tools.md
 
+## Latest functional checkpoint (2026-10-21)
+
+Canonical creation with a prepared question image, MCP append and an autonomous
+text replacement have positive fresh remote verification. The Quizzes panel
+also completed a private two-question image/typing journey; separate registered
+MCP verification returned `published: true` at 03:59 UTC.
+
+That panel journey required two explicit controller-assisted Saves after
+provider 429 responses, preserving the same set and journals. It proves
+recoverable completion, not uninterrupted autonomous publication. Older
+uncertain attempts remain untouched; never replay them based on this result.
+
+Explicit MCP image intake, enrichment and the new `library_image_prepare`
+operation also completed against the development library: the current
+revision produced a 24,434-byte rendition and retained original Spanish text.
+The registered tools cross the actual CLI boundary; this does not establish
+automatic ChatGPT attachment delivery or remote OAuth client acceptance.
+
+Native Edit Info reads send server actions. The worker now shares its bounded
+five-second action cooldown with Create Set and question writes, because the
+application mutation lease precedes the final metadata read and cannot space
+Save from that read. Portable regression proves failed admission prevents any
+write-form action; a loaded-worker live check is still required.
+
 This guide records bounded evidence and the next implementation boundaries.
 Read `AGENTS.md`, the complete developer profile, `TODO.md`, and the owning
 record first. It does not declare quiz publication or automatic installation

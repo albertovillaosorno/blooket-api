@@ -73,6 +73,18 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+On 2026-10-21 at 03:59 UTC, the real Quizzes panel completed a private
+image/typing quiz and separate registered MCP verification confirmed all three
+operations with `published: true`. Two provider 429 stops required explicit
+controller-assisted Saves, followed by retained-journal reconciliation; no
+replacement set or journal overwrite was used.
+
+This proves recoverable panel completion, not uninterrupted autonomy.
+Native Edit Info and write jobs now share the existing five-second cooldown
+within their original deadlines. The application mutation lease alone could
+not space Save from the final metadata server action; live effectiveness
+remains subject to a newly loaded companion and independent remote proof.
+
 On 2026-10-21 at 03:32 UTC, a second canonical replacement edited the existing
 second question to a new prompt and 40-second timer without controller Save.
 The step retained an uncertain journal; separate read-only reconciliation
