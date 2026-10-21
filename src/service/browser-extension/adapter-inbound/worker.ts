@@ -1224,6 +1224,11 @@ async function relay(current: Connection, activeGeneration: number) {
         const jobBrowser = ownedBrowser(current, activeGeneration, deadline);
         let result: unknown = { ok: false, code: "blooket-browser-failed" };
         let releaseAction: (() => void) | undefined;
+        const releaseProviderAction = () => {
+          const release = releaseAction;
+          releaseAction = undefined;
+          release?.();
+        };
         try {
           if (job.command.kind === "sets.create" ||
               job.command.kind === "questions.create" ||
@@ -1305,7 +1310,9 @@ async function relay(current: Connection, activeGeneration: number) {
               if (!prepared.ok) {
                 result = { ok: true, value: prepared };
               } else {
-                const submitted = await host.submitCreateSet(input);
+                let submitted;
+                try { submitted = await host.submitCreateSet(input); }
+                finally { releaseProviderAction(); }
                 result = submitted.ok
                   ? {
                       ok: true,
@@ -1320,6 +1327,7 @@ async function relay(current: Connection, activeGeneration: number) {
               jobBrowser,
               current.tabId,
               pause,
+              releaseProviderAction,
             );
             result = {
               ok: true,
@@ -1341,7 +1349,7 @@ async function relay(current: Connection, activeGeneration: number) {
         } catch {
           if (!isOwner()) return;
           status = "blooket-attention-required";
-        } finally { releaseAction?.(); }
+        } finally { releaseProviderAction(); }
         // An old relay cannot change the new connection's popup status.
         if (!isOwner()) return;
         // Popup status tracks the last *confirmed* session observation.

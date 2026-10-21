@@ -57,13 +57,23 @@ package has passed local startup, native media preparation, packaged CLI,
 repeated launch and shutdown. The macOS target is ARM64;
 CI is configured to build its Safari WebExtension companion into `Blooket
 API.app`. Native Mac acceptance and signing/notarization remain in ongoing
-platform hardening; safe application replacement remains unfinished.
+platform hardening.
+
+The owner-approved Linux update workflow checks GitHub's
+SHA-256 and stages the archive for manual installation with the previous app
+retained; automatic application replacement is optional future work.
 
 Chrome and Firefox extensions can be assembled locally. Authenticated set
 summaries, private details, saved questions with bounded image evidence, and
 capabilities have passed real service and CLI reads in authorized Chrome.
+
 Creation, image verification, and an appended text question have also passed
-live canonical reads; existing-question replacement is still unverified.
+live canonical reads. A text-question replacement has independently passed
+fresh verification without controller Save. The panel also completed and
+verified a two-question image/typing quiz after assisted provider-throttle
+recovery.
+
+This is not uninterrupted autonomous publication evidence.
 
 Non-empty collection completeness, pagination, public set details, and
 unsupported media variants remain unknown or pending. Keep these limits

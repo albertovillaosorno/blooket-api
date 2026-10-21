@@ -153,6 +153,7 @@ export function createExtensionAddQuestionHost(
   tabId: number,
   pause: (ms: number) => Promise<void> = async (ms) =>
     await new Promise((resolve) => setTimeout(resolve, ms)),
+  afterSubmitAttempt: () => void = () => {},
 ) {
   const script = async (
     func: (...args: never[]) => unknown,
@@ -416,10 +417,17 @@ export function createExtensionAddQuestionHost(
         );
         if (echoed !== true) return browserFailure();
         try {
-          const submittedResult = await ownedScript(
-            runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
-            ["submit", serializedInput],
-          );
+          let submittedResult: unknown;
+          try {
+            submittedResult = await ownedScript(
+              runBlooketAddQuestionPageAction as (...args: never[]) => unknown,
+              ["submit", serializedInput],
+            );
+          } finally {
+            // Start the provider cooldown at the attempted action, not after
+            // lengthy reload/read-back. The callback never confirms a write.
+            afterSubmitAttempt();
+          }
           if (!exactOk(submittedResult)) {
             // A negative reply can follow the latched Save click. Preserve a
             // current human stop instead of overriding it with a prior 429.
