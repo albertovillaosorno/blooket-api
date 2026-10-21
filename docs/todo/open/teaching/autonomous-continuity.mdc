@@ -125,3 +125,9 @@ connection stop from ordinary remote verification failures, with ES/EN
 instructions to reuse the existing profile, retain journals and never repeat
 an uncertain Save. No browser reload, account write or replacement login was
 performed in this session.
+
+An additional Studio control-lifetime test exercised the actual Quizzes
+closure using its abort signal while the bounded read-only cooldown was
+pending. Stop immediately resolved the timer, removed the active Stop control
+and exposed only the next safe status refresh. No write or additional sender
+invocation was introduced during cancellation.
