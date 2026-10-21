@@ -85,9 +85,10 @@ resolve that read failure or authorize another Save.
 A red-to-green pacing regression found that nonfinite or rolled-back native
 read clocks could admit a provider metadata action or strand its exclusive
 lease after a release-clock exception. The read pacer now refuses invalid
-clock/budget samples, releases its local lease safely, and fails closed until
-a trustworthy fresh worker owns subsequent actions. These are portable
-hardening tests, not evidence of an additional remote write.
+clock/budget samples and releases its local lease safely. An invalid
+pre-admission sample can recover after a valid monotonic reading, while a
+failed post-action release clock blocks the unknown cooldown. These are
+portable hardening tests, not evidence of an additional remote write.
 
 A 2026-10-21 provider-surface regression found that the native Edit Info
 panel could be reported closed while an independent question edit owner

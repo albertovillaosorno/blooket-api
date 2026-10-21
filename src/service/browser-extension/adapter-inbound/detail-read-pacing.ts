@@ -36,24 +36,20 @@ export function createDetailReadPacer(ports: {
   let occupied = false;
   let nextAt = 0;
   let observedAt = 0;
-  let clockInvalid = false;
   const now = (): number | undefined => {
-    if (clockInvalid) return undefined;
     try {
       const value = ports.now();
       if (!Number.isFinite(value) || value < observedAt || value < 0) {
-        clockInvalid = true;
         return undefined;
       }
       observedAt = value;
       return value;
     } catch {
-      clockInvalid = true;
       return undefined;
     }
   };
   return async (remaining: () => number) => {
-    if (occupied || clockInvalid) return undefined;
+    if (occupied) return undefined;
     occupied = true;
     let admitted = false;
     try {
