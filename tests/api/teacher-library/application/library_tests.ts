@@ -252,6 +252,40 @@ test(
     }
   },
 );
+test("animated GIF import and preparation persist multiple frames on reload",
+  async () => {
+  const { root, input } = await setup();
+  try {
+    const sharp = await loadSharp();
+    const pixels = new Uint8Array([
+      255, 0, 0, 255, 255, 0, 0, 255,
+      0, 0, 255, 255, 0, 0, 255, 255,
+    ]);
+    const gif = await sharp(pixels, {
+      raw: { width: 1, height: 2, channels: 4, pageHeight: 1 },
+    }).gif({ delay: [150, 150], loop: 0,
+      keepDuplicateFrames: true }).toBuffer();
+    assert.equal((await sharp(gif, { animated: true }).metadata()).pages, 2);
+    const imported = await importLibraryImage(root, {
+      ...input, name: "Animated paste", base64: gif.toString("base64"),
+    });
+    const saved = await prepareLibraryImage(root, imported.id,
+      imported.revision);
+    const library = (await loadPreferences(root)).mediaRoot;
+    const persisted = await readPreparedLibraryImage(library, imported.id,
+      saved.revision);
+    assert.equal(persisted.file.endsWith(".gif"), true);
+    assert.deepEqual(await readFile(join(library, persisted.file)),
+      persisted.bytes);
+    const decoded = await sharp(persisted.bytes, { animated: true })
+      .metadata();
+    assert.ok((decoded.pages ?? 0) >= 2);
+    const reload = (await listLibrary(library))
+      .find(record => record.id === imported.id);
+    assert.equal(reload?.prepared?.file, persisted.file);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("import and rename reject duplicate human-visible image names",
   async () => {
   const { root, input } = await setup();

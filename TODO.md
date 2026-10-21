@@ -8,7 +8,15 @@ acceptance standard: finish usable end-to-end behavior first, then iterate.
 Never relax authentication, data preservation, safe updates, or honest evidence.
 The final ongoing maintenance task is intentionally never auto-completed.
 
-## P1 - Foundations
+## P0 - Media library usability
+
+### TODO - Automatic prepared-media saves and animated GIF paste
+
+Show the persisted prepared media instead of the source image, preserve
+animation when pasting GIFs instead of importing a static preview, and reject
+duplicate library names. Retain the canonical editable source for recovery.
+
+[Record](docs/todo/open/media/save-and-gif-paste.mdc)
 
 ## P2 - Blooket publication
 
