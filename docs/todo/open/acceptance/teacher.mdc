@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 identity-origin regression found that an otherwise valid public
+login form could report `signed-out` despite an open native dialog, ordinary
+ARIA modal or `alertdialog`. The session reader now reports `unexpected-page`
+while such a visible prompt exists, preserving its distinct CAPTCHA state
+and ordinary signed-out detection after the dialog is hidden. No login or
+account action was performed; the fixtures are synthetic.
+
 A related 2026-10-21 read-only provider regression found that a visible
 ordinary ARIA modal (`role="dialog"`, `aria-modal="true"`) without a special
 organization heading could still certify My Sets cards, and the bootstrap

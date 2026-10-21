@@ -839,6 +839,22 @@ test(
     assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
   });
 
+  for (const selector of ['dialog[open]', '[role="alertdialog"]',
+    '[role="dialog"][aria-modal="true"]']) {
+    const modal = node("DIALOG");
+    document.selectors[selector] = [modal];
+    page(document, "https://id.blooket.com/login", () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "unexpected-page",
+      });
+      modal.visibility = "hidden";
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "signed-out",
+      });
+    });
+    delete document.selectors[selector];
+  }
+
   document.selectors[
     'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
   ] = [
