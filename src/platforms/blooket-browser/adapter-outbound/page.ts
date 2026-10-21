@@ -655,6 +655,14 @@ export function isBlooketDetailPanelClosed(
       "main button",
     )).filter(button => button.textContent?.trim() === "Edit Info");
     if (buttons.length !== 1 || !visible(buttons[0]!)) return false;
+    // A hidden metadata editor does not prove this native document is free
+    // of a different unsaved question, set or capability editor.
+    if ([
+      "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
+      "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+    ].some(key => Object.hasOwn(globalThis, key)) ||
+        document.querySelector('input#question[name="question"]'))
+      return false;
     if (pendingRead) {
       // A failed read-only opener can leave a watch without mounting its
       // panel. Only that untouched owner permits a recovery reload; this
@@ -666,12 +674,7 @@ export function isBlooketDetailPanelClosed(
       };
       const watch = world.__blooketDetailEditWatch;
       if (!watch || watch.document !== document || watch.setId !== setId ||
-          watch.dirty !== false || [
-            "__blooketCapabilityEditWatch", "__blooketQuestionEditWatch",
-            "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
-          ].some(key => Object.hasOwn(globalThis, key)) ||
-          document.querySelector('input#question[name="question"]'))
-        return false;
+          watch.dirty !== false) return false;
       const active = document.activeElement;
       if (active?.tagName === "INPUT" || active?.tagName === "TEXTAREA" ||
           active?.tagName === "SELECT" ||

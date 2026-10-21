@@ -73,6 +73,12 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A 2026-10-21 provider-surface regression found that the native Edit Info
+panel could be reported closed while an independent question edit owner
+remained active. The read-only closure probe now refuses competing editor
+watches or a live question input even when its metadata controls are hidden.
+This synthetic guard cannot prove that an outstanding Save persisted.
+
 On 2026-10-21, a red-to-green regression found that the detached question
 reader accepted a same-set watch with `submitted: true` but no monotonic Save
 latch. It now requires a finite in-document submit time and fully prepared,

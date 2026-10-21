@@ -1267,6 +1267,20 @@ test("owned Edit Info cancellation closes the read-only metadata panel", () => {
     assert.equal(close(), true);
     assert.equal(clicks, 1);
     assert.equal(isBlooketDetailPanelClosed("fixture"), true);
+    // The metadata panel may be gone while a second unsaved question editor
+    // has taken over the native document. That is not a clean read closure.
+    Object.defineProperty(globalThis, "__blooketAddQuestionFormWatch", {
+      configurable: true, value: { dirty: true },
+    });
+    try {
+      assert.equal(isBlooketDetailPanelClosed("fixture"), false);
+    } finally {
+      Reflect.deleteProperty(globalThis, "__blooketAddQuestionFormWatch");
+    }
+    document.selectors['input#question[name="question"]'] = [node("INPUT")];
+    assert.equal(isBlooketDetailPanelClosed("fixture"), false);
+    delete document.selectors['input#question[name="question"]'];
+    assert.equal(isBlooketDetailPanelClosed("fixture"), true);
     document.selectors[
       'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
     ] = [node("IFRAME")];
