@@ -33,7 +33,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
-import { publicationStopReason, waitForPublicationReadCooldown } from
+import { publicationStopReason, recoveredPublicationAction,
+  waitForPublicationReadCooldown } from
   "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 test("an uncertain throttled Save has a distinct waiting label", async () => {
@@ -173,6 +174,7 @@ async function quizFixture(options: {
     JSON,
     report: (error: unknown) => { reported.push(error); },
     publicationStopReason: () => "unknown",
+    recoveredPublicationAction,
     waitForPublicationReadCooldown,
     publishTextDraft: async (_id: unknown, _rev: unknown,
       _send: unknown, _progress: unknown, isCancelled: () => boolean,
@@ -203,7 +205,8 @@ async function quizFixture(options: {
           options.holdReconcile) return await reconcileResponse.promise;
       if (name === "blooket.publication.reconcile" &&
           options.reconcileOutcome)
-        return { phase: options.reconcileOutcome, published: false,
+        return { draftId: "synthetic", revision: "a".repeat(64),
+          phase: options.reconcileOutcome, published: false,
           completedOperations: options.reconcileOutcome === "recovered" ?
             2 : 1, totalOperations: options.reconcileOutcome === "recovered"
               ? 3 : 2, remoteSetId: "synthetic-set" };
@@ -214,7 +217,8 @@ async function quizFixture(options: {
         if (statusReads === 3 && options.holdThirdStatus)
           return await thirdStatus.promise;
         return options.uncertainAtStart
-          ? { phase: "reconciliation-required", completedOperations: 1,
+          ? { draftId: "synthetic", revision: "a".repeat(64),
+            phase: "reconciliation-required", completedOperations: 1,
             totalOperations: options.reconcileOutcome === "recovered" ?
               3 : 2, remoteSetId: "synthetic-set",
             published: false }
@@ -293,6 +297,27 @@ test("inconclusive read-only recovery never exposes a write action",
   assert.equal(ui.root.findAction("publish"), undefined);
   assert.equal(ui.calls.includes("publishTextDraft"), false);
   assert.ok(ui.root.findAction("refresh"));
+});
+
+test("malformed recovered response never enables Verify or Resume",
+  async () => {
+  for (const forged of [
+    { phase: "recovered", published: false },
+    { phase: "recovered", published: false,
+      completedOperations: 2, totalOperations: 2 },
+    { phase: "recovered", published: false,
+      completedOperations: 2, totalOperations: 3,
+      remoteSetId: "foreign-set" },
+  ]) {
+    const ui = await quizFixture({ uncertainAtStart: true,
+      holdReconcile: true });
+    ui.root.findAction("reconcile")?.handlers.get("click")?.();
+    ui.reconcileResponse.resolve(forged);
+    await flush();
+    assert.equal(ui.root.findAction("publish"), undefined);
+    assert.equal(ui.root.findAction("verify"), undefined);
+    assert.equal(ui.calls.includes("publishTextDraft"), false);
+  }
 });
 
 test("Stop during a pending read-only recovery never enables Resume",

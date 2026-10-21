@@ -109,6 +109,28 @@ function progress(value, draftId) {
   return value;
 }
 
+// An independent Reconcile button may offer Resume only after a complete,
+// read-only recovered checkpoint proves this exact frozen operation. The
+// subsequent user click re-reads canonical status before any new Save.
+export function recoveredPublicationAction(previous, incoming, draftId) {
+  const after = progress(incoming, draftId);
+  if (after.phase !== "recovered") return null;
+  const before = progress(previous, draftId);
+  if (before.phase !== "reconciliation-required" ||
+      before.published !== false || after.published !== false ||
+      typeof before.revision !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(before.revision) ||
+      after.revision !== before.revision ||
+      after.totalOperations !== before.totalOperations ||
+      after.completedOperations !== before.completedOperations + 1 ||
+      typeof after.remoteSetId !== "string" || !after.remoteSetId ||
+      (before.remoteSetId != null &&
+        after.remoteSetId !== before.remoteSetId))
+    throw Error("publication-progress-invalid");
+  return after.completedOperations === after.totalOperations
+    ? "verify" : "publish";
+}
+
 // A browser cooldown is never a mutation retry. A stopped teacher intent
 // releases the delay immediately rather than leaving Stop pending for 5 s.
 export async function waitForPublicationReadCooldown(
