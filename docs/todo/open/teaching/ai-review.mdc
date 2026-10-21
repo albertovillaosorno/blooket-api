@@ -69,6 +69,18 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+On 2026-10-21, registered MCP image import, enrichment and preparation ran
+through actual CLI subprocesses against the development library. The new
+`library_image_prepare` returned a 24,434-byte current-revision rendition;
+`library_get` confirmed completed normalization and preserved original Spanish
+name/description. No local editor or caller-selected path was needed.
+
+Separate registered MCP verification confirmed the recovered two-question
+panel journey at 03:59 UTC. That journey needed controller assistance at two
+provider 429 stops; it does not demonstrate uninterrupted autonomous creation.
+The earlier autonomous existing-question correction has positive verification
+at 03:32 UTC. Browserless agents must retain these evidence distinctions.
+
 On 2026-10-20, a new bounded `library_image_import` MCP tool now accepts
 explicit client-supplied canonical base64 (up to 900,000 encoded characters)
 and preserves original name/description under a service-owned media ID. An

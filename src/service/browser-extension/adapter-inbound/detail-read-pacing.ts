@@ -9,11 +9,11 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Serial admission and spacing of native Edit Info read actions.
+//   - Serial admission and spacing of native Edit Info and write actions.
 // - Must-Not:
 //   - Retry provider actions, extend deadlines, or authorize mutations.
 // - Allows:
-//   - Inputs: A monotonic clock, bounded wait, and remaining read budget.
+//   - Inputs: A monotonic clock, bounded wait, and remaining action budget.
 //   - Outputs: An exclusive release callback or unavailable admission.
 //   - Side effects: One bounded cooldown wait per admission.
 // - Split-When:
@@ -25,7 +25,7 @@
 // - Description:
 //   - Cooldown starts after release, including failed read attempts.
 // - Usage:
-//   - Share one pacer across worker jobs and release in a finally block.
+//   - Share one pacer across read/write jobs; release in a finally block.
 // - Defaults:
 //   - Five seconds is a conservative local policy, not a provider limit.
 //
