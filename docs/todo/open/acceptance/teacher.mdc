@@ -157,6 +157,15 @@ this final record.
 
 ## Evidence
 
+A previous concurrent `npm run validate` run reported an intermittent
+`owned-launcher-service-did-not-drain` failure in the silent supervised
+launcher integration test; the same test passed isolated. The test now uses
+a monotonic eight-second drain observation and permits bounded scheduling
+contention across the three child launches/two shutdowns. Its unchanged
+assertions still require actual runtime/lock/lease disappearance and genuine
+`--stop` success; no test cleanup grants permission to kill a foreign service.
+This improves deterministic Linux regression assurance, not provider state.
+
 On 2026-10-21, a red-to-green Studio publication regression showed that
 getter-backed, inherited and extra progress fields could cross the UI
 command boundary. A mutable progress callback could also retarget the
