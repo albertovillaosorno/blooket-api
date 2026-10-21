@@ -2252,7 +2252,10 @@ async function loadQuizzes() {
             latest = await publishTextDraft(
               id, record.revision,
               (name, payload) => command(name, payload, controller.signal),
-              observed => { state.textContent = publicationLabel(observed); },
+              observed => {
+                if (!controller.signal.aborted)
+                  state.textContent = publicationLabel(observed);
+              },
               () => controller.signal.aborted,
               () => waitForPublicationReadCooldown(controller.signal),
             );
@@ -2262,7 +2265,8 @@ async function loadQuizzes() {
               : "blooket.publication.verify";
             latest = await command(name, { draftId: id }, controller.signal);
           }
-          state.textContent = publicationLabel(latest);
+          state.textContent = controller.signal.aborted
+            ? t("publicationPaused") : publicationLabel(latest);
         } catch (error) {
           state.textContent = controller.signal.aborted
             ? t("publicationPaused") : publicationFailureText(error);

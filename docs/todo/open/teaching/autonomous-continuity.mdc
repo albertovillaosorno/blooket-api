@@ -140,3 +140,11 @@ After the correction, no late response is reported or used for a subsequent
 command once the explicit teacher intent is canceled. Stop does not abort an
 already submitted remote Save or promise it was undone: any ambiguity stays
 in the canonical journal for a separately authorized read-only recovery.
+
+A second 2026-10-21 red-to-green cancellation regression exercised the real
+Studio Quizzes closure. Even when the underlying orchestrator was stopped,
+late resolved `verified` or `recovered` responses could repaint the UI after
+Stop, falsely implying active success or progress. The visual controller now
+ignores progress callbacks after its abort signal and always displays Paused
+for any late successful command response. Subsequent writes remain gated by
+a new explicit teacher click and canonical status refresh.
