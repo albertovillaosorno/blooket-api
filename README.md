@@ -3,19 +3,25 @@
 A local-first TypeScript toolkit for a teacher who wants AI to help create
 Blooket quizzes without spending the afternoon uploading and formatting media.
 
-The intended workflow is simple: ask an AI for a quiz, review it in the browser,
-and publish it to Blooket. A background service on each teacher's Mac or
+Ask an AI for a quiz and let the registered tools publish and verify it on
+Blooket. Browser review and supported corrections are available without a
+routine approval gate. A background service on each teacher's Mac or
 Linux computer owns files, credentials, media preparation, and execution.
 An optional Cloudflare Tunnel connects online AI clients to its authenticated
 MCP gateway.
 
-**This is a working development prototype.** Canonical CLI/MCP publication
-has created and freshly verified a private set with a question image and a
-subsequent appended text question in the authorized Chrome session. One
-existing text-only question replacement has also passed fresh remote
-verification, but unattended multi-question publication, broader edits,
-native Safari, production updates and recipient-ChatGPT acceptance remain
-unfinished.
+**The admitted publication and personal Linux delivery workflows are
+complete.** Real Blooket acceptance covers creation, prepared question images,
+appending questions, bounded text-question replacement, recovery and fresh
+remote verification through the canonical CLI/MCP tools. The product has saved
+and verified a two-question image/typing quiz without controller Save.
+
+This does not promise uninterrupted operation or universal platform support.
+Provider-read stops remain recoverable, updates use verified downloads with
+manual installation, and native Mac/Safari and remote ChatGPT-client acceptance
+remain in ongoing maintenance. Only that maintenance task is open in
+[TODO.md](TODO.md); completed records retain the dated acceptance evidence.
+
 The project is independent of Blooket and is not endorsed by the platform.
 
 ## What works today
@@ -32,12 +38,17 @@ The project is independent of Blooket and is not endorsed by the platform.
   folder, online connection, and export defaults.
 - Personal skills and recoverable quiz drafts with revision checks. Startup
   installs initial authoring skills without replacing personal changes.
+- Real Blooket publication with durable progress, pacing, cancellation,
+  read-only reconciliation and separate remote verification. Supported
+  questions include multiple choice and typing answers with per-question time.
 - A Streamable HTTP MCP gateway with OAuth/PKCE and approval in the local UI.
   Approval requires the owner password; connections can be rejected or revoked.
   Its tools execute the canonical CLI rather than a separate implementation.
 - A lightweight first-use diagnostic, saved locally, with a manual rerun.
 - Explicit local service stop and reversible packaged Mac login startup,
   showing the OS authorization state instead of inferring it from a preference.
+- A verified Linux x64 package and on-demand GitHub update checks/downloads
+  with SHA-256 verification. Installation preserves the old app manually.
 
 Registered MCP tools retrieve teacher instructions, search/read/enrich media,
 manage skills and drafts, and expose guarded quiz publication, status,
@@ -322,12 +333,14 @@ and observed HTTP actions are evidence, not a stable public API. Their response
 contracts and concrete browser adapters need verification before activation.
 Client form limits alone do not prove server constraints.
 
-CAPTCHAs, organization selection, unfamiliar login challenges, and unknown
-security states stop execution for human action. Normal interaction pacing is
-planned; challenge bypass and anti-bot evasion are outside the design.
+Provider verification may settle automatically; execution requires fresh
+session evidence before continuing. Interactive challenges, organization
+selection and unfamiliar security states preserve a human-action stop.
+Shared pacing and cancellation are implemented; challenge bypass and anti-bot
+evasion are outside the design.
 
-macOS is the teacher product target, with ARM64 packages planned.
-Linux x64 delivery is required for developer testing of the shared service.
+Linux x64 and macOS ARM64 are personal-use targets. Linux package delivery
+has passed local verification; native Mac/Safari acceptance remains in P4.
 The bundled Node 24 runtime requires macOS 13.5 or later; confirm the OS before
 installation. No VM or Metal requirement is part of the initial plan.
 
@@ -456,32 +469,19 @@ Q1 is Jan–Mar, Q2 Apr–Jun, Q3 Jul–Sep, and Q4 Oct–Dec. YY means 2000–2
 PATCH is 0–99999 without leading zeros. The gate requires the tag to match the
 committed `PRODUCT_VERSION`; package metadata is a checked projection.
 
-A release tag starts a strictly ordered pipeline:
+A deliberately authorized release tag runs Linux CI against the exact tagged
+commit, including package assembly and release-package verification. The release
+gate also requires valid quarterly CalVer and `RELEASE_ENABLED=true`.
+Publication then downloads the verified `package-linux-x64` CI artifact and
+uploads `linux-x64.tar.gz` to GitHub Releases; it does not rebuild or rerun
+tests. Native Mac/Safari CI runs on explicit `ci-*` tags and does not block
+Linux release publication.
 
-1. reusable CI validates the exact tagged commit on Linux;
-2. only after that passes, the ARM64 macOS job builds/verifies the Mac app,
-   compiles the Safari WebExtension host, exercises Safari WebDriver, and
-   embeds the Safari companion inside the Mac app and rezips the final archive;
-   for release tags, it verifies that final archive with the release gate and
-   generates its publisher-signed update manifest;
-3. only after the complete CI workflow passes, the release gate requires valid
-   quarterly CalVer and repository variable RELEASE_ENABLED=true;
-4. publish downloads those CI artifacts and creates the GitHub Release.
-
-Release itself does not compile, run tests, build packages, or rerun package
-verification. It publishes darwin-arm64.zip and update-manifest.json; the app
-and extension live inside Blooket API.app in that archive. Linux x64 remains
-useful for portable development/validation and is never a release asset.
-
-Release signing requires the repository secret `BLOOKET_UPDATE_SIGNING_KEY`
-(an Ed25519 private PEM) and variable `BLOOKET_UPDATE_PUBLISHER_KEYS` (a JSON
-array of canonical public PEMs). Only the manifest step receives the private
-key; ordinary CI tags do not sign metadata. The receiving app must independently
-pin the admitted public roots. A CI variable alone never grants client trust.
-
-Missing signing inputs, failed final package assessment or missing manifest
-stop publication. Native signing/notarization and production publisher
-provisioning remain required; these workflow definitions do not establish them.
+Apple credentials and a separately signed update manifest are not prerequisites
+for the personal Linux workflow. Downloads use the fixed GitHub repository's
+asset digest; installation remains manual. Legacy Apple publisher-verification
+infrastructure does not establish native Mac acceptance or enable automatic
+replacement.
 
 There is no automated changelog and no repository release-notes file is
 required. The workflow creates the release with empty notes; write the human
@@ -504,8 +504,7 @@ npm run package -- linux-x64
 npm run package:verify -- linux-x64
 ```
 
-The product package target is `darwin-arm64`; `linux-x64` remains the portable
-development/validation package target. Outputs live under
+Package targets are `linux-x64` and `darwin-arm64`. Outputs live under
 `.temp/distributions/`; assembly refuses to overwrite an existing target
 directory or archive. Use the same explicit output name for a separate build
 and its verification, while reusing the existing dependency/download cache:
@@ -638,7 +637,7 @@ Canonical `publication append <draft-id> <revision> <set-id>` and
 the full desired quiz, preserving its existing metadata and question prefix.
 Only the new suffix is sent; subsequent `step`, `status`, `reconcile` and
 `verify` calls reuse the same frozen target and journal. Conflicting changes,
-deletion, replacement and reordering are refused.
+deletion, replacement and reordering are refused by the append operation.
 
 Portable MCP-to-CLI-to-service
 coverage verifies append behavior. On October 20, registered MCP handlers
@@ -652,14 +651,16 @@ remain unchanged. The selected question keeps its type and answer count;
 selected-row images/audio and deletion/reordering are refused before a write.
 
 One native Edit/Save uses the same pacing, durable journal, read-only recovery
-and separate final verification. It never falls back to Add Question. One
-text-only replacement passed independent remote verification after journal
-reconciliation; uninterrupted autonomous correction remains pending.
+and separate final verification. It never falls back to Add Question. On
+October 21, a text-only replacement passed fresh remote verification without
+controller Save. The product also saved both questions of a new image/typing
+quiz and separately verified all three operations after recoverable read stops.
 
-An October 15 Chrome test identified omitted null fields in injected MC input;
-JSON text now preserves them and real native preparation passes. The next
-canonical MC Save received HTTP 429 and remains journaled without replay.
-Uninterrupted multi-question publication is still unverified.
+Older ambiguous attempts remain journaled without replay. Completion does not
+claim an uninterrupted run under provider throttling. The
+[publication record](docs/todo/completed/blooket/publication.mdc) and
+[AI authoring record](docs/todo/completed/teaching/ai-review.mdc) distinguish
+autonomous writes, assisted historical checks and portable regression coverage.
 
 The local **Settings → Blooket publication pacing** controls expose four
 bounded, shared limits: seconds between mutation starts (2–60), mutation
@@ -757,8 +758,9 @@ Replacing a stopped extracted package retains the user data root; deleting
 the package does not remove saved settings, media or host-store secrets.
 Automated Linux updates and rollback are not enabled yet.
 
-Native Mac testing and the no-Apple-ID update path remain open. Do not
-present an unsigned archive as a trusted public automatic-update release.
+Native Mac testing remains in P4. Personal Linux check/download and manual
+installation are complete; automatic replacement is not enabled. Do not present
+an unsigned archive as a trusted public automatic-update release.
 
 ## Develop and verify
 
@@ -868,7 +870,8 @@ that directory. If it fails, point the shortcut back to the preserved old
 package. Do not delete the old app or its user-data directory.
 
 [Personal update delivery](docs/todo/completed/delivery/updates.mdc) records the
-implemented check/download and the remaining automatic replacement work.
+completed check/download and manual-installation scope. Automatic replacement
+is an optional future improvement.
 Background checking, unattended installs and rollback are not enabled.
 
 Configuration controls packaged Mac login registration through Service
