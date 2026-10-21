@@ -171,6 +171,21 @@ test("security stops cannot be confused with a compatible editor", () => {
   });
 });
 
+test("visible alertdialogs are human stops, not write-ready editors",
+  () => {
+  withEditor(page => {
+    page.document.selectors['[role="alertdialog"]'] = [new Node("DIV")];
+    assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+      "human-stop");
+    Object.defineProperty(globalThis, "getComputedStyle", {
+      configurable: true,
+      value: () => ({ display: "none", visibility: "visible" }),
+    });
+    assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+      "shape-compatible", "a hidden former alert must not mask the editor");
+  });
+});
+
 test("multiple choice answer-slot IDs cannot silently be renumbered", () => {
   withEditor(page => {
     page.fields[1]!.id = "answer-7";
