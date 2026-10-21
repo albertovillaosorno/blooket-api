@@ -136,6 +136,8 @@ async function quizFixture(options: {
   readonly holdSecondList?: boolean;
   readonly holdThirdList?: boolean;
   readonly holdSecondStatus?: boolean;
+  readonly failFirstStatus?: boolean;
+  readonly failSecondStatus?: boolean;
   readonly holdThirdStatus?: boolean;
   readonly uncertainAtStart?: boolean;
   readonly reconcileOutcome?: "recovered" | "reconciliation-required";
@@ -221,6 +223,10 @@ async function quizFixture(options: {
               ? 3 : 2, remoteSetId: "synthetic-set" };
       if (name === "blooket.publication.status") {
         statusReads++;
+        if (statusReads === 1 && options.failFirstStatus)
+          throw Error("blooket-browser-failed");
+        if (statusReads === 2 && options.failSecondStatus)
+          throw Error("blooket-browser-failed");
         if (statusReads === 2 && options.holdSecondStatus !== false)
           return await statusRefresh.promise;
         if (statusReads === 3 && options.holdThirdStatus)
@@ -264,6 +270,30 @@ async function quizFixture(options: {
 async function flush() {
   for (let i = 0; i < 6; i++) await Promise.resolve();
 }
+
+test("failed initial status always offers a read-only Refresh control",
+  async () => {
+  const ui = await quizFixture({ failFirstStatus: true });
+  assert.ok(ui.root.findAction("refresh"));
+  assert.equal(ui.root.findAction("publish"), undefined);
+  assert.equal(ui.root.findAction("verify"), undefined);
+});
+
+test("transient status failure removes stale write controls",
+  async () => {
+  const ui = await quizFixture({ failSecondStatus: true });
+  assert.ok(ui.root.findAction("publish"));
+  ui.root.findAction("refresh")?.handlers.get("click")?.();
+  await flush();
+  assert.equal(ui.root.findAction("publish"), undefined);
+  assert.equal(ui.root.findAction("verify"), undefined);
+  assert.ok(ui.root.findAction("refresh"));
+  assert.equal(ui.calls.includes("publishTextDraft"), false);
+  ui.root.findAction("refresh")?.handlers.get("click")?.();
+  await flush();
+  assert.ok(ui.root.findAction("publish"),
+    "a fresh valid status should restore the action");
+});
 
 test("status alone never advertises verified publication",
   async () => {

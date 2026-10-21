@@ -2217,14 +2217,28 @@ async function loadQuizzes() {
         requestGeneration !== refreshGeneration;
       let observed;
       try {
-        observed = await command("blooket.publication.status",
+        const response = await command("blooket.publication.status",
           { draftId: id });
+        if (obsolete()) return;
+        observed = publicationStatusForView(response, id);
       } catch (error) {
         if (obsolete()) return;
-        throw error;
+        // On a missing or malformed status, previous actions are stale.
+        // Keep only the read-only status refresh; do not offer another Save.
+        state.textContent = publicationFailureText(error);
+        actions.replaceChildren();
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.textContent = t("publicationRefresh");
+        retry.dataset.publicationAction = "refresh";
+        retry.addEventListener("click", () => {
+          if (!activePublication) void refreshState().catch(report);
+        });
+        actions.append(retry);
+        return;
       }
       if (obsolete()) return;
-      latest = publicationStatusForView(observed, id);
+      latest = observed;
       state.textContent = publicationLabel(latest);
       actions.replaceChildren();
       const add = (label, name, callback) => {

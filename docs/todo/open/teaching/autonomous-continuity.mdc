@@ -170,3 +170,10 @@ a forged `published: true` response, despite no fresh Blooket read. Quizzes
 now decodes its local status as a strict not-started, ready, writes-complete
 or reconciliation-required checkpoint with `published: false`, matching the
 registered canonical command. Fresh Verify alone may show completion.
+
+A fifth 2026-10-21 red-to-green Studio regression exercised failed initial and
+subsequent publication status requests. Initially the page had no way to retry;
+a later transient error left an obsolete Publish control visible. The Quizzes
+view now removes all stale actions after a missing or invalid status and
+provides only the read-only Refresh button. A newly validated journal can
+restore an explicit action; the failure itself never schedules a Save.
