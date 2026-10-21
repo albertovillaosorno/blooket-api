@@ -49,6 +49,7 @@ function tool(
   readOnly: boolean,
   required: readonly string[] = Object.keys(properties),
   openWorld = false,
+  recoverableJournalUpdate = false,
 ) {
   return {
     name,
@@ -62,8 +63,11 @@ function tool(
     },
     annotations: {
       readOnlyHint: readOnly,
-      destructiveHint: !readOnly,
-      idempotentHint: readOnly,
+      // A read-only provider reconciliation may advance only the existing
+      // local checkpoint. It is not environment-read-only, but it cannot
+      // replay a Save or destructively modify the remote question set.
+      destructiveHint: !readOnly && !recoverableJournalUpdate,
+      idempotentHint: readOnly || recoverableJournalUpdate,
       openWorldHint: openWorld,
     },
   };
@@ -309,6 +313,7 @@ const tools = [
       ? ["draftId", "expectedRevision", "remoteSetId"]
       : action === "step" ? ["draftId", "expectedRevision"] : ["draftId"],
     action !== "status",
+    action === "reconcile",
   )),
 ];
 export function listTeacherTools() {

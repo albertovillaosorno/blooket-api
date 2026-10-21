@@ -59,6 +59,26 @@ const command = {
   payload: {},
 };
 
+test("MCP annotations distinguish recoverable journals from remote Save",
+  () => {
+  const registered = new Map(listTeacherTools().map(tool =>
+    [tool.name, tool.annotations]));
+  const reconcile = registered.get("blooket_publication_reconcile");
+  assert.deepEqual(reconcile, {
+    readOnlyHint: false, destructiveHint: false,
+    idempotentHint: true, openWorldHint: true,
+  });
+  for (const name of ["blooket_publication_step",
+    "blooket_publication_append", "blooket_publication_replace"]) {
+    const annotation = registered.get(name);
+    assert.equal(annotation?.readOnlyHint, false);
+    assert.equal(annotation?.destructiveHint, true);
+    assert.equal(annotation?.idempotentHint, false);
+  }
+  assert.equal(registered.get("blooket_publication_verify")
+    ?.readOnlyHint, true);
+});
+
 test("teacher tool advertises scoped publication capability preflight", () => {
   const tool = listTeacherTools().find(item =>
     item.name === "blooket_capabilities_inspect");
