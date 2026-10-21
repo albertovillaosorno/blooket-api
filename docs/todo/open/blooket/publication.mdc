@@ -73,6 +73,15 @@ evidence but does not replace this missing end-to-end flow.
 
 ## Evidence
 
+A 2026-10-21 detached-read regression proved that a nonfinite or
+backward-moving clock could evade a read deadline. The isolated auxiliary
+question reader now rejects that clock before opening a tab or verifying a
+receipt, and closes its own tab if the clock changes after creation. This
+is deterministic fail-closed coverage, not a new remote provider read.
+Official Chrome documentation confirms that extension scripting defaults to
+an isolated world; page-main-world DevTools inspection is not proof that
+extension-owned mutation watches are absent.
+
 On 2026-10-21, the owner supplied a screenshot of a private two-question
 image/typing set with its image still visible and a 40-second Typing card.
 The local service remained connected and `session inspect` returned `edit`,

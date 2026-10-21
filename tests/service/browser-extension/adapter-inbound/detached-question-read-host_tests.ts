@@ -293,6 +293,56 @@ test("incomplete hydration and failed cleanup never confirm a question list",
   }
 });
 
+test("untrusted detached-read clocks cannot grant a remote receipt",
+  async () => {
+  const events: string[] = [];
+  const chrome: DetachedQuestionReadChromePort = {
+    tabs: {
+      create: async () => { events.push("create");
+        return { id: 83 }; },
+      get: async () => { throw Error("unexpected-get"); },
+      remove: async () => { throw Error("unexpected-remove"); },
+    },
+    scripting: { executeScript: async () => {
+      throw Error("unexpected-script");
+    } },
+  };
+  for (const tick of [Number.NaN, Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY, -1]) {
+    assert.deepEqual(await inspectDetachedBlooketQuestions(
+      chrome, "synthetic-set", 7_000, async () => {}, () => tick,
+    ), { ok: false, code: "blooket-browser-failed" });
+  }
+  assert.deepEqual(events, [], "an invalid clock cannot open a tab");
+});
+
+test("a read clock that breaks after temporary tab creation closes it",
+  async () => {
+  for (const failureTime of [Number.NaN, 0]) {
+    let calls = 0;
+    const events: string[] = [];
+    const chrome: DetachedQuestionReadChromePort = {
+      tabs: {
+        create: async () => { events.push("create"); return { id: 83 }; },
+        get: async () => { events.push("get"); return {
+          url: TARGET, status: "complete",
+        }; },
+        remove: async id => { assert.equal(id, 83);
+          events.push("remove"); },
+      },
+      scripting: { executeScript: async () => {
+        throw Error("no page script after a bad clock");
+      } },
+    };
+    const result = await inspectDetachedBlooketQuestions(
+      chrome, "synthetic-set", 7_000, async () => {},
+      () => ++calls === 1 ? 1_000 : failureTime,
+    );
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.deepEqual(events, ["create", "remove"]);
+  }
+});
+
 test("invalid detached target does not even create a background tab",
   async () => {
   const page = fixture();
