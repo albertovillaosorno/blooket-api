@@ -188,9 +188,40 @@ test("submitted owner checks exact set binding without leaking the ID", () => {
     value: new URL("https://dashboard.blooket.com/edit?id=set-fixture"),
   });
   try {
-    const watch = { ...bound(), setId: "set-fixture", submitted: true };
+    const watch = { ...bound(), setId: "set-fixture", submitted: true,
+      prepared: true, finalized: true, submitStartMs: performance.now() };
     withWatch(watch, () => {
       assert.equal(probe("set-fixture"), true);
+      delete (watch as { submitStartMs?: number }).submitStartMs;
+      assert.equal(probe("set-fixture"), false,
+        "a forged submit latch without its timestamp cannot own a read");
+      watch.submitStartMs = Number.NaN;
+      assert.equal(probe("set-fixture"), false);
+      watch.submitStartMs = Number.POSITIVE_INFINITY;
+      assert.equal(probe("set-fixture"), false);
+      watch.submitStartMs = -1;
+      assert.equal(probe("set-fixture"), false);
+      watch.submitStartMs = performance.now() + 10_000;
+      assert.equal(probe("set-fixture"), false);
+      watch.submitStartMs = performance.now();
+      watch.prepared = false;
+      assert.equal(probe("set-fixture"), false);
+      watch.prepared = true;
+      watch.finalized = false;
+      assert.equal(probe("set-fixture"), false);
+      watch.finalized = true;
+      assert.equal(probe("set-fixture"), true);
+      let accessCount = 0;
+      Object.defineProperty(watch, "submitStartMs", {
+        configurable: true, enumerable: true,
+        get() { accessCount++; throw Error("private state"); },
+      });
+      assert.equal(probe("set-fixture"), false);
+      assert.equal(accessCount, 0);
+      Object.defineProperty(watch, "submitStartMs", {
+        configurable: true, enumerable: true, writable: true,
+        value: performance.now(),
+      });
       assert.equal(probe("another-set"), false);
       watch.setId = "other-set";
       assert.equal(probe("set-fixture"), false);
