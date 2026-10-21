@@ -45,7 +45,10 @@ function fixture(options: {
   readonly builds?: readonly string[];
   readonly url?: string;
   readonly readyState?: string;
+  readonly prompt?: "native" | "alert" | "challenge" | "hidden" |
+    "late-alert";
 } = {}) {
+  let overlayChecks = 0;
   const values = {
     location: { href: options.url ??
       "https://dashboard.blooket.com/my-sets" },
@@ -54,16 +57,34 @@ function fixture(options: {
       scripts: (options.scripts ?? [
         BOOTSTRAP + push([1, "0:{}\n"]), push([1, "1:{}\n"]),
       ]).map(textContent => ({ textContent })),
-      querySelectorAll: () => (options.builds ?? [BUILD]).map(build => ({
-        getAttribute: (key: string) => key === "href"
-          ? "https://ac.blooket.com/dashboard/" + build +
-            "/_next/static/css/fixture.css" : null,
-      })),
+      querySelectorAll: (selector: string) => {
+        if (selector === "script[src],link[href]")
+          return (options.builds ?? [BUILD]).map(build => ({
+            getAttribute: (key: string) => key === "href"
+              ? "https://ac.blooket.com/dashboard/" + build +
+                "/_next/static/css/fixture.css" : null,
+          }));
+        if (selector === "dialog[open]") overlayChecks++;
+        if (options.prompt === "late-alert" &&
+            selector === '[role="alertdialog"]' && overlayChecks >= 2 ||
+            options.prompt === "native" && selector === "dialog[open]" ||
+            (options.prompt === "alert" || options.prompt === "hidden") &&
+              selector === '[role="alertdialog"]' ||
+            options.prompt === "challenge" && selector ===
+              'iframe[src*="recaptcha"],iframe[src*="hcaptcha"]')
+          return [{ getBoundingClientRect: () => ({ width: 1, height: 1 }) }];
+        return [];
+      },
     },
   };
+  const getComputedStyle = () => ({
+    display: options.prompt === "hidden" ? "none" : "block",
+    visibility: "visible",
+  });
   const previous = new Map<string, PropertyDescriptor | undefined>();
   try {
-    for (const [key, value] of Object.entries(values)) {
+    for (const [key, value] of Object.entries({ ...values,
+      getComputedStyle })) {
       previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
       Object.defineProperty(globalThis, key, { configurable: true, value });
     }
@@ -84,6 +105,15 @@ test("initial combined bootstrap and later packets retain exact model text",
     { build: BUILD, source });
   },
 );
+
+test("provider human dialogs and challenges cannot authorize model capture",
+  () => {
+  for (const prompt of ["native", "alert", "challenge",
+    "late-alert"] as const)
+    assert.equal(fixture({ prompt }), null);
+  assert.deepEqual(fixture({ prompt: "hidden" }),
+    { build: BUILD, source: "0:{}\n1:{}\n" });
+});
 
 test("unknown framing and executable suffixes are never interpreted", () => {
   for (const scripts of [

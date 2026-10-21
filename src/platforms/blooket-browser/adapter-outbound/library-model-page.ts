@@ -33,7 +33,21 @@ export function captureBlooketLibraryModel():
   { readonly build: string; readonly source: string } | null {
   try {
     if (location.href !== "https://dashboard.blooket.com/my-sets" ||
-        document.readyState !== "complete") return null;
+        document.readyState !== "complete" ||
+        document.title === "Just a moment...") return null;
+    // The underlying My Sets scripts can remain mounted behind a human
+    // decision surface. Their presence is not permission to certify a read.
+    const blocked = () => [
+      'dialog[open]', '[role="alertdialog"]',
+      'iframe[src*="recaptcha"],iframe[src*="hcaptcha"]',
+    ].some(selector => Array.from(document.querySelectorAll(selector))
+      .some(element => {
+        const bounds = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return bounds.width > 0 && bounds.height > 0 &&
+          style.display !== "none" && style.visibility === "visible";
+      }));
+    if (blocked()) return null;
     const builds = new Set<string>();
     const resources = document.querySelectorAll("script[src],link[href]");
     if (resources.length > 500 || document.scripts.length > 200) return null;
@@ -73,7 +87,8 @@ export function captureBlooketLibraryModel():
       } else return null;
     }
     if (!bootstrap || source.length === 0 ||
-        new TextEncoder().encode(source).length > 5_000_000) return null;
+        new TextEncoder().encode(source).length > 5_000_000 || blocked())
+      return null;
     return { build: [...builds][0]!, source };
   } catch {
     return null;

@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green initial My Sets model-capture regression found
+that a complete Next.js packet envelope could be collected while a visible
+native dialog, ARIA alertdialog or human challenge occupied the same page.
+The page-local collector now rejects those prompts before and after reading
+the script packets; a late-appearing prompt also invalidates the receipt.
+The synthetic tests never execute captured scripts or touch the account.
+This is not evidence of a new live provider change.
+
 On 2026-10-21, a read-only provider-drift regression showed that a visible
 native `dialog[open]` or ARIA `alertdialog` could coexist with authenticated
 My Sets cards and still produce an apparently complete saved collection.
