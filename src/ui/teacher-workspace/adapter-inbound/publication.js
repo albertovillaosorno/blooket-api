@@ -246,6 +246,22 @@ export async function publishTextDraft(
       recoveredByProbe = true;
     }
     if (next.phase !== "advanced" && !recoveredByProbe) {
+      // A provider wait after a normal step is a stop, not a new progress
+      // checkpoint. A changed set or counter must not reach the UI as an
+      // apparently resumable state. Before the first snapshot a stop may
+      // legitimately omit all checkpoint metadata.
+      if (!["wait", "human-action-required", "session-required"].includes(
+        next.phase)) throw Error("publication-progress-invalid");
+      if (current.phase === "not-started") {
+        if (next.completedOperations !== 0 || next.remoteSetId != null ||
+            (next.totalOperations !== 0 &&
+              next.revision !== frozenRevision))
+          throw Error("publication-progress-invalid");
+      } else if (next.revision !== frozenRevision ||
+          next.completedOperations !== current.completedOperations ||
+          next.totalOperations !== current.totalOperations ||
+          next.remoteSetId !== current.remoteSetId)
+        throw Error("publication-progress-invalid");
       report(next);
       return next;
     }

@@ -436,17 +436,46 @@ test("nonadvancing or malformed replies fail closed", async () => {
       calls.push(name);
       return name.endsWith("status") ? state("ready", 0) : step;
     };
-    if (typeof step.completedOperations !== "number" ||
-        step.published === true ||
-        (step.phase === "advanced" && step.completedOperations !== 1))
-      await assert.rejects(publishTextDraft(ID, REV, send),
-        /publication-progress-invalid/u);
-    else {
-      const result = await publishTextDraft(ID, REV, send);
-      assert.notEqual(result.phase, "verified");
-    }
+    await assert.rejects(publishTextDraft(ID, REV, send),
+      /publication-progress-invalid/u);
     assert.equal(calls.filter(c => c.endsWith("step")).length, 1);
   }
+});
+
+test("a nonadvancing step cannot return a foreign or rolled-back journal",
+  async () => {
+  for (const patch of [
+    { remoteSetId: "foreign-set" },
+    { completedOperations: 0 },
+    { totalOperations: 4 },
+    { revision: "b".repeat(64) },
+    { phase: "ready" },
+    { phase: "recovered" },
+  ]) {
+    const calls: string[] = [];
+    const replies = [state("ready", 1),
+      { ...state("wait", 1), state: "rate-limited", ...patch }];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return replies.shift();
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.step"]);
+  }
+});
+
+test("unchanged provider pacing may stop without another Save",
+  async () => {
+  const calls: string[] = [];
+  const replies = [state("ready", 1),
+    { ...state("wait", 1), state: "rate-limited" }];
+  const result = await publishTextDraft(ID, REV, async name => {
+    calls.push(name);
+    return replies.shift();
+  });
+  assert.equal(result.phase, "wait");
+  assert.deepEqual(calls, ["blooket.publication.status",
+    "blooket.publication.step"]);
 });
 
 test("remote set identity cannot switch after one confirmed operation",
