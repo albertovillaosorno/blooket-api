@@ -198,3 +198,11 @@ Its two sequential provider mutations are requested by the orchestrator,
 not manually replayed by the test, and the final receipt requires verifiedAt.
 This is a real multi-process integration with a fake Blooket provider, not
 a fresh authenticated provider Save or recipient-ChatGPT observation.
+
+The MCP tool annotation contract was audited against the 2026-03-16 MCP
+maintainer guidance. The `reconcile` tool observes only the provider but may
+update an existing local checkpoint; it is therefore not annotated as pure
+read-only. It is now explicitly non-destructive and idempotent, unlike the
+non-idempotent `step`, `append` and `replace` mutations. An integration test
+checks every relevant annotation to avoid unnecessary AI-client warnings or
+unsafe claims about remote Save replay.
