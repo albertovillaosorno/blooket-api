@@ -69,6 +69,12 @@ English and Spanish, preserving quiz and original-media language independently.
 
 ## Evidence
 
+A 2026-10-21 red-to-green Studio regression found that a canonical
+`blooket-browser-failed` read stop appeared as a generic pause. Recognized
+browser read failures now use the existing localized verification guidance
+instead: keep the draft and journal, inspect the connected session and never
+replay an uncertain Save. This changes presentation, not write authority.
+
 A 2026-10-21 red-to-green orchestration regression showed that Studio stopped
 at a preexisting `reconciliation-required` journal without attempting the
 already-admitted read-only reconciler. A resumed user publication intent now
