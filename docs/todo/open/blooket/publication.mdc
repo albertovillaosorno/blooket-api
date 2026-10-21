@@ -79,6 +79,11 @@ reclaim only an unchanged, document-bound metadata watch with no competing
 editor, active text input, or visible editable metadata controls. Two fresh
 owner observations must agree before the recovery reload.
 
+A red-to-green worker regression found consecutive same-tick observations
+could miss a React panel mounting just after the first probe. Cleanup now
+waits one browser task, rechecks native-document ownership and reserves
+500 ms of its original deadline before authorizing the optional reload.
+
 A denied cleanup retains its original error: it does not cancel the user's
 form, retry the provider opener, or confirm saved metadata. The extension
 worker test counts normal fresh-document navigation separately from this
