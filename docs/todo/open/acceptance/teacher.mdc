@@ -157,6 +157,12 @@ this final record.
 
 ## Evidence
 
+The same 2026-10-21 alertdialog drift scenario also fooled the independent
+read-only question-editor compatibility probe into reporting `shape-compatible`
+during a visible human decision prompt. It now reports `human-stop` until that
+prompt is hidden, without reading answers or changing the browser page.
+Sanitized fixtures, not a live Blooket DOM change, establish this regression.
+
 A companion 2026-10-21 red-to-green drift regression found that a visible
 `alertdialog` did not revoke the capability probe's owned Add Question/Audio
 controls. All eight independent Chrome-injected capability functions now
