@@ -190,3 +190,11 @@ from a rate-limit progress callback still allowed the UI to start its next
 read-only cooldown timer. The orchestrator now checks cancellation immediately
 after the callback, so no timer or provider retry is scheduled under a revoked
 intent. Existing interrupted Save receipts remain journaled and un-replayed.
+
+The registered MCP integration now drives a single uninterrupted Studio-style
+publication intent across actual MCP tool descriptors, CLI subprocesses,
+localhost service, journaled broker and a sanitized synthetic extension.
+Its two sequential provider mutations are requested by the orchestrator,
+not manually replayed by the test, and the final receipt requires verifiedAt.
+This is a real multi-process integration with a fake Blooket provider, not
+a fresh authenticated provider Save or recipient-ChatGPT observation.
