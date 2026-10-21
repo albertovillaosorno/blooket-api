@@ -87,6 +87,33 @@ test("transport callbacks cannot retarget a later verify or reconciliation",
   }
 });
 
+test("provider stops cannot masquerade as writable or verified phases",
+  async () => {
+  for (const patch of [
+    { ...state("ready", 1, 2), state: "security-challenge" },
+    { ...state("ready", 1, 2), reason: "write-not-confirmed" },
+    { ...state("ready", 1, 2), verifiedAt: "2026-10-21T18:00:00.000Z" },
+  ]) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return patch;
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status"]);
+  }
+  for (const patch of [{ state: "security-challenge" },
+    { reason: "write-not-confirmed" }]) {
+    const calls: string[] = [];
+    await assert.rejects(publishTextDraft(ID, REV, async name => {
+      calls.push(name);
+      return name.endsWith("status") ? state("writes-complete", 3)
+        : { ...state("verified", 3), ...patch };
+    }), /publication-progress-invalid/u);
+    assert.deepEqual(calls, ["blooket.publication.status",
+      "blooket.publication.verify"]);
+  }
+});
+
 test("malformed progress diagnostics never reach the next writer",
   async () => {
   for (const patch of [

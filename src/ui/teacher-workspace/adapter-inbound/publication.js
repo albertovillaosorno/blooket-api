@@ -68,6 +68,16 @@ function progress(value, draftId) {
   for (const field of ["state", "reason", "verifiedAt"])
     if (value[field] !== undefined && typeof value[field] !== "string")
       throw Error("publication-progress-invalid");
+  // Native stop diagnostics never accompany an ordinary writable or
+  // verified checkpoint. Reject contradictory statuses rather than letting
+  // a security challenge be displayed as another authorized Save.
+  if ((value.state !== undefined &&
+        !["wait", "human-action-required", "session-required",
+          "reconciliation-required"].includes(value.phase)) ||
+      (value.reason !== undefined &&
+        value.phase !== "reconciliation-required") ||
+      (value.verifiedAt !== undefined && value.phase !== "verified"))
+    throw Error("publication-progress-invalid");
   // A plan without a journal cannot already own saved operations or a set.
   // Refuse contradictory preflight data before the first remote write.
   if (value.phase === "not-started" && (
