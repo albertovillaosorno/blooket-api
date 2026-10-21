@@ -33,6 +33,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
+import { publicationStopReason } from
+  "../../../../src/ui/teacher-workspace/adapter-inbound/publication.js";
 
 test("an uncertain throttled Save has a distinct waiting label", async () => {
   const source = await readFile(new URL(
@@ -55,6 +57,31 @@ test("an uncertain throttled Save has a distinct waiting label", async () => {
     "readSignedOut");
   assert.equal(label({ phase: "session-required",
     state: "expired-session" }), "readSignedOut");
+});
+
+test("localized publication errors identify repairable single-row edits",
+  async () => {
+  const source = await readFile(new URL(
+    "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
+    import.meta.url,
+  ), "utf8");
+  const start = source.indexOf("function publicationFailureText(");
+  const end = source.indexOf("\nasync function ", start + 1);
+  assert.ok(start > 0 && end > start);
+  const label = runInNewContext("(" + source.slice(start, end) + ")", {
+    t: (key: string) => key, publicationStopReason,
+  });
+  assert.equal(label(Error("blooket-publication-single-edit-required")),
+    "publicationStopSingleEdit");
+  assert.equal(label(Error("blooket-publication-edit-unsupported")),
+    "publicationStopEditUnsupported");
+  assert.equal(label(Error("blooket-write-baseline-not-captured")),
+    "publicationStopConflict");
+  for (const key of ["publicationStopSingleEdit",
+    "publicationStopEditUnsupported"]) {
+    assert.equal(source.split(key + ":").length - 1, 2,
+      "both Spanish and English must explain the stop");
+  }
 });
 
 class Element {

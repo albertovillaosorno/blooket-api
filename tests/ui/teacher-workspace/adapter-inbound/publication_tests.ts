@@ -402,6 +402,12 @@ test("publication error labels classify only owned safe codes", () => {
     Error("blooket-publication-recovery-required")), "storage");
   assert.equal(publicationStopReason(
     Error("blooket-publication-invalid-draft")), "content");
+  assert.equal(publicationStopReason(
+    Error("blooket-publication-single-edit-required")), "single-edit");
+  assert.equal(publicationStopReason(
+    Error("blooket-publication-edit-unsupported")), "edit-unsupported");
+  assert.equal(publicationStopReason(
+    Error("blooket-write-baseline-not-captured")), "conflict");
   for (const code of ["mutation-task-start-budget-exhausted",
     "mutation-task-duration-exhausted"])
     assert.equal(publicationStopReason(Error(code)), "limit");

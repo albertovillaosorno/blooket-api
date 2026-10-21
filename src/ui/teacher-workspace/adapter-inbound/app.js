@@ -326,6 +326,12 @@ const words = {
     publicationStopContent:
       "El borrador contiene campos que Blooket no puede guardar. " +
       "Revisa el contenido antes de publicar de nuevo.",
+    publicationStopSingleEdit:
+      "Modifica exactamente una pregunta existente. Conserva las demás " +
+      "preguntas y los datos del quiz antes de continuar.",
+    publicationStopEditUnsupported:
+      "La edición automática exige una pregunta de texto con el mismo " +
+      "tipo y cantidad de respuestas. Edita otros formatos manualmente.",
     publicationStopCapacity:
       "El lector actual permite verificar hasta 200 preguntas por quiz. " +
       "Guarda un quiz más pequeño; no se inició otra escritura.",
@@ -676,6 +682,12 @@ const words = {
     publicationStopContent:
       "The draft contains fields Blooket cannot save. " +
       "Review its content before publishing again.",
+    publicationStopSingleEdit:
+      "Change exactly one existing question. Keep other questions " +
+      "and quiz details unchanged before trying again.",
+    publicationStopEditUnsupported:
+      "Automatic edits require a text question with unchanged type " +
+      "and answer count. Edit other formats manually.",
     publicationStopCapacity:
       "The current reader can verify up to 200 questions per quiz. " +
       "Save a smaller quiz; no additional write was started.",
@@ -2129,6 +2141,8 @@ function publicationFailureText(error) {
     busy: "publicationStopBusy",
     storage: "publicationStopStorage",
     content: "publicationStopContent",
+    "single-edit": "publicationStopSingleEdit",
+    "edit-unsupported": "publicationStopEditUnsupported",
     limit: "publicationStopLimit",
     capacity: "publicationStopCapacity",
     pacing: "publicationStopPacing",
