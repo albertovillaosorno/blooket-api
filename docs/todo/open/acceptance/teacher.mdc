@@ -163,8 +163,11 @@ expired saved-state reply. A second regression exposed a clock failure during
 client pruning after an initially valid poll, which still granted a lease.
 The broker now poisons its monotonic clock for the rest of that instance,
 retiring queued jobs, declining dispatch and refusing stale completions rather
-than ever replaying a potentially committed Save. No actual provider write
-was made: these are sanitized, local bridge tests.
+than ever replaying a potentially committed Save. A separate red-to-green
+test showed that lease time could expire *during* response decoding after an
+initially valid completion check. The broker now checks the time again after
+decoding before accepting any read-back or Save reply. No actual provider
+write was made: these are sanitized, local bridge tests.
 
 A 2026-10-21 red-to-green authentication-host regression found that the
 credential submission gate could accept a `NaN` or backward-moving deadline

@@ -340,6 +340,16 @@ export function createBlooketBrowserBridgeBroker(
         });
         return false;
       }
+      // Decoding and sanitizing a large remote response takes time. A lease
+      // checked only before decoding might have expired while the broker was
+      // interpreting it; a late acknowledgement is never a saved-state proof.
+      if (now() >= job.expiresAt) {
+        settle(job.request.id, {
+          ok: false,
+          code: "blooket-browser-unavailable",
+        });
+        return false;
+      }
       // A legacy list envelope has no collection evidence. Preserve the
       // failed operation for its owning decoder; never replay it here. Stop
       // this identified extension from winning later leases over an updated
