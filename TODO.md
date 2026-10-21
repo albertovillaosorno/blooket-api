@@ -8,16 +8,6 @@ acceptance standard: finish usable end-to-end behavior first, then iterate.
 Never relax authentication, data preservation, safe updates, or honest evidence.
 The final ongoing maintenance task is intentionally never auto-completed.
 
-## P1 - Autonomous teacher workflow
-
-### TODO - Uninterrupted autonomous quiz authoring assurance
-
-Improve the end-to-end teacher authoring journey through the registered
-MCP/CLI path, preserving explicit user authority, verified remote receipts,
-read-only recovery, and progress without routine human workarounds.
-
-[Record](docs/todo/open/teaching/autonomous-continuity.mdc)
-
 ## P4 - Continuous maintenance (never auto-complete)
 
 ### TODO - Ongoing compatibility assurance and product hardening
