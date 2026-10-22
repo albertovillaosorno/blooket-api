@@ -137,6 +137,13 @@ export async function confirmBlooketReadNavigation(
   const deadline = Math.min(readDeadline, now() + NAVIGATION_BUDGET_MS);
   if (!Number.isFinite(deadline) || now() >= deadline) return undefined;
   previous = snapshotBlooketReadTab(previous) ?? {};
+  // A session observation does not navigate, but it still belongs to the
+  // originally selected document. A later complete tab at another route
+  // cannot inherit that authority merely because no target was requested.
+  if (target === null &&
+      (typeof previous.url !== "string" || !previous.url ||
+       previous.status !== "complete" ||
+       previous.pendingUrl !== undefined)) return undefined;
   let previousOrigin: number | undefined;
   if (target) {
     // The caller's previous tab snapshot may be obsolete if the user moved.
@@ -185,8 +192,9 @@ export async function confirmBlooketReadNavigation(
     const tab = snapshotBlooketReadTab(await tabs.get(tabId));
     // A delayed tabs.get result cannot prove that the budget was respected.
     if (now() >= deadline) return undefined;
-    if (!tab || (tab.pendingUrl !== undefined &&
-        (target === null || tab.pendingUrl !== target))) return undefined;
+    if (!tab || (target === null && tab.url !== previous.url) ||
+        (tab.pendingUrl !== undefined &&
+         (target === null || tab.pendingUrl !== target))) return undefined;
     if (tab.status === "complete" && tab.pendingUrl === undefined &&
         (!target || tab.url === target)) {
       if (!target) return tab;
