@@ -157,6 +157,16 @@ this final record.
 
 ## Evidence
 
+A companion 2026-10-21 red-to-green test found that the same open browser
+Popover API overlay could still allow five independent question-read / Cancel
+helpers, Add Question form preparation, Create Set submission and redirect
+acceptance, question-answer control writes, and even login credential fill and
+Submit. The nine affected write-side or human-sensitive injected paths now
+refuse a visible top-layer popover, including when it appears after a prepared
+form was claimed. The staged synthetic suite passes 193 tests with no real
+provider mutation or credential use. A hidden or closed popover does not make
+the old owner authoritative again after an attempted action.
+
 A 2026-10-21 red-to-green provider-drift regression found that a browser
 Popover API top-layer control could remain visible without an ARIA dialog
 or native `dialog[open]`. Capability navigation and read-owned controls could

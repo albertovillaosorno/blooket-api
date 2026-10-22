@@ -91,6 +91,7 @@ export function prepareBlooketCreateSetForm(
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -275,7 +276,8 @@ export function prepareBlooketCreateSetForm(
       )).some(node => readyControl(node) &&
         node.textContent?.trim() === "Select your organization") ||
           [...Array.from(document.querySelectorAll('[role="alertdialog"]')),
-            ...Array.from(document.querySelectorAll('dialog[open]'))]
+            ...Array.from(document.querySelectorAll('dialog[open]')),
+            ...Array.from(document.querySelectorAll(':popover-open'))]
             .some(readyControl))
         return false;
       const currentButtons = Array.from(form.querySelectorAll("button"))
@@ -381,6 +383,7 @@ export function submitBlooketCreateSetForm(
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -550,6 +553,7 @@ export function observeBlooketCreateSetSuccess():
     const humanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -604,6 +608,7 @@ export function runBlooketCreateSetOwnership(
       )),
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ];
     const visibleStop = (node: Element): boolean => {
       const bounds = node.getBoundingClientRect();

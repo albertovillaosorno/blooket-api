@@ -741,15 +741,19 @@ test("question reads and Cancel stop behind human-action overlays", () => {
   document.selectors['form input#question[name="question"]'] = [question];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     for (const mode of [
-      "native-dialog", "alertdialog", "organization", "challenge",
+      "native-dialog", "alertdialog", "popover", "organization",
+      "challenge",
       "missing-shell", "password-overlay", "interstitial",
     ] as const) {
       document.selectors['dialog[open]'] = [];
       document.selectors['[role="alertdialog"]'] = [];
+      document.selectors[":popover-open"] = [];
       if (mode === "native-dialog") {
         document.selectors['dialog[open]'] = [node("DIALOG")];
       } else if (mode === "alertdialog") {
         document.selectors['[role="alertdialog"]'] = [node("DIV")];
+      } else if (mode === "popover") {
+        document.selectors[":popover-open"] = [node("DIV")];
       } else if (mode === "organization") {
         const heading = node("H3", "Select your organization");
         document.selectors[

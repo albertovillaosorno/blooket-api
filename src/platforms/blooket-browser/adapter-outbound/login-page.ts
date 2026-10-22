@@ -85,7 +85,7 @@ export function runBlooketLoginPageAction(
     // click Submit under a human-owned modal, including a native dialog.
     const humanDialog = [
       '[role="dialog"][aria-modal="true"]',
-      '[role="alertdialog"]', 'dialog[open]',
+      '[role="alertdialog"]', 'dialog[open]', ':popover-open',
     ].some(selector => Array.from(document.querySelectorAll(selector))
       .some(visible));
     if (humanDialog) return null;

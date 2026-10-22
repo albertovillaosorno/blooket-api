@@ -92,7 +92,8 @@ export async function prepareBlooketQuestionControls(
       )).some(node => visible(node) &&
         node.textContent?.trim() === "Select your organization") &&
       ![...Array.from(document.querySelectorAll('[role="alertdialog"]')),
-        ...Array.from(document.querySelectorAll('dialog[open]'))]
+        ...Array.from(document.querySelectorAll('dialog[open]')),
+        ...Array.from(document.querySelectorAll(':popover-open'))]
         .some(visible));
   };
   const pause = async (): Promise<void> =>
@@ -531,7 +532,8 @@ export function inspectBlooketPreparedQuestionEcho(
     )).some(node => visible(node) &&
       node.textContent?.trim() === "Select your organization") ||
       [...Array.from(document.querySelectorAll('[role="alertdialog"]')),
-        ...Array.from(document.querySelectorAll('dialog[open]'))]
+        ...Array.from(document.querySelectorAll('dialog[open]')),
+        ...Array.from(document.querySelectorAll(':popover-open'))]
         .some(visible))
       return false;
     const unique = (selector: string): HTMLElement | null => {

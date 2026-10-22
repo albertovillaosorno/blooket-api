@@ -617,7 +617,7 @@ test("an edit redirect behind a password prompt is not a receipt", () => {
 test("human overlays block Create Set preparation and submission", () => {
   const input = { title: "Synthetic", description: "", private: true };
   for (const reason of ["verification", "password", "organization",
-    "captcha", "native-dialog", "alertdialog"] as const) {
+    "captcha", "native-dialog", "alertdialog", "popover"] as const) {
     const page = fixture(true);
     withPage(page.document, "https://dashboard.blooket.com/create", () => {
       assert.deepEqual(prepareBlooketCreateSetForm(input), { ok: true });
@@ -637,6 +637,8 @@ test("human overlays block Create Set preparation and submission", () => {
         page.document.selectors['dialog[open]'] = [node("DIALOG")];
       if (reason === "alertdialog")
         page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
+      if (reason === "popover")
+        page.document.selectors[":popover-open"] = [node("DIV")];
       assert.equal(submitBlooketCreateSetForm(input).ok, false);
       assert.equal(page.form.selectors["button"]?.[0]?.clicked, 0);
       assert.equal(prepareBlooketCreateSetForm(input).ok, false);
@@ -681,7 +683,7 @@ test("closed account menu permits the observed Create Set form", () => {
 
 test("Create Set redirects refuse every active human-stop overlay", () => {
   for (const kind of ["organization", "captcha", "native-dialog",
-    "alertdialog"] as const) {
+    "alertdialog", "popover"] as const) {
     const document = node("DOCUMENT");
     if (kind === "organization")
       document.selectors['[role="dialog"][aria-modal="true"] h3'] = [
@@ -695,6 +697,8 @@ test("Create Set redirects refuse every active human-stop overlay", () => {
       document.selectors['dialog[open]'] = [node("DIALOG")];
     if (kind === "alertdialog")
       document.selectors['[role="alertdialog"]'] = [node("DIV")];
+    if (kind === "popover")
+      document.selectors[":popover-open"] = [node("DIV")];
     withPage(document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.deepEqual(observeBlooketCreateSetSuccess(), {

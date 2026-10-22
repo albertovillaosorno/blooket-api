@@ -87,6 +87,7 @@ export function listBlooketQuestionNumbers(setId: string): QuestionPanelResult {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -227,6 +228,7 @@ export function openBlooketQuestionPanel(
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -383,6 +385,7 @@ export function inspectOpenedBlooketQuestion(
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -658,6 +661,7 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -792,6 +796,7 @@ export function isBlooketQuestionPanelClosed(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);

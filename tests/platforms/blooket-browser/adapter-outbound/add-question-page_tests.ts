@@ -1148,7 +1148,7 @@ test(
   "human and security overlays block every Add Question page action",
   () => {
   for (const blocked of ["verification", "password", "organization",
-    "captcha", "native-dialog", "alertdialog"] as const) {
+    "captcha", "native-dialog", "alertdialog", "popover"] as const) {
     const page = fixture();
     if (blocked === "verification")
       Object.assign(page.document, { title: "Just a moment..." });
@@ -1166,6 +1166,8 @@ test(
       page.document.selectors['dialog[open]'] = [node("DIALOG")];
     if (blocked === "alertdialog")
       page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
+    if (blocked === "popover")
+      page.document.selectors[":popover-open"] = [node("DIV")];
     withPage(page.document,
       "https://dashboard.blooket.com/edit?id=set-fixture", () => {
       assert.equal(openBlooketAddQuestionPanel("set-fixture"), false);
