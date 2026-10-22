@@ -157,6 +157,15 @@ this final record.
 
 ## Evidence
 
+A third 2026-10-21 Popover API regression showed that the general provider
+read adapter accepted authenticated My Sets and signed-out session states
+while a visible top-layer popover was open. The Edit Info helper could also
+open or close a metadata form under that popover. Those five independently
+injected page readers and controls now reject visible `:popover-open` state,
+retaining ordinary behavior when the popover is hidden. All 29 synthetic page
+tests pass after the change. No private lesson data, provider Save, or
+credential-bearing browser action was used.
+
 A companion 2026-10-21 red-to-green test found that the same open browser
 Popover API overlay could still allow five independent question-read / Cancel
 helpers, Add Question form preparation, Create Set submission and redirect
