@@ -157,6 +157,17 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 clipboard regression found that a provider may advertise an
+animated GIF format but reject `ClipboardItem.getType("image/gif")` even when
+a second valid GIF item or exact GIF link remains accessible. Previously the
+first exception stopped the entire paste.
+
+The local UI now checks later GIF items and direct GIF URLs without falling
+back silently to a flat PNG if all claimed animated bytes are inaccessible.
+EN/ES guidance tells the teacher to paste the original file or GIF link in
+that case. The targeted library and UI tests are synthetic; no real
+clipboard permission was assumed.
+
 A third 2026-10-21 Popover API regression showed that the general provider
 read adapter accepted authenticated My Sets and signed-out session states
 while a visible top-layer popover was open. The Edit Info helper could also

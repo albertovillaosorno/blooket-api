@@ -155,6 +155,30 @@ test("clipboard prefers original GIF bytes to a PNG preview",
   }
 });
 
+test("GIF paste survives inaccessible clipboard representations",
+  async () => {
+  const gif = new Blob(["animated"], { type: "image/gif" });
+  const png = new Blob(["still"], { type: "image/png" });
+  const denied = { types: ["image/gif"],
+    getType: async () => { throw Error("unsupported-gif-blob"); } };
+  const available = { types: ["image/gif"],
+    getType: async () => gif };
+  assert.deepEqual(await readClipboardImage({
+    read: async () => [denied, available],
+  }), { image: gif });
+  const gifUrl = "https://images.example.test/animation.gif";
+  const text = { types: ["text/plain"],
+    getType: async () => new Blob([gifUrl], { type: "text/plain" }) };
+  assert.deepEqual(await readClipboardImage({
+    read: async () => [denied, { types: ["image/png"],
+      getType: async () => png }, text],
+  }), { url: gifUrl }, "a PNG is not a replacement for a failed GIF");
+  await assert.rejects(readClipboardImage({
+    read: async () => [denied, { types: ["image/png"],
+      getType: async () => png }],
+  }), /clipboard-gif-unavailable/u);
+});
+
 test(
   "clipboard chooses an image before text and admits only web image URLs",
   async () => {

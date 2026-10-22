@@ -123,11 +123,18 @@ export function preparedMediaUrl(record) {
 export async function readClipboardImage(clipboard) {
   if (clipboard.read) {
     const items = await clipboard.read();
-    // Some clipboard providers expose a static PNG preview alongside the
-    // original animated GIF. Prefer the native GIF bytes across all items.
-    for (const item of items)
-      if (item.types.includes("image/gif"))
-        return { image: await item.getType("image/gif") };
+    // Some clipboard providers advertise GIF support but refuse to return
+    // those bytes. Try another GIF and then an exact source link; never
+    // silently turn a claimed animation into its static PNG thumbnail.
+    let gifUnavailable = false;
+    for (const item of items) {
+      if (!item.types.includes("image/gif")) continue;
+      try {
+        const image = await item.getType("image/gif");
+        if (image.type === "image/gif") return { image };
+      } catch { /* A different item or exact direct link may still work. */ }
+      gifUnavailable = true;
+    }
     // An explicitly linked GIF retains animation even when the clipboard's
     // only bitmap is a flattened PNG preview.
     for (const item of items) {
@@ -136,6 +143,7 @@ export async function readClipboardImage(clipboard) {
       const gifUrl = clipboardGifUrl(text);
       if (gifUrl) return { url: gifUrl };
     }
+    if (gifUnavailable) throw Error("clipboard-gif-unavailable");
     const supported = ["image/png", "image/jpeg", "image/webp"];
     for (const item of items) {
       const type = supported.find((candidate) =>
