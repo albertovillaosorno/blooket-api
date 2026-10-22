@@ -84,8 +84,12 @@ export function inspectBlooketQuestionEditorCompatibility():
     const nativeDialogs = Array.from(document.querySelectorAll(
       'dialog[open]',
     ));
+    // A shown HTML popover is a top-layer human surface even without ARIA.
+    const popovers = Array.from(document.querySelectorAll(
+      ':popover-open',
+    ));
     if (challengeFrames.some(isVisible) || alertDialogs.some(isVisible) ||
-        nativeDialogs.some(isVisible) ||
+        nativeDialogs.some(isVisible) || popovers.some(isVisible) ||
         organizationHeadings.some(heading => isVisible(heading) &&
           heading.textContent?.trim() === "Select your organization"))
       return result("human-stop");

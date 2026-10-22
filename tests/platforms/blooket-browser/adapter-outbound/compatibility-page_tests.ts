@@ -186,6 +186,21 @@ test("visible alertdialogs are human stops, not write-ready editors",
   });
 });
 
+test("visible HTML popover is not a verified question editor",
+  () => {
+  withEditor(page => {
+    page.document.selectors[":popover-open"] = [new Node("DIV")];
+    assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+      "human-stop");
+    Object.defineProperty(globalThis, "getComputedStyle", {
+      configurable: true,
+      value: () => ({ display: "none", visibility: "visible" }),
+    });
+    assert.equal(inspectBlooketQuestionEditorCompatibility().state,
+      "shape-compatible");
+  });
+});
+
 test("native open dialog is a compatibility human stop", () => {
   withEditor(page => {
     page.document.selectors["dialog[open]"] = [new Node("DIALOG")];

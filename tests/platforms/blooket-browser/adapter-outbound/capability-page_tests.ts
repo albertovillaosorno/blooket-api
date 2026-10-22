@@ -387,6 +387,26 @@ test("native open dialog blocks route change without ARIA attributes",
   });
 });
 
+test("visible HTML popovers block reads without explicit dialog roles",
+  () => {
+  const page = fixture();
+  const injected = Function(
+    "return (" + canLeaveBlooketPageForRead.toString() + ")",
+  )() as typeof canLeaveBlooketPageForRead;
+  const popover = node("DIV", "Choose an option");
+  page.document.selectors[":popover-open"] = [popover];
+  withPage(page.document, () => {
+    assert.equal(injected(), false,
+      "a top-layer popover can contain a teacher decision");
+    popover.computedStyle = { display: "none", visibility: "visible" };
+    assert.equal(injected(), true);
+    popover.computedStyle = { display: "block", visibility: "visible" };
+    assert.equal(injected(), false);
+    page.document.selectors[":popover-open"] = [];
+    assert.equal(injected(), true);
+  });
+});
+
 test("read navigation respects computed modal visibility", () => {
   const page = fixture();
   const dialog = node("DIV");
@@ -838,7 +858,7 @@ test(
 test("capability probes refuse a human prompt or missing session", () => {
   for (const mode of [
     "organization", "challenge", "alertdialog", "native-dialog",
-    "password-overlay",
+    "popover", "password-overlay",
     "missing-shell",
     "interstitial", "hidden-main", "duplicate-main", "hidden-navigation",
     "duplicate-navigation", "hidden-logout", "duplicate-logout",
@@ -857,6 +877,8 @@ test("capability probes refuse a human prompt or missing session", () => {
       page.document.selectors['[role="alertdialog"]'] = [node("DIV")];
     } else if (mode === "native-dialog") {
       page.document.selectors['dialog[open]'] = [node("DIALOG")];
+    } else if (mode === "popover") {
+      page.document.selectors[":popover-open"] = [node("DIV")];
     } else if (mode === "password-overlay") {
       page.document.selectors['input[type="password"]'] = [node("INPUT")];
     } else if (mode === "interstitial") {
@@ -1172,7 +1194,8 @@ test("hidden native dialogs do not block an authenticated capability read",
 test("temporary human stops permanently revoke read-owned capability panels",
   () => {
   const causes = ["captcha", "organization", "alertdialog",
-    "native-dialog", "interstitial", "password", "lost-shell"] as const;
+    "native-dialog", "popover", "interstitial", "password",
+    "lost-shell"] as const;
   for (const cause of causes) {
     const page = fixture();
     withPage(page.document, () => {
@@ -1185,6 +1208,7 @@ test("temporary human stops permanently revoke read-owned capability panels",
         ? 'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
         : cause === "alertdialog" ? '[role="alertdialog"]'
         : cause === "native-dialog" ? 'dialog[open]'
+        : cause === "popover" ? ":popover-open"
         : cause === "organization"
           ? '[role="dialog"][aria-modal="true"] h3'
           : cause === "password" ? 'input[type="password"]'

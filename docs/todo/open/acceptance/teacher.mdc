@@ -157,6 +157,20 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green provider-drift regression found that a browser
+Popover API top-layer control could remain visible without an ARIA dialog
+or native `dialog[open]`. Capability navigation and read-owned controls could
+continue, the editor shape inspector could claim `shape-compatible`, and a
+question image read could issue a positive saved-byte digest if the popover
+appeared during transfer. All three read-side adapters now reject visible
+`:popover-open` controls; a closed or CSS-hidden popover remains nonblocking.
+The tests are sanitized synthetic evidence, not a claim that the current
+Blooket account rendered this overlay or that a remote Save occurred.
+
+MDN's Popover API guide, checked 2026-10-21, documents both the
+`:popover-open` selector and top-layer behavior:
+https://developer.mozilla.org/en-US/docs/Web/API/Popover_API/Using.
+
 During the 2026-10-21 concurrent final suite, two long-running synthetic
 integration tests exhausted only their *test-runner* scheduling windows:
 the owned challenge foreground event and the intentionally still-listening
