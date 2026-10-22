@@ -960,8 +960,12 @@ test("read routes encode IDs and panel opening never submits a form", () => {
     node("INPUT"),
   ];
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
+    const hidden = node("DIALOG");
+    hidden.display = "none";
+    document.selectors['dialog[open]'] = [hidden];
     assert.equal(openBlooketDetailPanel("fixture"), true);
     assert.equal(clicks, 1);
+    document.selectors['dialog[open]'] = [];
     button.visibility = "hidden";
     assert.equal(openBlooketDetailPanel("fixture"), false);
     delete button.visibility;
@@ -1312,9 +1316,13 @@ test("owned Edit Info cancellation closes the read-only metadata panel", () => {
     document.selectors['[role="alertdialog"]'] = [node("DIV")];
     assert.equal(close(), false);
     document.selectors['[role="alertdialog"]'] = [];
+    const hidden = node("DIALOG");
+    hidden.visibility = "hidden";
+    document.selectors['dialog[open]'] = [hidden];
     assert.equal(close(), true);
     assert.equal(clicks, 1);
     assert.equal(isBlooketDetailPanelClosed("fixture"), true);
+    document.selectors['dialog[open]'] = [];
     // The metadata panel may be gone while a second unsaved question editor
     // has taken over the native document. That is not a clean read closure.
     Object.defineProperty(globalThis, "__blooketAddQuestionFormWatch", {
@@ -1370,7 +1378,11 @@ test("detail baseline requires the original visible unedited sidebar", () => {
   )() as typeof inspectBlooketDetailSidebar;
   page(document, "https://dashboard.blooket.com/edit?id=fixture", () => {
     assert.deepEqual(inspectBlooketDetailSidebar("fixture"), baseline);
+    const hidden = node("DIALOG");
+    hidden.display = "none";
+    document.selectors['dialog[open]'] = [hidden];
     assert.deepEqual(serialized("fixture"), baseline);
+    document.selectors['dialog[open]'] = [];
     title.visibility = "hidden";
     assert.equal(serialized("fixture").ok, false);
     delete title.visibility;
