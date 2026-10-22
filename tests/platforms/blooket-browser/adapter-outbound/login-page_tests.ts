@@ -328,6 +328,50 @@ test("normal invisible reCAPTCHA does not block the login form", () => {
   });
 });
 
+test("login refuses native and ARIA human dialogs before credential fill",
+  () => {
+  for (const selector of ['[role="dialog"][aria-modal="true"]',
+    '[role="alertdialog"]', 'dialog[open]']) {
+    const page = fixture();
+    page.document.selectors[selector] = [node("DIALOG")];
+    withPage(page.document, "https://id.blooket.com/login", () => {
+      assert.equal(prepareBlooketLoginForm(credentials).ok, false);
+      assert.equal(page.identifier.value, "");
+      assert.equal(page.password.value, "");
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+});
+
+test("login human dialog revokes prepared credentials before any click",
+  () => {
+  for (const selector of ['[role="dialog"][aria-modal="true"]',
+    '[role="alertdialog"]', 'dialog[open]']) {
+    const page = fixture();
+    withPage(page.document, "https://id.blooket.com/login", () => {
+      assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+      page.document.selectors[selector] = [node("DIALOG")];
+      assert.equal(isBlooketLoginFormPrepared(credentials), false);
+      assert.equal(submitBlooketLoginForm(credentials).ok, false);
+      page.document.selectors[selector] = [];
+      assert.equal(submitBlooketLoginForm(credentials).ok, false,
+        "a dismissed human prompt must not reauthorize a stale login");
+      assert.equal(page.submit.clicked, 0);
+    });
+  }
+});
+
+test("hidden native login dialogs do not block valid preparation", () => {
+  const page = fixture();
+  const hidden = node("DIALOG");
+  hidden.display = "none";
+  page.document.selectors['dialog[open]'] = [hidden];
+  withPage(page.document, "https://id.blooket.com/login", () => {
+    assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });
+    assert.equal(isBlooketLoginFormPrepared(credentials), true);
+  });
+});
+
 test("a challenge appearing after preparation blocks the submit", () => {
   const page = fixture();
   withPage(page.document, "https://id.blooket.com/login", () => {

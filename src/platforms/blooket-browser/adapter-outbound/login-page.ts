@@ -80,6 +80,15 @@ export function runBlooketLoginPageAction(
       return bounds.width > 0 && bounds.height > 0 &&
         style.display !== "none" && style.visibility === "visible";
     };
+    // A visible security, consent or organization dialog can cover a stale
+    // login form while its inputs remain mounted. Never fill credentials or
+    // click Submit under a human-owned modal, including a native dialog.
+    const humanDialog = [
+      '[role="dialog"][aria-modal="true"]',
+      '[role="alertdialog"]', 'dialog[open]',
+    ].some(selector => Array.from(document.querySelectorAll(selector))
+      .some(visible));
+    if (humanDialog) return null;
     const challenged = Array.from(
       document.querySelectorAll(
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]',
