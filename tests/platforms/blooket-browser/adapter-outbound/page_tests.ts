@@ -1033,8 +1033,9 @@ test("lost Edit Info click acknowledgment retains its owner watch", () => {
 
 test("Edit Info opener refuses human-action overlays and lost sessions", () => {
   for (const mode of [
-    "organization", "challenge", "password-overlay", "missing-shell",
-    "interstitial", "hidden-main", "duplicate-main", "hidden-nav",
+    "organization", "challenge", "native-dialog", "alertdialog",
+    "password-overlay", "missing-shell", "interstitial",
+    "hidden-main", "duplicate-main", "hidden-nav",
     "duplicate-nav", "hidden-logout", "duplicate-logout",
   ] as const) {
     const { document } = base();
@@ -1058,6 +1059,10 @@ test("Edit Info opener refuses human-action overlays and lost sessions", () => {
       document.selectors[
         'iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
       ] = [node("IFRAME", "", { src: "https://hcaptcha.com/challenge" })];
+    } else if (mode === "native-dialog") {
+      document.selectors['dialog[open]'] = [node("DIALOG")];
+    } else if (mode === "alertdialog") {
+      document.selectors['[role="alertdialog"]'] = [node("DIV")];
     } else if (mode === "password-overlay") {
       document.selectors['input[type="password"]'] = [node("INPUT")];
     } else if (mode === "interstitial") {
@@ -1301,6 +1306,12 @@ test("owned Edit Info cancellation closes the read-only metadata panel", () => {
     assert.equal(close(), false);
     assert.equal(clicks, 0);
     outer.parentElement.selectors[":scope > p"] = [];
+    document.selectors['dialog[open]'] = [node("DIALOG")];
+    assert.equal(close(), false);
+    document.selectors['dialog[open]'] = [];
+    document.selectors['[role="alertdialog"]'] = [node("DIV")];
+    assert.equal(close(), false);
+    document.selectors['[role="alertdialog"]'] = [];
     assert.equal(close(), true);
     assert.equal(clicks, 1);
     assert.equal(isBlooketDetailPanelClosed("fixture"), true);
@@ -1314,6 +1325,9 @@ test("owned Edit Info cancellation closes the read-only metadata panel", () => {
     } finally {
       Reflect.deleteProperty(globalThis, "__blooketAddQuestionFormWatch");
     }
+    document.selectors['dialog[open]'] = [node("DIALOG")];
+    assert.equal(isBlooketDetailPanelClosed("fixture"), false);
+    document.selectors['dialog[open]'] = [];
     document.selectors['input#question[name="question"]'] = [node("INPUT")];
     assert.equal(isBlooketDetailPanelClosed("fixture"), false);
     delete document.selectors['input#question[name="question"]'];
@@ -1366,6 +1380,9 @@ test("detail baseline requires the original visible unedited sidebar", () => {
     description.visibility = "collapse";
     assert.equal(serialized("fixture").ok, false);
     delete description.visibility;
+    document.selectors['dialog[open]'] = [node("DIALOG")];
+    assert.equal(serialized("fixture").ok, false);
+    document.selectors['dialog[open]'] = [];
     const opener = main.selectors["button"]![0]!;
     opener.display = "none";
     assert.equal(serialized("fixture").ok, false);

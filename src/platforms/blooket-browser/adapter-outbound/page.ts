@@ -420,6 +420,12 @@ export function inspectBlooketDetailSidebar(setId: string): PageReadResult {
       return bounds.width > 0 && bounds.height > 0 &&
         style.display !== "none" && style.visibility === "visible";
     };
+    // A human prompt can cover the still-mounted metadata sidebar or
+    // Cancel button; neither a saved-data receipt nor a click is then safe.
+    if (['dialog[open]', '[role="alertdialog"]',
+      '[role="dialog"][aria-modal="true"]'].some(selector =>
+        Array.from(document.querySelectorAll(selector)).some(visible)))
+      return failed();
     const mains = Array.from(document.querySelectorAll("main"));
     const nav = Array.from(document.querySelectorAll(
       'nav a[href="/my-sets"]',
@@ -492,6 +498,12 @@ export function closeBlooketDetailPanel(
       return bounds.width > 0 && bounds.height > 0 &&
         style.display !== "none" && style.visibility === "visible";
     };
+    // A human prompt can cover the still-mounted metadata sidebar or
+    // Cancel button; neither a saved-data receipt nor a click is then safe.
+    if (['dialog[open]', '[role="alertdialog"]',
+      '[role="dialog"][aria-modal="true"]'].some(selector =>
+        Array.from(document.querySelectorAll(selector)).some(visible)))
+      return false;
     const main = Array.from(document.querySelectorAll("main"));
     const nav = Array.from(document.querySelectorAll(
       'nav a[href="/my-sets"]',
@@ -625,6 +637,12 @@ export function isBlooketDetailPanelClosed(
       return bounds.width > 0 && bounds.height > 0 &&
         style.display !== "none" && style.visibility === "visible";
     };
+    // A human prompt can cover the still-mounted metadata sidebar or
+    // Cancel button; neither a saved-data receipt nor a click is then safe.
+    if (['dialog[open]', '[role="alertdialog"]',
+      '[role="dialog"][aria-modal="true"]'].some(selector =>
+        Array.from(document.querySelectorAll(selector)).some(visible)))
+      return false;
     const mains = Array.from(document.querySelectorAll("main"));
     const nav = Array.from(document.querySelectorAll(
       'nav a[href="/my-sets"]',
@@ -767,7 +785,18 @@ export function openBlooketDetailPanel(setId: string): boolean {
     const bounds = frame.getBoundingClientRect();
     return bounds.width > 0 && bounds.height > 0;
   });
-  if (!authenticated || organizationPrompt || securityChallenge) return false;
+  // HTML-native and accessible modal prompts outrank a mounted Edit Info
+  // button. A prior session check cannot authorize opening another editor.
+  const humanModal = ['dialog[open]', '[role="alertdialog"]',
+    '[role="dialog"][aria-modal="true"]'].some(selector =>
+    Array.from(document.querySelectorAll(selector)).some(element => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    }));
+  if (!authenticated || organizationPrompt || securityChallenge ||
+      humanModal) return false;
   if (
     location.origin !== "https://dashboard.blooket.com" ||
     location.pathname !== "/edit" ||

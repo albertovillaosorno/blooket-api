@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 Edit Info regression showed that a visible native dialog or
+`alertdialog` could coexist with the saved metadata sidebar or an
+automation-owned Cancel button. The four independent injected Edit Info
+entrypoints now refuse opening, baseline reads, cancellation, and claims of
+successful closure under a human-owned modal. The exact control still works
+once the prompt is gone, and the synthetic test never contacted Blooket.
+
 A 2026-10-21 red-to-green page-level login regression found that visible
 ARIA dialogs and open native HTML dialogs could cover an otherwise mounted
 login form while the login helper still prepared synthetic credentials or
