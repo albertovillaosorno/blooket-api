@@ -331,7 +331,7 @@ test("normal invisible reCAPTCHA does not block the login form", () => {
 test("login refuses native and ARIA human dialogs before credential fill",
   () => {
   for (const selector of ['[role="dialog"][aria-modal="true"]',
-    '[role="alertdialog"]', 'dialog[open]']) {
+    '[role="alertdialog"]', 'dialog[open]', ':popover-open']) {
     const page = fixture();
     page.document.selectors[selector] = [node("DIALOG")];
     withPage(page.document, "https://id.blooket.com/login", () => {
@@ -346,7 +346,7 @@ test("login refuses native and ARIA human dialogs before credential fill",
 test("login human dialog revokes prepared credentials before any click",
   () => {
   for (const selector of ['[role="dialog"][aria-modal="true"]',
-    '[role="alertdialog"]', 'dialog[open]']) {
+    '[role="alertdialog"]', 'dialog[open]', ':popover-open']) {
     const page = fixture();
     withPage(page.document, "https://id.blooket.com/login", () => {
       assert.deepEqual(prepareBlooketLoginForm(credentials), { ok: true });

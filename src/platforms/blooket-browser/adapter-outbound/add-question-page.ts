@@ -351,6 +351,7 @@ export function runBlooketAddQuestionPageAction(
     const humanDialogVisible = (): boolean => [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some(panel => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);

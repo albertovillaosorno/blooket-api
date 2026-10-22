@@ -500,7 +500,8 @@ test("visible editor events generate typing state without hidden overrides",
 
 test("human dialogs refuse visible question control writes and echo",
   async () => {
-  for (const selector of ['dialog[open]', '[role="alertdialog"]']) {
+  for (const selector of ['dialog[open]', '[role="alertdialog"]',
+    ':popover-open']) {
     await withEditor(async page => {
       page.document.selectors[selector] = [new Control()];
       assert.equal(await prepareBlooketQuestionControls(input), false);
