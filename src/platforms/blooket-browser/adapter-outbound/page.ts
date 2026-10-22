@@ -82,6 +82,7 @@ export function inspectBlooketPage(
     const humanDialog = [
       ...Array.from(document.querySelectorAll('dialog[open]')),
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
       ...Array.from(document.querySelectorAll(
         '[role="dialog"][aria-modal="true"]',
       )),
@@ -422,7 +423,7 @@ export function inspectBlooketDetailSidebar(setId: string): PageReadResult {
     };
     // A human prompt can cover the still-mounted metadata sidebar or
     // Cancel button; neither a saved-data receipt nor a click is then safe.
-    if (['dialog[open]', '[role="alertdialog"]',
+    if (['dialog[open]', '[role="alertdialog"]', ':popover-open',
       '[role="dialog"][aria-modal="true"]'].some(selector =>
         Array.from(document.querySelectorAll(selector)).some(visible)))
       return failed();
@@ -500,7 +501,7 @@ export function closeBlooketDetailPanel(
     };
     // A human prompt can cover the still-mounted metadata sidebar or
     // Cancel button; neither a saved-data receipt nor a click is then safe.
-    if (['dialog[open]', '[role="alertdialog"]',
+    if (['dialog[open]', '[role="alertdialog"]', ':popover-open',
       '[role="dialog"][aria-modal="true"]'].some(selector =>
         Array.from(document.querySelectorAll(selector)).some(visible)))
       return false;
@@ -639,7 +640,7 @@ export function isBlooketDetailPanelClosed(
     };
     // A human prompt can cover the still-mounted metadata sidebar or
     // Cancel button; neither a saved-data receipt nor a click is then safe.
-    if (['dialog[open]', '[role="alertdialog"]',
+    if (['dialog[open]', '[role="alertdialog"]', ':popover-open',
       '[role="dialog"][aria-modal="true"]'].some(selector =>
         Array.from(document.querySelectorAll(selector)).some(visible)))
       return false;
@@ -788,7 +789,7 @@ export function openBlooketDetailPanel(setId: string): boolean {
   // HTML-native and accessible modal prompts outrank a mounted Edit Info
   // button. A prior session check cannot authorize opening another editor.
   const humanModal = ['dialog[open]', '[role="alertdialog"]',
-    '[role="dialog"][aria-modal="true"]'].some(selector =>
+    ':popover-open', '[role="dialog"][aria-modal="true"]'].some(selector =>
     Array.from(document.querySelectorAll(selector)).some(element => {
       const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);

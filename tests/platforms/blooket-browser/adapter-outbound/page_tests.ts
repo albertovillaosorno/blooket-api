@@ -700,7 +700,7 @@ test(
 test("native and ARIA modal dialogs cannot certify saved My Sets content",
   () => {
   for (const selector of ['dialog[open]', '[role="alertdialog"]',
-    '[role="dialog"][aria-modal="true"]']) {
+    '[role="dialog"][aria-modal="true"]', ':popover-open']) {
     const { document, main } = base();
     main.selectors["article"] = [card()];
     const modal = node("DIALOG");
@@ -840,7 +840,7 @@ test(
   });
 
   for (const selector of ['dialog[open]', '[role="alertdialog"]',
-    '[role="dialog"][aria-modal="true"]']) {
+    '[role="dialog"][aria-modal="true"]', ':popover-open']) {
     const modal = node("DIALOG");
     document.selectors[selector] = [modal];
     page(document, "https://id.blooket.com/login", () => {
@@ -1038,7 +1038,7 @@ test("lost Edit Info click acknowledgment retains its owner watch", () => {
 test("Edit Info opener refuses human-action overlays and lost sessions", () => {
   for (const mode of [
     "organization", "challenge", "native-dialog", "alertdialog",
-    "password-overlay", "missing-shell", "interstitial",
+    "popover", "password-overlay", "missing-shell", "interstitial",
     "hidden-main", "duplicate-main", "hidden-nav",
     "duplicate-nav", "hidden-logout", "duplicate-logout",
   ] as const) {
@@ -1067,6 +1067,8 @@ test("Edit Info opener refuses human-action overlays and lost sessions", () => {
       document.selectors['dialog[open]'] = [node("DIALOG")];
     } else if (mode === "alertdialog") {
       document.selectors['[role="alertdialog"]'] = [node("DIV")];
+    } else if (mode === "popover") {
+      document.selectors[":popover-open"] = [node("DIV")];
     } else if (mode === "password-overlay") {
       document.selectors['input[type="password"]'] = [node("INPUT")];
     } else if (mode === "interstitial") {
