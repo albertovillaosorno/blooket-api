@@ -302,6 +302,37 @@ test("session observation does not navigate when no route is required",
   },
 );
 
+test("session observation refuses a tab that changed after source selection",
+  async () => {
+  const page = fixture();
+  const observed = [EDIT, "https://foreign.invalid/", "about:blank"];
+  for (const changedUrl of observed) {
+    const tabs = { ...page.tabs, get: async (id: number) => ({
+      ...await page.tabs.get(id), url: changedUrl,
+    }) };
+    const result = await confirmBlooketReadNavigation(
+      tabs, 7, page.previous, null, 8_000,
+      page.pause, page.documentOrigin, page.now,
+    );
+    assert.equal(result, undefined, `changed URL ${changedUrl}`);
+  }
+  assert.equal(page.reloads(), 0);
+  assert.equal(page.updates(), 0);
+});
+
+test("session observation refuses invalid selected route metadata",
+  async () => {
+  const page = fixture();
+  for (const previous of [{ url: SETS, status: "loading" },
+    { status: "complete" }, { url: SETS, status: "complete",
+      pendingUrl: EDIT }]) {
+    assert.equal(await confirmBlooketReadNavigation(
+      page.tabs, 7, previous, null, 8_000,
+      page.pause, page.documentOrigin, page.now,
+    ), undefined);
+  }
+});
+
 test("pending foreign navigation blocks a source tab before reload",
   async () => {
   const page = fixture();

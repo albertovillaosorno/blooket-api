@@ -157,6 +157,16 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green session navigation regression showed that a
+read-only `target=null` observation accepted a later completed tab at an
+unrelated URL or accepted missing/incomplete source metadata. Chrome's
+[Tabs API](https://developer.chrome.com/docs/extensions/reference/api/tabs)
+distinguishes last committed `url` from the in-flight `pendingUrl`; neither
+a new committed route nor a pending redirect may inherit earlier session
+read authority. The navigation helper now binds no-navigation reads to the
+original exact completed route without touching the user's browser.
+Synthetic only: this is not a new real provider session acceptance.
+
 A 2026-10-21 red-to-green synthetic login host regression found that a
 nonfinite deadline clock on the exact polling-delay sample could yield a
 `-Infinity` timeout, even after preceding tab/origin checks passed. The
