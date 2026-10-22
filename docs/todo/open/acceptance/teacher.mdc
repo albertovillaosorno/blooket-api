@@ -157,6 +157,14 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green page-level login regression found that visible
+ARIA dialogs and open native HTML dialogs could cover an otherwise mounted
+login form while the login helper still prepared synthetic credentials or
+admitted Submit. The injected helper now treats those visible surfaces as
+human-owned stops, marks its existing form owner dirty, and refuses stale
+Submit even if the dialog disappears. Hidden dialogs remain nonblocking.
+No real credentials or authenticated session were changed in this test.
+
 A 2026-10-21 red-to-green session navigation regression showed that a
 read-only `target=null` observation accepted a later completed tab at an
 unrelated URL or accepted missing/incomplete source metadata. Chrome's
