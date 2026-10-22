@@ -2348,7 +2348,10 @@ test(
     onTabUpdated(7, { title: "Just a moment..." }, {
       id: 7, url: tabUrl, windowId: 3,
     });
-    const eventDeadline = realNow() + 7_000;
+    // Concurrent provider suites can delay Node's event loop before the
+    // owned focus request resolves. Keep the actual foreground proof; allow
+    // scheduling headroom without ever focusing a foreign tab.
+    const eventDeadline = realNow() + 18_000;
     while (focusedWindows.length !== 1) {
       assert.ok(realNow() < eventDeadline,
         "owned background challenge did not open its browser window");

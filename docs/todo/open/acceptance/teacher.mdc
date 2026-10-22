@@ -157,6 +157,16 @@ this final record.
 
 ## Evidence
 
+During the 2026-10-21 concurrent final suite, two long-running synthetic
+integration tests exhausted only their *test-runner* scheduling windows:
+the owned challenge foreground event and the intentionally still-listening
+stale-PID launcher stop. The tests now allow bounded event-loop and child
+startup headroom while keeping exact owned-tab focus checks and actual
+runtime/lock/writer-drain refusal (`code: 1`). Product mutation deadlines,
+service-stop proof, foreign-process protections and provider behavior are
+unchanged. The preceding targeted and provider-drift tests were green; this
+adjustment itself still requires a fresh full validation receipt.
+
 A 2026-10-21 Edit Info regression showed that a visible native dialog or
 `alertdialog` could coexist with the saved metadata sidebar or an
 automation-owned Cancel button. The four independent injected Edit Info
