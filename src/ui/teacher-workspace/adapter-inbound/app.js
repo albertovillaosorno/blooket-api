@@ -169,6 +169,9 @@ const words = {
     clipboardEmpty: "Copia una imagen o un enlace directo a una imagen.",
     clipboardDenied:
       "Permite leer el portapapeles o pega aquí con Ctrl+V / ⌘V.",
+    clipboardGifUnavailable:
+      "No se pudo leer el GIF animado. Pega el archivo GIF original " +
+      "o su enlace directo .gif.",
     downloadFailed: "No se pudo cargar esa imagen. Prueba otro enlace directo.",
     search: "Buscar por nombre, descripción o tema…",
     drop: "Arrastra aquí una foto o un GIF",
@@ -536,6 +539,9 @@ const words = {
     shownOf: "of",
     clipboardEmpty: "Copy an image or a direct image link first.",
     clipboardDenied: "Allow clipboard access or paste here with Ctrl+V / ⌘V.",
+    clipboardGifUnavailable:
+      "The animated GIF could not be read. Paste the original GIF file " +
+      "or its direct .gif link.",
     downloadFailed: "Could not load that image. Try another direct image link.",
     search: "Search names, descriptions or topics…",
     drop: "Drop a photo or GIF here",
@@ -902,6 +908,7 @@ function report(error) {
     "filename-already-exists": "collision",
     "source-too-large": "sourceTooLarge",
     "clipboard-image-missing": "clipboardEmpty",
+    "clipboard-gif-unavailable": "clipboardGifUnavailable",
     "invalid-image-url": "downloadFailed",
     "image-url-not-public": "downloadFailed",
     "image-download-not-image": "downloadFailed",
@@ -1113,7 +1120,8 @@ $("#pasteImage").addEventListener("click", async () => {
     if (!navigator.clipboard) throw new Error("clipboard-unavailable");
     await pasteSource(await readClipboardImage(navigator.clipboard));
   } catch (error) {
-    if (error.message === "clipboard-image-missing") report(error);
+    if (["clipboard-image-missing", "clipboard-gif-unavailable"]
+      .includes(error.message)) report(error);
     else toast(t("clipboardDenied"));
   } finally {
     clipboardReading = false;
