@@ -308,6 +308,38 @@ test("a changed tab after preparation is never submitted", async () => {
   assert.equal(page.calls.includes("submit"), false);
 });
 
+test("login never passes an expired or invalid budget to the poll waiter",
+  async () => {
+  // A previously valid clock can fail at the exact time a sleep duration
+  // is calculated, after the preceding successful readiness observation.
+  for (let failedSample = 1; failedSample <= 55; failedSample++) {
+    const page = fixture({ preparedPolls: Array(15).fill(false) });
+    let sample = 0;
+    const requested: number[] = [];
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async ms => { requested.push(ms); },
+      () => ++sample === failedSample ? Number.NaN : 0,
+    ).authenticate(credentials);
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.calls.includes("submit"), false);
+    assert.ok(requested.every(ms => Number.isFinite(ms) && ms > 0 &&
+      ms <= 50), `bad wait on clock sample ${failedSample}: ${requested}`);
+  }
+  for (const stride of [35, 90, 140, 250, 350, 500, 650, 900, 1_200]) {
+    const page = fixture({ preparedPolls: Array(15).fill(false) });
+    let time = 0;
+    const requested: number[] = [];
+    const result = await createExtensionSessionAuthenticationHost(
+      page.chrome, 7, async ms => { requested.push(ms); },
+      () => (time += stride),
+    ).authenticate(credentials);
+    assert.deepEqual(result, { ok: false, code: "blooket-browser-failed" });
+    assert.equal(page.calls.includes("submit"), false);
+    assert.ok(requested.every(ms => Number.isFinite(ms) && ms > 0 &&
+      ms <= 50), `invalid clock budget for stride ${stride}: ${requested}`);
+  }
+});
+
 test("polling consumes the shared login deadline", async () => {
   const page = fixture({
     scriptLatencyMs: 600,
