@@ -157,6 +157,13 @@ this final record.
 
 ## Evidence
 
+A 2026-10-21 red-to-green synthetic login host regression found that a
+nonfinite deadline clock on the exact polling-delay sample could yield a
+`-Infinity` timeout, even after preceding tab/origin checks passed. The
+credential-submission host now refuses a nonfinite or expired pause budget
+before calling the waiter. All delayed checks remain bounded and a clock
+failure never retries or confirms authentication. No live login was attempted.
+
 On 2026-10-21, the authenticated, already connected Chrome for Testing
 session returned a successful canonical read-only `questions list` reply
 for the owner's existing private quiz: exactly two rows (multiple-choice

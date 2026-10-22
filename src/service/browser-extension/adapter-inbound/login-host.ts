@@ -173,7 +173,13 @@ export function createExtensionSessionAuthenticationHost(
             return browserFailure();
           ready = observed;
           if (ready) break;
-          await pause(Math.min(POLL_MS, deadline - now()));
+          // The clock can fail between the last successful identity check
+          // and computing a polling delay. Never forward -Infinity or an
+          // expired duration to a browser scheduler.
+          const left = deadline - now();
+          if (!Number.isFinite(left) || left <= 0)
+            return browserFailure();
+          await pause(Math.min(POLL_MS, left));
         }
         if (!ready || !await readyTab()) return browserFailure();
         const submitted = await script(
