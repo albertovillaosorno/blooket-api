@@ -191,6 +191,9 @@ test("unowned, challenged, ambiguous, or edited forms never start fetching",
       (state: ReturnType<typeof setup>) => {
         state.extra["dialog[open]"] = [node("DIALOG")];
       },
+      (state: ReturnType<typeof setup>) => {
+        state.extra[":popover-open"] = [node("DIV")];
+      },
     ];
     for (const mutate of variants) await fixture(async state => {
       mutate(state);
@@ -198,6 +201,17 @@ test("unowned, challenged, ambiguous, or edited forms never start fetching",
       assert.equal(state.calls.length, 0);
     });
   },
+);
+
+test("HTML popover appearing during media transfer invalidates digest",
+  async () => fixture(async state => {
+  state.response = async () => {
+    state.extra[":popover-open"] = [node("DIV")];
+    return new Response(png);
+  };
+  assert.deepEqual(await serialized("fixture", 1, 1_000), failed);
+  assert.equal(state.calls.length, 1);
+}),
 );
 
 test("native modal appearing mid-transfer invalidates image evidence",

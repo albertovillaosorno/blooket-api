@@ -97,8 +97,13 @@ export function canLeaveBlooketPageForRead(): boolean {
     const alerts = Array.from(document.querySelectorAll(
       '[role="alertdialog"]',
     ));
+    // Popover API top-layer controls can contain active teacher choices
+    // without an ARIA dialog role or native <dialog> element.
+    const popovers = Array.from(document.querySelectorAll(
+      ':popover-open',
+    ));
     if (dialogs.some(visible) || nativeDialogs.some(visible) ||
-        alerts.some(visible)) return false;
+        alerts.some(visible) || popovers.some(visible)) return false;
     if (document.querySelector('input#question[name="question"]') ||
         document.querySelector('aside[data-drawer-open="true"]'))
       return false;
@@ -169,6 +174,7 @@ export function openBlooketCapabilityQuestionPanel(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -322,6 +328,7 @@ export function isBlooketCapabilityQuestionPanelReady(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -468,6 +475,7 @@ export function openBlooketAudioCapabilityDrawer(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -625,6 +633,7 @@ export function inspectBlooketAudioCapabilityDrawer(
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -805,6 +814,7 @@ export function closeBlooketAudioCapabilityDrawer(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -959,6 +969,7 @@ export function isBlooketAudioCapabilityDrawerClosed(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -1101,6 +1112,7 @@ export function closeBlooketCapabilityQuestionPanel(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
@@ -1249,6 +1261,7 @@ export function isBlooketCapabilityQuestionPanelClosed(setId: string): boolean {
     const blockedByHumanDialog = [
       ...Array.from(document.querySelectorAll('[role="alertdialog"]')),
       ...Array.from(document.querySelectorAll('dialog[open]')),
+      ...Array.from(document.querySelectorAll(':popover-open')),
     ].some((panel) => {
       const bounds = panel.getBoundingClientRect();
       const style = getComputedStyle(panel);
