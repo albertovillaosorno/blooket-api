@@ -97,6 +97,9 @@ export function createBlooketBrowserBridgeBroker(
   } = {},
 ): BlooketBrowserBridgeBroker {
   const timeoutMs = options.timeoutMs ?? 10_000;
+  // Full question scans open/cancel every saved panel and verify image bytes.
+  // Keep ordinary reads short, but allow a bounded minute for this collection.
+  const questionTimeoutMs = options.timeoutMs ?? 60_000;
   // Create Set now verifies saved metadata in a fresh reloaded document.
   // Retain the full bounded navigation/rehydration budget for both pages,
   // instead of expiring a possible Save while its read-back is in flight.
@@ -220,9 +223,12 @@ export function createBlooketBrowserBridgeBroker(
       if (!Number.isFinite(startedAt))
         return { ok: false, code: "blooket-browser-unavailable" };
       const write = request.command.kind === "sets.create" ||
+        request.command.kind === "text.revise" ||
         request.command.kind === "questions.create" ||
         request.command.kind === "questions.replace";
-      const lifetimeMs = write ? writeTimeoutMs : timeoutMs;
+      const lifetimeMs = write ? writeTimeoutMs
+        : request.command.kind === "questions.list"
+          ? questionTimeoutMs : timeoutMs;
       const expiresAt = startedAt + lifetimeMs;
       // An otherwise finite but absurd clock may not represent even one
       // future lease due to float precision. Never queue an unbounded Save.
@@ -294,11 +300,14 @@ export function createBlooketBrowserBridgeBroker(
           : kind === "capabilities.inspect" ||
             kind === "capabilities.inspect-text"
             ? MIN_CAPABILITY_DISPATCH_MS
-            : kind === "sets.create" || kind === "questions.create" ||
+            : kind === "text.revise" || kind === "sets.create" ||
+                kind === "questions.create" ||
                 kind === "questions.replace"
               ? Math.max(MIN_WRITE_DISPATCH_MS, writeTimeoutMs - 500)
+              : kind === "questions.list"
+                ? Math.max(MIN_READ_DISPATCH_MS, questionTimeoutMs - 500)
               : kind === "session.observe" || kind === "sets.list" ||
-                kind === "sets.get" || kind === "questions.list"
+                kind === "sets.get"
               ? MIN_READ_DISPATCH_MS
               : 0;
         if (

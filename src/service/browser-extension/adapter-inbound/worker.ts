@@ -54,6 +54,9 @@ import {
   // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../platforms/blooket-browser/adapter-outbound/question-write-stage-page.ts";
 import { createExtensionAddQuestionHost } from "./add-question-host.ts";
+import { createExtensionTextRevisionHost } from "./text-revision-host.ts";
+import { recoverRetainedTextRevision } from
+  "./text-revision-recovery-host.ts";
 import { createExtensionCapabilityInspectionHost } from
   "./capability-inspection-host.ts";
 import { inspectDetachedBlooketCapabilities } from
@@ -371,8 +374,10 @@ async function read(
     | PageReadOperation
     | { readonly kind: "questions.list"; readonly setId: string },
 ) {
-  // Leave room for the ten-second bridge deadline, including navigation.
-  const readDeadline = Date.now() + 8_000;
+  // Full question scans have a minute lease; reserve two seconds of the
+  // worker budget for read-owned panel cleanup after inspection expires.
+  const readDeadline = Date.now() +
+    (operation.kind === "questions.list" ? 55_000 : 8_000);
   if (operation.kind === "session.observe") {
     const source = await browser.tabs.get(current.tabId);
     let observed = await readPage(current, browser, operation, readDeadline);
@@ -450,6 +455,7 @@ async function readPage(
     | PageReadOperation
     | { readonly kind: "questions.list"; readonly setId: string },
   readDeadline: number,
+  navigationOnly = false,
 ) {
   const target =
     operation.kind === "questions.list"
@@ -575,6 +581,7 @@ async function readPage(
       confirmedTargetOrigin === undefined))
     throw new Error("browser-navigation-timeout");
   tab = confirmed;
+  if (navigationOnly) return { ok: true, value: "edit" };
   if (operation.kind === "questions.list") {
     const host = createExtensionQuestionInspectionHost(
       browser, current.tabId, pause,
@@ -1262,15 +1269,17 @@ async function relay(current: Connection, activeGeneration: number) {
         const decoded = decodeBlooketBrowserBridgeRequest(next.job);
         if (!decoded.ok) throw new Error("invalid-browser-job");
         const job = decoded.value;
-        // Reads retain ten seconds; browser writes have a sixty-second
-        // broker lease for navigation and fresh-document verification.
+        // Full question scans and writes have a sixty-second broker lease;
+        // ordinary reads retain ten seconds.
         // Leave transport margin before expiry so a late script cannot
         // start another mutation after its caller stopped awaiting it.
         const budgetMs = job.command.kind === "session.authenticate"
           ? 7_500
           : job.command.kind === "sets.create" ||
               job.command.kind === "questions.create" ||
-              job.command.kind === "questions.replace"
+              job.command.kind === "questions.replace" ||
+              job.command.kind === "text.revise" ||
+              job.command.kind === "questions.list"
             ? 57_000
             : job.command.kind === "capabilities.inspect" ||
                 job.command.kind === "capabilities.inspect-text"
@@ -1286,18 +1295,40 @@ async function relay(current: Connection, activeGeneration: number) {
         };
         try {
           if (job.command.kind === "sets.create" ||
+              job.command.kind === "text.revise" ||
               job.command.kind === "questions.create" ||
               job.command.kind === "questions.replace") {
             // Native Edit Info also sends a provider server action. The
             // application mutation lease precedes that final metadata read,
             // so it cannot space the following Save from the read itself.
+            // Every text Save must also follow the preceding metadata read
+            // or text Save by this native provider action interval.
             releaseAction = await admitProviderAction(
               () => deadline - Date.now(),
             );
             if (!releaseAction || !isOwner())
               throw new Error("browser-action-unavailable");
           }
-          if (job.command.kind === "writes.inspect-replacement") {
+          if (job.command.kind === "text.revise") {
+            const request = job.command.request;
+            const recovered = job.command.verifyOnly
+              ? await recoverRetainedTextRevision(jobBrowser, current.tabId,
+                  request, deadline - 1_000, pause) : undefined;
+            if (recovered !== undefined) {
+              result = { ok: true,
+                value: { outcome: recovered, stage: "verify" } };
+            } else {
+              await readPage(current, jobBrowser,
+                { kind: "sets.get", setId: request.expectedSet.id },
+                deadline - 2_000, true);
+              let stage = "navigation";
+              const host = createExtensionTextRevisionHost(jobBrowser,
+                current.tabId, pause, value => { stage = value; });
+              const outcome = await host.revise(request,
+                job.command.verifyOnly, deadline - 1_000);
+              result = { ok: true, value: { outcome, stage } };
+            }
+          } else if (job.command.kind === "writes.inspect-replacement") {
             result = { ok: true, value: {
               questionReplacement: "single-row-reload-v1",
             } };
@@ -1519,6 +1550,40 @@ function reclaimableBlooketTab(tab: BrowserTab | undefined): boolean {
     (url.searchParams.get("__cf_chl_rt_tk")?.length ?? 0) > 0;
 }
 
+// Extension reload may lose the in-memory write watch while retaining a safe,
+// idle Edit Set page. Do not navigate it or infer the old Save completed.
+// Reclaim only its recorded tab ID after the native page itself proves that
+// no editor, human decision or pending extension-owned form is present.
+async function reclaimableIdleEditor(tab: BrowserTab | undefined) {
+  if (!admittedBlooketTab(tab) || tab?.status !== "complete" ||
+      typeof tab.url !== "string" || !tab.id) return false;
+  const url = new URL(tab.url);
+  if (url.origin !== "https://dashboard.blooket.com" ||
+      url.pathname !== "/edit" || url.hash ||
+      url.searchParams.size !== 1 ||
+      url.searchParams.getAll("id").length !== 1 ||
+      !/^[a-f0-9]{24}$/u.test(url.searchParams.get("id") ?? ""))
+    return false;
+  try {
+    const frames = snapshotExactDenseArray(
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: canLeaveBlooketPageForRead,
+      }), 1);
+    if (frames?.length !== 1) return false;
+    const frame = frames[0];
+    const result = Object.getOwnPropertyDescriptor(frame, "result");
+    const frameId = Object.getOwnPropertyDescriptor(frame, "frameId");
+    if (!result?.enumerable || !("value" in result) ||
+        result.value !== true ||
+        (frameId && (!frameId.enumerable || !("value" in frameId) ||
+          frameId.value !== 0))) return false;
+    const after = await chrome.tabs.get(tab.id);
+    return after.id === tab.id && after.url === tab.url &&
+      after.status === "complete" && after.pendingUrl === undefined;
+  } catch { return false; }
+}
+
 async function connectWorkspace(message: unknown) {
   if (
     !message ||
@@ -1604,7 +1669,8 @@ async function connectWorkspace(message: unknown) {
           owned > 0) {
         const previousTab = await chrome.tabs.get(owned);
         if (previousTab.id === owned && existingBlooketTab(previousTab)) {
-          if (reclaimableBlooketTab(previousTab)) tab = previousTab;
+          if (reclaimableBlooketTab(previousTab) ||
+              await reclaimableIdleEditor(previousTab)) tab = previousTab;
           else {
             // Reload invalidates isolated-world editor ownership. Preserve
             // that existing tab instead of accumulating replacement tabs.

@@ -674,6 +674,62 @@ claim an uninterrupted run under provider throttling. The
 [AI authoring record](docs/todo/completed/teaching/ai-review.mdc) distinguish
 autonomous writes, assisted historical checks and portable regression coverage.
 
+The local CLI also corrects one existing set title or one question's text,
+including questions that already have images:
+
+```sh
+npm run blooket -- sets revise-text request.json --json
+```
+
+For a title, supply the exact metadata returned by `sets get`:
+
+```json
+{
+  "schemaVersion": 1,
+  "expectedSet": {
+    "schemaVersion": 1,
+    "id": "exact-remote-set-id",
+    "title": "Current saved title",
+    "description": "Current saved description",
+    "visibility": "private"
+  },
+  "change": {
+    "kind": "set-title",
+    "title": "Corrected title"
+  }
+}
+```
+
+For a question, use `change.kind: "question-text"`, `previous` containing the
+exact normalized row from `questions list`, the desired `question`, and an
+`answers` string array in the existing answer order. Correctness flags, answer
+count, type, time, shuffle, order, media and set metadata remain unchanged.
+Correct the text of a marked answer without changing its existing flag.
+
+Each admission performs at most one Save, uses shared mutation pacing, and
+retains a durable journal under `text-revisions/` in the local data root.
+`verified: true` requires read-back from a freshly reloaded document.
+The extension retains native media fields and checks their identity after
+reload; the CLI never needs a provider media URL or a replacement upload.
+
+An explicitly `not-submitted` result permits retrying the unchanged request
+after fixing its reported preparation stage. An uncertain request only
+reconciles on repetition without clicking Save. For an existing question,
+two independent fresh documents proving the exact original text, non-text
+facts and original media identity return `text-revision-reconciled-unchanged`.
+
+That call stops and records recovery history; a separate paced invocation
+may then apply the same idempotent text assignment to the same row. Mixed
+state, unavailable media identity and verified requests never re-arm.
+This recovery does not apply to creating sets or adding questions.
+
+When the original submitted form remains open, recovery uses at most one
+temporary background read tab. Only independent confirmation permits closing
+that exact unchanged owned form; interrupted or mixed state stays pending.
+The temporary tab must close before recovery can be reported.
+This local CLI workflow uses the installed companion and signed-in session;
+it does not require a browser testing controller.
+
 The local **Settings → Blooket publication pacing** controls expose four
 bounded, shared limits: seconds between mutation starts (2–60), mutation
 starts per rolling minute (1–20), attempts per publication (1–10,000), and

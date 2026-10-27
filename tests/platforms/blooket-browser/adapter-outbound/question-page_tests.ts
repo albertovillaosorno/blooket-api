@@ -994,6 +994,13 @@ test("question modal actions refuse disabled and hidden controls", () => {
     cancel.display = "none";
     assert.equal(closeBlooketQuestionPanel("fixture"), false);
     delete cancel.display;
+    Object.defineProperty(globalThis, "__blooketTextRevisionWatch", {
+      configurable: true, value: { submitted: true },
+    });
+    try { assert.equal(closeBlooketQuestionPanel("fixture"), false); }
+    finally {
+      Reflect.deleteProperty(globalThis, "__blooketTextRevisionWatch");
+    }
     assert.equal(closeBlooketQuestionPanel("fixture"), true);
   });
   assert.equal(editClicks, 1);

@@ -90,6 +90,8 @@ import {
   "./set-read-verifier.ts";
 import type { BlooketQuestionRead } from
   "../../../ir/blooket-question-reads/contract/question-read.ts";
+import type { BlooketTextRevisionPort } from
+  "../../../ir/blooket-publication-commands/contract/text-revision.ts";
 import { sameBlooketWriteVerificationBaseline,
   type BlooketWriteVerificationBaseline } from
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
@@ -103,6 +105,7 @@ import { isBrowserWriteExecutionPort,
   browserQuestionReplacementSupported } from "./browser-write-adapter.ts";
 
 export interface BlooketPublicationDependencies {
+  readonly textRevision?: BlooketTextRevisionPort;
   readonly root: string;
   readonly blooket: BlooketReadDependencies;
   readonly writes: BlooketWriteExecutionPort;
