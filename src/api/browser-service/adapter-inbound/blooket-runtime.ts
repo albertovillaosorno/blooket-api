@@ -38,14 +38,42 @@ import type { BlooketBrowserBridgeTransport } from
   "../../../platforms/blooket-browser/contract/bridge-transport.ts";
 import { createBlooketPreparedMediaReadPort } from
   "./blooket-prepared-media.ts";
+import type { BlooketTextRevisionPort } from
+  "../../../ir/blooket-publication-commands/contract/text-revision.ts";
 
 export function createBlooketRuntimePorts(
   bridge: BlooketBrowserBridgeTransport,
   root: string,
 ) {
   const adapters = createBlooketBrowserBridgeAdapters(bridge);
+  const textRevision: BlooketTextRevisionPort = {
+    revise: async (request, verifyOnly) => {
+      const result = await bridge.request({
+        kind: "text.revise", request, verifyOnly,
+      });
+      if (!result.ok || !result.value ||
+          typeof result.value !== "object") return { outcome: "uncertain" };
+      const value = Object.getOwnPropertyDescriptor(result.value, "outcome");
+      const stage = Object.getOwnPropertyDescriptor(result.value, "stage");
+      const stages = ["navigation", "open", "prepare", "submit", "closure",
+        "reload", "verify", "close"];
+      const safeStage = stage?.enumerable && "value" in stage &&
+          typeof stage.value === "string" &&
+          (stages.includes(stage.value) ||
+            /^prepare-[a-z-]{1,40}$/u.test(stage.value))
+        ? stage.value : undefined;
+      return value?.enumerable && "value" in value &&
+          ["verified", "not-submitted", "unchanged", "uncertain"]
+            .includes(value.value)
+        ? { outcome: value.value as "verified" | "not-submitted" |
+            "unchanged" | "uncertain",
+            ...(safeStage ? { stage: safeStage } : {}) }
+        : { outcome: "uncertain" };
+    },
+  };
   return {
     ...adapters,
+    textRevision,
     writeExecution: blooketBrowserWriteExecutionPort(adapters.writes),
     preparedMedia: createBlooketPreparedMediaReadPort(root),
   };

@@ -34,6 +34,7 @@ import type { DecodeResult } from
   "../../runtime-decoding/domain/decode-result.ts";
 import { decodeBlooketSetId } from
   "../../blooket-set-reads/contract/set-read.ts";
+import { TEXT_REVISION_COMMAND } from "./text-revision.ts";
 
 export const BLOOKET_PUBLICATION_COMMANDS = [
   "blooket.publication.step", "blooket.publication.status",
@@ -41,7 +42,7 @@ export const BLOOKET_PUBLICATION_COMMANDS = [
   "blooket.publication.append", "blooket.publication.replace",
 ] as const;
 export type BlooketPublicationCommandName =
-  (typeof BLOOKET_PUBLICATION_COMMANDS)[number];
+  (typeof BLOOKET_PUBLICATION_COMMANDS)[number] | typeof TEXT_REVISION_COMMAND;
 export interface BlooketPublicationPayload {
   readonly draftId: string;
   readonly expectedRevision?: string;
@@ -50,7 +51,8 @@ export interface BlooketPublicationPayload {
 export function isBlooketPublicationCommand(
   name: string,
 ): name is BlooketPublicationCommandName {
-  return BLOOKET_PUBLICATION_COMMANDS.some(command => command === name);
+  return name === TEXT_REVISION_COMMAND ||
+    BLOOKET_PUBLICATION_COMMANDS.some(command => command === name);
 }
 export function decodeBlooketPublicationCommand(
   name: BlooketPublicationCommandName, value: unknown,
@@ -67,6 +69,8 @@ export function decodeBlooketPublicationCommand(
     }],
   });
   try {
+    // Text revisions have their own exact prior-state contract, not a draft.
+    if (name === TEXT_REVISION_COMMAND) return invalid();
     if (!isRecord(value)) return invalid();
     const fields = append ? ["draftId", "expectedRevision", "remoteSetId"]
       : step ? ["draftId", "expectedRevision"] : ["draftId"];

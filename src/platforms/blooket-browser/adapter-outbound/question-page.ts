@@ -726,7 +726,8 @@ export function closeBlooketQuestionPanel(setId: string): boolean {
     // Incidental input does not transfer an automation-owned read panel.
     // Cancel discards only that panel's transient edits, never a pending Save.
     if (["__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
-      "__blooketDetailEditWatch", "__blooketCapabilityEditWatch"]
+      "__blooketDetailEditWatch", "__blooketCapabilityEditWatch",
+      "__blooketTextRevisionWatch"]
       .some(key => Object.hasOwn(globalThis, key))) return false;
     // A different question modal is not ours, even when the set ID is equal.
     // Only its ordinal is inspected here; the untrusted draft is never sent

@@ -3001,3 +3001,80 @@ test("Cloudflare landing tabs survive reload without claiming editor tabs",
   }
   },
 );
+
+test("reloaded extension reclaims only an idle recorded Edit Set tab",
+  async () => {
+    const previousChrome = Object.getOwnPropertyDescriptor(globalThis,
+      "chrome");
+    const previousFetch = globalThis.fetch;
+    const origin = "http://127.0.0.1:4567";
+    const url = "https://dashboard.blooket.com/edit?id=" + "a".repeat(24);
+    try {
+      for (const idle of [true, false]) {
+        let listener: ((message: unknown, sender: unknown,
+          reply: (value: unknown) => void) => boolean) | undefined;
+        let created = 0;
+        const session: Record<string, unknown> = {};
+        const local: Record<string, unknown> = { "blooket-owned-tab-id": 7 };
+        Object.defineProperty(globalThis, "chrome", {
+          configurable: true,
+          value: {
+            runtime: { getURL: (path: string) =>
+              "chrome-extension://idle-reclaim-test/" + path,
+              onMessage: { addListener: (fn: typeof listener) => {
+                listener = fn;
+              } } },
+            tabs: {
+              onUpdated: { addListener: () => {} },
+              query: async () => [],
+              get: async (id: number) => ({ id, url, title: "Edit Set",
+                status: "complete" }),
+              create: async () => { created++; throw Error("no second tab"); },
+            },
+            scripting: { executeScript: async ({func}: {func: Function}) => {
+              assert.equal(func.name, "canLeaveBlooketPageForRead");
+              return [{ frameId: 0, result: idle }];
+            } },
+            storage: {
+              local: {
+                get: async () => ({ ...local }),
+                set: async (value: Record<string, unknown>) => {
+                  Object.assign(local, value);
+                },
+              },
+              session: {
+                get: async () => ({ ...session }),
+                set: async (value: Record<string, unknown>) => {
+                  Object.assign(session, value);
+                },
+                remove: async (key: string) => { delete session[key]; },
+              },
+            },
+          },
+        });
+        globalThis.fetch = async (requested: string) =>
+          requested.endsWith("/api/browser-bridge/status")
+            ? Response.json({ ok: true, pending: 0, connected: false })
+            : new Response(null, { status: 426 });
+        const modulePath =
+          "../../../../src/service/browser-extension/adapter-inbound/" +
+          "worker.ts?idle-editor-reclaim-" + idle;
+        await import(modulePath);
+        const reply = await new Promise(resolve => {
+          assert.equal(listener!({ kind: "workspace-ready", origin,
+            token: "a".repeat(43) }, { url: origin + "/",
+              tab: { id: 99 } }, resolve), true);
+        });
+        assert.deepEqual(reply, idle
+          ? { ok: true, status: "connected" }
+          : { ok: false, status: "blooket-tab-retained" });
+        assert.equal(created, 0);
+        assert.equal(idle && "connection" in session, idle);
+      }
+    } finally {
+      if (previousChrome)
+        Object.defineProperty(globalThis, "chrome", previousChrome);
+      else Reflect.deleteProperty(globalThis, "chrome");
+      globalThis.fetch = previousFetch;
+    }
+  });

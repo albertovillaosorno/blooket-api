@@ -93,3 +93,76 @@ Use separate, reviewable provider-compatibility commits repeatedly instead of
 waiting for feature failures. Keep the permanent `blooket-15` task active even
 when drift checks are green or other milestones are complete. Never reclassify
 unconfirmed account writes as successful based on a local shape check.
+
+On 2026-10-26, an authorized read-only Chrome 155 session reproduced an
+incomplete image-rich question scan under the eight-second worker budget.
+After extending only question collections, the canonical CLI returned all
+26 saved questions through the reloaded companion. No Save was used.
+
+Question collections now have a 60-second broker lease, 55-second inspection
+budget, two seconds reserved for owned-panel cleanup, and a 75-second CLI
+timeout. Ordinary reads retain their shorter deadlines. Regression tests cover
+late collection replies and queued jobs with insufficient remaining time.
+
+Chrome's [worker lifecycle documentation][worker-lifetime], checked on
+2026-10-26, confirms that extension API calls reset the idle timer. The scan
+continues using ordinary API calls; it does not add a background keepalive.
+The local Git gate also now matches the installed 2.56.0 release, confirmed
+against the [official Git release page][git-release] on the same date.
+
+<!-- jig-ignore-next-line: Official documentation URL must remain intact. -->
+[worker-lifetime]: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle
+[git-release]: https://git-scm.com/
+
+On 2026-10-26, existing-text correction exposed two native-form contracts:
+Edit Info's Done button uses an explicit `form` association outside the form,
+and an existing question editor is itself an ARIA modal dialog. The revision
+adapter admits only that exact read-owned question dialog while continuing
+to reject additional human dialogs. Regression fixtures cover external form
+ownership, image preservation, trusted input and single-use Save latches.
+
+The canonical local CLI saved and freshly verified an existing title and
+question text without a controller Save. A subsequent full saved-question
+read independently confirmed unchanged image hashes. These observations
+establish the admitted correction path, not unrestricted metadata/media edits
+or an uninterrupted provider workflow.
+
+Chrome's [scripting API][scripting-arguments], checked on 2026-10-26, requires
+JSON-serializable injection arguments. The host omits an absent optional
+argument rather than passing `undefined`; a transport fixture now enforces
+that real-browser constraint.
+
+<!-- jig-ignore-next-line: Official documentation URL must remain intact. -->
+[scripting-arguments]: https://developer.chrome.com/docs/extensions/reference/api/scripting
+
+On 2026-10-26, a rapid text Save following a metadata read left its owned
+form open and a same-route HTTP 429 was observed. A separate fresh read
+showed the original row and original media unchanged. All text corrections
+now share the native provider-action spacing, including question text.
+
+Read-panel cleanup refuses a retained text-revision watch. Existing-row
+recovery can return a separate unchanged checkpoint only after two fresh
+documents agree on the exact original row and original media identity. It never
+clicks Save during reconciliation; an additional paced admission is required
+for the idempotent assignment, with prior uncertainty retained in history.
+Create Set and Add Question replay rules remain unchanged.
+
+On 2026-10-27, a later existing-row Save received HTTP 429 with a provider
+verification HTML response while the ordinary editor remained visible. No
+`Retry-After` header was observed. A response code alone therefore cannot
+identify a documented Blooket rate policy or prove a rejected Save.
+
+The retained-text recovery host verifies through one temporary background
+read tab and checks the original source document, submitted owner, exact
+request and media identity again before closing its transient form. It
+never saves during reconciliation, and failed read-tab cleanup stays uncertain.
+Sanitized fixtures cover verified and unchanged rows, mixed state, interrupted
+source ownership, missing byte evidence and failed cleanup.
+
+[MDN's HTTP 429 reference][http-429], checked on 2026-10-27, explains that
+`Retry-After` may be present; its absence supplies no exact waiting period.
+Provider verification is observed through normal browser navigation, without
+a challenge solver, cookie export or security-setting changes.
+
+<!-- jig-ignore-next-line: Official documentation URL must remain intact. -->
+[http-429]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429

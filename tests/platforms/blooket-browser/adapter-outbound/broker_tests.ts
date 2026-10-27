@@ -1101,6 +1101,73 @@ test("late queued writes expire before dispatch without any mutation",
   },
 );
 
+test("full question scans retain their owner past the ordinary read deadline",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    const client = "chrome-extension://test-profile/";
+    try {
+      const request = broker.request({
+        kind: "questions.list", setId: "fixture",
+      });
+      const leased = broker.next(TOKEN, client);
+      assert.ok(leased);
+      tick += 46_000;
+      assert.equal(broker.status().connected, true);
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: leased.id, ok: true, value: [],
+      }, client), true);
+      assert.deepEqual(await request, { ok: true, value: [] });
+    } finally { broker.close(); }
+  },
+);
+
+test("question scans cannot dispatch without their full remaining budget",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    try {
+      const queued = broker.request({
+        kind: "questions.list", setId: "fixture",
+      });
+      tick += 501;
+      assert.equal(broker.next(TOKEN, "chrome-extension://test-profile/"),
+        null);
+      assert.deepEqual(await queued, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally { broker.close(); }
+  },
+);
+
+test("expired full question scans cannot return late collection evidence",
+  async () => {
+    let tick = 100_000;
+    const broker = createBlooketBrowserBridgeBroker({
+      token: TOKEN, now: () => tick,
+    });
+    const client = "chrome-extension://test-profile/";
+    try {
+      const request = broker.request({
+        kind: "questions.list", setId: "fixture",
+      });
+      const leased = broker.next(TOKEN, client);
+      assert.ok(leased);
+      tick += 60_000;
+      assert.equal(broker.complete(TOKEN, {
+        schemaVersion: 1, id: leased.id, ok: true, value: [],
+      }, client), false);
+      assert.deepEqual(await request, {
+        ok: false, code: "blooket-browser-unavailable",
+      });
+    } finally { broker.close(); }
+  },
+);
+
 test("default write lease covers fresh-document persistence inspection",
   async () => {
     let tick = 100_000;

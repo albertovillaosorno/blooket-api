@@ -54,6 +54,10 @@ import {
 } from "../../blooket-set-reads/application/command.ts";
 import { isBlooketPublicationCommand } from
   "../../../ir/blooket-publication-commands/contract/commands.ts";
+import { TEXT_REVISION_COMMAND } from
+  "../../../ir/blooket-publication-commands/contract/text-revision.ts";
+import { executeTextRevision } from
+  "../../blooket-write-execution/application/text-revision.ts";
 import { executeBlooketPublicationCommand,
   type BlooketPublicationDependencies } from
   "../../blooket-write-execution/application/command.ts";
@@ -64,6 +68,8 @@ export async function executeCommand(
   blooket?: BlooketReadDependencies,
   publication?: BlooketPublicationDependencies,
 ): Promise<ResultEnvelope> {
+  if (command.command === TEXT_REVISION_COMMAND)
+    return executeTextRevision(command, publication);
   if (isBlooketPublicationCommand(command.command))
     return executeBlooketPublicationCommand(command, publication);
   if (isBlooketReadCommand(command.command))

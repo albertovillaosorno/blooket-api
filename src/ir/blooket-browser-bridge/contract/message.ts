@@ -45,6 +45,8 @@ import {
 import {
   decodeBlooketPreparedImage, type BlooketPreparedImage,
 } from "./prepared-image.ts";
+import { decodeBlooketTextRevision, type BlooketTextRevision } from
+  "../../blooket-publication-commands/contract/text-revision.ts";
 
 export const BLOOKET_BROWSER_BRIDGE_VERSION = 1 as const;
 export const BLOOKET_BROWSER_CLIENT_HEADER = "x-blooket-browser-client";
@@ -87,11 +89,14 @@ export type BlooketBrowserBridgeOperation =
   | "sets.list"
   | "sets.get"
   | "questions.list"
+  | "text.revise"
   | "sets.create"
   | "questions.create"
   | "questions.replace";
 
 export type BlooketBrowserBridgeCommand =
+  | { readonly kind: "text.revise";
+      readonly request: BlooketTextRevision; readonly verifyOnly: boolean }
   | { readonly kind: "browser.activate" }
   | { readonly kind: "session.observe" }
   | {
@@ -201,7 +206,16 @@ export function decodeBlooketBrowserBridgeRequest(
     kind === "sets.list"
   )
     command = { kind };
-  else if (kind === "sets.get" || kind === "questions.list") {
+  else if (kind === "text.revise") {
+    keys = ["kind", "request", "verifyOnly"];
+    const request = decodeBlooketTextRevision(ownDataField(candidate,
+      "request"));
+    const verifyOnly = ownDataField(candidate, "verifyOnly");
+    if (request.ok && typeof verifyOnly === "boolean")
+      command = { kind, request: request.value, verifyOnly };
+    else issues.push({ path: "$.command", code: "invalid-text-revision",
+      message: "Expected one bounded existing-text revision." });
+  } else if (kind === "sets.get" || kind === "questions.list") {
     keys = ["kind", "setId"];
     const setId = requiredString(
       ownDataField(candidate, "setId"), "$.command.setId", issues,

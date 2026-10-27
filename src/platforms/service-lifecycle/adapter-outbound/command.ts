@@ -40,6 +40,8 @@ import {
 } from "../../../ir/blooket-read-commands/contract/commands.ts";
 import { isBlooketPublicationCommand, decodeBlooketPublicationCommand } from
   "../../../ir/blooket-publication-commands/contract/commands.ts";
+import { decodeBlooketTextRevision, TEXT_REVISION_COMMAND } from
+  "../../../ir/blooket-publication-commands/contract/text-revision.ts";
 
 // The CLI uses local CSRF admission; no browser token enters its arguments,
 // environment, stdin envelope, or result. Redirects are never followed.
@@ -62,7 +64,9 @@ export async function executeLocalBlooketRead(
   const publication = isBlooketPublicationCommand(command.command);
   if (!publication && !isBlooketReadCommand(command.command))
     return failure("unknown-command");
-  const decoded = isBlooketPublicationCommand(command.command)
+  const decoded = command.command === TEXT_REVISION_COMMAND
+    ? decodeBlooketTextRevision(command.payload)
+    : isBlooketPublicationCommand(command.command)
     ? decodeBlooketPublicationCommand(command.command, command.payload)
     : decodeBlooketReadCommand(
         command.command as Parameters<typeof decodeBlooketReadCommand>[0],
@@ -78,7 +82,8 @@ export async function executeLocalBlooketRead(
   try {
     const runtime = await existingService(root);
     if (!runtime) return failure("blooket-browser-unavailable");
-    const signal = AbortSignal.timeout(publication ? 120_000 : 25_000);
+    const signal = AbortSignal.timeout(publication ? 120_000
+      : command.command === "blooket.questions.list" ? 75_000 : 25_000);
     const bootResponse = await fetch(runtime.origin + "/api/bootstrap", {
       redirect: "error",
       signal,

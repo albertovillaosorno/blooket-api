@@ -194,3 +194,17 @@ test("replacement CLI requires a saved revision and exact remote set", () => {
     "publication", "replace", "edit-fixture", revision,
   ]).ok, false);
 });
+
+test("text revision CLI requires one request file and only machine-output flag",
+  () => {
+    assert.deepEqual(parseCliArguments([
+      "sets", "revise-text", "request.json", "--json",
+    ]), { ok: true, invocation: { kind: "text-revision",
+      requestPath: "request.json", json: true } });
+    for (const args of [
+      ["sets", "revise-text"],
+      ["sets", "revise-text", "--json"],
+      ["sets", "revise-text", "request.json", "--force"],
+      ["sets", "revise-text", "request.json", "other.json"],
+    ]) assert.equal(parseCliArguments(args).ok, false);
+  });
