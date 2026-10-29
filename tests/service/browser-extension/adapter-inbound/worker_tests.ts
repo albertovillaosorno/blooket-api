@@ -116,6 +116,7 @@ test(
   let detailCancelSucceeds = true;
   let detailCancelReplyLost = false;
   let detailReadWatchCanRelease = false;
+  let detailReleaseReplacesDocument = false;
   let detailClosedSucceeds = true;
   let detailPendingRecoverySafe = false;
   let detailPendingRecoveryChecks = 0;
@@ -508,9 +509,15 @@ test(
           assert.deepEqual(args, [tabUrl]);
           return [{ result: documentOrigin }];
         }
-        if (func.name === "releaseClosedBlooketDetailReadWatch")
-          return [{ result: detailReadWatchCanRelease &&
-            detailCancelObserved }];
+        if (func.name === "releaseClosedBlooketDetailReadWatch") {
+          const released = detailReadWatchCanRelease &&
+            detailCancelObserved;
+          if (detailReleaseReplacesDocument) {
+            detailReleaseReplacesDocument = false;
+            documentOrigin += 1_000;
+          }
+          return [{ result: released }];
+        }
         if (func.name === "canLeaveBlooketPageForRead") {
           readGuardChecks++;
           if (reloadDuringLeave) {
@@ -2017,6 +2024,14 @@ test(
     // neither a failed click alone nor a closure assertion is sufficient.
     detailCancelReplyLost = true;
     detailReadWatchCanRelease = true;
+    detailReleaseReplacesDocument = true;
+    const beforeReplacedDocument = scripts.length;
+    assert.equal((await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    })).ok, false);
+    assert.equal(scripts.slice(beforeReplacedDocument).filter(name =>
+      name === "releaseClosedBlooketDetailReadWatch").length, 1);
+    // A new native document cannot reuse an earlier closure proof.
     const beforeLostReply = scripts.length;
     const recoveredCancel = await expectReply({
       kind: "sets.get", setId: "opaque id/with spaces",
