@@ -630,7 +630,9 @@ only when the exact original native document independently proves the
 editor is closed and releases its clean, extension-owned read watch.
 The implementation does not repeat Cancel or Save, and a refused watch
 release still blocks the read; this is synthetic fail-closed evidence,
-not a claim of renewed live provider acceptance.
+not a claim of renewed live provider acceptance. A second regression
+rejects a replacement native document after closure despite a positive
+read-watch release.
 
 
 On 2026-10-29, verified upstream registry observations were refreshed
