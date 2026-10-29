@@ -42,7 +42,7 @@ import { inspectBlooketDocumentOrigin } from
   "../../../platforms/blooket-browser/adapter-outbound/document-page.ts";
 import { inspectBlooketPage, inspectBlooketDetailSidebar,
   openBlooketDetailPanel, closeBlooketDetailPanel,
-  isBlooketDetailPanelClosed } from
+  isBlooketDetailPanelClosed, releaseClosedBlooketDetailReadWatch } from
   "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { openBlooketQuestionPanel, closeBlooketQuestionPanel,
   isBlooketQuestionPanelClosed } from
@@ -80,6 +80,7 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
       let submitted = verifyOnly;
       let opened = false;
       let freshRead = false;
+      let cleanupBlocked = false;
       let observedMetadata: { title: string; description: string;
         visibility: "private" | "public" } | undefined;
       const failure = () => submitted ? "uncertain" as const
@@ -168,20 +169,44 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
         // no Save is ever attempted by cleanup or reconciliation.
         for (let n = 0; n < 15; n++) {
           if (!await sameTab()) return false;
+          let lostCancelReply = false;
           const result = metadataChange
             ? observedMetadata && await script(closeBlooketDetailPanel as
                 (...args: never[]) => unknown,
                 [set.id, observedMetadata, observedMetadata])
+                .catch(() => { lostCancelReply = true; return false; })
             : await script(closeBlooketQuestionPanel as
                 (...args: never[]) => unknown, [set.id]);
           if (result === true) { opened = false; return true; }
-          // A previous guarded Cancel may have already unmounted its form
-          // despite a lost scripting reply. Accept only the native, read-only
-          // proof that the exact metadata editor is fully closed.
-          if (metadataChange && await script(
-              isBlooketDetailPanelClosed as
-                (...args: never[]) => unknown, [set.id]) === true &&
-              await sameTab()) { opened = false; return true; }
+          // A prior guarded Cancel may have unmounted its form even when
+          // the reply was lost. An unreadable closure never permits a retry.
+          const nativeClosed = metadataChange
+            ? await script(isBlooketDetailPanelClosed as
+                (...args: never[]) => unknown, [set.id])
+                .catch(() => undefined)
+            : false;
+          if (nativeClosed === true) {
+            if (!await sameTab().catch(() => false)) {
+              cleanupBlocked = true;
+              return false;
+            }
+            // A lost Cancel reply can leave the exact read-owned watch
+            // behind. Closed native UI alone cannot retire this ownership.
+            const released = await script(
+              releaseClosedBlooketDetailReadWatch as
+                (...args: never[]) => unknown, [set.id])
+                .catch(() => false);
+            if (released !== true || !await sameTab()) {
+              cleanupBlocked = true;
+              return false;
+            }
+            opened = false;
+            return true;
+          }
+          if (lostCancelReply || nativeClosed === undefined) {
+            cleanupBlocked = true;
+            return false;
+          }
           if (!metadataChange) return false;
           await pause(100);
         }
@@ -296,7 +321,8 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
       finally {
         // A failed prepare is ours to cancel. An uncertain submitted form
         // remains intact; its next request can only verify, never click Save.
-        if (opened && (!submitted || freshRead || verifyOnly)) {
+        if (opened && !cleanupBlocked &&
+            (!submitted || freshRead || verifyOnly)) {
           if (!submitted) await action("release").catch(() => undefined);
           await close().catch(() => false);
         }
