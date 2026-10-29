@@ -632,6 +632,17 @@ The implementation does not repeat Cancel or Save, and a refused watch
 release still blocks the read; this is synthetic fail-closed evidence,
 not a claim of renewed live provider acceptance.
 
+
+On 2026-10-29, verified upstream registry observations were refreshed
+for five unchanged package versions: Sharp, TypeScript, YAML, yauzl and
+its Node type declarations. Newer upstream releases of Node type
+bindings and pnpm were also observed, but their project observations
+and stable-channel edits were not adopted because the exact Node 24
+compatibility exception and the pinned package manager require review.
+The remaining Jig gate separately reports stale observations for these
+two authorities, mismatched catalog registration, and hook ownership;
+no toolchain upgrade or validation bypass was made.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto
