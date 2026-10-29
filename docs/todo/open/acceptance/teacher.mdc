@@ -622,6 +622,16 @@ The regression does not equate an incomplete list or missing response
 with proof of persistence; independent remote evidence remains required.
 All 2,308 repository tests passed in separate groups after this test.
 
+
+On 2026-10-29, a red-to-green worker regression reproduced a lost native
+Cancel reply after an otherwise complete read-only Edit Info inspection.
+A returned false or missing Cancel acknowledgment now permits cleanup
+only when the exact original native document independently proves the
+editor is closed and releases its clean, extension-owned read watch.
+The implementation does not repeat Cancel or Save, and a refused watch
+release still blocks the read; this is synthetic fail-closed evidence,
+not a claim of renewed live provider acceptance.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto

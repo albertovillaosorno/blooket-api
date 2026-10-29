@@ -114,6 +114,8 @@ test(
   let detailSidebarProxy = false;
   let detailSidebarProxyReads = 0;
   let detailCancelSucceeds = true;
+  let detailCancelReplyLost = false;
+  let detailReadWatchCanRelease = false;
   let detailClosedSucceeds = true;
   let detailPendingRecoverySafe = false;
   let detailPendingRecoveryChecks = 0;
@@ -507,7 +509,8 @@ test(
           return [{ result: documentOrigin }];
         }
         if (func.name === "releaseClosedBlooketDetailReadWatch")
-          return [{ result: false }];
+          return [{ result: detailReadWatchCanRelease &&
+            detailCancelObserved }];
         if (func.name === "canLeaveBlooketPageForRead") {
           readGuardChecks++;
           if (reloadDuringLeave) {
@@ -613,7 +616,8 @@ test(
             { title: "Synthetic", description: "" },
             { title: "Synthetic", description: "", visibility: "private" },
           ]);
-          if (detailCancelSucceeds) detailCancelObserved = true;
+          if (detailCancelSucceeds || detailCancelReplyLost)
+            detailCancelObserved = true;
           return [{ result: detailCancelSucceeds }];
         }
         if (func.name === "isBlooketDetailPanelClosed") {
@@ -2004,7 +2008,26 @@ test(
     ), true);
     assert.equal(scripts.slice(beforeCancelFailure).includes(
       "isBlooketDetailPanelClosed",
-    ), false);
+    ), true);
+    assert.equal(scripts.slice(beforeCancelFailure).includes(
+      "releaseClosedBlooketDetailReadWatch",
+    ), true);
+    // Cancel may have completed even if its scripting reply was lost.
+    // Recovery needs the native closed proof and exact idle-watch release;
+    // neither a failed click alone nor a closure assertion is sufficient.
+    detailCancelReplyLost = true;
+    detailReadWatchCanRelease = true;
+    const beforeLostReply = scripts.length;
+    const recoveredCancel = await expectReply({
+      kind: "sets.get", setId: "opaque id/with spaces",
+    });
+    assert.equal(recoveredCancel.ok, true);
+    assert.equal(scripts.slice(beforeLostReply).filter(name =>
+      name === "closeBlooketDetailPanel").length, 1);
+    assert.equal(scripts.slice(beforeLostReply).filter(name =>
+      name === "releaseClosedBlooketDetailReadWatch").length, 1);
+    detailCancelReplyLost = false;
+    detailReadWatchCanRelease = false;
     detailCancelSucceeds = true;
     detailClosedSucceeds = false;
     const beforeClosureFailure = scripts.length;

@@ -881,7 +881,7 @@ async function readPage(
           closeBlooketDetailPanel as (...args: never[]) => unknown,
           [operation.setId, baseline, cancellationEvidence],
         ).catch(() => false);
-        if (canceled === true) {
+        if (canceled === true || canceled === false) {
           for (let attempt = 0; attempt < 15 && Date.now() < readDeadline;
             attempt++) {
             if (!await ownsDetailRoute().catch(() => false)) break;
@@ -893,6 +893,18 @@ async function readPage(
             if (result === true && await ownsDetailRoute().catch(
               () => false,
             )) {
+              if (canceled !== true) {
+                // A lost Cancel reply is not proof of closure. Recover only
+                // after the native document proves its editor closed and
+                // retires the exact unchanged, read-owned orphan watch.
+                const released = await script(current, browser,
+                  releaseClosedBlooketDetailReadWatch as
+                    (...args: never[]) => unknown,
+                  [operation.setId],
+                ).catch(() => false);
+                if (released !== true || !await ownsDetailRoute().catch(
+                  () => false)) break;
+              }
               closed = true;
               break;
             }
