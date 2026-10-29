@@ -177,7 +177,30 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
                 .catch(() => { lostCancelReply = true; return false; })
             : await script(closeBlooketQuestionPanel as
                 (...args: never[]) => unknown, [set.id]);
-          if (result === true) { opened = false; return true; }
+          if (result === true) {
+            if (metadataChange) {
+              // A returned click is not evidence that React unmounted the
+              // editor. Observe closure without clicking Cancel again.
+              let confirmed = false;
+              for (let check = 0; check < 15; check++) {
+                if (!await sameTab().catch(() => false)) break;
+                const closed = await script(isBlooketDetailPanelClosed as
+                  (...args: never[]) => unknown, [set.id])
+                  .catch(() => false);
+                if (closed === true && await sameTab().catch(() => false)) {
+                  confirmed = true;
+                  break;
+                }
+                await pause(100);
+              }
+              if (!confirmed) {
+                cleanupBlocked = true;
+                return false;
+              }
+            }
+            opened = false;
+            return true;
+          }
           // A prior guarded Cancel may have unmounted its form even when
           // the reply was lost. An unreadable closure never permits a retry.
           const nativeClosed = metadataChange
