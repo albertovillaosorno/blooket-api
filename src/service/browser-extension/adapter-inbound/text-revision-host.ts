@@ -178,25 +178,25 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
             : await script(closeBlooketQuestionPanel as
                 (...args: never[]) => unknown, [set.id]);
           if (result === true) {
-            if (metadataChange) {
-              // A returned click is not evidence that React unmounted the
-              // editor. Observe closure without clicking Cancel again.
-              let confirmed = false;
-              for (let check = 0; check < 15; check++) {
-                if (!await sameTab().catch(() => false)) break;
-                const closed = await script(isBlooketDetailPanelClosed as
-                  (...args: never[]) => unknown, [set.id])
-                  .catch(() => false);
-                if (closed === true && await sameTab().catch(() => false)) {
-                  confirmed = true;
-                  break;
-                }
-                await pause(100);
+            // A returned Cancel click is not evidence that React unmounted
+            // either editor. Observe closure without clicking again.
+            const closureProbe = metadataChange
+              ? isBlooketDetailPanelClosed : isBlooketQuestionPanelClosed;
+            let confirmed = false;
+            for (let check = 0; check < 15; check++) {
+              if (!await sameTab().catch(() => false)) break;
+              const closed = await script(closureProbe as
+                (...args: never[]) => unknown, [set.id])
+                .catch(() => false);
+              if (closed === true && await sameTab().catch(() => false)) {
+                confirmed = true;
+                break;
               }
-              if (!confirmed) {
-                cleanupBlocked = true;
-                return false;
-              }
+              await pause(100);
+            }
+            if (!confirmed) {
+              cleanupBlocked = true;
+              return false;
             }
             opened = false;
             return true;

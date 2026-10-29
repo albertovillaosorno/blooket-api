@@ -52,6 +52,7 @@ test("retained text recovery verifies independently before source cleanup",
     for (const state of ["verified", "unchanged", "mixed", "interrupted",
       "missing", "cleanup-failed"]) {
       let created = 0, removed = 0, released = false, read = false;
+      let detachedClosed = false;
       let origin = 200;
       const identity = "a".repeat(64);
       const browser: Parameters<typeof recoverRetainedTextRevision>[0] = {
@@ -76,10 +77,13 @@ test("retained text recovery verifies independently before source cleanup",
             result = target.tabId === 1 ? 100 : origin;
           else if (func.name === "inspectBlooketDetailSidebar") result = {
             ok: true, value: { title: "Title", description: "Keep" } };
-          else if (func.name === "openBlooketQuestionPanel" ||
-              func.name === "closeBlooketQuestionPanel") result = true;
+          else if (func.name === "openBlooketQuestionPanel") result = true;
+          else if (func.name === "closeBlooketQuestionPanel") {
+            if (target.tabId === 2) detachedClosed = true;
+            result = true;
+          }
           else if (func.name === "isBlooketQuestionPanelClosed")
-            result = released;
+            result = target.tabId === 1 ? released : detachedClosed;
           else if (func.name === "runBlooketTextRevisionPageAction") {
             assert.notEqual(args[0], "submit");
             assert.notEqual(args[0], "prepare");

@@ -664,6 +664,15 @@ delayed React unmounts still succeed, while a persistent or unreadable
 form preserves uncertainty. These are synthetic browser results, not
 a new provider-side Save or authenticated browser acceptance.
 
+
+A third 2026-10-29 regression applied the same post-Cancel closure
+authority to existing-question text reads. A returned question-editor
+Cancel click previously could confirm recovery while the native form
+remained open. Now both question and metadata reads require an actual
+same-document closed-form observation after the acknowledged click;
+the guard never sends a second Cancel or a new Save. This remains
+portable synthetic evidence, not a live account edit.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto
