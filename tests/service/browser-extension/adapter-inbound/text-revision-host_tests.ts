@@ -260,7 +260,7 @@ test("unchanged recovery requires two fresh original-row observations",
   });
 
 
-test("acknowledged question Cancel cannot confirm a still-open editor",
+test("question Cancel needs closure and never re-clicks after lost reply",
   async () => {
     const input: BlooketTextRevision = { ...request, change: {
       kind: "question-text", previous: { schemaVersion: 4, number: 1,
@@ -270,37 +270,43 @@ test("acknowledged question Cancel cannot confirm a still-open editor",
           { kind: "text", content: "No", correct: false, match: null }] },
       question: "After?", answers: ["Yes", "No"],
     } };
-    let closes = 0, saves = 0;
-    const browser: AddQuestionChromePort = {
-      tabs: { get: async () => ({ status: "complete",
-        url: "https://dashboard.blooket.com/edit?id=fixture" }),
-        update: async () => { throw Error("unexpected navigation"); },
-        reload: async () => { throw Error("unexpected reload"); },
-      },
-      scripting: { executeScript: async ({ func, args = [] }) => {
-        let result: unknown;
-        if (func.name === "inspectBlooketDocumentOrigin") result = 100;
-        else if (func.name === "inspectBlooketDetailSidebar") result = {
-          ok: true, value: { title: "Before", description: "Keep" },
-        };
-        else if (func.name === "openBlooketQuestionPanel") result = true;
-        else if (func.name === "closeBlooketQuestionPanel") {
-          closes++; result = true;
-        } else if (func.name === "isBlooketQuestionPanelClosed")
-          result = false;
-        else if (func.name === "runBlooketTextRevisionPageAction") {
-          if (args[0] === "submit") saves++;
-          result = { ok: true };
-        } else throw Error("unexpected script " + func.name);
-        return [{ result }];
-      } },
-    };
-    const host = createExtensionTextRevisionHost(browser, 1,
-      async () => {});
-    assert.equal(await host.revise(input, true, Date.now() + 10_000),
-      "uncertain");
-    assert.equal(saves, 0);
-    assert.equal(closes, 1, "Acknowledged Cancel cannot be clicked twice");
+    for (const cancel of ["acknowledged-open", "lost-closed",
+      "lost-open", "refused"] as const) {
+      let closes = 0, saves = 0;
+      const browser: AddQuestionChromePort = {
+        tabs: { get: async () => ({ status: "complete",
+          url: "https://dashboard.blooket.com/edit?id=fixture" }),
+          update: async () => { throw Error("unexpected navigation"); },
+          reload: async () => { throw Error("unexpected reload"); },
+        },
+        scripting: { executeScript: async ({ func, args = [] }) => {
+          let result: unknown;
+          if (func.name === "inspectBlooketDocumentOrigin") result = 100;
+          else if (func.name === "inspectBlooketDetailSidebar") result = {
+            ok: true, value: { title: "Before", description: "Keep" },
+          };
+          else if (func.name === "openBlooketQuestionPanel") result = true;
+          else if (func.name === "closeBlooketQuestionPanel") {
+            closes++;
+            if (cancel.startsWith("lost"))
+              throw Error("Cancel applied but reply lost");
+            result = cancel !== "refused";
+          } else if (func.name === "isBlooketQuestionPanelClosed")
+            result = cancel === "lost-closed";
+          else if (func.name === "runBlooketTextRevisionPageAction") {
+            if (args[0] === "submit") saves++;
+            result = { ok: true };
+          } else throw Error("unexpected script " + func.name);
+          return [{ result }];
+        } },
+      };
+      const host = createExtensionTextRevisionHost(browser, 1,
+        async () => {});
+      assert.equal(await host.revise(input, true, Date.now() + 10_000),
+        "uncertain");
+      assert.equal(saves, 0);
+      assert.equal(closes, 1, "Cancel cannot be clicked twice");
+    }
   });
 
 test("image recovery without old bytes binds native media across reloads",

@@ -176,7 +176,8 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
                 [set.id, observedMetadata, observedMetadata])
                 .catch(() => { lostCancelReply = true; return false; })
             : await script(closeBlooketQuestionPanel as
-                (...args: never[]) => unknown, [set.id]);
+                (...args: never[]) => unknown, [set.id])
+                .catch(() => { cleanupBlocked = true; return false; });
           if (result === true) {
             // A returned Cancel click is not evidence that React unmounted
             // either editor. Observe closure without clicking again.
@@ -230,7 +231,12 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
             cleanupBlocked = true;
             return false;
           }
-          if (!metadataChange) return false;
+          if (!metadataChange) {
+            // A lost question Cancel reply may mean the click completed.
+            // Retain uncertainty rather than attempting another Cancel.
+            cleanupBlocked = true;
+            return false;
+          }
           await pause(100);
         }
         return false;

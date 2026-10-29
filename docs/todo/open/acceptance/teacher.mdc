@@ -673,6 +673,17 @@ same-document closed-form observation after the acknowledged click;
 the guard never sends a second Cancel or a new Save. This remains
 portable synthetic evidence, not a live account edit.
 
+
+On 2026-10-29, a later synthetic regression exposed a second native
+Cancel click when a question-text read recovery received a lost reply
+or explicit refusal. The correction host previously retried question
+cleanup from `finally` after the first uncertain result. It now keeps
+an uncertain outcome without re-clicking or assuming a Save occurred.
+
+Fixtures cover a closed editor after a lost reply, a still-open form,
+an acknowledged but unclosed editor, and a refused Cancel. The guard
+never mutates remote quiz content and is not live provider acceptance.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto
