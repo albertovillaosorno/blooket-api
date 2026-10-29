@@ -655,6 +655,15 @@ closure now retain uncertainty without a second Cancel attempt. The
 regressions use a synthetic browser, leave submitted Saves untouched,
 and do not establish new live Blooket acceptance.
 
+
+A follow-up 2026-10-29 red-to-green regression found that even an
+acknowledged metadata Cancel click could previously confirm a text
+revision while the native Edit Info form remained visible. The host
+now observes bounded same-document closure without a second click;
+delayed React unmounts still succeed, while a persistent or unreadable
+form preserves uncertainty. These are synthetic browser results, not
+a new provider-side Save or authenticated browser acceptance.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto

@@ -48,8 +48,9 @@ function fixture(loseSaveReply = false,
   input: BlooketTextRevision = request, persist = true,
   cancel: "confirmed" | "lost-closed" | "thrown-closed" = "confirmed",
   releaseWatch = false, replaceDocumentOnRelease = false,
-  loseClosureProbe = false) {
-  let origin = 100, saves = 0, reloads = 0;
+  loseClosureProbe = false, stuckClosure = false,
+  closureDelay = 0) {
+  let origin = 100, saves = 0, reloads = 0, closureProbes = 0;
   const calls: string[] = [];
   const browser: AddQuestionChromePort = {
     tabs: { get: async () => ({ status: "complete",
@@ -93,7 +94,7 @@ function fixture(loseSaveReply = false,
       }
       else if (name === "isBlooketDetailPanelClosed") {
         if (loseClosureProbe) throw Error("closure read unavailable");
-        result = true;
+        result = !stuckClosure && ++closureProbes > closureDelay;
       }
       else if (name === "openBlooketDetailPanel") result = true;
       else throw Error("unexpected script " + name);
@@ -167,6 +168,34 @@ test("lost metadata Cancel reply needs an exact orphan-watch release",
     assert.equal(missingProof.calls.filter(x =>
       x === "closeBlooketDetailPanel").length, 1,
       "An unreadable closure cannot trigger a second Cancel click");
+  });
+
+test("acknowledged metadata Cancel still needs closed-form evidence",
+  async () => {
+    const f = fixture(false, request, true, "confirmed",
+      false, false, false, true);
+    assert.equal(await f.host.revise(request, true,
+      Date.now() + 10_000), "uncertain");
+    assert.equal(f.saves(), 0);
+    assert.equal(f.calls.filter(x =>
+      x === "closeBlooketDetailPanel").length, 1,
+      "Do not retry an acknowledged Cancel");
+    assert.ok(f.calls.filter(x =>
+      x === "isBlooketDetailPanelClosed").length >= 2);
+    const hydrated = fixture(false, request, true, "confirmed",
+      false, false, false, false, 2);
+    assert.equal(await hydrated.host.revise(request, true,
+      Date.now() + 10_000), "verified");
+    assert.equal(hydrated.calls.filter(x =>
+      x === "isBlooketDetailPanelClosed").length, 3);
+    assert.equal(hydrated.calls.filter(x =>
+      x === "closeBlooketDetailPanel").length, 1);
+    const unknown = fixture(false, request, true, "confirmed",
+      false, false, true);
+    assert.equal(await unknown.host.revise(request, true,
+      Date.now() + 10_000), "uncertain");
+    assert.equal(unknown.calls.filter(x =>
+      x === "closeBlooketDetailPanel").length, 1);
   });
 
 test("an unchanged metadata Save requires two fresh native documents to rearm",
