@@ -46,6 +46,8 @@ export type CliInvocation =
   | ProjectValidateInvocation
   | { readonly kind: "text-revision";
       readonly requestPath: string; readonly json: boolean }
+  | { readonly kind: "text-revision-reconcile";
+      readonly requestPath: string; readonly json: boolean }
   | BlooketReadInvocation
   | BlooketPublicationInvocation;
 
@@ -98,13 +100,17 @@ const FIELD_VALUES = new Set<MediaSearchField>([
 ]);
 
 export function parseCliArguments(args: readonly string[]): CliParseResult {
-  if (args[0] === "sets" && args[1] === "revise-text") {
+  if (args[0] === "sets" &&
+      (args[1] === "revise-text" || args[1] === "reconcile-text")) {
     const json = args.at(-1) === "--json";
     if (args.length !== (json ? 4 : 3) || !args[2])
       return { ok: false,
-        message: "Usage: blooket sets revise-text <request.json> [--json]" };
+        message: "Usage: blooket sets revise-text|reconcile-text " +
+          "<request.json> [--json]" };
     return { ok: true, invocation: {
-      kind: "text-revision", requestPath: args[2], json } };
+      kind: args[1] === "reconcile-text"
+        ? "text-revision-reconcile" : "text-revision",
+      requestPath: args[2], json } };
   }
   if (args.length === 0 || args[0] === "help" || args[0] === "--help") {
     return { ok: true, invocation: { kind: "help" } };

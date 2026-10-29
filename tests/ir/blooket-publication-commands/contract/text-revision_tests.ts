@@ -56,6 +56,9 @@ test("no-op and structurally different corrections cannot be submitted",
   () => {
     for (const change of [
       { kind: "set-title", title: set.title },
+      { kind: "set-description", description: set.description },
+      { kind: "set-description", description: "New", image: null },
+      { kind: "set-description", description: " " },
       { kind: "set-title", title: "A new title", image: null },
       { kind: "question-text", previous, question: previous.question,
         answers: ["yes", "no"] },
@@ -85,3 +88,14 @@ test("unsupported media and accessor requests cannot reach native controls",
       change: { kind: "set-title", title: "New title" } }).ok, false);
     assert.equal(reads, 0);
   });
+test("description correction admits only a changed bounded text field", () => {
+  const request = { schemaVersion: 1, expectedSet: set,
+    change: { kind: "set-description",
+      description: "Practice classroom vocabulary." } };
+  const decoded = decodeBlooketTextRevision(request);
+  assert.equal(decoded.ok, true);
+  if (decoded.ok) assert.deepEqual(decoded.value.change, request.change);
+  assert.equal(decodeBlooketTextRevision({ ...request,
+    change: { ...request.change, description: "x".repeat(1_001) } }).ok,
+  false);
+});

@@ -40,7 +40,7 @@ import {
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/service/browser-extension/adapter-inbound/detached-capability-host.ts";
 
-const MY_SETS = "https://dashboard.blooket.com/my-sets";
+const MY_SETS = "https://dashboard.blooket.com/my-sets?filter=recent";
 
 function fixture(options: {
   readonly createAccessor?: boolean;

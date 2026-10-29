@@ -674,8 +674,8 @@ claim an uninterrupted run under provider throttling. The
 [AI authoring record](docs/todo/completed/teaching/ai-review.mdc) distinguish
 autonomous writes, assisted historical checks and portable regression coverage.
 
-The local CLI also corrects one existing set title or one question's text,
-including questions that already have images:
+The local CLI also corrects one existing set title, description, or
+question's text, including questions that already have images:
 
 ```sh
 npm run blooket -- sets revise-text request.json --json
@@ -700,6 +700,11 @@ For a title, supply the exact metadata returned by `sets get`:
 }
 ```
 
+For description-only updates, use `change.kind: "set-description"` and a
+new, nonblank English `description` (at most 1,000 characters). The full
+`expectedSet` must match the saved title, previous description and privacy.
+The native editor preserves its title, cover image and privacy controls.
+
 For a question, use `change.kind: "question-text"`, `previous` containing the
 exact normalized row from `questions list`, the desired `question`, and an
 `answers` string array in the existing answer order. Correctness flags, answer
@@ -717,6 +722,19 @@ after fixing its reported preparation stage. An uncertain request only
 reconciles on repetition without clicking Save. For an existing question,
 two independent fresh documents proving the exact original text, non-text
 facts and original media identity return `text-revision-reconciled-unchanged`.
+For an unchanged title or description whose original editor is no longer
+available, a separate **local-only** recovery path can reconcile its original
+immutable attempted request:
+
+```sh
+npm run blooket -- sets reconcile-text request.json --json
+```
+
+This recovery performs two independent canonical fresh `sets get` reads under
+a publication lock. Only exact original metadata and an unchanged attempted
+journal permit `text-revision-reconciled-unchanged`. It records both operation
+IDs and the unchanged history; it never clicks Save or invents a receipt.
+The subsequent revision requires a separate paced admission.
 
 That call stops and records recovery history; a separate paced invocation
 may then apply the same idempotent text assignment to the same row. Mixed

@@ -208,3 +208,14 @@ test("text revision CLI requires one request file and only machine-output flag",
       ["sets", "revise-text", "request.json", "other.json"],
     ]) assert.equal(parseCliArguments(args).ok, false);
   });
+
+
+test("local metadata reconciliation requires one immutable request", () => {
+  assert.deepEqual(parseCliArguments([
+    "sets", "reconcile-text", "original.json", "--json",
+  ]), { ok: true, invocation: { kind: "text-revision-reconcile",
+    requestPath: "original.json", json: true } });
+  assert.equal(parseCliArguments([
+    "sets", "reconcile-text", "original.json", "--retry",
+  ]).ok, false);
+});

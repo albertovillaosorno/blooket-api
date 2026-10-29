@@ -312,7 +312,7 @@ test("a pending redirect after My Sets load cannot certify capabilities",
   async () => {
   const page = fixture();
   const original = page.chrome.tabs.get;
-  const target = "https://dashboard.blooket.com/my-sets";
+  const target = "https://dashboard.blooket.com/my-sets?filter=recent";
   page.chrome.tabs.get = async id => ({ ...await original(id),
     ...(page.currentUrl() === target ? {
       pendingUrl: "https://foreign.invalid/" } : {}),
@@ -714,7 +714,7 @@ test(
   const get = page.chrome.tabs.get;
   page.chrome.tabs.get = async (id: number) => {
     const tab = await get(id);
-    return tab.url?.endsWith("/my-sets")
+    return tab.url === "https://dashboard.blooket.com/my-sets?filter=recent"
       ? { ...tab, status: "loading" }
       : tab;
   };
@@ -1566,7 +1566,7 @@ test("capability probing may return to the same route with a fresh document",
   assert.equal(result.ok, true);
   assert.equal(page.currentUrl(), page.originalUrl);
   assert.equal(page.navigations.includes(
-    "https://dashboard.blooket.com/my-sets"), true);
+    "https://dashboard.blooket.com/my-sets?filter=recent"), true);
   assert.equal(page.navigations.includes(page.originalUrl), true);
   assert.equal(page.scripts.includes("openBlooketCapabilityQuestionPanel"),
     true);

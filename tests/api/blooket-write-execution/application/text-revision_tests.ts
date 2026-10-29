@@ -31,10 +31,12 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from
+  "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { executeTextRevision } from
+import { executeTextRevision,
+  reconcileUnchangedMetadataTextRevision } from
   "../../../../src/api/blooket-write-execution/application/text-revision.ts";
 import type { BlooketPublicationDependencies } from
   "../../../../src/api/blooket-write-execution/application/command.ts";
@@ -125,5 +127,150 @@ test("confirmed unchanged recovery stops before a separate paced admission",
       assert.equal((await executeTextRevision(correction, host)).ok, false);
       assert.equal((await executeTextRevision(correction, host)).ok, false);
       assert.deepEqual(calls, [false, true, false, true, true]);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+test("local metadata reconciliation uses two fresh reads without any Save",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "text-title-reconcile-"));
+    let saves = 0, reads = 0;
+    const host = { root, pacer: { acquire: async () => ({ ok: true,
+      lease: { startedAtMs: 0, release() {} } }) },
+      textRevision: { revise: async () => {
+        saves++;
+        return { outcome: "uncertain" };
+      } } } as BlooketPublicationDependencies;
+    const reconcile = { ...command,
+      command: "blooket.publication.reconcile-text" };
+    const fresh = async () => ({
+      operationId: `cli:00000000-0000-4000-8000-00000000000${++reads}`,
+      metadata: payload.expectedSet,
+    });
+    try {
+      assert.equal((await executeTextRevision(command, host)).ok, false);
+      const result = await reconcileUnchangedMetadataTextRevision(
+        reconcile, root, fresh);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.issues[0]?.code,
+        "text-revision-reconciled-unchanged");
+      assert.equal(reads, 2);
+      assert.equal(saves, 1);
+      const blocked = await reconcileUnchangedMetadataTextRevision(
+        reconcile, root, fresh);
+      assert.equal(blocked.ok, false);
+      assert.equal(reads, 2, "Reconciled journal cannot be rearmed again");
+      assert.equal((await executeTextRevision(command, host)).ok, false);
+      assert.equal(saves, 2, "Only a separate paced call may Save again");
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+test("metadata reconciliation refuses conflicting provider observations",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "text-title-conflict-"));
+    const host = { root, pacer: { acquire: async () => ({ ok: true,
+      lease: { startedAtMs: 0, release() {} } }) },
+      textRevision: { revise: async () => ({ outcome: "uncertain" }) },
+    } as BlooketPublicationDependencies;
+    const reconcile = { ...command,
+      command: "blooket.publication.reconcile-text" };
+    let reads = 0;
+    const fresh = async () => ({
+      operationId: `cli:00000000-0000-4000-8000-00000000000${++reads}`,
+      metadata: reads === 2 ? { ...payload.expectedSet,
+        description: "Someone else changed this" } : payload.expectedSet,
+    });
+    try {
+      assert.equal((await executeTextRevision(command, host)).ok, false);
+      assert.equal((await reconcileUnchangedMetadataTextRevision(
+        reconcile, root, fresh)).ok, false);
+      assert.equal(reads, 2);
+      const later = await executeTextRevision({ ...command,
+        payload: { ...payload,
+          change: { kind: "set-title", title: "Conflicting change" } } }, host);
+      assert.equal(later.ok, false,
+        "An unchanged-looking first read cannot clear another attempt");
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+
+test("metadata reconciliation rejects a repeated fresh-read identity",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "text-title-reused-read-"));
+    let reads = 0, saves = 0;
+    const host = { root, pacer: { acquire: async () => ({ ok: true,
+      lease: { startedAtMs: 0, release() {} } }) },
+      textRevision: { revise: async () => {
+        saves++;
+        return { outcome: "uncertain" };
+      } } } as BlooketPublicationDependencies;
+    const reconcile = { ...command,
+      command: "blooket.publication.reconcile-text" };
+    const fresh = async () => {
+      reads++;
+      return { operationId: "cli:00000000-0000-4000-8000-000000000001",
+        metadata: payload.expectedSet };
+    };
+    try {
+      assert.equal((await executeTextRevision(command, host)).ok, false);
+      const result = await reconcileUnchangedMetadataTextRevision(
+        reconcile, root, fresh);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.issues[0]?.code,
+        "text-revision-reconciliation-required");
+      assert.equal(reads, 2);
+      const changed = { ...command, payload: { ...payload,
+        change: { kind: "set-title", title: "Another title" } } };
+      assert.equal((await executeTextRevision(changed, host)).ok, false);
+      assert.equal(saves, 1,
+        "A repeated read identity must never re-arm the uncertain Save");
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+test("metadata reconciliation preserves a journal changed between reads",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "text-title-journal-race-"));
+    let reads = 0, saves = 0;
+    const host = { root, pacer: { acquire: async () => ({ ok: true,
+      lease: { startedAtMs: 0, release() {} } }) },
+      textRevision: { revise: async () => {
+        saves++;
+        return { outcome: "uncertain" };
+      } } } as BlooketPublicationDependencies;
+    const reconcile = { ...command,
+      command: "blooket.publication.reconcile-text" };
+    try {
+      assert.equal((await executeTextRevision(command, host)).ok, false);
+      const directory = join(root, "text-revisions");
+      const [setKey] = await readdir(directory);
+      assert.ok(setKey);
+      const [filename] = await readdir(join(directory, setKey));
+      assert.ok(filename);
+      const path = join(directory, setKey, filename);
+      const first = await readFile(path, "utf8");
+      const fresh = async () => {
+        reads++;
+        if (reads === 2) {
+          const saved = JSON.parse(first);
+          saved.history = [{ outcome: "unchanged",
+            at: "2026-10-29T19:00:00.000Z" }];
+          await writeFile(path, JSON.stringify(saved) + "\n");
+        }
+        return {
+          operationId: `cli:00000000-0000-4000-8000-00000000000${reads}`,
+          metadata: payload.expectedSet,
+        };
+      };
+      const result = await reconcileUnchangedMetadataTextRevision(
+        reconcile, root, fresh);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.issues[0]?.code,
+        "text-revision-reconciliation-required");
+      assert.equal(reads, 2);
+      assert.equal(JSON.parse(await readFile(path, "utf8")).phase,
+        "attempting", "A changed journal cannot be promoted to ready");
+      const changed = { ...command, payload: { ...payload,
+        change: { kind: "set-title", title: "Another title" } } };
+      assert.equal((await executeTextRevision(changed, host)).ok, false);
+      assert.equal(saves, 1, "No Save follows a changed attempt journal");
     } finally { await rm(root, { recursive: true, force: true }); }
   });

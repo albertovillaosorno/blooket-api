@@ -64,7 +64,7 @@ Usage:
   blooket capabilities inspect [--text-only] [--json]
   blooket sets list [--json]
   blooket sets get <set-id> [--json]
-  blooket sets revise-text <request.json> [--json]
+  blooket sets revise-text|reconcile-text <request.json> [--json]
   blooket questions list <set-id> [--json]
   blooket publication step <draft-id> <revision> [--json]
   blooket publication append|replace <draft-id> <revision> <set-id> [--json]
@@ -165,9 +165,12 @@ async function prepareCommand(
   operationId: string,
   readText: (path: string) => Promise<string>,
 ): Promise<CommandEnvelope> {
-  if (invocation.kind === "text-revision")
+  if (invocation.kind === "text-revision" ||
+      invocation.kind === "text-revision-reconcile")
     return { version: COMMAND_ENVELOPE_VERSION, operationId,
-      command: "blooket.publication.revise-text",
+      command: invocation.kind === "text-revision-reconcile"
+        ? "blooket.publication.reconcile-text"
+        : "blooket.publication.revise-text",
       payload: JSON.parse(await readText(invocation.requestPath)) };
   if (invocation.kind === "blooket-read" ||
       invocation.kind === "blooket-publication")

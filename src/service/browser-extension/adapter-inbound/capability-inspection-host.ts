@@ -124,7 +124,9 @@ function exactCapabilityFields<const K extends string>(
 }
 
 const DASHBOARD_ORIGIN = "https://dashboard.blooket.com";
-const MY_SETS_URL = DASHBOARD_ORIGIN + "/my-sets";
+// Observed Blooket dashboard canonicalizes My Sets to its recent filter.
+// Keep the exact query: arbitrary teacher filters are not a safe read route.
+const MY_SETS_URL = DASHBOARD_ORIGIN + "/my-sets?filter=recent";
 const MAX_POLLS = 50;
 const POLL_MS = 100;
 // Reserve three seconds for modal cleanup and navigation restoration.
