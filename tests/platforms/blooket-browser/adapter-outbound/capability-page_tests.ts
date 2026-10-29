@@ -340,7 +340,7 @@ test("read navigation preserves unfamiliar teacher URL state", () => {
       assert.equal(injected(), false, path);
     }
     for (const path of ["/edit?id=set-fixture", "/my-sets",
-      "/set/fixture"]) {
+      "/my-sets?filter=recent", "/set/fixture"]) {
       Object.defineProperty(globalThis, "location", {
         configurable: true,
         value: new URL("https://dashboard.blooket.com" + path),

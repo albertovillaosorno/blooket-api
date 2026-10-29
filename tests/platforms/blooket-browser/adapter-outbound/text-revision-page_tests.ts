@@ -224,6 +224,18 @@ test("title correction uses Done's explicit external form association",
     assert.deepEqual(await action("submit", request), { ok: false });
   }, "title"));
 
+test("description correction preserves title, privacy and submits once",
+  async () => fixture(async page => {
+    const request: BlooketTextRevision = { ...input,
+      change: { kind: "set-description",
+        description: "Practice English vocabulary with pictures." } };
+    assert.equal((await action("prepare", request)).ok, true);
+    assert.equal((await action("verify", request)).ok, true);
+    assert.deepEqual(await action("submit", request), { ok: true });
+    assert.equal(page.saves(), 1);
+    assert.deepEqual(await action("submit", request), { ok: false });
+  }, "title"));
+
 test("an externally associated foreign Done cannot receive Save",
   async () => fixture(async page => {
     const request: BlooketTextRevision = { ...input,

@@ -37,7 +37,7 @@ import {
   openBlooketDetailPanel,
   inspectBlooketDetailSidebar,
   closeBlooketDetailPanel,
-  isBlooketDetailPanelClosed,
+  isBlooketDetailPanelClosed, releaseClosedBlooketDetailReadWatch,
 } from "../../../../src/platforms/blooket-browser/adapter-outbound/page.ts";
 import {
   decodeBlooketSetList,
@@ -935,6 +935,8 @@ test(
 });
 
 test("read routes encode IDs and panel opening never submits a form", () => {
+  assert.equal(blooketReadUrl({ kind: "sets.list" }),
+    "https://dashboard.blooket.com/my-sets?filter=recent");
   assert.equal(
     blooketReadUrl({ kind: "sets.get", setId: "x&redirect=http://bad" }),
     "https://dashboard.blooket.com/edit?id=x%26redirect%3Dhttp%3A%2F%2Fbad",
@@ -1582,6 +1584,32 @@ test("only an untouched pending metadata read permits recovery reload", () => {
   });
 });
 
+test("My Sets admits only the observed recent-filter route", () => {
+  const { document, main } = base();
+  main.selectors["article"] = [card()];
+  page(document,
+    "https://dashboard.blooket.com/my-sets?filter=recent", () => {
+      assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }), {
+        ok: true, value: "my-sets",
+      });
+      const result = inspectBlooketPage({ kind: "sets.list" });
+      assert.equal(result.ok, true);
+      if (result.ok) assert.equal(
+        (result.value as { readonly items: unknown[] }).items.length, 1);
+    });
+  for (const suffix of [
+    "?filter=recent&owner=other", "?filter=unknown", "?filter=recent#x",
+    "?filter=recent&filter=recent", "?filter=Recent",
+  ]) {
+    page(document, "https://dashboard.blooket.com/my-sets" + suffix,
+      () => {
+        assert.deepEqual(inspectBlooketPage({ kind: "session.observe" }),
+          { ok: true, value: "unexpected-page" });
+        assert.equal(inspectBlooketPage({ kind: "sets.list" }).ok, false);
+      });
+  }
+});
+
 test("My Sets refuses filtered and fragmented collection routes", () => {
   const { document, main } = base();
   main.selectors["article"] = [card()];
@@ -1616,4 +1644,51 @@ test("Create and Edit status refuses extra URL state", () => {
         ok: true, value: suffix ? "unexpected-page" : "edit",
       }));
   }
+});
+
+
+test("orphaned read-owned details release only after native closure", () => {
+  const setId = "a".repeat(24);
+  const { document } = base();
+  const form = node("FORM");
+  const id = node("INPUT");
+  id.value = setId;
+  form.selectors['input[type="hidden"][name="setId"]'] = [id];
+  const title = node("INPUT");
+  title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+  form.selectors['input#title[name="title"]'] = [title];
+  document.selectors["form#question-set-form"] = [form];
+  document.selectors["main button"] = [node("BUTTON", "Edit Info")];
+  document.selectors["main p"] = [];
+  const world = globalThis as typeof globalThis & {
+    __blooketDetailEditWatch?: {
+      document: Document; setId: string; dirty: boolean;
+      dispose(): void;
+    };
+  };
+  let disposed = 0;
+  const owned = () => {
+    world.__blooketDetailEditWatch = {
+      document: document as unknown as Document, setId, dirty: false,
+      dispose: () => { disposed++; },
+    };
+  };
+  page(document, "https://dashboard.blooket.com/edit?id=" + setId, () => {
+    owned();
+    assert.equal(releaseClosedBlooketDetailReadWatch("b".repeat(24)),
+      false);
+    assert.equal(disposed, 0);
+    title.getBoundingClientRect = () => ({ width: 20, height: 20 });
+    assert.equal(releaseClosedBlooketDetailReadWatch(setId), false);
+    title.getBoundingClientRect = () => ({ width: 0, height: 0 });
+    world.__blooketDetailEditWatch!.dirty = true;
+    assert.equal(releaseClosedBlooketDetailReadWatch(setId), false);
+    world.__blooketDetailEditWatch!.dirty = false;
+    document.selectors['[role="alertdialog"]'] = [node("DIV")];
+    assert.equal(releaseClosedBlooketDetailReadWatch(setId), false);
+    document.selectors['[role="alertdialog"]'] = [];
+    assert.equal(releaseClosedBlooketDetailReadWatch(setId), true);
+    assert.equal(disposed, 1);
+    assert.equal(releaseClosedBlooketDetailReadWatch(setId), false);
+  });
 });

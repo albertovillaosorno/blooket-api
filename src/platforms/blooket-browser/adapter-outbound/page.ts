@@ -185,7 +185,9 @@ export function inspectBlooketPage(
         return { ok: true, value: "unexpected-page" };
       const heading = main.querySelector("h1");
       if (
-        url.pathname === "/my-sets" && !url.search && !url.hash &&
+        url.pathname === "/my-sets" &&
+        (url.search === "" || url.search === "?filter=recent") &&
+        !url.hash &&
         heading !== null && visible(heading) &&
         heading.textContent?.trim() === "My Sets"
       )
@@ -227,7 +229,9 @@ export function inspectBlooketPage(
     if (operation.kind === "sets.list") {
       const heading = main.querySelector("h1");
       if (
-        url.pathname !== "/my-sets" || url.search || url.hash ||
+        url.pathname !== "/my-sets" ||
+        (url.search !== "" && url.search !== "?filter=recent") ||
+        url.hash ||
         !heading || !visible(heading) ||
         heading.textContent?.trim() !== "My Sets"
       )
@@ -728,8 +732,10 @@ export function isBlooketDetailPanelClosed(
 
 export function blooketReadUrl(operation: PageReadOperation): string | null {
   if (operation.kind === "session.observe") return null;
+  // The live My Sets route uses this exact, observed filter. Read guards
+  // still refuse every other query or fragment on provider pages.
   if (operation.kind === "sets.list")
-    return "https://dashboard.blooket.com/my-sets";
+    return "https://dashboard.blooket.com/my-sets?filter=recent";
   if (
     !operation.setId ||
     operation.setId.length > 512 ||
@@ -885,4 +891,71 @@ export function openBlooketDetailPanel(setId: string): boolean {
     // reply failed; retain the ownership watch to prohibit duplicate opens.
     return false;
   }
+}
+
+// A failed read can leave an extension-owned clean Edit Info watch behind
+// after its native Cancel completed. This only retires the orphaned read
+// ownership; it cannot close an open form or change saved provider data.
+// Chrome serializes the helper, so it must not depend on module scope.
+export function releaseClosedBlooketDetailReadWatch(setId: string): boolean {
+  try {
+    const url = new URL(location.href);
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        url.pathname !== "/edit" || url.hash ||
+        url.searchParams.size !== 1 ||
+        url.searchParams.getAll("id").length !== 1 ||
+        url.searchParams.get("id") !== setId ||
+        !/^[a-f0-9]{24}$/u.test(setId) ||
+        document.title === "Just a moment..." ||
+        document.querySelector('input[type="password"]')) return false;
+    const visible = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 &&
+        style.display !== "none" && style.visibility === "visible";
+    };
+    if (["dialog[open]", '[role="alertdialog"]',
+      '[role="dialog"][aria-modal="true"]', ":popover-open",
+      'iframe[src*="recaptcha"]', 'iframe[src*="hcaptcha"]',
+    ].some(selector => Array.from(document.querySelectorAll(selector))
+      .some(visible))) return false;
+    const forms = document.querySelectorAll("form#question-set-form");
+    if (forms.length !== 1) return false;
+    const ids = forms[0]!.querySelectorAll(
+      'input[type="hidden"][name="setId"]');
+    const titles = forms[0]!.querySelectorAll('input#title[name="title"]');
+    const editButtons = Array.from(document.querySelectorAll(
+      "main button")).filter(button =>
+        visible(button) && button.textContent?.trim() === "Edit Info");
+    const markers = Array.from(document.querySelectorAll("main p"))
+      .filter(node => visible(node) &&
+        node.textContent?.trim() === "EDITING SET DETAILS");
+    if (ids.length !== 1 || (ids[0] as HTMLInputElement).value !== setId ||
+        titles.length !== 1 || visible(titles[0]!) ||
+        editButtons.length !== 1 || markers.length !== 0 ||
+        document.querySelector('input#question[name="question"]'))
+      return false;
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" ||
+        active.tagName === "TEXTAREA" || active.tagName === "SELECT" ||
+        (active as HTMLElement).isContentEditable ||
+        active.getAttribute("role") === "textbox")) return false;
+    const world = globalThis as typeof globalThis & {
+      __blooketDetailEditWatch?: {
+        document: Document; setId: string; dirty: boolean;
+        dispose: () => void;
+      };
+    };
+    if (["__blooketTextRevisionWatch", "__blooketQuestionEditWatch",
+      "__blooketAddQuestionFormWatch", "__blooketCreateSetWatch",
+      "__blooketCapabilityEditWatch"].some(key =>
+        Object.hasOwn(world, key))) return false;
+    const watch = world.__blooketDetailEditWatch;
+    if (!watch || watch.document !== document || watch.setId !== setId ||
+        watch.dirty !== false || typeof watch.dispose !== "function")
+      return false;
+    watch.dispose();
+    delete world.__blooketDetailEditWatch;
+    return true;
+  } catch { return false; }
 }

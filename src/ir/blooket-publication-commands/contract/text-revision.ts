@@ -9,7 +9,7 @@
 //
 // Boundary-Contract:
 // - Owns:
-//   - Exact requests for one existing-set title or question-text revision.
+//   - Exact title, description or question-text correction requests.
 // - Must-Not:
 //   - Change media, timing, answer correctness, types, or question order.
 // - Allows:
@@ -44,6 +44,7 @@ export interface BlooketTextRevision {
   readonly expectedSet: BlooketSetDetail;
   readonly change:
     | { readonly kind: "set-title"; readonly title: string }
+    | { readonly kind: "set-description"; readonly description: string }
     | { readonly kind: "question-text";
         readonly previous: BlooketQuestionRead;
         readonly question: string; readonly answers: readonly string[] };
@@ -77,6 +78,17 @@ export function decodeBlooketTextRevision(value: unknown):
       return { ok: true, value: { schemaVersion: 1,
         expectedSet: metadata.value,
         change: { kind: "set-title", title: title["title"] } } };
+    }
+    const description = exactOwnData(input["change"],
+      ["kind", "description"]);
+    if (description?.["kind"] === "set-description") {
+      if (!text(description["description"], 1_000) ||
+          description["description"] === metadata.value.description)
+        return invalid();
+      return { ok: true, value: { schemaVersion: 1,
+        expectedSet: metadata.value,
+        change: { kind: "set-description",
+          description: description["description"] } } };
     }
     const change = exactOwnData(input["change"],
       ["kind", "previous", "question", "answers"]);

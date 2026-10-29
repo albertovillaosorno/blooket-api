@@ -30,6 +30,8 @@
 //   - Files are decoded as UTF-8 text.
 //
 import { randomUUID } from "node:crypto";
+import { reconcileUnchangedMetadataTextRevision } from
+  "../../../api/blooket-write-execution/application/text-revision.ts";
 import { readFile } from "node:fs/promises";
 
 import { runCli } from "../../command-running/adapter-inbound/run-cli.ts";
@@ -47,7 +49,24 @@ import { userDataRoot } from
 
 const exitCode = await runCli(process.argv.slice(2), {
   execute: (command) =>
-    isBlooketReadCommand(command.command) ||
+    command.command === "blooket.publication.reconcile-text"
+      ? reconcileUnchangedMetadataTextRevision(command, userDataRoot(),
+        async (setId) => {
+          const operationId = "cli:" + randomUUID();
+          const result = await executeLocalBlooketRead({
+            version: 1, operationId, command: "blooket.sets.get",
+            payload: { setId },
+          }, userDataRoot());
+          const data = result.ok && result.value &&
+              typeof result.value === "object" &&
+              !Array.isArray(result.value) ? result.value : undefined;
+          if (!data || !("ok" in data) || data.ok !== true ||
+              !("kind" in data) || data.kind !== "set" ||
+              !("value" in data))
+            throw new Error("fresh-set-read-unavailable");
+          return { operationId, metadata: data.value };
+        })
+      : isBlooketReadCommand(command.command) ||
       isBlooketPublicationCommand(command.command)
       ? executeLocalBlooketRead(command, userDataRoot())
       : executeCommand(command),

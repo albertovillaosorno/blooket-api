@@ -269,7 +269,8 @@ test(
         }
         if (active === false &&
             tabUrl === "https://dashboard.blooket.com/edit?id=set-fixture" &&
-            url === "https://dashboard.blooket.com/my-sets") {
+            (url === "https://dashboard.blooket.com/my-sets" ||
+             url === "https://dashboard.blooket.com/my-sets?filter=recent")) {
           capabilityTabsCreated++;
           detachedCapabilityUrl = url;
           return { id: 84, url, status: "complete", windowId: 3 };
@@ -505,6 +506,8 @@ test(
           assert.deepEqual(args, [tabUrl]);
           return [{ result: documentOrigin }];
         }
+        if (func.name === "releaseClosedBlooketDetailReadWatch")
+          return [{ result: false }];
         if (func.name === "canLeaveBlooketPageForRead") {
           readGuardChecks++;
           if (reloadDuringLeave) {
@@ -614,6 +617,7 @@ test(
           return [{ result: detailCancelSucceeds }];
         }
         if (func.name === "isBlooketDetailPanelClosed") {
+          if (unsafeReadSource) return [{ result: false }];
           if (args?.[1] === true) {
             detailPendingRecoveryChecks++;
             if (detailPanelMountsAfterFirstProbe &&
@@ -872,7 +876,7 @@ test(
               expireDetailRead = false;
               // Cross the polling cutoff without expiring the reserved
               // cleanup window, which must still re-check tab ownership.
-              Date.now = () => realNow() + 6_500;
+              Date.now = () => realNow() + 22_500;
             }
             return [{ result: {
               ok: false, code: "blooket-browser-failed",
@@ -1336,6 +1340,8 @@ test(
       assert.equal(scripts.length, scriptsBeforePartial,
         "ranged response must never enter native browser scripts");
     }
+    // The observed provider navigation canonicalizes My Sets to recent.
+    tabUrl = "https://dashboard.blooket.com/my-sets?filter=recent";
     const firstSets = await expectReply({ kind: "sets.list" });
     assert.equal(firstSets.ok, true);
     assert.equal(firstSets.value.completeness, "unknown");
@@ -1389,7 +1395,7 @@ test(
     const beforeGuardSwitch = scripts.length;
     assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
     assert.equal(readReloads, reloadBeforeGuard);
-    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+    assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets?filter=recent");
     assert.deepEqual(scripts.slice(beforeGuardSwitch), [
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
       "inspectBlooketDocumentOrigin",
@@ -1414,13 +1420,16 @@ test(
     }
     assert.deepEqual(scripts.slice(beforeUnsafeRead), [
       "canLeaveBlooketPageForRead",
-      "inspectBlooketDocumentOrigin", "closeBlooketQuestionPanel",
+      "inspectBlooketDocumentOrigin", "isBlooketDetailPanelClosed",
+      "closeBlooketQuestionPanel",
       "inspectBlooketDocumentOrigin", "inspectBlooketQuestionWriteStage",
       "inspectBlooketSubmittedQuestionOwner", "inspectBlooketPage",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
-      "inspectBlooketDocumentOrigin", "closeBlooketQuestionPanel",
+      "inspectBlooketDocumentOrigin", "isBlooketDetailPanelClosed",
+      "closeBlooketQuestionPanel",
       "inspectBlooketDocumentOrigin", "canLeaveBlooketPageForRead",
-      "inspectBlooketDocumentOrigin", "closeBlooketQuestionPanel",
+      "inspectBlooketDocumentOrigin", "isBlooketDetailPanelClosed",
+      "closeBlooketQuestionPanel",
     ]);
     // A new CLI read reclaims its own interrupted inspection panel without
     // foregrounding the browser, submitting a form or acquiring a new tab.
@@ -1737,7 +1746,8 @@ test(
         return [bad];
       };
       assert.equal((await expectReply({ kind: "sets.list" })).ok, false);
-      assert.equal(tabUrl, "https://dashboard.blooket.com/my-sets");
+      assert.equal(tabUrl,
+        "https://dashboard.blooket.com/my-sets?filter=recent");
     }
     browser.scripting.executeScript = scriptBeforeBadWrapper;
     assert.equal(wrapperGetterCalls, 0);

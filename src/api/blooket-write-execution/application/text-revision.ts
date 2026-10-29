@@ -30,6 +30,8 @@
 //   - Unknown storage, pending edits and missing browser support stop.
 //
 import { createHash } from "node:crypto";
+import { decodeBlooketSetDetail, type BlooketSetDetail } from
+  "../../../ir/blooket-set-reads/contract/set-read.ts";
 import { readdir } from "node:fs/promises";
 import type { CommandEnvelope } from
   "../../../ir/wire-envelopes/contract/command-envelope.ts";
@@ -123,8 +125,7 @@ export async function executeTextRevision(command: CommandEnvelope,
         key, phase: "ready", request: input, history }) + "\n");
       return fail("text-revision-not-submitted", result.stage);
     }
-    if (result.outcome === "unchanged" && unresolved &&
-        input.change.kind === "question-text") {
+    if (result.outcome === "unchanged" && unresolved) {
       if (history.length >= 100)
         return fail("text-revision-reconciliation-required");
       history.push({ outcome: "unchanged", at: new Date().toISOString() });
@@ -146,4 +147,106 @@ export async function executeTextRevision(command: CommandEnvelope,
     });
   } catch { return fail("text-revision-storage-or-browser-unavailable"); }
   finally { lease?.release(); await boundary.lock.release(); }
+}
+
+
+// A local-only recovery tool for a lost Edit Info Save. Existing sets.get
+// forces a newly loaded provider document for each invocation. No text.revise
+// or Save is sent until two separate canonical reads establish the unchanged
+// original metadata, and the exact attempted request is still journaled.
+export async function reconcileUnchangedMetadataTextRevision(
+  command: CommandEnvelope, root: string,
+  readFresh: (setId: string) => Promise<{
+    readonly operationId: string; readonly metadata: unknown;
+  }>,
+) {
+  const stop = (code: string) => commandFailure(command.operationId, [{
+    path: "$.revision", code,
+    message: "Reconciliation stopped without a Save. Preserve the original " +
+      "journal and review fresh account evidence before any retry.",
+  }]);
+  if (command.command !== "blooket.publication.reconcile-text")
+    return stop("text-revision-invalid-recovery-command");
+  const decoded = decodeBlooketTextRevision(command.payload);
+  if (!decoded.ok) return commandFailure(command.operationId, decoded.issues);
+  const input = decoded.value;
+  if (input.change.kind === "question-text")
+    return stop("text-revision-metadata-only");
+  const key = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  const setKey = createHash("sha256").update(input.expectedSet.id)
+    .digest("hex");
+  const boundary = await acquirePublicationBoundary(root);
+  if (!boundary.ok) return stop("blooket-publication-busy");
+  try {
+    const path = await safeLibraryPath(root,
+      "text-revisions/" + setKey + "/" + key + ".json");
+    const files = await readdir(path.slice(0, path.lastIndexOf("/")));
+    if (files.length > 1_000) return stop("text-revision-storage-unavailable");
+    let original: Buffer | undefined;
+    let originalHistory: { outcome: "unchanged"; at: string }[] = [];
+    for (const file of files) {
+      if (!/^[a-f0-9]{64}\.json$/u.test(file))
+        return stop("text-revision-storage-unavailable");
+      const bytes = await boundedBytes(await safeLibraryPath(root,
+        "text-revisions/" + setKey + "/" + file), 1_000_000);
+      const entry = JSON.parse(bytes.toString("utf8"));
+      const valid = decodeBlooketTextRevision(entry.request);
+      if (!valid.ok || entry.schemaVersion !== 1 ||
+          !["ready", "attempting", "verified"].includes(entry.phase) ||
+          entry.key !== file.slice(0, -5) ||
+          createHash("sha256").update(JSON.stringify(valid.value))
+            .digest("hex") !== entry.key ||
+          valid.value.expectedSet.id !== input.expectedSet.id)
+        return stop("text-revision-storage-unavailable");
+      if (file === key + ".json") {
+        if (entry.phase !== "attempting" ||
+            JSON.stringify(valid.value) !== JSON.stringify(input) ||
+            !Array.isArray(entry.history) || entry.history.length >= 100 ||
+            entry.history.some((x: { outcome?: unknown; at?: unknown }) =>
+              x?.outcome !== "unchanged" ||
+              typeof x.at !== "string" ||
+              !Number.isFinite(Date.parse(x.at))))
+          return stop("text-revision-reconciliation-required");
+        original = bytes;
+        originalHistory = entry.history;
+      } else if (entry.phase === "attempting")
+        return stop("text-revision-reconciliation-required");
+    }
+    if (!original) return stop("text-revision-reconciliation-required");
+    const verified: { readonly operationId: string;
+      readonly metadata: BlooketSetDetail }[] = [];
+    for (let i = 0; i < 2; i++) {
+      const response = await readFresh(input.expectedSet.id);
+      const observation = decodeBlooketSetDetail(response.metadata);
+      if (!/^cli:[a-f0-9-]{36}$/u.test(response.operationId) ||
+          verified.some(x => x.operationId === response.operationId) ||
+          !observation.ok ||
+          JSON.stringify(observation.value) !==
+            JSON.stringify(input.expectedSet))
+        return stop("text-revision-reconciliation-required");
+      verified.push({ operationId: response.operationId,
+        metadata: observation.value });
+    }
+    // Validate journal bytes again after the second independently reloaded
+    // provider document. A concurrent or manually changed journal is not
+    // allowed to be promoted by an earlier observation.
+    const current = await boundedBytes(path, 1_000_000);
+    if (!current.equals(original))
+      return stop("text-revision-reconciliation-required");
+    const recovered = JSON.parse(original.toString("utf8"));
+    const at = new Date().toISOString();
+    const history = [...originalHistory, { outcome: "unchanged", at }];
+    await writeAtomicFile(path, JSON.stringify({ ...recovered,
+      phase: "ready", history,
+      recoveryEvidence: { kind: "fresh-set-get-v1", at,
+        operationIds: verified.map(x => x.operationId) },
+    }) + "\n");
+    return commandFailure(command.operationId, [{
+      path: "$.revision", code: "text-revision-reconciled-unchanged",
+      message: "Two independent fresh set reads verified the original " +
+        "metadata. No Save was sent. The original attempt remains in " +
+        "journal history; a separate paced admission is now possible.",
+    }]);
+  } catch { return stop("text-revision-storage-or-browser-unavailable"); }
+  finally { await boundary.lock.release(); }
 }

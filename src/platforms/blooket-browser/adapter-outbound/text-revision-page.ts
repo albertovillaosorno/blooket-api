@@ -103,11 +103,13 @@ export async function runBlooketTextRevisionPageAction(
       (visible(logout[0]!) || (profile.length === 1 &&
         visible(profile[0]!) && !!profile[0]!.textContent?.trim()));
   };
-  const owner = change.kind === "set-title"
+  const metadataChange = change.kind !== "question-text";
+  const owner = metadataChange
     ? world.__blooketDetailEditWatch : world.__blooketQuestionEditWatch;
   const owned = () => guarded() && owner?.document === document &&
     owner.setId === set.id && !owner.dirty &&
-    (change.kind === "set-title" || owner.number === change.previous.number);
+    (metadataChange || (change.kind === "question-text" &&
+      owner.number === change.previous.number));
   let form: HTMLFormElement | null = null;
   const one = (selector: string): HTMLInputElement |
     HTMLTextAreaElement | null => {
@@ -143,7 +145,8 @@ export async function runBlooketTextRevisionPageAction(
       HTMLInputElement | null;
     if (id?.value !== set.id) return undefined;
     return JSON.stringify(Array.from(form.querySelectorAll(
-      "input,textarea,select")).filter(node => node.id !== "title")
+      "input,textarea,select")).filter(node =>
+      node.id !== (change.kind === "set-description" ? "desc" : "title"))
       .map(node => {
         const control = node as HTMLInputElement;
         return [control.tagName, control.id, control.name, control.type,
@@ -158,7 +161,7 @@ export async function runBlooketTextRevisionPageAction(
       .padStart(2, "0")).join("");
   };
   const media = async (): Promise<string | undefined> => {
-    if (change.kind === "set-title") {
+    if (metadataChange) {
       const fields = preserved();
       return fields === undefined ? undefined : digest(fields);
     }
@@ -187,13 +190,15 @@ export async function runBlooketTextRevisionPageAction(
     const title = one('input#title[name="title"]');
     const desc = one('textarea#desc[name="desc"]');
     const privacy = one('input#private[name="private"]');
-    return change.kind === "set-title" && !!title && !!desc && !!privacy &&
-      title.value === (desired ? change.title : set.title) &&
-      desc.value === set.description &&
+    return metadataChange && !!title && !!desc && !!privacy &&
+      title.value === (desired && change.kind === "set-title"
+        ? change.title : set.title) &&
+      desc.value === (desired && change.kind === "set-description"
+        ? change.description : set.description) &&
       privacy.getAttribute("aria-checked") ===
         (set.visibility === "private" ? "false" : "true");
   };
-  const matches = (desired: boolean) => change.kind === "set-title"
+  const matches = (desired: boolean) => metadataChange
     ? titleMatches(desired) : questionMatches(desired);
   const wait = async (check: () => boolean): Promise<boolean> => {
     for (let i = 0; i < 50; i++) {
@@ -278,10 +283,14 @@ export async function runBlooketTextRevisionPageAction(
         request: JSON.stringify(input), preserved: before,
         prepared: false, submitted: false };
       world.__blooketTextRevisionWatch = watch;
-      if (change.kind === "set-title") {
-        phase = "title-control";
-        if (!await setText(one('input#title[name="title"]'), change.title))
-          return failed();
+      if (metadataChange) {
+        phase = "metadata-control";
+        const control = change.kind === "set-title"
+          ? one('input#title[name="title"]')
+          : one('textarea#desc[name="desc"]');
+        const value = change.kind === "set-title"
+          ? change.title : change.description;
+        if (!await setText(control, value)) return failed();
       } else {
         const prior = change.previous;
         // Remove a changed correct text through its native toggle first;
@@ -341,14 +350,14 @@ export async function runBlooketTextRevisionPageAction(
         preserved() !== watch.preserved) return failed();
     // Edit Info's Done control is outside the form and uses HTML's explicit
     // form association. Question Save remains a descendant of its own form.
-    const candidates = change.kind === "set-title"
+    const candidates = metadataChange
       ? Array.from(document.querySelectorAll('button[type="submit"]'))
           .filter(button => (button as HTMLButtonElement).form ===
             capturedForm)
       : Array.from(capturedForm.querySelectorAll('button[type="submit"]'));
     const buttons = candidates
       .filter(button => visible(button) && button.textContent?.trim() ===
-        (change.kind === "set-title" ? "Done" : "Save Question"));
+        (metadataChange ? "Done" : "Save Question"));
     const save = buttons.length === 1 ? buttons[0] as HTMLButtonElement : null;
     if (!save || save.disabled || save.getAttribute("aria-disabled") ===
         "true" || !owned() || !matches(true) ||

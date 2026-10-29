@@ -44,7 +44,8 @@ const request: BlooketTextRevision = { schemaVersion: 1,
   expectedSet: { schemaVersion: 1, id: "fixture", title: "Before",
     description: "Keep", visibility: "public" },
   change: { kind: "set-title", title: "B.1.01 - Vocabulary of Lesson 1" } };
-function fixture(loseSaveReply = false) {
+function fixture(loseSaveReply = false,
+  input: BlooketTextRevision = request, persist = true) {
   let origin = 100, saves = 0, reloads = 0;
   const calls: string[] = [];
   const browser: AddQuestionChromePort = {
@@ -60,18 +61,24 @@ function fixture(loseSaveReply = false) {
       calls.push(name + (name === "runBlooketTextRevisionPageAction"
         ? ":" + args[0] : ""));
       let result: unknown;
-      const title = saves ? "B.1.01 - Vocabulary of Lesson 1" : "Before";
+      const title = saves && persist && input.change.kind === "set-title"
+        ? input.change.title : "Before";
+      const description = saves && persist &&
+        input.change.kind === "set-description"
+        ? input.change.description : "Keep";
       if (name === "inspectBlooketDocumentOrigin") result = origin;
       else if (name === "inspectBlooketDetailSidebar")
-        result = { ok: true, value: { title, description: "Keep" } };
+        result = { ok: true, value: { title, description } };
       else if (name === "inspectBlooketPage") result = { ok: true,
-        value: { ...request.expectedSet, title } };
+        value: { ...input.expectedSet, title, description } };
       else if (name === "runBlooketTextRevisionPageAction") {
         if (args[0] === "submit") {
           saves++;
           if (loseSaveReply) throw Error("lost submission reply");
           result = { ok: true };
         } else if (args[0] === "release") result = { ok: true };
+        else if (args[0] === "verify" && saves && !persist)
+          result = { ok: false };
         else result = { ok: true, mediaIdentity: "a".repeat(64) };
       } else if (["openBlooketDetailPanel", "closeBlooketDetailPanel",
         "isBlooketDetailPanelClosed"].includes(name)) result = true;
@@ -94,6 +101,18 @@ test("title correction confirms one Save in a new native document",
       f.calls.indexOf("runBlooketTextRevisionPageAction:verify"));
   });
 
+test("description correction verifies saved text after a fresh reload",
+  async () => {
+    const input: BlooketTextRevision = { ...request,
+      change: { kind: "set-description",
+        description: "Learn everyday English vocabulary." } };
+    const f = fixture(false, input);
+    assert.equal(await f.host.revise(input, false, Date.now() + 10_000),
+      "verified");
+    assert.equal(f.saves(), 1);
+    assert.equal(f.reloads(), 1);
+  });
+
 test("a lost native Save reply never reloads or resubmits the owned form",
   async () => {
     const f = fixture(true);
@@ -102,6 +121,18 @@ test("a lost native Save reply never reloads or resubmits the owned form",
     assert.equal(f.saves(), 1);
     assert.equal(f.reloads(), 0);
     assert.equal(f.calls.includes("closeBlooketDetailPanel"), false);
+  });
+
+test("an unchanged metadata Save requires two fresh native documents to rearm",
+  async () => {
+    const f = fixture(true, request, false);
+    assert.equal(await f.host.revise(request, false, Date.now() + 10_000),
+      "uncertain");
+    assert.equal(f.saves(), 1);
+    assert.equal(await f.host.revise(request, true, Date.now() + 10_000),
+      "unchanged");
+    assert.equal(f.reloads(), 1);
+    assert.equal(f.saves(), 1);
   });
 
 test("unchanged recovery requires two fresh original-row observations",

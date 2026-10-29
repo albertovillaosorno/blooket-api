@@ -39,7 +39,7 @@ import {
   inspectBlooketDetailSidebar,
   closeBlooketDetailPanel,
   isBlooketDetailPanelClosed,
-  blooketReadUrl,
+  releaseClosedBlooketDetailReadWatch, blooketReadUrl,
   type PageReadOperation,
 } from "../../../platforms/blooket-browser/adapter-outbound/page.ts";
 import { createExtensionQuestionInspectionHost } from
@@ -376,8 +376,12 @@ async function read(
 ) {
   // Full question scans have a minute lease; reserve two seconds of the
   // worker budget for read-owned panel cleanup after inspection expires.
+  // Metadata reads navigate, hydrate, inspect twice and Cancel an owned
+  // sidebar. Reserve a bounded budget for the native cleanup, even when
+  // provider pacing or hydration is slower than the session read.
   const readDeadline = Date.now() +
-    (operation.kind === "questions.list" ? 55_000 : 8_000);
+    (operation.kind === "questions.list" ? 55_000 :
+      operation.kind === "sets.get" ? 24_000 : 8_000);
   if (operation.kind === "session.observe") {
     const source = await browser.tabs.get(current.tabId);
     let observed = await readPage(current, browser, operation, readDeadline);
@@ -433,6 +437,19 @@ async function canLeaveAutomationPage(
     inspectBlooketDocumentOrigin as (...args: never[]) => unknown, [tab.url]);
   if (typeof origin !== "number" || !Number.isFinite(origin) || origin <= 0)
     return false;
+  const closedDetail = await script(current, browser,
+    isBlooketDetailPanelClosed as (...args: never[]) => unknown, [id]);
+  if (closedDetail === true && await script(current, browser,
+    releaseClosedBlooketDetailReadWatch as
+      (...args: never[]) => unknown, [id]) === true) {
+    const after = await browser.tabs.get(current.tabId);
+    if (after.url !== tab.url || after.status !== "complete" ||
+        after.pendingUrl !== undefined || await script(current, browser,
+          inspectBlooketDocumentOrigin as (...args: never[]) => unknown,
+          [tab.url]) !== origin) return false;
+    return await script(current, browser,
+      canLeaveBlooketPageForRead as (...args: never[]) => unknown);
+  }
   if (await script(current, browser,
     closeBlooketQuestionPanel as (...args: never[]) => unknown, [id]) !== true)
     return false;
@@ -1090,7 +1107,7 @@ async function inspectDetachedBlooketSets(
   browser: ReturnType<typeof ownedBrowser>,
 ): Promise<unknown> {
   const failed = () => ({ ok: false, code: "blooket-browser-failed" });
-  const url = "https://dashboard.blooket.com/my-sets";
+  const url = "https://dashboard.blooket.com/my-sets?filter=recent";
   let tabId: number | undefined;
   let removed = false;
   let result: unknown = failed();
@@ -1269,8 +1286,9 @@ async function relay(current: Connection, activeGeneration: number) {
         const decoded = decodeBlooketBrowserBridgeRequest(next.job);
         if (!decoded.ok) throw new Error("invalid-browser-job");
         const job = decoded.value;
-        // Full question scans and writes have a sixty-second broker lease;
-        // ordinary reads retain ten seconds.
+        // Full question scans and writes have a sixty-second broker lease.
+        // Native metadata reads need time for hydration and guarded Cancel;
+        // short session/list reads retain their existing eight-second budget.
         // Leave transport margin before expiry so a late script cannot
         // start another mutation after its caller stopped awaiting it.
         const budgetMs = job.command.kind === "session.authenticate"
@@ -1281,6 +1299,7 @@ async function relay(current: Connection, activeGeneration: number) {
               job.command.kind === "text.revise" ||
               job.command.kind === "questions.list"
             ? 57_000
+            : job.command.kind === "sets.get" ? 27_000
             : job.command.kind === "capabilities.inspect" ||
                 job.command.kind === "capabilities.inspect-text"
               ? 9_000 : 8_000;

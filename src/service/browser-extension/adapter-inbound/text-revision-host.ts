@@ -21,7 +21,7 @@
 // - Merge-When:
 //   - Existing text edits share one provider mutation host.
 // - Summary:
-//   - Preserves images during bounded title and question-text corrections.
+//   - Preserves media during existing title, description and question edits.
 // - Description:
 //   - A lost response permits verification only, never another Save.
 // - Usage:
@@ -75,6 +75,7 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
       const set = input.expectedSet, change = input.change;
       const url = "https://dashboard.blooket.com/edit?id=" +
         encodeURIComponent(set.id);
+      const metadataChange = change.kind !== "question-text";
       let origin: number | undefined;
       let submitted = verifyOnly;
       let opened = false;
@@ -134,18 +135,22 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
           ["title", "description"]);
         const expectedTitle = change.kind === "set-title" &&
           (verifyOnly || freshRead) ? change.title : set.title;
+        const expectedDescription = change.kind === "set-description" &&
+          (verifyOnly || freshRead) ? change.description : set.description;
         if (source?.["ok"] !== true ||
             (metadata?.["title"] !== expectedTitle &&
               !(verifyOnly && metadata?.["title"] === set.title)) ||
-            metadata["description"] !== set.description) return false;
-        if (change.kind === "set-title") {
+            (metadata["description"] !== expectedDescription &&
+              !(verifyOnly && metadata["description"] === set.description)))
+          return false;
+        if (metadataChange) {
           if (await script(openBlooketDetailPanel as
               (...args: never[]) => unknown, [set.id]) !== true) return false;
         } else if (await script(openBlooketQuestionPanel as
             (...args: never[]) => unknown,
             [set.id, change.previous.number]) !== true) return false;
         opened = true;
-        if (change.kind !== "set-title") return true;
+        if (!metadataChange) return true;
         return await wait(async () => {
           if (!await sameTab()) return false;
           const read = exactOwnData(await script(inspectBlooketPage as
@@ -158,16 +163,29 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
         });
       };
       const close = async (): Promise<boolean> => {
-        if (!await sameTab()) return false;
-        const result = change.kind === "set-title"
-          ? observedMetadata && await script(closeBlooketDetailPanel as
-              (...args: never[]) => unknown,
-              [set.id, observedMetadata, observedMetadata])
-          : await script(closeBlooketQuestionPanel as
-              (...args: never[]) => unknown, [set.id]);
-        if (result !== true) return false;
-        opened = false;
-        return true;
+        // The metadata editor may briefly retain a stale React form after
+        // its read-only verification. Retry only the exact guarded Cancel;
+        // no Save is ever attempted by cleanup or reconciliation.
+        for (let n = 0; n < 15; n++) {
+          if (!await sameTab()) return false;
+          const result = metadataChange
+            ? observedMetadata && await script(closeBlooketDetailPanel as
+                (...args: never[]) => unknown,
+                [set.id, observedMetadata, observedMetadata])
+            : await script(closeBlooketQuestionPanel as
+                (...args: never[]) => unknown, [set.id]);
+          if (result === true) { opened = false; return true; }
+          // A previous guarded Cancel may have already unmounted its form
+          // despite a lost scripting reply. Accept only the native, read-only
+          // proof that the exact metadata editor is fully closed.
+          if (metadataChange && await script(
+              isBlooketDetailPanelClosed as
+                (...args: never[]) => unknown, [set.id]) === true &&
+              await sameTab()) { opened = false; return true; }
+          if (!metadataChange) return false;
+          await pause(100);
+        }
+        return false;
       };
       try {
         stage("open");
@@ -188,7 +206,7 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
           if (prepared?.["ok"] !== true ||
               typeof prepared["mediaIdentity"] !== "string") return failure();
           identity = prepared["mediaIdentity"];
-          if (change.kind === "set-title") await pause(5_000);
+          if (metadataChange) await pause(5_000);
           submitted = true;
           stage("submit");
           const saved = await action("submit");
@@ -197,7 +215,7 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
           if (saved?.["ok"] !== true) return failure();
           opened = false;
           stage("closure");
-          const closedProbe = change.kind === "set-title"
+          const closedProbe = metadataChange
             ? isBlooketDetailPanelClosed : isBlooketQuestionPanelClosed;
           if (!await wait(async () => await sameTab() &&
               await script(closedProbe as (...args: never[]) => unknown,
@@ -206,7 +224,7 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
           await chrome.tabs.reload(tabId, { bypassCache: true });
           if (!await wait(() => sameTab(true))) return failure();
           freshRead = true;
-          if (change.kind === "set-title") await pause(5_000);
+          if (metadataChange) await pause(5_000);
           if (!await open()) return failure();
         }
         let verified = false;
@@ -216,19 +234,29 @@ export function createExtensionTextRevisionHost(chrome: AddQuestionChromePort,
           if (probe?.["ok"] === true) { verified = true; break; }
           await pause(100);
         }
-        // Existing-row text assignment is idempotent. Re-arm only after
-        // two independent documents show the exact original text, flags,
+        // Text assignment is idempotent. Re-arm only after
+        // two independent documents show the exact original fields, flags,
         // timing and original media identity. This call never clicks Save;
         // the application records recovery and stops for a separate call.
         let unchanged = false;
-        if (!verified && verifyOnly && change.kind === "question-text") {
+        if (!verified && verifyOnly) {
           const original = await action("verify-original", identity);
           unchanged = original?.["ok"] === true;
           if (!unchanged) return failure();
+          // Metadata recovery, like question recovery, requires a native
+          // identity bound on the first freshly read document and reproduced
+          // on a distinct reloaded document before a separate new Save.
+          if (metadataChange && identity === undefined) {
+            const observed = original?.["mediaIdentity"];
+            if (typeof observed !== "string" ||
+                !/^[a-f0-9]{64}$/u.test(observed)) return failure();
+            identity = observed;
+          }
           // If the original collection had no image byte evidence, bind the
           // current native image serialization to the first fresh document.
           // The next document must match this exact digest before rearming.
-          if (change.previous.hasImage &&
+          if (change.kind === "question-text" &&
+              change.previous.hasImage &&
               !change.previous.imageEvidence && identity === undefined) {
             const observed = original?.["mediaIdentity"];
             if (typeof observed !== "string" ||

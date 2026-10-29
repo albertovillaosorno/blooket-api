@@ -70,7 +70,8 @@ export function canLeaveBlooketPageForRead(): boolean {
         !url.searchParams.get("id") ||
         url.searchParams.get("id")!.length > 512 ||
         /[\x00-\x1f\x7f]/u.test(url.searchParams.get("id")!)
-      : Boolean(url.search))) return false;
+      : url.search !== "" && url.search !== "?filter=recent"))
+      return false;
     const visible = (element: Element) => {
       const bounds = element.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return false;

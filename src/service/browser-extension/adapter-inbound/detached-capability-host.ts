@@ -54,7 +54,8 @@ export interface DetachedCapabilityChromePort extends
   };
 }
 
-const MY_SETS = "https://dashboard.blooket.com/my-sets";
+// Blooket currently canonicalizes this listing to the recent-filter route.
+const MY_SETS = "https://dashboard.blooket.com/my-sets?filter=recent";
 const failed = (): ExtensionCapabilityInspectionResult =>
   ({ ok: false, code: "blooket-browser-failed" });
 
