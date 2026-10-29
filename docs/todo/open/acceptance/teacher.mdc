@@ -645,6 +645,16 @@ The remaining Jig gate separately reports stale observations for these
 two authorities, mismatched catalog registration, and hook ownership;
 no toolchain upgrade or validation bypass was made.
 
+
+On 2026-10-29, existing-text verification cleanup was separately
+hardened after reproducing a false or thrown native Cancel reply.
+A closed-looking metadata editor no longer confirms recovery unless
+the exact untouched read-owned watch is released on the same native
+document. Missing watch release, a document replacement, or an unreadable
+closure now retain uncertainty without a second Cancel attempt. The
+regressions use a synthetic browser, leave submitted Saves untouched,
+and do not establish new live Blooket acceptance.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto

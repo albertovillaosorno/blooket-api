@@ -45,7 +45,10 @@ const request: BlooketTextRevision = { schemaVersion: 1,
     description: "Keep", visibility: "public" },
   change: { kind: "set-title", title: "B.1.01 - Vocabulary of Lesson 1" } };
 function fixture(loseSaveReply = false,
-  input: BlooketTextRevision = request, persist = true) {
+  input: BlooketTextRevision = request, persist = true,
+  cancel: "confirmed" | "lost-closed" | "thrown-closed" = "confirmed",
+  releaseWatch = false, replaceDocumentOnRelease = false,
+  loseClosureProbe = false) {
   let origin = 100, saves = 0, reloads = 0;
   const calls: string[] = [];
   const browser: AddQuestionChromePort = {
@@ -80,8 +83,19 @@ function fixture(loseSaveReply = false,
         else if (args[0] === "verify" && saves && !persist)
           result = { ok: false };
         else result = { ok: true, mediaIdentity: "a".repeat(64) };
-      } else if (["openBlooketDetailPanel", "closeBlooketDetailPanel",
-        "isBlooketDetailPanelClosed"].includes(name)) result = true;
+      } else if (name === "closeBlooketDetailPanel") {
+        if (cancel === "thrown-closed") throw Error("lost Cancel reply");
+        result = cancel === "confirmed";
+      }
+      else if (name === "releaseClosedBlooketDetailReadWatch") {
+        if (replaceDocumentOnRelease) origin++;
+        result = releaseWatch;
+      }
+      else if (name === "isBlooketDetailPanelClosed") {
+        if (loseClosureProbe) throw Error("closure read unavailable");
+        result = true;
+      }
+      else if (name === "openBlooketDetailPanel") result = true;
       else throw Error("unexpected script " + name);
       return [{ result }];
     } },
@@ -121,6 +135,38 @@ test("a lost native Save reply never reloads or resubmits the owned form",
     assert.equal(f.saves(), 1);
     assert.equal(f.reloads(), 0);
     assert.equal(f.calls.includes("closeBlooketDetailPanel"), false);
+  });
+
+test("lost metadata Cancel reply needs an exact orphan-watch release",
+  async () => {
+    for (const cancel of ["lost-closed", "thrown-closed"] as const) {
+      for (const released of [false, true]) {
+        const f = fixture(false, request, true, cancel, released);
+        assert.equal(await f.host.revise(request, true,
+          Date.now() + 10_000), released ? "verified" : "uncertain");
+        assert.equal(f.saves(), 0, "Recovery cannot click Save");
+        assert.equal(f.calls.filter(x => x ===
+          "closeBlooketDetailPanel").length, 1,
+          "A lost Cancel reply must not cause another Cancel click");
+        assert.equal(f.calls.filter(x => x ===
+          "releaseClosedBlooketDetailReadWatch").length, 1);
+      }
+    }
+    const replaced = fixture(false, request, true, "thrown-closed",
+      true, true);
+    assert.equal(await replaced.host.revise(request, true,
+      Date.now() + 10_000), "uncertain");
+    assert.equal(replaced.saves(), 0);
+    assert.equal(replaced.calls.filter(x =>
+      x === "closeBlooketDetailPanel").length, 1);
+    const missingProof = fixture(false, request, true, "thrown-closed",
+      false, false, true);
+    assert.equal(await missingProof.host.revise(request, true,
+      Date.now() + 10_000), "uncertain");
+    assert.equal(missingProof.saves(), 0);
+    assert.equal(missingProof.calls.filter(x =>
+      x === "closeBlooketDetailPanel").length, 1,
+      "An unreadable closure cannot trigger a second Cancel click");
   });
 
 test("an unchanged metadata Save requires two fresh native documents to rearm",
