@@ -598,6 +598,30 @@ and visual confirmation that no Terminal opens. Portable fixtures prove the
 controller and product composition only; they never stand in for these native
 observations or reopen the completed functional milestone.
 
+
+On 2026-10-29, two synthetic text-revision recovery regressions
+verified that reusing a fresh-read operation identity or changing the
+attempt journal between independent metadata observations cannot
+promote an uncertain Save to a new submission. Both paths preserve the
+blocked attempt and permit no additional Save. The focused recovery
+suite passed 7 tests; the full repository passed 2,307 tests in
+separate groups, and provider-drift coverage passed 431 tests. These
+are local fixture results, not a new live Blooket Save or provider
+acceptance claim.
+
+At that point, the next lesson remained unpublished because the
+connected My Sets listing had unknown completeness. Later teacher
+confirmation allowed guarded publication and verified recovery.
+
+A separate 2026-10-29 synthetic regression covers the subsequent
+ambiguous Create Set scenario: an explicitly verified, positive remote
+set receipt under the shared reconciliation lock can advance a journal
+with an incomplete set-observation baseline exactly once. Replaying the
+same resolution must fail without changing the confirmed checkpoint.
+The regression does not equate an incomplete list or missing response
+with proof of persistence; independent remote evidence remains required.
+All 2,308 repository tests passed in separate groups after this test.
+
 ## Blockers
 
 This evergreen record has no finite technical completion target; only Alberto

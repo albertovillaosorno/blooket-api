@@ -134,6 +134,49 @@ test(
   },
 );
 
+test("a partial set observation recovers only an explicitly verified set",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const value = paths(directory);
+      const baseline = { schemaVersion: 1 as const,
+        kind: "set-observation" as const, itemCount: 33,
+        sha256: "a".repeat(64) };
+      const begun = await beginWriteAttempt(value.attempt, plan, 0,
+        baseline);
+      assert.equal(begun.ok, true);
+      const loaded = await loadWriteAttemptFile(value.attempt, plan);
+      assert.equal(loaded.ok, true);
+      if (!loaded.ok || loaded.kind !== "record") return;
+      assert.deepEqual(loaded.record.baseline, baseline);
+
+      // External evidence is required to resolve incomplete account lists;
+      // the locked reconciler does not infer a Save from the digest alone.
+      const resolution = { operationId: plan.operations[0]!.operationId,
+        outcome: "confirmed" as const,
+        receipt: { kind: "set-created" as const,
+          remoteSetId: "a".repeat(24) } };
+      const recovered = await reconcilePersistedBlooketWrite(
+        value.checkpoint, value.attempt, plan, resolution);
+      assert.equal(recovered.ok, true);
+      if (!recovered.ok) return;
+      assert.equal(recovered.kind, "recovered");
+      assert.deepEqual(recovered.checkpoint, {
+        schemaVersion: 2, planId: plan.planId,
+        nextOperationIndex: 1, remoteSetId: resolution.receipt.remoteSetId,
+      });
+      assert.deepEqual(await loadWriteAttemptFile(value.attempt, plan),
+        { ok: true, kind: "missing" });
+
+      assert.deepEqual(await reconcilePersistedBlooketWrite(
+        value.checkpoint, value.attempt, plan, resolution), {
+        ok: false, stage: "reconciliation",
+        code: "reconciliation-not-required",
+      });
+      assert.deepEqual(JSON.parse(await readFile(value.checkpoint,
+        "utf8")), recovered.checkpoint);
+    });
+  });
+
 test(
   "not-confirmed reconciliation clears only the ambiguous attempt",
   async () => {
