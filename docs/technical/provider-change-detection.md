@@ -89,10 +89,11 @@ capturing personal account data. First add a failing regression. Then make a
 narrow fix and preserve tests for unsupported, interrupted, human-stop and
 ambiguous outcomes. Review old fixtures for false confidence after updates.
 
-Use separate, reviewable provider-compatibility commits repeatedly instead of
-waiting for feature failures. Keep the permanent `blooket-15` task active even
-when drift checks are green or other milestones are complete. Never reclassify
-unconfirmed account writes as successful based on a local shape check.
+For future authorized provider work, prefer separate, reviewable
+compatibility commits instead of waiting for feature failures. The historical
+`blooket-15` evergreen task was explicitly closed by the owner on 2026-11-02;
+it is not a standing instruction to run new work. Never reclassify unconfirmed
+account writes as successful based on a local shape check.
 
 On 2026-10-26, an authorized read-only Chrome 155 session reproduced an
 incomplete image-rich question scan under the eight-second worker budget.

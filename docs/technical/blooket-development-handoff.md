@@ -14,10 +14,10 @@ image/typing quiz with all three operations complete and `published: true`.
 The product saved both questions without controller Save; the current
 companion was loaded and the exact local service restarted before verification.
 
-Tasks blooket-11 and blooket-12 are now completed under
-`docs/todo/completed/`. Browserless agents should continue with blooket-15,
-including intermittent provider-read stops, controller attachment and
-uninterrupted-run assurance; never replay the retained historical attempts.
+Tasks blooket-11 and blooket-12 are completed under
+`docs/todo/completed/`. The former ongoing `blooket-15` maintenance record
+was explicitly closed by the owner on 2026-11-02. Future browserless work
+requires separate authorization. Never replay retained historical attempts.
 
 One later registered-MCP verification encountered a recoverable browser-read
 failure; the independent canonical CLI verification subsequently succeeded at

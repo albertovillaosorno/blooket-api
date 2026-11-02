@@ -45,16 +45,16 @@ hold usable implementation hostage to exhaustive hypothetical platform tests,
 aesthetic perfection, or unrelated hardening. Maintain targeted regression
 evidence and never promote a mock or synthetic result into live acceptance.
 
-The final `blooket-15` record is **evergreen**. Its work is repeated bug
-finding/fixing, regression tests, UI/UX improvements, Linux test stubs, and
-theoretical macOS/Safari/ChatGPT compatibility assurance. It remains active
-indefinitely even after all other records finish.
+The historical `blooket-15` maintenance record was **evergreen**: repeated
+bug fixes, regression tests, UI improvements, and platform compatibility
+assurance. Alberto explicitly approved closing this exact task on 2026-11-02.
+Its full evidence is preserved in `completed/acceptance/teacher.mdc` and it
+is no longer an unfinished roadmap entry.
 
-**Never complete/move/remove
-`blooket-15` without an explicit instruction from Alberto to close that exact
-task.** Passing validation, finishing the release, or finding no current bugs
-cannot substitute for this manual approval. The open maintenance record is not
-a functional release blocker and does not itself schedule background work.
+**Never close an evergreen record without an explicit owner instruction.**
+Tests, releases, and a lack of known bugs do not substitute for approval.
+Closing this historical record does not claim exhaustive platform assurance,
+authorize unattended work, or prevent future separately authorized fixes.
 
 ## Completion transaction
 

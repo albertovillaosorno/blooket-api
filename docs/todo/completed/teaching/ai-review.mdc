@@ -294,6 +294,7 @@ No blocker remains for admitted AI authoring, explicit small-image intake,
 preparation, canonical publication, correction and separate fresh verification.
 Larger local imports and unsupported media retain their documented boundaries.
 
-Additional UI polish, uninterrupted-run assurance under provider throttling,
-remote ChatGPT-client testing and theoretical Apple compatibility remain in
-blooket-15, which intentionally stays active.
+Additional UI polish, provider-throttling assurance, remote ChatGPT-client
+testing, and theoretical Apple compatibility were tracked in `blooket-15`.
+The owner explicitly closed that evergreen record on 2026-11-02; these limits
+are not silently reclassified as tested or resolved.

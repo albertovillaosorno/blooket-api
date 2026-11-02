@@ -63,21 +63,22 @@ entire index entry. Preserve stable IDs and completion evidence; never put a
 diary back in `TODO.md`. Follow `docs/todo/README.md` and run
 `npm run roadmap:check`.
 
-**Evergreen exception:** task `blooket-15` is a continuous maintenance loop
-for bug fixes, regression tests, dedicated recurring commits that detect
-Blooket platform drift, UX, Linux stubs, and theoretical macOS/Safari/ChatGPT
-assurance. For provider-facing changes, test both compatibility and fail-closed
+**Former evergreen exception (closed 2026-11-02):** `blooket-15` was the
+continuous maintenance lane for browser compatibility, UX, Linux stubs, and
+macOS/Safari/ChatGPT assurance. Alberto explicitly requested closing this
+exact task; its history is archived in `docs/todo/completed/acceptance/`.
+Do not reopen it automatically or infer that future platform drift is solved.
+
+For any later provider-facing changes, test both compatibility and fail-closed
 behavior with sanitized fixtures and read-only checks before claiming live
-acceptance; old green fixtures do not establish compatibility with a changed
+acceptance. Old green fixtures do not prove compatibility with a changed
 provider build. Run `npm run provider:drift:check` for changes to Blooket
-browser adapters, extension behavior and observed provider contracts; this
+browser adapters, extension behavior and observed provider contracts. This
 is deterministic regression coverage, not current provider acceptance.
 
-Never complete, move, or remove it unless Alberto explicitly asks to close
-**that exact task**, even when other TODOs are finished or all tests pass. Its
-open status never blocks working features, safe updates, or shipping. It does
-not authorize unattended background work, commits, releases, or automatic
-changes to a user's Blooket account.
+The former maintenance task never granted unattended background work, commits,
+releases, security bypass, or automatic changes to a Blooket account. Its
+owner-approved closure grants none of those permissions either.
 
 Developer and product-user instruction profiles are already separate. Preserve
 that authority boundary: personal skills cannot expose developer contracts,

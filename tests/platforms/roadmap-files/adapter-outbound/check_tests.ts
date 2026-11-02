@@ -31,7 +31,8 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, writeFile, rm, rename } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, rename, readdir } from
+  "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkRoadmap } from
@@ -90,11 +91,14 @@ async function fixture(run: (root: string) => Promise<void>) {
   }
 }
 
-test("real roadmap has one index entry per unfinished typed record",
+test("real roadmap indexes every unfinished record, including none",
 async () => {
-  assert.ok(
-    (await checkRoadmap(new URL("../../../../", import.meta.url).pathname)) > 0,
-  );
+  const root = new URL("../../../../", import.meta.url).pathname;
+  const open = await readdir(join(root, "docs/todo/open"), {
+    recursive: true,
+  });
+  const expected = open.filter(name => name.endsWith(".mdc")).length;
+  assert.equal(await checkRoadmap(root), expected);
 });
 test("completion moves retain evidence and permit an empty index", async () => {
   await fixture(async (root) => {

@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 id: "blooket-15"
-status: "active"
+status: "completed"
 priority: "p3"
 horizon: "acceptance"
 order: 170
@@ -43,6 +43,42 @@ validation:
 ---
 
 # TODO - Ongoing compatibility assurance and product hardening
+
+## Owner-authorized closure (2026-11-02)
+
+Alberto explicitly requested closure of the final open `blooket-15` task on
+2026-11-02, satisfying the manual closure gate below. This is retirement of
+the ongoing maintenance queue, **not** a claim that provider compatibility,
+optional native macOS/Safari checks, or client integrations are exhaustively
+verified or cannot regress in future releases. Previous evidence and known
+limits remain preserved for future separately authorized work.
+
+The original evergreen instructions below describe the historical maintenance
+contract. They do not authorize new background work, reopening this record,
+account modifications, or bypassing user-owned browser challenges.
+
+## Final closure validation (2026-11-02)
+
+- `npm run roadmap:check`: passed with **zero unfinished records**.
+- Roadmap unit tests: **5/5 passed**, including the empty-index case.
+- `npm run check`: passed TypeScript checking.
+- `npm test`: **2,312/2,312 passed** on the final rerun, zero failures.
+- `npm run provider:drift:check`: **379/379 browser-page** and
+  **434/434 extension-worker** regression tests passed. These are synthetic
+  compatibility checks, not new live-provider acceptance evidence.
+- A local Linux x64 package built successfully and passed
+  `npm run package:verify -- linux-x64 --output owner-closeout-20261102`.
+  This was a local verification only; no release or tag was created.
+- `jig doctor` remained degraded and `jig check` still failed for existing
+  Git-hook ownership evidence (`JIG-HOOK-003`) and stale or incompatible
+  version observations (`JIG-VERSION-021/030/031`). These are **not**
+  represented as passing gates; no safety hook was bypassed.
+- No Blooket account mutation, native recipient-Mac/Safari test, or
+  remote ChatGPT-client acceptance was performed for this closure.
+
+A prior test assumed at least one task must be open; its real-roadmap check
+now compares against the actual indexed open-record count, including zero.
+A tracked `docs/todo/open/.gitkeep` retains that directory on fresh clones.
 
 ## Objective
 
@@ -683,6 +719,15 @@ an uncertain outcome without re-clicking or assuming a Save occurred.
 Fixtures cover a closed editor after a lost reply, a still-open form,
 an acknowledged but unclosed editor, and a refused Cancel. The guard
 never mutates remote quiz content and is not live provider acceptance.
+
+## Closure and residual limits
+
+Owner-approved closure on 2026-11-02 retires the indefinite improvement lane.
+Portable tests and read-only provider checks do not establish native macOS,
+Safari, recipient-device, or ChatGPT-client acceptance. Blooket may change
+later, and any future account writes must still require explicit authority,
+reconciliation of ambiguous outcomes, and respect for human verification.
+These remaining platform risks do not imply unfinished work in this record.
 
 ## Blockers
 

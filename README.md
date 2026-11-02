@@ -510,9 +510,9 @@ developing and reserve a `ci-*` tag for deliberate native-runner validation.
 A `vYY.Q.PATCH` release tag invokes CI itself, so do not add a second CI tag
 for the same release commit.
 
-Jig is a local repository validator and is not part of GitHub Actions. Apple
-signing and remaining native macOS/Safari hardening stay centralized in
-`blooket-15`.
+Jig is a local repository validator and is not part of GitHub Actions.
+Remaining native macOS/Safari limitations are documented in the completed
+`blooket-15` maintenance record. Future checks require separate authorization.
 
 To build and verify a local package on the matching host:
 
