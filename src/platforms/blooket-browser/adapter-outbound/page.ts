@@ -38,6 +38,40 @@ export type PageReadResult =
   | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly code: "blooket-browser-failed" };
 
+// Chrome renders this provider transport failure as a single visible <pre>,
+// not as a Blooket page. Never mistake a mounted editor, challenge or a
+// user-authored question containing the same words for a reloadable error.
+// Self-contained so the extension can execute it in the admitted main frame.
+export function inspectBlooketRawUpstreamError(): boolean {
+  try {
+    const url = new URL(location.href);
+    const edit = url.pathname === "/edit" && !url.hash &&
+      url.searchParams.size === 1 &&
+      url.searchParams.getAll("id").length === 1 &&
+      !!url.searchParams.get("id") &&
+      url.searchParams.get("id")!.length <= 512;
+    const mySets = url.pathname === "/my-sets" && !url.hash &&
+      (url.search === "" || url.search === "?filter=recent");
+    const create = url.pathname === "/create" &&
+      !url.search && !url.hash;
+    if (url.origin !== "https://dashboard.blooket.com" ||
+        !(edit || mySets || create) || document.title !== "") return false;
+    const body = document.body;
+    if (!body || body.children.length !== 1 ||
+        document.querySelector('main, form, dialog, [role="dialog"], ' +
+          '[role="alertdialog"], iframe, input, button')) return false;
+    const pre = body.children[0];
+    if (!pre || pre.tagName !== "PRE" ||
+        pre.textContent?.trim() !==
+          "upstream connect error or disconnect/reset before headers. " +
+          "reset reason: remote connection failure") return false;
+    const bounds = pre.getBoundingClientRect();
+    const style = getComputedStyle(pre);
+    return bounds.width > 0 && bounds.height > 0 &&
+      style.display !== "none" && style.visibility === "visible";
+  } catch { return false; }
+}
+
 // Self-contained so WebExtension scripting can serialize it without closures.
 export function inspectBlooketPage(
   operation: PageReadOperation,

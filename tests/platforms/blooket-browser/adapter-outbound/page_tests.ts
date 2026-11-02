@@ -32,7 +32,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  inspectBlooketPage,
+  inspectBlooketPage, inspectBlooketRawUpstreamError,
   blooketReadUrl,
   openBlooketDetailPanel,
   inspectBlooketDetailSidebar,
@@ -426,6 +426,45 @@ test(
         kind: "sets.get", setId: "fixture",
       }).ok, false));
   }
+});
+
+test("only the exact visible upstream error is reloadable", () => {
+  const error = "upstream connect error or disconnect/reset before headers. " +
+    "reset reason: remote connection failure";
+  const pre = node("PRE", error);
+  const document = Object.assign(node("HTML"), {
+    title: "", body: { children: [pre] },
+  });
+  const edit = "https://dashboard.blooket.com/edit?id=existing-set";
+  page(document, edit, () => {
+    assert.equal(inspectBlooketRawUpstreamError(), true);
+    pre.textContent = "Another failure";
+    assert.equal(inspectBlooketRawUpstreamError(), false);
+    pre.textContent = error;
+    pre.visibility = "hidden";
+    assert.equal(inspectBlooketRawUpstreamError(), false);
+    pre.visibility = "visible";
+    document.title = "Just a moment...";
+    assert.equal(inspectBlooketRawUpstreamError(), false);
+    document.title = "";
+    document.selectors["main, form, dialog, [role=\"dialog\"], " +
+      "[role=\"alertdialog\"], iframe, input, button"] = [
+        node("MAIN"),
+      ];
+    assert.equal(inspectBlooketRawUpstreamError(), false,
+      "a mounted editor or challenge must not be reloaded");
+    delete document.selectors["main, form, dialog, [role=\"dialog\"], " +
+      "[role=\"alertdialog\"], iframe, input, button"];
+  });
+  page(document, "https://foreign.invalid/edit?id=existing-set", () => {
+    assert.equal(inspectBlooketRawUpstreamError(), false);
+  });
+  page(document, "https://dashboard.blooket.com/edit?id=one&id=two", () => {
+    assert.equal(inspectBlooketRawUpstreamError(), false);
+  });
+  page(document, "https://dashboard.blooket.com/my-sets", () => {
+    assert.equal(inspectBlooketRawUpstreamError(), true);
+  });
 });
 
 test("set privacy comes from the recovered visible sibling paragraph", () => {

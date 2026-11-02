@@ -145,6 +145,10 @@ test(
   let sessionReadProbeCount = 0;
   let driftSessionAtSameRoute = false;
   let reloadSessionAtSameRoute = false;
+  let rawUpstreamError = false;
+  let rawUpstreamReloads = 0;
+  let upstreamRecoveryAtReload = 0;
+  let upstreamSwitchAfterReload = false;
   let sessionObservations = 0;
   let listFailuresRemaining = 0;
   let listDrifts = false;
@@ -394,6 +398,15 @@ test(
         assert.deepEqual(options, { bypassCache: true });
         documentOrigin += 1_000;
         readReloads++;
+        if (rawUpstreamError) {
+          rawUpstreamReloads++;
+          if (upstreamRecoveryAtReload === rawUpstreamReloads)
+            rawUpstreamError = false;
+          if (upstreamSwitchAfterReload) {
+            tabUrl = "https://foreign.invalid/redirect";
+            upstreamSwitchAfterReload = false;
+          }
+        }
       },
     },
     windows: {
@@ -810,8 +823,12 @@ test(
               remoteSetId: "created-set-fixture",
             },
           }];
+        if (func.name === "inspectBlooketRawUpstreamError")
+          return [{ result: rawUpstreamError }];
         assert.equal(func.name, "inspectBlooketPage");
         const operation = args[0];
+        if (operation.kind === "session.observe" && rawUpstreamError)
+          return [{ result: { ok: true, value: "unexpected-page" } }];
         if (operation.kind === "session.observe" &&
             pendingDuringSessionScript) {
           pendingDuringSessionScript = false;
@@ -2467,6 +2484,38 @@ test(
     assert.equal(switchedDashboardPage.ok, false);
     assert.equal(tabUrl,
       "https://dashboard.blooket.com/edit?id=another-set");
+
+    // Only the exact raw upstream error can be retried. Successful recovery
+    // stops immediately; repeated session polls share the three-reload cap.
+    tabUrl = "https://dashboard.blooket.com/edit?id=set-fixture";
+    documentOrigin += 1_000;
+    rawUpstreamError = true;
+    rawUpstreamReloads = 0;
+    upstreamRecoveryAtReload = 2;
+    const recoveredUpstream = await expectReply({ kind: "session.observe" });
+    assert.equal(recoveredUpstream.value, "edit");
+    assert.equal(rawUpstreamReloads, 2);
+    rawUpstreamError = true;
+    rawUpstreamReloads = 0;
+    upstreamRecoveryAtReload = 0;
+    const exhausted = await expectReply({ kind: "session.observe" });
+    assert.equal(exhausted.value, "unexpected-page");
+    assert.equal(rawUpstreamReloads, 3);
+    const repeated = await expectReply({ kind: "session.observe" });
+    assert.equal(repeated.value, "unexpected-page");
+    assert.equal(rawUpstreamReloads, 3,
+      "separate session polls must not reset the exhausted retry budget");
+    rawUpstreamError = false;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "edit");
+    rawUpstreamError = true;
+    rawUpstreamReloads = 0;
+    upstreamRecoveryAtReload = 0;
+    upstreamSwitchAfterReload = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).ok,
+      false, "a post-reload redirect must block further navigation");
+    assert.equal(rawUpstreamReloads, 1);
+    rawUpstreamError = false;
 
     tabUrl = "https://id.blooket.com/login";
     const before = scripts.length;

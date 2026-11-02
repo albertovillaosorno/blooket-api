@@ -181,6 +181,16 @@ requirement. GIF FPS controls timing, not a guaranteed file size.
 
 ## If Blooket requests browser verification
 
+An exact bare Blooket `upstream connect error or disconnect/reset before
+headers` page gets up to three automatic reloads during session checking.
+Recovery stops at the first valid Blooket page, and repeated checks do not
+restart an exhausted three-reload budget. A real editor, unsaved form, login,
+challenge, redirect or other unexpected page is never reloaded automatically.
+
+If the transport error persists after three tries, the app asks for human
+attention. An uncertain Save still requires independent reconciliation; a
+reload alone never verifies a write or authorizes repeating it.
+
 Use **Show connected tab** in Quizzes to bring forward the extension's actual
 Blooket session, then complete any provider verification yourself. **Check My
 Sets read** checks that same session without publishing or signing in. A

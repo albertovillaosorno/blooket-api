@@ -34,7 +34,7 @@
 import { exactOwnData, snapshotExactDenseArray } from
   "../../../ir/runtime-decoding/domain/exact-object.ts";
 import {
-  inspectBlooketPage,
+  inspectBlooketPage, inspectBlooketRawUpstreamError,
   openBlooketDetailPanel,
   inspectBlooketDetailSidebar,
   closeBlooketDetailPanel,
@@ -197,6 +197,12 @@ function pairedBrowserLabel(): Promise<string> {
   return browserClientLabel;
 }
 const AUTOMATIC_VERIFICATION_GRACE_MS = 6_000;
+const MAX_UPSTREAM_ERROR_RELOADS = 3;
+// Keep the retry count across separate session polls, not just one command.
+// A persistent provider outage must not cause an endless reload loop.
+const upstreamErrorReloads = new WeakMap<Connection, {
+  url: string; attempts: number;
+}>();
 const pendingChallengeAttention = new WeakSet<Connection>();
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -385,6 +391,68 @@ async function read(
   if (operation.kind === "session.observe") {
     const source = await browser.tabs.get(current.tabId);
     let observed = await readPage(current, browser, operation, readDeadline);
+    // Only a bare, visible upstream transport-error document may be
+    // refreshed. A mounted editor, human challenge or generic unexpected
+    // page is NEVER a retry signal. This is navigation, not a Save retry.
+    while (exactSessionObservation(observed) === "unexpected-page" &&
+        Date.now() < readDeadline - 750) {
+      const tab = await browser.tabs.get(current.tabId);
+      if (tab.status !== "complete" || !tab.url ||
+          tab.pendingUrl !== undefined) break;
+      const prior = upstreamErrorReloads.get(current);
+      if (prior?.url !== tab.url) upstreamErrorReloads.delete(current);
+      const origin = await script(current, browser,
+        inspectBlooketSessionDocumentOrigin as
+          (...args: never[]) => unknown, [tab.url]);
+      const error = await script(current, browser,
+        inspectBlooketRawUpstreamError as (...args: never[]) => unknown);
+      const checked = await browser.tabs.get(current.tabId);
+      const afterOrigin = await script(current, browser,
+        inspectBlooketSessionDocumentOrigin as
+          (...args: never[]) => unknown, [tab.url]);
+      if (checked.status !== "complete" || checked.url !== tab.url ||
+          checked.pendingUrl !== undefined ||
+          typeof origin !== "number" || !Number.isFinite(origin) ||
+          origin <= 0 || origin !== afterOrigin ||
+          Date.now() >= readDeadline - 750)
+        throw new Error("browser-session-changed");
+      if (error !== true) {
+        upstreamErrorReloads.delete(current);
+        break;
+      }
+      const attempts = prior?.url === tab.url ? prior.attempts : 0;
+      if (attempts >= MAX_UPSTREAM_ERROR_RELOADS) return observed;
+      // Reserve the attempt BEFORE reloading; a missing reload reply must
+      // never permit an unbounded number of further refreshes.
+      upstreamErrorReloads.set(current,
+        { url: tab.url, attempts: attempts + 1 });
+      await browser.tabs.reload(current.tabId, { bypassCache: true });
+      let ready = false;
+      const reloadDeadline = Math.min(readDeadline - 500,
+        Date.now() + 1_250);
+      while (Date.now() < reloadDeadline) {
+        const next = await browser.tabs.get(current.tabId);
+        if (next.url !== tab.url ||
+            (next.pendingUrl !== undefined && next.pendingUrl !== tab.url))
+          throw new Error("browser-session-changed");
+        if (next.status === "complete" &&
+            next.pendingUrl === undefined) {
+          const epoch = await script(current, browser,
+            inspectBlooketSessionDocumentOrigin as
+              (...args: never[]) => unknown, [tab.url]);
+          if (typeof epoch === "number" && Number.isFinite(epoch) &&
+              epoch > 0 && epoch !== origin) {
+            ready = true;
+            break;
+          }
+        }
+        await pause(75);
+      }
+      if (!ready) return observed;
+      observed = await readPage(current, browser, operation, readDeadline);
+    }
+    if (exactSessionObservation(observed) !== "unexpected-page")
+      upstreamErrorReloads.delete(current);
     if (exactSessionObservation(observed) !== "security-challenge")
       return observed;
     const graceDeadline = Math.min(readDeadline - 500,
