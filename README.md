@@ -31,6 +31,23 @@ remain in ongoing maintenance. [TODO.md](TODO.md) has no unfinished product
 work. [Completed media work](docs/todo/completed/media/save-and-gif-paste.mdc)
 and the other completed records retain dated acceptance evidence.
 
+## Recovery protocol engine
+
+The runtime's technical core is an immutable write-plan compiler, a monotonic
+checkpoint reducer, and a deterministic recovery automaton. The automaton is
+used by the **real persisted write executor**, not an independent demo: the
+headless `decideWriteRecovery` function adjudicates confirmed, already-applied,
+ambiguous and inconsistent write-ahead journal states before any recovery file
+mutation. `analyzeWriteRecoveryProtocol` independently explores every modeled
+interruption cut of a sequential plan with a bounded breadth-first search,
+checking safety properties against the production classifier. This is not
+browser-specific logic; browser, desktop, CLI and MCP interfaces are adapters.
+
+See [the recovery state machine and model-checking contracts](docs/technical/recovery/write-recovery-protocol.md)
+for exact source paths and executable evidence. This verification is local to
+the modeled journal protocol; it does not prove remote provider success or
+implement distributed consensus.
+
 The project is independent of Blooket and is not endorsed by the platform.
 
 ## What works today

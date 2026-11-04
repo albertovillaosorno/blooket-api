@@ -29,3 +29,14 @@ export type {
   BlooketWriteVerificationBaseline,
   BlooketWriteVerificationBaselineKind,
 } from "../projects/blooket-write-plans/domain/verification-baseline.ts";
+
+export {
+  analyzeWriteRecoveryProtocol,
+  decideWriteRecovery,
+} from "../projects/blooket-write-plans/domain/recovery-automaton.ts";
+export type {
+  WriteRecoveryAttempt,
+  WriteRecoveryDecision,
+  WriteRecoveryProtocolReport,
+  WriteRecoveryProtocolState,
+} from "../projects/blooket-write-plans/domain/recovery-automaton.ts";

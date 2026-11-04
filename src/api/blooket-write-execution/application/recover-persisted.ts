@@ -47,10 +47,10 @@ import {
   type WriteCheckpointFileSaveResult,
 } from
   "../../../platforms/write-checkpoint-files/adapter-outbound/file.ts";
-import {
-  advanceBlooketWriteCheckpoint,
-  type BlooketWriteCheckpoint,
-} from "../../../projects/blooket-write-plans/domain/checkpoint.ts";
+import type { BlooketWriteCheckpoint } from
+  "../../../projects/blooket-write-plans/domain/checkpoint.ts";
+import { decideWriteRecovery } from
+  "../../../projects/blooket-write-plans/domain/recovery-automaton.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 
@@ -215,38 +215,19 @@ export async function recoverPersistedBlooketWriteUnderLock(
   }
 
   const attempt = attemptLoaded.record;
-  if (attempt.phase === "attempting") {
+  const decision = decideWriteRecovery(plan, checkpoint, attempt);
+  if (decision.action === "reconcile") {
     return {
       ok: true,
       kind: "reconciliation-required",
-      reason: checkpoint.nextOperationIndex === attempt.operationIndex
-        ? "ambiguous-attempt"
-        : "inconsistent-attempt-state",
+      reason: decision.reason,
       attempt,
       checkpoint,
     };
   }
-
-  if (checkpoint.nextOperationIndex === attempt.operationIndex) {
-    const advanced = advanceBlooketWriteCheckpoint(
-      plan,
-      checkpoint,
-      attempt.operationId,
-      attempt.receipt,
-    );
-    if (!advanced.ok) {
-      return {
-        ok: true,
-        kind: "reconciliation-required",
-        reason: "inconsistent-attempt-state",
-        attempt,
-        checkpoint,
-      };
-    }
+  if (decision.action === "persist-confirmed") {
     const saved = await saveWriteCheckpointFile(
-      checkpointPath,
-      plan,
-      advanced.value,
+      checkpointPath, plan, decision.checkpoint,
     );
     if (!saved.ok) {
       return {
@@ -256,36 +237,14 @@ export async function recoverPersistedBlooketWriteUnderLock(
       };
     }
     return await clearConfirmedAttempt(
-      attemptPath,
-      plan,
-      attempt,
-      advanced.value,
-      true,
+      attemptPath, plan, attempt, decision.checkpoint, true,
     );
   }
-
-  if (
-    checkpoint.nextOperationIndex
-    === attempt.operationIndex + 1
-  ) {
-    if (!checkpointMatchesConfirmedAttempt(plan, checkpoint, attempt)) {
-      return {
-        ok: true,
-        kind: "reconciliation-required",
-        reason: "inconsistent-attempt-state",
-        attempt,
-        checkpoint,
-      };
-    }
+  if (decision.action === "clear-confirmed") {
     return await clearConfirmedAttempt(
-      attemptPath,
-      plan,
-      attempt,
-      checkpoint,
-      false,
+      attemptPath, plan, attempt, checkpoint, false,
     );
   }
-
   return {
     ok: true,
     kind: "reconciliation-required",
@@ -293,23 +252,6 @@ export async function recoverPersistedBlooketWriteUnderLock(
     attempt,
     checkpoint,
   };
-}
-
-function checkpointMatchesConfirmedAttempt(
-  plan: BlooketWritePlan,
-  checkpoint: BlooketWriteCheckpoint,
-  attempt: WriteAttemptRecord,
-): boolean {
-  const operation = plan.operations[attempt.operationIndex];
-  if (operation === undefined) {
-    return false;
-  }
-  if (operation.kind !== "set") {
-    return attempt.receipt === null
-      && checkpoint.remoteSetId !== null;
-  }
-  return attempt.receipt !== null
-    && checkpoint.remoteSetId === attempt.receipt.remoteSetId;
 }
 
 async function clearConfirmedAttempt(
