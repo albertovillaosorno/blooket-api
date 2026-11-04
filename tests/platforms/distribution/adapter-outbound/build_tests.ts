@@ -47,6 +47,8 @@ import {
   readDistributionCacheFile,
   writeDistributionCacheFile,
   extractDistributionTar,
+  syncDistributionArchive,
+  syncDistributionFolder,
 } from "../../../../src/platforms/distribution/adapter-outbound/build.ts";
 import { join } from "node:path";
 
@@ -207,6 +209,54 @@ test("Linux archives exclude their reserved partial and keep a stable root",
       await assert.rejects(createLinuxArchive(output, partial),
         { code: "EEXIST" });
     } finally { await rm(root, { recursive: true }); }
+  });
+
+test("package durability sync admits only matching regular files and folders",
+  { skip: process.platform === "win32" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "package-durable-"));
+    try {
+      const file = join(root, "archive.tar.gz");
+      await writeFile(file, "archive bytes");
+      const directory = join(root, "staging");
+      await mkdir(directory);
+      await syncDistributionArchive(file);
+      await syncDistributionFolder(directory);
+      await assert.rejects(syncDistributionArchive(directory));
+      await assert.rejects(syncDistributionFolder(file));
+      const archiveLink = join(root, "archive-link");
+      const directoryLink = join(root, "folder-link");
+      await symlink(file, archiveLink);
+      await symlink(directory, directoryLink);
+      await assert.rejects(syncDistributionArchive(archiveLink));
+      await assert.rejects(syncDistributionFolder(directoryLink));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+test("package durability sync rejects FIFO substitutions without hanging",
+  { skip: process.platform === "win32" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "package-durable-fifo-"));
+    try {
+      const fifo = join(root, "replacement");
+      await promisify(execFile)("mkfifo", [fifo]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/distribution/adapter-outbound/build.ts",
+        import.meta.url,
+      ).href;
+      for (const method of ["syncDistributionArchive",
+        "syncDistributionFolder"]) {
+        const script = `import { ${method} } from ` +
+          `${JSON.stringify(moduleUrl)};` +
+          `await ${method}(process.argv[1]).then(` +
+          `() => { throw Error("accepted-FIFO"); }, () => undefined);`;
+        await promisify(execFile)(process.execPath,
+          ["--input-type=module", "-e", script, fifo],
+          { timeout: 3_000, killSignal: "SIGKILL" });
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
 test("package output names remain repository-owned and cannot select paths",

@@ -311,6 +311,25 @@ export async function createLinuxArchive(output: string, partial: string) {
   await run("tar", ["-czf", partial,
     "--exclude=./" + basename(partial), "-C", output, "."]);
 }
+export async function syncDistributionArchive(path: string): Promise<void> {
+  // Archive assembly owns a regular file, not a blocking FIFO or symlink.
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  try {
+    if (!(await file.stat()).isFile())
+      throw new Error("unsafe-package-archive");
+    await file.sync();
+  } finally { await file.close(); }
+}
+
+export async function syncDistributionFolder(path: string): Promise<void> {
+  // Require a directory before opening; a swapped FIFO must not block.
+  const parent = await open(path, constants.O_RDONLY | constants.O_DIRECTORY |
+    constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try { await parent.sync(); }
+  finally { await parent.close(); }
+}
+
 export async function buildDistribution(
   target: DistributionTarget, outputName?: string,
 ) {
@@ -545,14 +564,10 @@ export async function buildDistribution(
       await chmod(shortcut, 0o755);
       await createLinuxArchive(output, partialArchive);
     }
-    const file = await open(partialArchive, "r");
-    try { await file.sync(); }
-    finally { await file.close(); }
+    await syncDistributionArchive(partialArchive);
     // A no-clobber publish also preserves an archive created during assembly.
     await link(partialArchive, destinationArchive);
-    const parent = await open(directory, "r");
-    try { await parent.sync(); }
-    finally { await parent.close(); }
+    await syncDistributionFolder(directory);
     await rm(partialArchive);
     return { target, output, archive: destinationArchive, sourceRevision };
   } catch (error) {
