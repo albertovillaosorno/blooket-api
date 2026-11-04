@@ -31,9 +31,12 @@
 //
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from
+  "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import {
   buildMacIcon,
   buildExtensionIcons,
@@ -87,4 +90,54 @@ test(
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("native and browser icon builds refuse FIFO artwork without hanging", {
+  skip: process.platform === "win32",
+}, async () => {
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const root = await mkdtemp(join(repo, ".temp/icon-source-fifo-"));
+  try {
+    const sourceDirectory = join(root, "assets/icon");
+    await mkdir(sourceDirectory, { recursive: true });
+    await promisify(execFile)("mkfifo", [
+      join(sourceDirectory, "blooket-extension-and-macos.png"),
+    ]);
+    const entrypoint = new URL(
+      "../../../../src/platforms/distribution/adapter-outbound/icons.ts",
+      import.meta.url,
+    ).href;
+    const script = "import { buildExtensionIcons, buildMacIcon } from " +
+      JSON.stringify(entrypoint) + `;
+      const build = process.argv[2] === "mac"
+        ? buildMacIcon : buildExtensionIcons;
+      await build(process.argv[1], process.argv[1] + "/output").then(
+        () => { throw Error("accepted-FIFO-icon"); },
+        error => {
+          if (!/distribution-icon-source-invalid/u.test(String(error)))
+            throw error;
+        },
+      );`;
+    for (const target of ["browser", "mac"]) {
+      await promisify(execFile)(process.execPath,
+        ["--input-type=module", "-e", script, root, target],
+        { timeout: 15_000, killSignal: "SIGKILL" });
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("icon assembly rejects artwork exceeding the owned byte limit",
+  async () => {
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const root = await mkdtemp(join(repo, ".temp/icon-source-large-"));
+  try {
+    const sourceDirectory = join(root, "assets/icon");
+    await mkdir(sourceDirectory, { recursive: true });
+    await writeFile(join(sourceDirectory,
+      "blooket-extension-and-macos.png"), Buffer.alloc(8_388_609));
+    await assert.rejects(buildMacIcon(root, join(root, "icon.icns")),
+      /distribution-icon-source-invalid/u);
+    await assert.rejects(buildExtensionIcons(root, join(root, "extension")),
+      /distribution-icon-source-invalid/u);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
