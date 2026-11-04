@@ -97,9 +97,11 @@ export async function downloadGithubAsset(options: {
   options.signal?.addEventListener("abort", cancel, { once: true });
   let temporary: string | undefined;
   let published = false;
+  let response: Response | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     if (options.signal?.aborted) throw new Error("cancelled");
-    const response = await downloadResponse(
+    response = await downloadResponse(
       asset.url, options.fetch ?? fetch, controller.signal,
     );
     const header = response.headers.get("content-length");
@@ -111,7 +113,7 @@ export async function downloadGithubAsset(options: {
     const partial = join(temporary, archive + ".partial");
     const destination = join(temporary, archive);
     const file = await open(partial, "wx", 0o600);
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const hash = createHash("sha256");
     let total = 0;
     try {
@@ -156,6 +158,8 @@ export async function downloadGithubAsset(options: {
     controller.abort();
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", cancel);
+    // A rejected header or staging failure may leave the body unread.
+    if (!reader) void response?.body?.cancel().catch(() => undefined);
     let cleanupFailed = false;
     try {
       if (temporary && !published)

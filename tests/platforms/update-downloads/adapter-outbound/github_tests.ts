@@ -122,6 +122,23 @@ test("bad hash, length, wrong target and foreign redirect fail closed",
   });
 });
 
+test("rejected GitHub response size releases the unconsumed body", async () => {
+  await temporary(async directory => {
+    let cancelled = false;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      cancel() { cancelled = true; },
+    }), { headers: { "Content-Length": String(bytes.length + 1) } });
+    const result = await downloadGithubAsset({ directory,
+      selection: selected, target: "linux-x64",
+      fetch: async () => response,
+    });
+    assert.deepEqual(result,
+      { status: "verification-failed", reason: "size-mismatch" });
+    assert.equal(cancelled, true);
+    assert.deepEqual(await readdir(directory), []);
+  });
+});
+
 test("cancelled GitHub download retains no archive and permits retry",
   async () => {
   await temporary(async directory => {
