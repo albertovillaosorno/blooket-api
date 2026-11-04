@@ -31,7 +31,7 @@
 //
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, open, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -87,5 +87,26 @@ test("CLI continues to read regular and caller-selected symbolic files",
         const result = JSON.parse(stdout);
         assert.equal(result.ok, true);
       }
+    });
+  });
+
+test("CLI refuses oversized local input before parsing or allocating it",
+  async () => {
+    await fixture(async root => {
+      const source = join(root, "media-oversized.jsonl");
+      const file = await open(source, "wx");
+      try { await file.truncate(16 * 1_024 * 1_024 + 1); }
+      finally { await file.close(); }
+      const failure = await run(process.execPath, [
+        executable, "media", "search", "sun", "--media", source, "--json",
+      ], { timeout: 8_000, maxBuffer: 2_000_000 }).then(
+        () => assert.fail("oversized input must not reach the decoder"),
+        error => error,
+      );
+      assert.equal(failure.code, 3);
+      assert.equal(failure.stderr, "");
+      const result = JSON.parse(failure.stdout);
+      assert.equal(result.issues[0]?.code, "file-read-failed");
+      assert.equal(failure.stdout.includes(source), false);
     });
   });

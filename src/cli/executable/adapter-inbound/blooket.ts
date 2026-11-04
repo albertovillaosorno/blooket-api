@@ -48,15 +48,31 @@ import { executeLocalBlooketRead } from
 import { userDataRoot } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
 
-// CLI callers may intentionally select symlinked regular files, but a named
-// pipe must not hold file input indefinitely before the CLI can return a
-// sanitized file-read-failed result. Check the opened descriptor, not a path.
+// CLI callers may intentionally select symlinked regular files, but named
+// pipes and oversized inputs must fail before any unbounded read. The limit
+// matches the media vault's 16 MiB historical text-file recovery ceiling.
+const MAX_CLI_TEXT_BYTES = 16 * 1_024 * 1_024;
 async function readCliText(path: string): Promise<string> {
   const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
   try {
-    if (!(await handle.stat()).isFile())
-      throw new Error("cli-file-not-regular");
-    return await handle.readFile("utf8");
+    const before = await handle.stat({ bigint: true });
+    if (!before.isFile() || before.size > BigInt(MAX_CLI_TEXT_BYTES))
+      throw new Error("cli-file-not-admitted");
+    const bytes = Buffer.alloc(Number(before.size) + 1);
+    let count = 0;
+    while (count < bytes.length) {
+      const part = await handle.read(bytes, count,
+        Math.min(65_536, bytes.length - count), null);
+      if (!part.bytesRead) break;
+      count += part.bytesRead;
+    }
+    const after = await handle.stat({ bigint: true });
+    if (BigInt(count) !== before.size || before.dev !== after.dev ||
+        before.ino !== after.ino || before.size !== after.size ||
+        before.mtimeNs !== after.mtimeNs ||
+        before.ctimeNs !== after.ctimeNs)
+      throw new Error("cli-file-changed");
+    return bytes.subarray(0, count).toString("utf8");
   } finally { await handle.close(); }
 }
 
