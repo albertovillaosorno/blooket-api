@@ -211,7 +211,8 @@ test("CI validates before ARM Safari and release only publishes", async () => {
 
   assert.equal(release.jobs.publish.needs, "gate");
   const download = release.jobs.publish.steps[0];
-  assert.equal(download.uses, "actions/download-artifact@v8");
+  assert.equal(download.uses,
+    "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333");
   assert.equal(download.with.name, "package-linux-x64");
   assert.equal(download.with.pattern, undefined);
   assert.equal(download.with["merge-multiple"], undefined);
@@ -230,7 +231,8 @@ test("CI validates before ARM Safari and release only publishes", async () => {
         if (key === "uses")
           assert.ok(
             typeof child === "string" &&
-              (child.startsWith("./") || /@v\d+$/u.test(child)),
+              (child.startsWith("./") ||
+                /@(?:v\d+|[0-9a-f]{40})$/u.test(child)),
           );
         visit(child);
       }
@@ -249,7 +251,8 @@ test("Linux public release uploads verified artifact without macOS job",
   const releaseVerification = validate.findIndex((step: { run?: string }) =>
     step.run?.includes("npm run package:verify -- linux-x64 --release"));
   const upload = validate.findIndex((step: { uses?: string }) =>
-    step.uses === "actions/upload-artifact@v7");
+    step.uses ===
+      "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9");
   assert.ok(verification >= 0 && releaseVerification > verification &&
     upload > releaseVerification);
   assert.equal(validate[releaseVerification].if,
