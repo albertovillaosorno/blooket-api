@@ -281,6 +281,12 @@ function configured(value: unknown): Connection | undefined {
   } catch { return undefined; }
 }
 
+async function discardBridgeBody(response: Response): Promise<void> {
+  // A rejected HTTP reply must release its transport without reading bytes.
+  // Cancellation failures must not replace the original rejection reason.
+  try { await response.body?.cancel(); }
+  catch { /* Preserve the caller's rejection. */ }
+}
 async function jsonResponse(
   response: Response,
   maxBytes = 1_000_000,
@@ -288,8 +294,10 @@ async function jsonResponse(
   // Only an entire canonical 200 response can authorize a browser job.
   // A partial 206 is not a complete command, even if its JSON parses.
   if (response.status !== 200 || response.redirected ||
-      response.headers.has("content-range") || !response.body)
+      response.headers.has("content-range") || !response.body) {
+    await discardBridgeBody(response);
     throw new Error("bridge-unavailable");
+  }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -342,7 +350,10 @@ async function bridgeFetch(
     },
     ...(value === undefined ? {} : { body: JSON.stringify(value) }),
   });
-  if (response.status === 426) throw new BrowserBridgeCompatibilityError();
+  if (response.status === 426) {
+    await discardBridgeBody(response);
+    throw new BrowserBridgeCompatibilityError();
+  }
   // Base64 expands one admitted image to ~3.34 MB. Only job delivery receives
   // that allowance; status and result responses keep their original bound.
   return await jsonResponse(response,

@@ -62,6 +62,7 @@ test(
   let validStatus = true;
   let partialJobResponse: false | "partial" | "ranged-200" = false;
   let partialJobDelivered = false;
+  let rejectedBridgeBodiesCancelled = 0;
   let reuseBridgeResponseChunks = false;
   let recycledBridgeChunks = 0;
   let incompatibleStatus = false;
@@ -1095,9 +1096,14 @@ test(
     requests.push(url);
     if ((url.endsWith("/status") && incompatibleStatus) ||
       (url.endsWith("/next") && incompatiblePoll)) {
-      return Response.json({
-        ok: false, code: "blooket-browser-incompatible",
-      }, { status: 426 });
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(
+            '{"ok":false,"code":"blooket-browser-incompatible"}',
+          ));
+        },
+        cancel() { rejectedBridgeBodiesCancelled++; },
+      }), { status: 426 });
     }
     let value;
     if (url.endsWith("/status"))
@@ -1130,7 +1136,12 @@ test(
       const statusCode = partialJobResponse === "partial" ? 206 : 200;
       partialJobResponse = false;
       partialJobDelivered = true;
-      return new Response(JSON.stringify(value), { status: statusCode,
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(JSON.stringify(value)));
+        },
+        cancel() { rejectedBridgeBodiesCancelled++; },
+      }), { status: statusCode,
         headers: { "Content-Range": "bytes 0-100/300" } });
     }
     return Response.json(value);
@@ -1352,6 +1363,7 @@ test(
     assert.equal(fromReusedChunks.ok, true);
     assert.ok(recycledBridgeChunks >= 2);
     for (const mode of ["partial", "ranged-200"] as const) {
+      const cancelledBefore = rejectedBridgeBodiesCancelled;
       partialJobResponse = mode;
       partialJobDelivered = false;
       const partialJob = job({ kind: "session.observe" });
@@ -1367,6 +1379,8 @@ test(
       assert.equal(replies.some(reply => reply.id === partialJob.id), false);
       assert.equal(scripts.length, scriptsBeforePartial,
         "ranged response must never enter native browser scripts");
+      assert.equal(rejectedBridgeBodiesCancelled, cancelledBefore + 1,
+        "rejected ranged replies must release their response stream");
     }
     // The observed provider navigation canonicalizes My Sets to recent.
     tabUrl = "https://dashboard.blooket.com/my-sets?filter=recent";
@@ -2672,6 +2686,7 @@ test(
       "a lost tab-create reply cannot authorize another allocation");
 
     const beforeCompatibilityStop = scripts.length;
+    const cancelledBeforeCompatibility = rejectedBridgeBodiesCancelled;
     incompatiblePoll = true;
     const compatibilityDeadline = realNow() + 3000;
     while ((await message({ kind: "status" })).status !==
@@ -2681,12 +2696,18 @@ test(
       await pause(20);
     }
     assert.deepEqual(stored, {});
+    assert.equal(rejectedBridgeBodiesCancelled,
+      cancelledBeforeCompatibility + 1,
+      "incompatible poll must release its response stream");
     incompatiblePoll = false;
     incompatibleStatus = true;
     assert.deepEqual(await announce({ origin, token }), {
       ok: false, status: "extension-update-required",
     });
     assert.equal(scripts.length, beforeCompatibilityStop);
+    assert.equal(rejectedBridgeBodiesCancelled,
+      cancelledBeforeCompatibility + 2,
+      "incompatible connection must release its response stream");
     assert.deepEqual(stored, {});
   } finally {
     if (priorPerformanceNow)
