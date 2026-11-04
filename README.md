@@ -19,9 +19,9 @@ and verified a two-question image/typing quiz without controller Save.
 This does not promise uninterrupted operation or universal platform support.
 Provider-read stops remain recoverable, updates use verified downloads with
 manual installation, and native Mac/Safari and remote ChatGPT-client acceptance
-remain in ongoing maintenance. [TODO.md](TODO.md) also tracks the requested
-save/paste media follow-up; completed records retain the dated acceptance
-evidence for publication and delivery.
+remain in ongoing maintenance. [TODO.md](TODO.md) has no unfinished product
+work. [Completed media work](docs/todo/completed/media/save-and-gif-paste.mdc)
+and the other completed records retain dated acceptance evidence.
 
 The project is independent of Blooket and is not endorsed by the platform.
 
@@ -105,8 +105,9 @@ Non-empty collection completeness, pagination, public set details, and
 unsupported media variants remain unknown or pending. Keep these limits
 explicit when using the observed account capabilities.
 
-See [TODO.md](TODO.md) for the ordered plan and dated evidence. Portable tests
-cannot establish Keychain or native macOS compatibility. Chrome retains live
+See [completed records](docs/todo/completed/) for dated evidence and
+[TODO.md](TODO.md) for any unfinished work. Portable tests cannot establish
+Keychain or native macOS compatibility. Chrome retains live
 provider-read evidence; Firefox has portable build and bridge tests. The
 ARM64 macOS CI stage builds and embeds the Safari companion; native
 acceptance remains pending.
