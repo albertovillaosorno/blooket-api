@@ -31,11 +31,13 @@
 //   - Non-macOS, missing files, and malformed identifiers fail closed.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   openPackagedSafariExtension,
@@ -164,5 +166,39 @@ test("symbolic Safari companion or executable helper cannot be activated",
       assert.equal(calls, 0);
     } finally { await rm(root, { recursive: true, force: true }); }
   }
+  },
+);
+
+// A validated packaged identifier can be swapped before its descriptor opens.
+// Refuse the substituted pipe promptly instead of waiting for a writer.
+test("Safari identifier replacement by FIFO never blocks activation",
+  async () => {
+    const { root, paths } = await fixture();
+    const fifo = join(root, "replacement.fifo");
+    const run = promisify(execFile);
+    try {
+      await run("mkfifo", [fifo]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/safari-extension/adapter-outbound/" +
+        "install.ts", import.meta.url,
+      ).href;
+      const script =
+        `import { openPackagedSafariExtension } from ` +
+        `${JSON.stringify(moduleUrl)};` +
+        "let reads = 0;" +
+        "const paths = { companion: process.argv[1], " +
+        "helper: process.argv[2], get identifier() { " +
+        "return ++reads === 1 ? process.argv[3] : process.argv[4]; } };" +
+        "const result = await openPackagedSafariExtension({ " +
+        "platform: 'darwin', paths, " +
+        "run: async () => { throw Error('unexpected-open'); } });" +
+        "process.stdout.write(JSON.stringify(result));";
+      const { stdout, stderr } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, paths.companion,
+          paths.helper, paths.identifier, fifo], { timeout: 8_000 });
+      assert.equal(stderr, "");
+      assert.deepEqual(JSON.parse(stdout),
+        { ok: false, code: "safari-extension-invalid" });
+    } finally { await rm(root, { recursive: true, force: true }); }
   },
 );

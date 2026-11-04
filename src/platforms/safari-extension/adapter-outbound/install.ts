@@ -91,7 +91,7 @@ export async function openPackagedSafariExtension(
   let identifier: string;
   try {
     const handle = await open(paths.identifier,
-      constants.O_RDONLY | constants.O_NOFOLLOW);
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
       const stat = await handle.stat();
       if (!stat.isFile() || stat.size > 256 || stat.size < 1)
