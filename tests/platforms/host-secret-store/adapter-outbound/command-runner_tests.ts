@@ -31,6 +31,11 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
+import childProcess from "node:child_process";
+import { EventEmitter } from "node:events";
+import { syncBuiltinESMExports } from "node:module";
+import { PassThrough } from "node:stream";
+import { setImmediate as nextTurn } from "node:timers/promises";
 
 import { runSecretCommand } from
   // jig-ignore-next-line: Static import path cannot be wrapped safely.
@@ -125,4 +130,80 @@ test("missing executables return a stable unavailable result", async () => {
     ok: false,
     code: "secret-command-unavailable",
   });
+});
+
+
+for (const failure of ["output-limit", "child-error",
+  "stdin-error", "stdout-error", "stderr-error"] as const) {
+  test(`runner ${failure} keeps the child owned until close`, async t => {
+    const signals: string[] = [];
+    const child = Object.assign(new EventEmitter(), {
+      stdin: new PassThrough(), stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: (signal: string) => { signals.push(signal); return true; },
+    });
+    const spawn = t.mock.method(childProcess, "spawn", () => child);
+    syncBuiltinESMExports();
+    try {
+      let settled = false;
+      const pending = runSecretCommand({ command: "synthetic", args: [],
+        captureStdout: true });
+      void pending.then(() => { settled = true; }, () => { settled = true; });
+      if (failure === "output-limit")
+        child.stdout.emit("data", Buffer.alloc(140_000));
+      else if (failure === "child-error")
+        child.emit("error", new Error("spawn-failed"));
+      else child[failure === "stdin-error" ? "stdin" :
+        failure === "stdout-error" ? "stdout" : "stderr"]
+        .emit("error", new Error("stream-failed"));
+      await nextTurn();
+      assert.equal(settled, false, "a signal is not subprocess completion");
+      assert.deepEqual(signals, failure === "child-error"
+        ? [] : ["SIGKILL"]);
+      child.emit("close", null, failure === "child-error"
+        ? null : "SIGKILL");
+      assert.deepEqual(await pending, { ok: false,
+        code: failure === "output-limit"
+          ? "secret-command-output-too-large"
+          : "secret-command-unavailable",
+      });
+      assert.equal(settled, true);
+    } finally {
+      child.emit("close", null, null);
+      spawn.mock.restore();
+      syncBuiltinESMExports();
+    }
+  });
+}
+
+
+test("runner timeout retains subprocess ownership until close", async t => {
+  const signals: string[] = [];
+  const child = Object.assign(new EventEmitter(), {
+    stdin: new PassThrough(), stdout: new PassThrough(),
+    stderr: new PassThrough(),
+    kill: (signal: string) => { signals.push(signal); return true; },
+  });
+  const spawn = t.mock.method(childProcess, "spawn", () => child);
+  syncBuiltinESMExports();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    let settled = false;
+    const pending = runSecretCommand({ command: "synthetic", args: [],
+      timeoutMs: 50 });
+    void pending.then(() => { settled = true; }, () => { settled = true; });
+    t.mock.timers.tick(50);
+    await nextTurn();
+    assert.equal(settled, false);
+    assert.deepEqual(signals, ["SIGKILL"]);
+    child.emit("error", new Error("late-kill-error"));
+    child.stdout.emit("data", Buffer.alloc(200_000));
+    child.emit("close", null, "SIGKILL");
+    assert.deepEqual(await pending, { ok: false,
+      code: "secret-command-timeout" });
+  } finally {
+    child.emit("close", null, null);
+    spawn.mock.restore();
+    syncBuiltinESMExports();
+  }
 });

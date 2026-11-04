@@ -81,51 +81,53 @@ export const runSecretCommand: SecretCommandRunner = async (
       return;
     }
 
-    let settled = false;
-    let timedOut = false;
+    let failure: Extract<SecretCommandResult, { ok: false }>["code"]
+      | undefined;
     let stderrBytes = 0;
     let stdoutBytes = 0;
     const stdoutChunks: Buffer[] = [];
+    const stop = (code: NonNullable<typeof failure>, terminate: boolean) => {
+      if (failure !== undefined) return;
+      failure = code;
+      stdoutChunks.length = 0;
+      if (terminate) {
+        try { child.kill("SIGKILL"); }
+        catch { /* The close event still owns process completion. */ }
+      }
+    };
     const timeout = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
+      stop("secret-command-timeout", true);
     }, invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
-    const finish = (result: SecretCommandResult): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      resolve(result);
-    };
-
+    // A signal, stream error, or failed spawn is not proof that a secret
+    // store writer has exited. Only close releases subprocess ownership.
     child.once("error", () => {
-      finish({ ok: false, code: "secret-command-unavailable" });
+      stop("secret-command-unavailable", false);
     });
+    for (const stream of [child.stdin, child.stdout, child.stderr]) {
+      stream.on("error", () => {
+        stop("secret-command-unavailable", true);
+      });
+    }
     child.stdout.on("data", (chunk: Buffer) => {
+      if (failure !== undefined) return;
       stdoutBytes += chunk.byteLength;
       if (stdoutBytes > MAX_STDOUT_BYTES) {
-        child.kill("SIGKILL");
-        finish({
-          ok: false,
-          code: "secret-command-output-too-large",
-        });
-        return;
-      }
-      if (invocation.captureStdout === true) {
+        stop("secret-command-output-too-large", true);
+      } else if (invocation.captureStdout === true) {
         stdoutChunks.push(Buffer.from(chunk));
       }
     });
     child.stderr.on("data", (chunk: Buffer) => {
-      stderrBytes += chunk.byteLength;
+      if (failure === undefined) stderrBytes += chunk.byteLength;
     });
     child.once("close", (exitCode, signal) => {
-      if (timedOut) {
-        finish({ ok: false, code: "secret-command-timeout" });
+      clearTimeout(timeout);
+      if (failure !== undefined) {
+        resolve({ ok: false, code: failure });
         return;
       }
-      finish({
+      resolve({
         ok: true,
         exitCode,
         signal,
@@ -134,6 +136,7 @@ export const runSecretCommand: SecretCommandRunner = async (
       });
     });
 
-    child.stdin.end(invocation.stdin);
+    try { child.stdin.end(invocation.stdin); }
+    catch { stop("secret-command-unavailable", true); }
   });
 };
