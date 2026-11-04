@@ -239,7 +239,9 @@ async function readLockOwner(path: string): Promise<
   // A symlink swapped in between lstat and readFile must never be followed.
   let handle;
   try {
-    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    // A FIFO must not wait for a writer before we can reject its file type.
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
   } catch (error: unknown) {
     if (isCode(error, "ENOENT")) return { kind: "missing" };
     if (isCode(error, "ELOOP")) return { kind: "unsafe" };

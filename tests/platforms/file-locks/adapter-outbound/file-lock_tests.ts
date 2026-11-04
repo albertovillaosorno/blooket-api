@@ -30,6 +30,7 @@
 //   - Test locks exist only under the operating-system temporary directory.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   mkdtemp,
   readFile,
@@ -41,6 +42,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { tryAcquireFileLock } from
   "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts";
@@ -187,6 +189,40 @@ test("owner reads reject dangling links and bounded-size violations",
       ok: false, reason: "unsafe",
     });
   });
+  },
+);
+
+
+// A FIFO opened for reading blocks until a writer arrives unless O_NONBLOCK
+// is used. Bound this regression in a subprocess so an unsafe implementation
+// fails the test instead of hanging the entire repository suite.
+test("FIFO lock paths and reclaim guards fail closed without blocking",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const run = promisify(execFile);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/file-locks/adapter-outbound/file-lock.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { tryAcquireFileLock } from ${JSON.stringify(moduleUrl)};` +
+        "const result = await tryAcquireFileLock(process.argv[1]);" +
+        "process.stdout.write(JSON.stringify(result));";
+      for (const guard of [false, true]) {
+        const path = join(directory, guard ? "guard.lock" : "pipe.lock");
+        if (guard) {
+          await writeFile(path,
+            '{"version":1,"pid":2147483647,"token":"stale"}\n');
+        }
+        await run("mkfifo", [guard ? path + ".reclaim" : path]);
+        const { stdout } = await run(process.execPath,
+          ["--input-type=module", "--eval", script, path],
+          { timeout: 1_500 });
+        assert.deepEqual(JSON.parse(stdout), {
+          ok: false, reason: "unsafe",
+        });
+      }
+    });
   },
 );
 
