@@ -170,6 +170,29 @@ test("a ranged 200 image cannot be imported as complete media",
   assert.equal(partial.requests(), 1);
 });
 
+test("incomplete or malformed declared image lengths fail closed",
+  async () => {
+    for (const declared of ["8", "3", "garbage", "0", "9007199254740993"]) {
+      const mocked = transport([{ headers: {
+        "content-type": "image/png", "content-length": declared,
+      } }]);
+      await assert.rejects(
+        downloadImage("https://example.test/image.png", mocked.dependencies),
+        /image-download-failed|image-download-not-image/u,
+        declared,
+      );
+      assert.equal(mocked.requests(), 1);
+    }
+    const complete = transport([{ headers: {
+      "content-type": "image/png", "content-length": "5",
+    } }]);
+    const image = await downloadImage(
+      "https://example.test/image.png", complete.dependencies,
+    );
+    assert.equal(image.bytes.toString(), "image");
+    assert.equal(image.type, "image/png");
+  });
+
 test(
   "downloads bound bytes and redirects and reject HTML or TLS downgrade",
   async () => {

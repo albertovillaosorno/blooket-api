@@ -145,7 +145,17 @@ export async function downloadImage(
             return;
           }
           const type = response.headers["content-type"]?.split(";")[0]?.trim();
-          if (Number(response.headers["content-length"]) > MAX_BYTES) {
+          const declaredLength = response.headers["content-length"];
+          if (declaredLength !== undefined &&
+              (!/^[1-9][0-9]*$/u.test(declaredLength) ||
+               !Number.isSafeInteger(Number(declaredLength)))) {
+            response.destroy();
+            reject(new Error("image-download-not-image"));
+            return;
+          }
+          const expectedLength = declaredLength === undefined
+            ? undefined : Number(declaredLength);
+          if (expectedLength !== undefined && expectedLength > MAX_BYTES) {
             response.destroy();
             reject(new Error("source-too-large"));
             return;
@@ -179,6 +189,8 @@ export async function downloadImage(
           );
           response.on("end", () => {
             if (!size) reject(new Error("image-download-not-image"));
+            else if (expectedLength !== undefined && size !== expectedLength)
+              reject(new Error("image-download-failed"));
             else resolve({ bytes: Buffer.concat(chunks), type });
           });
         },
