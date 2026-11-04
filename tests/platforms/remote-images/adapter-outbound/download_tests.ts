@@ -155,6 +155,21 @@ test(
   assert.equal(rebound.requests(), 1);
 });
 
+test("a ranged 200 image cannot be imported as complete media",
+  async () => {
+  const partial = transport([{
+    headers: {
+      "content-type": "image/png",
+      "content-range": "bytes 0-4/100",
+    },
+  }]);
+  await assert.rejects(
+    downloadImage("https://example.test/image.png", partial.dependencies),
+    /image-download-not-image/u,
+  );
+  assert.equal(partial.requests(), 1);
+});
+
 test(
   "downloads bound bytes and redirects and reject HTML or TLS downgrade",
   async () => {

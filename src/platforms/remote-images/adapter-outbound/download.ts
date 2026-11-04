@@ -152,6 +152,7 @@ export async function downloadImage(
           }
           if (
             status !== 200 ||
+            response.headers["content-range"] !== undefined ||
             !type ||
             !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
               type,
