@@ -32,7 +32,8 @@
 import { randomUUID } from "node:crypto";
 import { reconcileUnchangedMetadataTextRevision } from
   "../../../api/blooket-write-execution/application/text-revision.ts";
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 
 import { runCli } from "../../command-running/adapter-inbound/run-cli.ts";
 
@@ -46,6 +47,18 @@ import { executeLocalBlooketRead } from
   "../../../platforms/service-lifecycle/adapter-outbound/command.ts";
 import { userDataRoot } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
+
+// CLI callers may intentionally select symlinked regular files, but a named
+// pipe must not hold file input indefinitely before the CLI can return a
+// sanitized file-read-failed result. Check the opened descriptor, not a path.
+async function readCliText(path: string): Promise<string> {
+  const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
+  try {
+    if (!(await handle.stat()).isFile())
+      throw new Error("cli-file-not-regular");
+    return await handle.readFile("utf8");
+  } finally { await handle.close(); }
+}
 
 const exitCode = await runCli(process.argv.slice(2), {
   execute: (command) =>
@@ -81,7 +94,7 @@ const exitCode = await runCli(process.argv.slice(2), {
     }
     return Buffer.concat(chunks).toString("utf8");
   },
-  readText: (path) => readFile(path, "utf8"),
+  readText: readCliText,
   operationId: () => `cli:${randomUUID()}`,
   stdout: (text) => process.stdout.write(text),
   stderr: (text) => process.stderr.write(text),
