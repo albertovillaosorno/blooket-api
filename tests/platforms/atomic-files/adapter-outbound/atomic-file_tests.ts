@@ -30,6 +30,7 @@
 //   - Test state lives only in the operating-system temporary directory.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   lstat,
   mkdtemp,
@@ -42,6 +43,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   linkDurableFileIfAbsent,
@@ -263,6 +265,33 @@ test("streamed previous-value backup retains exact large binary bytes",
     ]);
   });
   },
+);
+
+// Backups must reject FIFO targets before waiting on their open operation.
+test("atomic backup refuses FIFO source without blocking the process",
+  async () => { await withTemporaryDirectory(async directory => {
+    const target = join(directory, "project.json");
+    const backup = join(directory, "project.json.bak");
+    const run = promisify(execFile);
+    await run("mkfifo", [target]);
+    const moduleUrl = new URL(
+      "../../../../src/platforms/atomic-files/adapter-outbound/" +
+      "atomic-file.ts",
+      import.meta.url,
+    ).href;
+    const script =
+      `import { writeAtomicFile } from ${JSON.stringify(moduleUrl)};` +
+      "try { await writeAtomicFile(process.argv[1], 'replacement'," +
+      "{ backupPath: process.argv[2] });" +
+      "process.stdout.write('unexpected-success'); }" +
+      "catch (error) { process.stdout.write(error.message); }";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, target, backup],
+      { timeout: 8_000 });
+    assert.equal(stdout, "Refusing unsafe backup source.");
+    assert.equal((await lstat(target)).isFIFO(), true);
+    assert.deepEqual(await readdir(directory), ["project.json"]);
+  }); },
 );
 
 test("symbolic backup paths refuse replacement without overwriting data",

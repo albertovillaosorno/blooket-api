@@ -197,7 +197,7 @@ async function createBackup(
   // Pathname copyFile follows a source symlink substituted after the
   // target check. Copy the exact opened regular-file descriptor instead.
   const source = await open(targetPath,
-    constants.O_RDONLY | constants.O_NOFOLLOW);
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await source.stat();
     if (!before.isFile() || !Number.isSafeInteger(before.size))
