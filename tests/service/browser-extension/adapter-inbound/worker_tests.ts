@@ -2553,6 +2553,20 @@ test(
       "unexpected-page");
     assert.equal(rawUpstreamReloads, 3,
       "human prompts cannot reset the spent upstream reload budget");
+    // A challenge that resolves on its own to a freshly verified editor
+    // must reset the cap, unlike an unresolved human-owned prompt.
+    rawUpstreamError = false;
+    automaticVerificationReads = 2;
+    verificationRouteAfter = tabUrl;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "edit");
+    verificationRouteAfter = null;
+    rawUpstreamError = true;
+    rawUpstreamReloads = 0;
+    upstreamRecoveryAtReload = 1;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "edit", "verified challenge recovery should rearm bounded reloads");
+    assert.equal(rawUpstreamReloads, 1);
     rawUpstreamError = false;
     assert.equal((await expectReply({ kind: "session.observe" })).value,
       "edit");

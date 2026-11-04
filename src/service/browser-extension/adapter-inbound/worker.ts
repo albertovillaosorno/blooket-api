@@ -483,8 +483,15 @@ async function read(
       if (next.status !== "complete" || next.pendingUrl !== undefined)
         continue;
       observed = await readPage(current, browser, operation, readDeadline);
-      if (exactSessionObservation(observed) !== "security-challenge")
+      const recovered = exactSessionObservation(observed);
+      if (recovered !== "security-challenge") {
+        // The provider may finish verification during the grace window.
+        // Only a verified usable page can rearm the exhausted reload budget.
+        if (recovered === "dashboard" || recovered === "my-sets" ||
+            recovered === "create" || recovered === "edit")
+          upstreamErrorReloads.delete(current.tabId);
         return observed;
+      }
     }
     return observed;
   }
