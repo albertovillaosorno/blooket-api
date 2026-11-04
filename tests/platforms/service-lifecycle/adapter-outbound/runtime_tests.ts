@@ -30,7 +30,9 @@
 //   - Unsupported hosts and invalid lifecycle inputs fail closed.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
 import { mkdtemp, readFile, rm, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -105,6 +107,33 @@ test("service runtime records refuse oversized and symbolic files",
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+  },
+);
+
+
+// Guard the subprocess so a FIFO regression cannot hang the test runner.
+test("service runtime discovery refuses FIFO files without waiting",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "runtime-fifo-"));
+    try {
+      const run = promisify(execFile);
+      await run("mkfifo", [join(root, "service-runtime.json")]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/service-lifecycle/" +
+        "adapter-outbound/runtime.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { existingService } from ${JSON.stringify(moduleUrl)};` +
+        "const found = await existingService(process.argv[1]);" +
+        "process.stdout.write(found === undefined ? 'absent' : 'found');";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, root],
+        { timeout: 8_000 });
+      assert.equal(stdout, "absent");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   },
 );
 

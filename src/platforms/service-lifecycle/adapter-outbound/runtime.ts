@@ -136,7 +136,8 @@ export async function existingService(root: string) {
 const MAX_RUNTIME_BYTES = 4_096;
 
 async function readOwnedRuntime(path: string): Promise<string> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || !Number.isSafeInteger(stat.size) ||

@@ -30,10 +30,12 @@
 //   - Temporary fixture content is fictional and unprivileged.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import { loadPreferences, savePreferences } from
   "../../../../src/platforms/user-storage/adapter-outbound/root.ts";
 
@@ -98,6 +100,30 @@ test("oversized teacher settings refuse read rather than resetting defaults",
     await assert.rejects(loadPreferences(root), /settings-unreadable/u);
     assert.equal((await readFile(path)).byteLength, 65_537);
   });
+  },
+);
+
+
+// A named pipe is not a preferences document and must not stall startup.
+test("teacher preferences refuse FIFO files without waiting for a writer",
+  async () => {
+    await withRoot(async root => {
+      const run = promisify(execFile);
+      await run("mkfifo", [join(root, "settings.json")]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/user-storage/adapter-outbound/root.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { loadPreferences } from ${JSON.stringify(moduleUrl)};` +
+        "try { await loadPreferences(process.argv[1]);" +
+        "process.stdout.write('unexpected-success'); }" +
+        "catch (error) { process.stdout.write(error.message); }";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, root],
+        { timeout: 8_000 });
+      assert.equal(stdout, "settings-unreadable");
+    });
   },
 );
 

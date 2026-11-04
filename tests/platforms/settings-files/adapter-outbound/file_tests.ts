@@ -30,6 +30,7 @@
 //   - Tests use only the operating-system temporary directory.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   mkdtemp,
   readFile,
@@ -40,6 +41,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   loadSettingsFile,
@@ -181,6 +183,45 @@ test("invalid JSON and symbolic settings files fail closed", async () => {
     assert.equal(await readFile(outside, "utf8"), "safe");
   });
 });
+
+
+// Both read and write must refuse an existing FIFO without waiting
+// for a writer.
+test("settings FIFO files refuse load and save without blocking",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const run = promisify(execFile);
+      const path = join(directory, "settings.json");
+      await run("mkfifo", [path]);
+      const fileUrl = new URL(
+        "../../../../src/platforms/settings-files/adapter-outbound/file.ts",
+        import.meta.url,
+      ).href;
+      const settingsUrl = new URL(
+        "../../../../src/settings/local-service/domain/" +
+        "local-service-settings.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { loadSettingsFile, saveSettingsFile } from ` +
+        `${JSON.stringify(fileUrl)};` +
+        `import { defaultLocalServiceSettings } from ` +
+        `${JSON.stringify(settingsUrl)};` +
+        "const path = process.argv[1];" +
+        "const loaded = await loadSettingsFile(path);" +
+        "const saved = await saveSettingsFile(path, " +
+        "defaultLocalServiceSettings());" +
+        "process.stdout.write(JSON.stringify([loaded, saved]));";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, path],
+        { timeout: 8_000 });
+      assert.deepEqual(JSON.parse(stdout), [
+        { ok: false, kind: "io", code: "settings-file-unsafe" },
+        { ok: false, kind: "io", code: "settings-file-unsafe" },
+      ]);
+    });
+  },
+);
 
 test("settings refuse oversized files and dangling symlink aliases",
   async () => {

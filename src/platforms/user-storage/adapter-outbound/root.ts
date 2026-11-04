@@ -98,7 +98,8 @@ export async function savePreferences(
 const MAX_PREFERENCE_BYTES = 65_536;
 
 async function readPreferenceText(path: string): Promise<string> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
   try {
     const before = await handle.stat();
     if (!before.isFile() || !Number.isSafeInteger(before.size) ||
