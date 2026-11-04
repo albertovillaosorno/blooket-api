@@ -206,6 +206,13 @@ async function boundedJson(
       chunks.push(result.value);
     }
     if (signal.aborted) return sourceFailure("cancelled");
+    // Fetch decompresses encoded bodies but retains their wire length
+    // header. Only an identity body's bytes can be compared to that length.
+    const encoding = response.headers.get("content-encoding");
+    if (length !== null &&
+        (encoding === null || encoding.trim().toLowerCase() === "identity") &&
+        Number(length) !== bytes)
+      return metadataFailure("partial-response");
     const text = new TextDecoder("utf-8", { fatal: true }).decode(
       Buffer.concat(chunks, bytes),
     );

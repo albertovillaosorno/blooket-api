@@ -188,6 +188,45 @@ test(
     );
 });
 
+test("catalog length must match the complete decoded response", async () => {
+  const payload = JSON.stringify([release("26.4.1")]);
+  const length = Buffer.byteLength(payload);
+  for (const declared of [length + 10, length - 1, 0]) {
+    const result = await checkPublicUpdates({
+      ...options,
+      request: requests([
+        new Response(payload, {
+          headers: {
+            "content-type": "application/json",
+            "content-length": String(declared),
+          },
+        }),
+      ]).request,
+    });
+    assert.deepEqual(result, {
+      status: "untrusted-metadata",
+      reason: "partial-response",
+    });
+  }
+  const good = await checkPublicUpdates({
+    ...options,
+    request: requests([
+      json([release("26.4.1")], { "content-length": String(length) }),
+    ]).request,
+  });
+  assert.equal(good.status, "available");
+  // Node fetch retains the compressed wire length on a decoded gzip body.
+  const decoded = await checkPublicUpdates({
+    ...options,
+    request: requests([
+      json([release("26.4.1")], {
+        "content-encoding": "gzip", "content-length": "42",
+      }),
+    ]).request,
+  });
+  assert.equal(decoded.status, "available");
+});
+
 test("partial, redirected and foreign 200 catalogs cannot authorize updates",
   async () => {
   for (const scenario of [
