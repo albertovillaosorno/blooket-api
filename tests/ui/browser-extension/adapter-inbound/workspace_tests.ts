@@ -55,7 +55,7 @@ async function fixture(body, page = "http://127.0.0.1:4567/") {
       assert.equal(route, "/api/bootstrap");
       assert.equal(options.credentials, "omit");
       assert.equal(options.redirect, "error");
-      return typeof body === "string"
+      return body instanceof Response ? body : typeof body === "string"
         ? new Response(body) : Response.json(body);
     },
     AbortSignal, TextDecoder, setInterval: () => 1,
@@ -123,6 +123,7 @@ test("workspace advertises a new service token after restart", async () => {
   let poll: (() => void) | undefined;
   const messages: unknown[] = [];
   let requests = 0;
+  let cancelledUnavailableBodies = 0;
   const globals = {
     location: { protocol: "http:", pathname: "/", hostname: "127.0.0.1",
       origin: "http://127.0.0.1:2607" },
@@ -131,7 +132,12 @@ test("workspace advertises a new service token after restart", async () => {
     } } },
     fetch: async () => {
       requests++;
-      if (requests === 2) return new Response(null, { status: 503 });
+      if (requests === 2) return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("unavailable"));
+        },
+        cancel() { cancelledUnavailableBodies++; },
+      }), { status: 503 });
       return Response.json({ browserBridge: {
         application: "blooket-api", schemaVersion: 1,
         token: requests === 1 ? "a".repeat(43) : "b".repeat(43),
@@ -145,6 +151,8 @@ test("workspace advertises a new service token after restart", async () => {
   assert.ok(poll);
   poll();
   await pause(0);
+  assert.equal(cancelledUnavailableBodies, 1,
+    "a rejected bootstrap must release its HTTP response body");
   poll();
   await pause(0);
   assert.equal(requests, 3);
@@ -154,6 +162,37 @@ test("workspace advertises a new service token after restart", async () => {
     { kind: "workspace-ready", origin: "http://127.0.0.1:2607",
       token: "b".repeat(43) },
   ]);
+});
+
+test("workspace refuses partial and noncanonical successful bootstraps",
+  async () => {
+  const content = JSON.stringify({ browserBridge: {
+    application: "blooket-api", schemaVersion: 1, token,
+  } });
+  for (const [status, headers] of [
+    [206, { "Content-Range": "bytes 0-100/200" }],
+    [201, {}],
+    [200, { "Content-Range": "bytes 0-100/200" }],
+  ] as const) {
+    let cancellations = 0;
+    let delivered = false;
+    const response = new Response(new ReadableStream({
+      pull(controller) {
+        if (delivered) controller.close();
+        else {
+          controller.enqueue(new TextEncoder().encode(content));
+          delivered = true;
+        }
+      },
+      cancel() { cancellations++; },
+    }), { status, headers });
+    const result = await fixture(response);
+    assert.equal(result.fetches, 1);
+    assert.equal(result.messages.length, 0,
+      `HTTP ${status} must not authorize a workspace token`);
+    assert.equal(cancellations, 1,
+      `HTTP ${status} must release its unread response body`);
+  }
 });
 
 test("workspace retries never overlap an unfinished bridge bootstrap",

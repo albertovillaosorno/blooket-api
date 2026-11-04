@@ -48,7 +48,13 @@
         redirect: "error",
         signal: AbortSignal.timeout(3000),
       });
-      if (!response.ok || !response.body) return;
+      // A partial/ranged or other 2xx reply cannot authorize a token.
+      // Bootstrap failures repeat, so also release unread HTTP bodies.
+      if (response.status !== 200 || response.redirected ||
+          response.headers.has("content-range") || !response.body) {
+        void response.body?.cancel().catch(() => undefined);
+        return;
+      }
       const reader = response.body.getReader();
       let text = "",
         size = 0;
