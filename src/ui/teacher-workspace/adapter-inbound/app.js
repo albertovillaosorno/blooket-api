@@ -933,6 +933,14 @@ function report(error) {
   };
   toast(t(messages[error.message] ?? "operationFailed"));
 }
+// Preserve structured error replies, but never trust partial successful data.
+async function requireCompleteWorkspaceReply(response, expectedStatus) {
+  if (!response.ok) return;
+  if (response.status === expectedStatus && !response.redirected &&
+      !response.headers.has("content-range") && response.body) return;
+  await response.body?.cancel().catch(() => undefined);
+  throw new Error("operation-failed");
+}
 async function api(path, body, signal) {
   const request =
     body === undefined
@@ -947,15 +955,9 @@ async function api(path, body, signal) {
         };
   if (signal) request.signal = signal;
   const response = await fetch(path, { ...request, redirect: "error" });
-  // A full 200 reply completes ordinary requests; shutdown alone uses 202.
-  // Do not mistake a ranged or unexpected 2xx representation for success.
-  const expectedStatus = path === "/api/service-stop" ? 202 : 200;
-  if (response.ok && (response.status !== expectedStatus ||
-      response.redirected || response.headers.has("content-range") ||
-      !response.body)) {
-    await response.body?.cancel().catch(() => undefined);
-    throw new Error("operation-failed");
-  }
+  // Shutdown alone uses an accepted 202 instead of an ordinary full 200.
+  await requireCompleteWorkspaceReply(response,
+    path === "/api/service-stop" ? 202 : 200);
   const value = await response.json();
   if (!response.ok || value.ok === false)
     throw new Error(
@@ -1097,6 +1099,7 @@ async function pasteSource(source) {
     let image = source.image;
     if (source.url) {
       const response = await fetch("/api/image-source", {
+        redirect: "error",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1104,6 +1107,7 @@ async function pasteSource(source) {
         },
         body: JSON.stringify({ url: source.url }),
       });
+      await requireCompleteWorkspaceReply(response, 200);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.code ?? "image-download-failed");
@@ -2012,6 +2016,7 @@ settingsForm.addEventListener("submit", async (event) => {
     preferences.publication = readPublicationFormValues(name =>
       field(settingsForm, name).value);
     const response = await fetch("/api/settings", {
+      redirect: "error",
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2024,6 +2029,7 @@ settingsForm.addEventListener("submit", async (event) => {
         ownerPassword: field(settingsForm, "ownerPassword").value,
       }),
     });
+    await requireCompleteWorkspaceReply(response, 200);
     const result = await response.json();
     if (!response.ok) throw new Error(result.code);
     if (!result.ok) {

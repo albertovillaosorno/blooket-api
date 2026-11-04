@@ -614,7 +614,7 @@ test("workspace API rejects partial success without losing error semantics",
     "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
     import.meta.url,
   ), "utf8");
-  const start = source.indexOf("async function api(");
+  const start = source.indexOf("async function requireCompleteWorkspaceReply(");
   const end = source.indexOf("\nasync function command(", start);
   assert.ok(start > 0 && end > start);
   const sandbox = {
@@ -625,8 +625,9 @@ test("workspace API rejects partial success without losing error semantics",
         { status: 200 });
     },
   };
-  const api = runInNewContext("(" + source.slice(start, end) + ")",
-    sandbox) as (path: string, body?: unknown) => Promise<{
+  const api = runInNewContext("(function() {" + source.slice(start, end) +
+    "; return api; })()", sandbox) as
+    (path: string, body?: unknown) => Promise<{
       ok?: boolean; value?: number;
     }>;
   assert.equal((await api("/api/command", {})).value, 7);
@@ -664,4 +665,51 @@ test("workspace API rejects partial success without losing error semantics",
   sandbox.fetch = async () => new Response(
     JSON.stringify({ ok: false, code: "service-busy" }), { status: 429 });
   await assert.rejects(api("/api/command", {}), /service-busy/u);
+});
+
+
+test("direct workspace fetches require complete responses before success",
+  async () => {
+  const source = await readFile(new URL(
+    "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
+    import.meta.url,
+  ), "utf8");
+  const begin = source.indexOf("async function requireCompleteWorkspaceReply(");
+  const end = source.indexOf("\nasync function api(", begin);
+  assert.ok(begin > 0 && end > begin,
+    "one shared response admission must guard raw UI fetches");
+  const validate = runInNewContext("(" + source.slice(begin, end) + ")") as
+    (response: Response, expected: number) => Promise<void>;
+  await validate(new Response("ok", { status: 200 }), 200);
+  await validate(new Response("accepted", { status: 202 }), 202);
+  for (const expected of [200, 202]) {
+    for (const status of [201, 206, 202]) {
+      if (status === expected) continue;
+      await assert.rejects(validate(new Response("ok", { status }), expected),
+        /operation-failed/u);
+    }
+    await assert.rejects(validate(new Response("ok", {
+      status: expected, headers: { "Content-Range": "bytes 0-1/2" },
+    }), expected), /operation-failed/u);
+  }
+  let cancelled = false;
+  await assert.rejects(validate(new Response(new ReadableStream({
+    start(controller) { controller.enqueue(Uint8Array.of(1)); },
+    cancel() { cancelled = true; },
+  }), { status: 206 }), 200), /operation-failed/u);
+  assert.equal(cancelled, true);
+  // Non-success JSON replies must retain their original server error code.
+  await validate(new Response('{"code":"service-busy"}', { status: 429 }), 200);
+  const settings = source.slice(source.indexOf('fetch("/api/settings"'),
+    source.indexOf("const result = await response.json();",
+      source.indexOf('fetch("/api/settings"')));
+  const image = source.slice(source.indexOf('fetch("/api/image-source"'),
+    source.indexOf('image = await response.blob();',
+      source.indexOf('fetch("/api/image-source"')));
+  for (const [name, segment] of [["settings", settings],
+    ["image-source", image]] as const) {
+    assert.match(segment, /redirect: "error"/u, name);
+    assert.match(segment,
+      /await requireCompleteWorkspaceReply\(response, 200\)/u, name);
+  }
 });
