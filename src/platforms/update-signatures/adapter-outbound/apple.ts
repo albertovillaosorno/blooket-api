@@ -42,6 +42,23 @@ import { UPDATE_BUNDLE_ID, isAdmittedMinimumMacos } from
 import { verifySignedUpdateManifest } from "./verify.ts";
 
 const executeFile = promisify(execFile);
+
+export async function readAppleRuntimeHeader(runtime: string): Promise<Buffer> {
+  // Only the 32-byte Mach-O header is needed for this architecture probe.
+  // A replaced FIFO must fail before a blocking open, and a replaced
+  // directory must never be accepted as an executable.
+  const file = await open(runtime, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  try {
+    if (!(await file.stat()).isFile())
+      throw new Error("invalid-apple-runtime-header");
+    const header = Buffer.alloc(32);
+    const { bytesRead } = await file.read(header, 0, header.length, 0);
+    if (bytesRead !== header.length)
+      throw new Error("invalid-apple-runtime-header");
+    return header;
+  } finally { await file.close(); }
+}
 export type AppleAssessmentCommand = (
   executable: string,
   arguments_: readonly string[],
@@ -221,19 +238,12 @@ async function assessAppleBundle(
     // Read only Apple's fixed 32-byte mach_header_64. The shipped Node target
     // is a thin little-endian ARM64 executable, not a universal container.
     // This is an architecture check, not full Mach-O or signature validation.
-    const binary = await open(
-      runtime, constants.O_RDONLY | constants.O_NOFOLLOW,
-    );
-    const header = Buffer.alloc(32);
-    try {
-      const { bytesRead } = await binary.read(header, 0, header.length, 0);
-      if (bytesRead !== header.length ||
-          header.readUInt32LE(0) !== 0xfeedfacf || // MH_MAGIC_64
-          header.readUInt32LE(4) !== 0x0100000c || // CPU_TYPE_ARM64
-          header.readUInt32LE(8) !== 0 || // CPU_SUBTYPE_ARM64_ALL
-          header.readUInt32LE(12) !== 2) // MH_EXECUTE
-        return fail("architecture");
-    } finally { await binary.close(); }
+    const header = await readAppleRuntimeHeader(runtime);
+    if (header.readUInt32LE(0) !== 0xfeedfacf || // MH_MAGIC_64
+        header.readUInt32LE(4) !== 0x0100000c || // CPU_TYPE_ARM64
+        header.readUInt32LE(8) !== 0 || // CPU_SUBTYPE_ARM64_ALL
+        header.readUInt32LE(12) !== 2) // MH_EXECUTE
+      return fail("architecture");
     phase = "signature";
     const requirement = 'anchor apple generic and identifier "' +
       identity.bundleId + '" and certificate leaf[subject.OU] = "' +

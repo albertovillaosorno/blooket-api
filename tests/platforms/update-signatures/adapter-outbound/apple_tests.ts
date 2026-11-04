@@ -31,6 +31,8 @@
 //
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { generateKeyPairSync, sign, createHash } from "node:crypto";
 import {
   mkdir, mkdtemp, realpath, rm, symlink, writeFile,
@@ -39,6 +41,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   verifyAppleUpdateBundle,
+  readAppleRuntimeHeader,
   verifyAppleInstalledBundle,
   type AppleAssessmentCommand,
   type AppleBundleVerificationOptions,
@@ -140,6 +143,41 @@ async function fixture() {
     cleanup: () => rm(directory, { recursive: true, force: true }),
   };
 }
+
+test("Apple runtime header reads only a regular nonlinked executable",
+  async () => {
+    const f = await fixture();
+    try {
+      assert.deepEqual(await readAppleRuntimeHeader(f.runtime), f.header);
+      await writeFile(f.runtime, f.header.subarray(0, 31));
+      await assert.rejects(readAppleRuntimeHeader(f.runtime));
+      await rm(f.runtime);
+      await symlink(join(f.directory, "not-an-executable"), f.runtime);
+      await assert.rejects(readAppleRuntimeHeader(f.runtime));
+      await rm(f.runtime);
+      await assert.rejects(readAppleRuntimeHeader(f.directory));
+    } finally { await f.cleanup(); }
+  });
+
+test("Apple runtime header reader rejects substituted FIFOs without hanging",
+  { skip: process.platform === "win32" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "apple-runtime-fifo-"));
+    try {
+      const fifo = join(root, "runtime");
+      await promisify(execFile)("mkfifo", [fifo]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/update-signatures/adapter-outbound/apple.ts",
+        import.meta.url,
+      ).href;
+      const script = `import { readAppleRuntimeHeader } from ` +
+        `${JSON.stringify(moduleUrl)};` +
+        `await readAppleRuntimeHeader(process.argv[1]).then(` +
+        `() => { throw Error("accepted-FIFO"); }, () => undefined);`;
+      await promisify(execFile)(process.execPath,
+        ["--input-type=module", "-e", script, fifo],
+        { timeout: 3_000, killSignal: "SIGKILL" });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
 
 test("native assessment binds signed metadata, Apple identity, and OS trust",
   async () => {
