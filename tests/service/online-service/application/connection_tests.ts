@@ -196,6 +196,45 @@ test(
   },
 );
 
+test("tunnel startup failure cannot leave a gateway listener running",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "online-tunnel-start-"));
+    let gateway: Awaited<ReturnType<typeof startMcpGateway>> | undefined;
+    const controller = createOnlineConnection(root, {
+      read: async () => ({
+        ok: true, kind: "found", secret: "synthetic-secret",
+      }),
+      write: async () => ({ ok: true }),
+      delete: async () => ({ ok: true }),
+    }, {
+      startGateway: async options => {
+        gateway = await startMcpGateway({ ...options, port: 0 });
+        return gateway;
+      },
+      startTunnel: (_token, update) => {
+        update("starting");
+        throw new Error("synthetic-tunnel-start-failure");
+      },
+    });
+    try {
+      const preferences = await loadPreferences(root);
+      await savePreferences(root, { ...preferences, online: {
+        ...preferences.online, enabled: true,
+        publicUrl: "https://teacher.example/mcp",
+      } });
+      await controller.reload(35200);
+      assert.ok(gateway, "the gateway must have reached its startup point");
+      assert.equal(gateway.server.listening, false,
+        "tunnel failure must close the authenticated listener");
+      assert.equal((controller.status() as { state: string }).state,
+        "tunnel-start-failed");
+      assert.deepEqual(controller.pending(), []);
+    } finally {
+      await controller.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
 test("tunnel stop failure still closes the authenticated gateway", async () => {
   const root = await mkdtemp(join(tmpdir(), "online-stop-failure-"));
   const verifier = await createOwnerPasswordVerifier("owner-fixture");

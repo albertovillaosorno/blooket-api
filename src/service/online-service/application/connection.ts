@@ -140,12 +140,19 @@ export function createOnlineConnection(
           state = "gateway-start-failed";
           return;
         }
-        tunnel = (dependencies.startTunnel ?? startCloudflareTunnel)(
-          token.secret,
-          (next) => {
-            state = next;
-          },
-        );
+        try {
+          tunnel = (dependencies.startTunnel ?? startCloudflareTunnel)(
+            token.secret,
+            (next) => {
+              state = next;
+            },
+          );
+        } catch {
+          // A connector launch error must not leave the authenticated gateway
+          // listening without its owner-visible tunnel lifecycle.
+          await stopCurrent();
+          state = "tunnel-start-failed";
+        }
       };
       serial = serial.then(run, run);
       await serial;
