@@ -126,7 +126,8 @@ export async function readDevelopmentEnvironment(
   path: string,
 ): Promise<Readonly<Record<string, string | undefined>>> {
   try {
-    const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
     try {
       const before = await handle.stat();
       if (!before.isFile() || !Number.isSafeInteger(before.size) ||

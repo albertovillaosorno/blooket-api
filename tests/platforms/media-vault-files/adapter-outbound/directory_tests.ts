@@ -30,6 +30,7 @@
 //   - Test state lives only beneath the operating-system temp directory.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   link,
@@ -46,6 +47,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   importMediaVaultAsset,
@@ -125,6 +127,28 @@ test("missing vault loads empty without creating a directory", async () => {
     assert.equal(await pathExists(directory), false);
   });
 });
+
+// A replaced metadata index must never wait for a named-pipe writer.
+test("media vault FIFO index is refused without blocking loading",
+  async () => { await withTemporaryDirectory(async directory => {
+    const run = promisify(execFile);
+    await run("mkfifo", [join(directory, "media.jsonl")]);
+    const moduleUrl = new URL(
+      "../../../../src/platforms/media-vault-files/adapter-outbound/" +
+      "directory.ts",
+      import.meta.url,
+    ).href;
+    const script =
+      `import { loadMediaVault } from ${JSON.stringify(moduleUrl)};` +
+      "const result = await loadMediaVault(process.argv[1]);" +
+      "process.stdout.write(JSON.stringify(result));";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, directory],
+      { timeout: 8_000 });
+    assert.deepEqual(JSON.parse(stdout),
+      { ok: false, kind: "io", code: "media-vault-unsafe" });
+  }); },
+);
 
 test("imports publish assets before canonical metadata", async () => {
   await withTemporaryDirectory(async (directory) => {

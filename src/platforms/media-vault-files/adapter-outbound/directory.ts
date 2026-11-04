@@ -1304,7 +1304,8 @@ async function readOwnedBinaryFile(
 ): Promise<OwnedBinaryRead> {
   let handle;
   try {
-    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
   } catch (error: unknown) {
     if (isMissingPathError(error)) return { kind: "missing" };
     if (error instanceof Error && "code" in error &&

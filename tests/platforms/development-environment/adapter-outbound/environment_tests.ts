@@ -30,12 +30,13 @@
 //   - Unsupported or invalid requests fail closed.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
 import { mkdtemp, readFile, rm, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseEnv } from "node:util";
+import { parseEnv, promisify } from "node:util";
 import { developmentConfiguration, readDevelopmentEnvironment } from
 // jig-ignore-next-line: TypeScript module specifier is indivisible.
   "../../../../src/platforms/development-environment/adapter-outbound/environment.ts";
@@ -242,6 +243,33 @@ test("development env files admit the exact byte cap without reading beyond",
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+  },
+);
+
+// Explicit development reads must refuse named pipes without waiting.
+test("development environment FIFO fails closed without blocking",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "dev-env-fifo-"));
+    try {
+      const file = join(root, "synthetic.env");
+      const run = promisify(execFile);
+      await run("mkfifo", [file]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/development-environment/" +
+        "adapter-outbound/environment.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { readDevelopmentEnvironment } from ` +
+        `${JSON.stringify(moduleUrl)};` +
+        "try { await readDevelopmentEnvironment(process.argv[1]);" +
+        "process.stdout.write('unexpected-success'); }" +
+        "catch (error) { process.stdout.write(error.message); }";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, file],
+        { timeout: 8_000 });
+      assert.equal(stdout, "development-env-unreadable");
+    } finally { await rm(root, { recursive: true, force: true }); }
   },
 );
 
