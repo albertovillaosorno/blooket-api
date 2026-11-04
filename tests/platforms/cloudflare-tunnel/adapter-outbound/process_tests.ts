@@ -174,3 +174,80 @@ test("connector stop waits for a resistant child & excludes token argv",
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("split connection log confirms tunnel before its timeout", async () => {
+  const root = await mkdtemp(join(tmpdir(), "connector-split-"));
+  const fixture = join(root, "connector.cjs");
+  const states: string[] = [];
+  await writeFile(
+    fixture,
+    "#!/usr/bin/env node\n" +
+      'process.stderr.write("Registered tunnel ");\n' +
+      'setTimeout(() => {\n' +
+      '  process.stderr.write("connection\\n");\n' +
+      '}, 40);\n' +
+      "setInterval(()=>{},1000);\n",
+    { mode: 0o755 },
+  );
+  let observed!: () => void;
+  let failed!: (reason: Error) => void;
+  const connected = new Promise<void>((resolve, reject) => {
+    observed = resolve; failed = reject;
+  });
+  const tunnel = startCloudflareTunnel(
+    "synthetic-token",
+    (state) => {
+      states.push(state);
+      if (state === "connected") observed();
+      if (state === "connection-timeout")
+        failed(new Error("split-connection-not-detected"));
+    },
+    fixture,
+    700,
+  );
+  try {
+    await connected;
+    await new Promise<void>(resolve => setTimeout(resolve, 100));
+    assert.deepEqual(states, ["starting", "connected"]);
+  } finally {
+    await tunnel.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test("repeated registration lines do not duplicate connected state",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "connector-repeated-"));
+    const fixture = join(root, "connector.cjs");
+    const states: string[] = [];
+    await writeFile(
+      fixture,
+      "#!/usr/bin/env node\n" +
+        'process.stderr.write("Registered tunnel connection\\n");\n' +
+        'setTimeout(() => process.stderr.write(' +
+        '"Registered tunnel connection\\n"), 40);\n' +
+        "setInterval(()=>{},1000);\n",
+      { mode: 0o755 },
+    );
+    let observed!: () => void;
+    const connected = new Promise<void>((resolve) => { observed = resolve; });
+    const tunnel = startCloudflareTunnel(
+      "synthetic-token",
+      (state) => {
+        states.push(state);
+        if (state === "connected") observed();
+      },
+      fixture,
+    );
+    try {
+      await connected;
+      await new Promise<void>(resolve => setTimeout(resolve, 130));
+      assert.deepEqual(states, ["starting", "connected"]);
+    } finally {
+      await tunnel.stop();
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+);

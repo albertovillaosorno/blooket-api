@@ -67,14 +67,21 @@ export function startCloudflareTunnel(
     },
     stdio: ["ignore", "ignore", "pipe"],
   });
+  const marker = "Registered tunnel connection";
+  let recent = "";
+  let connected = false;
   child.stderr?.on("data", (chunk: Buffer) => {
-    if (
-      !failure &&
-      !stopped &&
-      /Registered tunnel connection/u.test(chunk.toString("utf8"))
-    ) {
+    if (failure || stopped || connected) return;
+    // The process can split its registration message across stderr chunks.
+    // Keep only enough untrusted output to match the boundary, never log it.
+    const next = recent + chunk.toString("utf8");
+    if (next.includes(marker)) {
+      connected = true;
+      recent = "";
       clearTimeout(timer);
       update("connected");
+    } else {
+      recent = next.slice(-(marker.length - 1));
     }
   });
   child.once("error", () => {
