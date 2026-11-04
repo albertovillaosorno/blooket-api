@@ -138,13 +138,24 @@ async function completeServiceResponse(response: Response): Promise<boolean> {
 
 async function boundedText(response: Response) {
   if (!response.body) throw new Error("empty-service-response");
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (!/^[1-9][0-9]*$/u.test(declared) ||
+      !Number.isSafeInteger(Number(declared)) ||
+      Number(declared) > 1_500_000)) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error("invalid-service-response-length");
+  }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        if (declared !== null && size !== Number(declared))
+          throw new Error("invalid-service-response-length");
+        break;
+      }
       size += value.length;
       if (size > 1_500_000) throw new Error("service-response-too-large");
       chunks.push(value);

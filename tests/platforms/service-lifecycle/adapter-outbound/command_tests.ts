@@ -372,6 +372,17 @@ test("canonical CLI denies incomplete local HTTP replies and closes bodies",
           assert.equal(commandRequests, requestsBefore,
             "a partial bootstrap cannot authorize a command request");
       }
+      status = 200;
+      for (const length of ["1", "9999", "invalid", "0",
+        "9007199254740993"]) {
+        headers = { "Content-Length": length };
+        const requestsBefore = commandRequests;
+        const result = await executeLocalBlooketRead(command, root);
+        assert.equal(result.ok, false,
+          `${target} must refuse forged Content-Length ${length}`);
+        if (target === "bootstrap")
+          assert.equal(commandRequests, requestsBefore);
+      }
     }
     status = 429;
     headers = {};
