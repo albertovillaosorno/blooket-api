@@ -282,8 +282,11 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function syncDirectory(path: string): Promise<void> {
-  const handle = await open(path, "r");
+export async function syncDirectory(path: string): Promise<void> {
+  // A caller-owned directory can be swapped for a FIFO before this open.
+  // O_DIRECTORY rejects that substitution without waiting for a writer.
+  const handle = await open(path,
+    constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NONBLOCK);
   try {
     await handle.sync();
   } finally {

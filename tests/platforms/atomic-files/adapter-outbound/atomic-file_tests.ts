@@ -50,6 +50,7 @@ import {
   removeDurableFile,
   writeAtomicFile,
   writeDurableFileIfAbsent,
+  syncDirectory,
 } from "../../../../src/platforms/atomic-files/adapter-outbound/atomic-file.ts";
 
 async function withTemporaryDirectory(
@@ -169,6 +170,27 @@ test("durable create refuses symbolic and non-file targets", async () => {
     );
   });
 });
+
+test("durable directory sync rejects FIFO instead of blocking",
+  { skip: process.platform === "win32" }, async () => {
+    await withTemporaryDirectory(async directory => {
+      await syncDirectory(directory);
+      const fifo = join(directory, "replacement");
+      await promisify(execFile)("mkfifo", [fifo]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/atomic-files/adapter-outbound/" +
+        "atomic-file.ts", import.meta.url,
+      ).href;
+      const script = `import { syncDirectory } from ` +
+        `${JSON.stringify(moduleUrl)};` +
+        `await syncDirectory(process.argv[1]).then(` +
+        `() => { throw Error("accepted-FIFO-directory"); },` +
+        `() => undefined);`;
+      await promisify(execFile)(process.execPath,
+        ["--input-type=module", "-e", script, fifo],
+        { timeout: 5_000, killSignal: "SIGKILL" });
+    });
+  });
 
 test("atomic writes create an owner-only file", async () => {
   await withTemporaryDirectory(async (directory) => {
