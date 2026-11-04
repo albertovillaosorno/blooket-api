@@ -29,7 +29,8 @@
 // - Defaults:
 //   - Invalid record identity, status, paths, and links fail closed.
 //
-import { lstat, readFile, readdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -47,6 +48,7 @@ type RecordData = {
   order: number;
   depends_on: string[];
 };
+const MAX_ROADMAP_FILE_BYTES = 1_048_576;
 const keys = [
   "schema_version",
   "id",
@@ -141,6 +143,35 @@ async function ownedPath(root: string, path: string): Promise<string> {
   return current;
 }
 
+async function readRoadmapFile(path: string, name: string):
+  Promise<string> {
+  // An owned path can be replaced by a FIFO after the pathname check.
+  // A nonblocking descriptor lets the regular-file check fail promptly.
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  try {
+    const before = await handle.stat();
+    if (!before.isFile()) return fail(`roadmap-nonregular-file: ${name}`);
+    if (before.size > MAX_ROADMAP_FILE_BYTES)
+      return fail(`roadmap-file-too-large: ${name}`);
+    const buffer = Buffer.alloc(before.size + 1);
+    let size = 0;
+    while (size < buffer.length) {
+      const part = await handle.read(buffer, size,
+        buffer.length - size, null);
+      if (!part.bytesRead) break;
+      size += part.bytesRead;
+    }
+    const after = await handle.stat();
+    if (size !== before.size || after.size !== before.size ||
+        after.dev !== before.dev || after.ino !== before.ino ||
+        after.mtimeMs !== before.mtimeMs ||
+        after.ctimeMs !== before.ctimeMs)
+      return fail(`roadmap-file-changed: ${name}`);
+    return buffer.subarray(0, size).toString("utf8");
+  } finally { await handle.close(); }
+}
+
 export async function checkRoadmap(root: string): Promise<number> {
   root = resolve(root);
   const records = new Map<string, { data: RecordData; path: string }>();
@@ -153,7 +184,7 @@ export async function checkRoadmap(root: string): Promise<number> {
         return fail(`roadmap-symbolic-path: ${child}`);
       if (entry.isDirectory()) await walk(child);
       else if (entry.name.endsWith(".mdc")) {
-        const source = await readFile(resolve(root, child), "utf8");
+        const source = await readRoadmapFile(resolve(root, child), child);
         const data = decode(source, child);
         if (records.has(data.id))
           return fail(`roadmap-duplicate-id: ${data.id}`);
@@ -185,7 +216,9 @@ export async function checkRoadmap(root: string): Promise<number> {
     visited.add(id);
   }
   for (const id of records.keys()) dependencies(id);
-  const index = await readFile(await ownedPath(root, "TODO.md"), "utf8");
+  const index = await readRoadmapFile(
+    await ownedPath(root, "TODO.md"), "TODO.md",
+  );
   const indexed = new Set<string>();
   const entries = [
     ...index.matchAll(

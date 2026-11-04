@@ -30,13 +30,17 @@
 //   - Failed checks block release and cleanup only the owned fixture.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
 import { mkdtemp, mkdir, writeFile, rm, rename, readdir } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { checkRoadmap } from
   "../../../../src/platforms/roadmap-files/adapter-outbound/check.ts";
+
+const run = promisify(execFile);
 
 const record = (id = "blooket-01", status = "active", deps: string[] = []) =>
   `---
@@ -170,5 +174,54 @@ test("index shape and unresolved owned paths fail closed", async () => {
     await writeFile(file, record().replace("scope: [docs/]",
       "scope: [../outside/]"));
     await assert.rejects(checkRoadmap(root), /unsafe-path/u);
+  });
+});
+
+test("roadmap rejects FIFO records and index files without hanging", {
+  skip: process.platform === "win32",
+}, async () => {
+  await fixture(async root => {
+    const targets = [
+      ["docs/todo/open/settings/task.mdc", record()],
+      ["TODO.md", index],
+    ] as const;
+    for (const [name, original] of targets) {
+      const file = join(root, name);
+      await rm(file);
+      await run("mkfifo", [file]);
+      try {
+        const entrypoint = new URL(
+          "../../../../src/platforms/roadmap-files/adapter-outbound/check.ts",
+          import.meta.url,
+        ).href;
+        const script = "import { checkRoadmap } from " +
+          JSON.stringify(entrypoint) + `;
+          await checkRoadmap(process.argv[1]).then(
+            () => { throw Error("roadmap-accepted-fifo"); },
+            error => {
+              if (!/roadmap-nonregular-file/u.test(String(error)))
+                throw error;
+            },
+          );`;
+        await run(process.execPath, ["--input-type=module", "-e", script,
+          root], { timeout: 15_000, killSignal: "SIGKILL" });
+      } finally {
+        await rm(file);
+        await writeFile(file, original);
+      }
+    }
+    assert.equal(await checkRoadmap(root), 1);
+  });
+});
+
+test("roadmap refuses oversized index and record inputs", async () => {
+  await fixture(async root => {
+    for (const name of ["docs/todo/open/settings/task.mdc", "TODO.md"]) {
+      const path = join(root, name);
+      await writeFile(path, "x".repeat(1_048_577));
+      await assert.rejects(checkRoadmap(root), /roadmap-file-too-large/u);
+      await writeFile(path, name === "TODO.md" ? index : record());
+    }
+    assert.equal(await checkRoadmap(root), 1);
   });
 });
