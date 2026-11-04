@@ -38,6 +38,7 @@ import { userDataRoot } from
   "../../../platforms/user-storage/adapter-outbound/root.ts";
 import {
   boundedResponseText,
+  completeLoopbackResponse,
   decodeServiceRuntime,
   existingService,
   serviceProcessExited,
@@ -124,7 +125,8 @@ if (
         const boot = await fetch(runtime.origin + "/api/bootstrap", {
           signal: AbortSignal.timeout(3_000), redirect: "error",
         });
-        if (!boot.ok) throw new Error("invalid-runtime");
+        if (!await completeLoopbackResponse(boot))
+          throw new Error("invalid-runtime");
         const source = await boundedResponseText(boot, 128_000);
         if (source === undefined) throw new Error("invalid-runtime");
         const data = JSON.parse(source) as { csrf?: unknown };

@@ -34,7 +34,8 @@ import { decodeUpdateHealthRequest, decodeUpdateHealthResponse } from
   "../../../ir/application-updates/contract/health.ts";
 import { decodeProductVersion } from
   "../../../ir/product-version/contract/version.ts";
-import { decodeServiceRuntime, type LocalServiceRuntime } from "./runtime.ts";
+import { completeLoopbackResponse, decodeServiceRuntime,
+  type LocalServiceRuntime } from "./runtime.ts";
 
 const pending = new WeakSet<ChildProcess>();
 export type OwnedServiceHealth =
@@ -145,8 +146,8 @@ async function freshRuntime(runtime: LocalServiceRuntime): Promise<boolean> {
     const response = await fetch(runtime.origin + "/api/service-status", {
       redirect: "error", signal: AbortSignal.timeout(1_500),
     });
-    if (!response.ok || !response.body) return false;
-    const reader = response.body.getReader();
+    if (!await completeLoopbackResponse(response)) return false;
+    const reader = response.body!.getReader();
     const parts: Uint8Array[] = [];
     let length = 0;
     try {

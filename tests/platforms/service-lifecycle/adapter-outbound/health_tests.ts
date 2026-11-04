@@ -33,6 +33,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fork, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
+import { createServer } from "node:http";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -188,3 +189,57 @@ test("in-flight health cancellation clears listeners without killing service",
     } finally { await close(child); }
   },
 );
+
+test("owned health rejects incomplete loopback status representations",
+  { timeout: 15_000 }, async () => {
+  // Real child IPC, synthetic local HTTP status. The child owns its response
+  // channel, but only a complete status representation should count as fresh.
+  let mode: "valid" | "partial" | "ranged" | "created" = "valid";
+  let runtime: LocalServiceRuntime;
+  const server = createServer((_request, response) => {
+    response.writeHead(mode === "partial" ? 206 :
+      mode === "created" ? 201 : 200, {
+      "Content-Type": "application/json",
+      ...(mode === "ranged" ? { "Content-Range": "bytes 0-99/100" } : {}),
+    });
+    response.end(JSON.stringify(runtime));
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const child = spawn(process.execPath, ["--input-type=module", "-e", `
+    import { installServiceHealthResponder } from ${JSON.stringify(
+      new URL("../../../../src/platforms/service-lifecycle/" +
+        "adapter-outbound/health.ts", import.meta.url).href)};
+    process.on('message', input => {
+      if (input?.kind !== 'setup') return;
+      installServiceHealthResponder({ version: 1, pid: process.pid,
+        instance: input.instance, origin: input.origin },
+        ${JSON.stringify(PRODUCT_VERSION)}, () => true);
+      process.send({ kind: 'ready' });
+    });
+  `], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+  runtime = { version: 1, pid: child.pid!, instance: randomUUID(),
+    origin: "http://127.0.0.1:" + address.port };
+  try {
+    const ready = once(child, "message");
+    child.send({ kind: "setup", instance: runtime.instance,
+      origin: runtime.origin });
+    assert.deepEqual((await ready)[0], { kind: "ready" });
+    const first = randomUUID();
+    assert.deepEqual(await probeOwnedServiceHealth(
+      child, runtime, PRODUCT_VERSION, first,
+    ), { status: "healthy", version: PRODUCT_VERSION, nonce: first });
+    for (const partial of ["partial", "created", "ranged"] as const) {
+      mode = partial;
+      assert.deepEqual(await probeOwnedServiceHealth(
+        child, runtime, PRODUCT_VERSION, randomUUID(),
+      ), { status: "unavailable" },
+      `owned health admitted ${partial} HTTP representation`);
+    }
+  } finally {
+    await close(child);
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});

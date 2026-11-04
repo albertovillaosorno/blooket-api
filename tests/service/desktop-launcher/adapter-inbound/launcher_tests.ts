@@ -258,8 +258,8 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
   // separate upper bound; a killed test child must never count as refusal.
   { timeout: 75_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "launcher-stop-safe-"));
-  let mode: "oversized" | "bad-csrf" | "valid" | "stale-pid" =
-    "oversized";
+  let mode: "oversized" | "bad-csrf" | "valid" | "stale-pid" |
+    "partial" | "created" | "ranged" = "oversized";
   let stopped = 0;
   const runtime = {
     version: 1, pid: process.pid,
@@ -271,7 +271,11 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify(runtime));
     } else if (request.url === "/api/bootstrap") {
-      response.writeHead(200, { "Content-Type": "application/json" });
+      response.writeHead(mode === "partial" ? 206 :
+        mode === "created" ? 201 : 200, {
+        "Content-Type": "application/json",
+        ...(mode === "ranged" ? { "Content-Range": "bytes 0-43/44" } : {}),
+      });
       response.end(mode === "oversized"
         ? "x".repeat(128_001)
         : JSON.stringify({ csrf: mode === "bad-csrf"
@@ -299,7 +303,9 @@ test("launcher stop refuses oversized and invalid local bootstrap replies",
   try {
     await writeFile(join(root, "service-runtime.json"),
       JSON.stringify(runtime));
-    for (const invalid of ["oversized", "bad-csrf"] as const) {
+    for (const invalid of [
+      "oversized", "bad-csrf", "partial", "created", "ranged",
+    ] as const) {
       mode = invalid;
       await assert.rejects(promisify(execFile)(process.execPath, [
         launcher, "--stop",

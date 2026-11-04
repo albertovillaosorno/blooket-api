@@ -102,6 +102,17 @@ export function decodeServiceRuntime(value: unknown): LocalServiceRuntime {
     throw new Error("invalid-service-runtime");
   return record as unknown as LocalServiceRuntime;
 }
+// A partial, ranged or unexpected 2xx reply cannot prove local service state.
+// Release rejected response bodies before the next discovery/health probe.
+export async function completeLoopbackResponse(
+  response: Response,
+): Promise<boolean> {
+  if (response.status === 200 && !response.redirected && response.body &&
+      !response.headers.has("content-range")) return true;
+  await response.body?.cancel().catch(() => undefined);
+  return false;
+}
+
 export async function existingService(root: string) {
   try {
     const bytes = await readOwnedRuntime(join(root, "service-runtime.json"));
@@ -110,10 +121,7 @@ export async function existingService(root: string) {
       signal: AbortSignal.timeout(1500),
       redirect: "error",
     });
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => undefined);
-      return undefined;
-    }
+    if (!await completeLoopbackResponse(response)) return undefined;
     const body = await boundedResponseText(response, 4096);
     if (body === undefined) return undefined;
     const current = decodeServiceRuntime(JSON.parse(body));

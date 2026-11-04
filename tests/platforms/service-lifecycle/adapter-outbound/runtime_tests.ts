@@ -125,6 +125,10 @@ test("service discovery bounds local HTTP status before decoding JSON",
       return;
     }
     response.setHeader("Content-Type", "application/json");
+    if (reply === "partial") response.statusCode = 206;
+    if (reply === "created") response.statusCode = 201;
+    if (reply === "ranged")
+      response.setHeader("Content-Range", "bytes 0-127/128");
     response.end(reply === "oversized"
       ? JSON.stringify(record).padEnd(4097, " ")
       : JSON.stringify(record));
@@ -138,6 +142,11 @@ test("service discovery bounds local HTTP status before decoding JSON",
     const source = JSON.stringify(record);
     await writeFile(path, source.padEnd(4096, " "));
     assert.deepEqual(await existingService(root), record);
+    for (const partial of ["partial", "created", "ranged"]) {
+      reply = partial;
+      assert.equal(await existingService(root), undefined,
+        `runtime discovery admitted ${partial} HTTP response`);
+    }
     reply = "oversized";
     assert.equal(await existingService(root), undefined);
     reply = "declared";
