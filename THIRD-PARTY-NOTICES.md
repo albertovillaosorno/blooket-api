@@ -3,18 +3,15 @@
 This project contains third-party assets and materials subject to their own
 respective licenses and terms.
 
-## 1. Brand Assets & Trademarks
+## 1. Independent presentation artwork and trademarks
 
-### Blooket Brand Assets
+The SVG and PNG icons under `assets/icon/` depict an independently authored
+open book. Copyright (c) 2026 Alberto Villa Osorno. They do not incorporate
+the Blooket logo. Existing filenames are retained for runtime compatibility.
 
-- **Files:** `assets/icon/Blooket.png`, `assets/icon/Blooket.svg`
-- **Owner:** Blooket LLC
-- **License Status:** **Not covered by this project's MIT license.**
-- **Notice:** The Blooket name, logo, and associated brand assets are registered
-  trademarks and copyrighted materials of Blooket LLC. They are included in this
-  repository strictly for non-commercial local display identity and integration
-  testing. All rights remain with Blooket LLC.
-
+Blooket and its associated trademarks belong to Blooket LLC. This independent
+integration is not an official product and does not grant rights to those
+marks. Earlier third-party logo artwork is excluded from the source delivery.
 
 ## 2. ZIP Runtime Dependencies
 
