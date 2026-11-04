@@ -32,6 +32,7 @@
 //   - All test state lives under the operating-system temporary directory.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   copyFile,
   mkdtemp,
@@ -43,6 +44,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { decodeProjectBundle } from
   "../../../../src/projects/project-bundles/domain/project-bundle.ts";
@@ -117,6 +119,37 @@ test("new project directories save and load one validated bundle", async () => {
     );
   });
 });
+
+// Existing FIFO project files must not block loading or saving a bundle.
+test("project file FIFO refuses reads and saves without blocking",
+  async () => { await withTemporaryDirectory(async directory => {
+    assert.deepEqual(await saveProjectDirectory(directory, firstBundle),
+      { ok: true });
+    const run = promisify(execFile);
+    const file = join(directory, "project.json");
+    await rm(file);
+    await run("mkfifo", [file]);
+    const moduleUrl = new URL(
+      "../../../../src/platforms/project-files/adapter-outbound/directory.ts",
+      import.meta.url,
+    ).href;
+    const script =
+      `import { loadProjectDirectory, saveProjectDirectory } from ` +
+      `${JSON.stringify(moduleUrl)};` +
+      "const directory = process.argv[1];" +
+      "const loaded = await loadProjectDirectory(directory);" +
+      "const saved = await saveProjectDirectory(directory, " +
+      "JSON.parse(process.argv[2]));" +
+      "process.stdout.write(JSON.stringify([loaded, saved]));";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, directory,
+        JSON.stringify(firstBundle)], { timeout: 8_000 });
+    assert.deepEqual(JSON.parse(stdout), [
+      { ok: false, kind: "io", code: "project-files-unreadable" },
+      { ok: false, kind: "io", code: "project-directory-unsafe" },
+    ]);
+  }); },
+);
 
 test(
   "project operations fail closed while another writer holds the lock",

@@ -120,7 +120,8 @@ interface StoredHistory {
 async function readHistory(path: string): Promise<StoredHistory | null> {
   let handle;
   try {
-    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
   } catch (error: unknown) {
     if (error instanceof Error && "code" in error &&
         error.code === "ENOENT") return null;

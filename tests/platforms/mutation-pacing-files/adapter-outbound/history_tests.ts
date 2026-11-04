@@ -30,7 +30,9 @@
 //   - Corrupt or unsafe evidence blocks writes rather than resetting history.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
 import {
   chmod, link, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile,
 } from "node:fs/promises";
@@ -165,6 +167,30 @@ test("symlinked pacing ledger cannot escape its owned data root", async () => {
       "fixture private outside bytes");
   });
 });
+
+// A named pipe must not hang mutation admission while waiting for a writer.
+test("FIFO pacing history fails closed without blocking admission",
+  async () => { await fixture(async file => {
+    const run = promisify(execFile);
+    await run("mkfifo", [file]);
+    const moduleUrl = new URL(
+      "../../../../src/platforms/mutation-pacing-files/" +
+      "adapter-outbound/history.ts",
+      import.meta.url,
+    ).href;
+    const script =
+      `import { reserveDurableMutationStart } from ` +
+      `${JSON.stringify(moduleUrl)};` +
+      "try { await reserveDurableMutationStart(process.argv[1], " +
+      "{ minimumStartIntervalMs: 2000, maximumStartsPerMinute: 2 }, " +
+      "() => 2000); process.stdout.write('unexpected-admission'); } " +
+      "catch (error) { process.stdout.write(error.message); }";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, file],
+      { timeout: 8_000 });
+    assert.equal(stdout, "mutation-pacing-history-unavailable");
+  }); },
+);
 
 test("symbolic lock files block reservations without touching the target",
   async () => { await fixture(async file => {

@@ -387,7 +387,8 @@ function decodeTransaction(value: unknown): LibraryTransaction {
 export async function boundedBytes(path: string, limit: number) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 32_000_000)
     throw new Error("invalid-library-read-limit");
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
   try {
     const stat = await handle.stat();
     if (!stat.isFile() || !Number.isSafeInteger(stat.size) ||

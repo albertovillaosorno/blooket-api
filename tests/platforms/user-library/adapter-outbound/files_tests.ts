@@ -30,10 +30,12 @@
 //   - No real user data is required.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import { boundedBytes } from
   "../../../../src/platforms/user-library/adapter-outbound/files.ts";
 
@@ -58,6 +60,28 @@ test("library reads admit exact byte thresholds and reject overflow",
         /invalid-library-read-limit/u);
   });
   },
+);
+
+// The bounded source reader must not wait for a writer on a named pipe.
+test("teacher library FIFO sources are refused without blocking",
+  async () => { await withDirectory(async root => {
+    const file = join(root, "image.bin");
+    const run = promisify(execFile);
+    await run("mkfifo", [file]);
+    const moduleUrl = new URL(
+      "../../../../src/platforms/user-library/adapter-outbound/files.ts",
+      import.meta.url,
+    ).href;
+    const script =
+      `import { boundedBytes } from ${JSON.stringify(moduleUrl)};` +
+      "try { await boundedBytes(process.argv[1], 10);" +
+      "process.stdout.write('unexpected-success'); }" +
+      "catch (error) { process.stdout.write(error.message); }";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, file],
+      { timeout: 8_000 });
+    assert.equal(stdout, "invalid-or-oversized-library-file");
+  }); },
 );
 
 test("teacher library source reads never follow symbolic aliases",
