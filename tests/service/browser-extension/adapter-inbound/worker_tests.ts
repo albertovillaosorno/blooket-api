@@ -2541,6 +2541,18 @@ test(
       "unexpected-page");
     assert.equal(rawUpstreamReloads, 3,
       "unknown pages cannot reset a spent upstream reload budget");
+    // A transient organization prompt is human-owned, not confirmed
+    // recovery. It cannot authorize another three automatic refreshes.
+    rawUpstreamError = false;
+    observedSessionOverride = "organization-prompt";
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "organization-prompt");
+    observedSessionOverride = null;
+    rawUpstreamError = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "unexpected-page");
+    assert.equal(rawUpstreamReloads, 3,
+      "human prompts cannot reset the spent upstream reload budget");
     rawUpstreamError = false;
     assert.equal((await expectReply({ kind: "session.observe" })).value,
       "edit");

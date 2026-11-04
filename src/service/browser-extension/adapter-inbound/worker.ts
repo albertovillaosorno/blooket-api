@@ -462,7 +462,11 @@ async function read(
       if (!ready) return observed;
       observed = await readPage(current, browser, operation, readDeadline);
     }
-    if (exactSessionObservation(observed) !== "unexpected-page")
+    // A challenge, organization prompt, rate limit, or ambiguous page is
+    // not successful recovery and cannot reset an exhausted reload budget.
+    const state = exactSessionObservation(observed);
+    if (state === "dashboard" || state === "my-sets" ||
+        state === "create" || state === "edit")
       upstreamErrorReloads.delete(current.tabId);
     if (exactSessionObservation(observed) !== "security-challenge")
       return observed;
