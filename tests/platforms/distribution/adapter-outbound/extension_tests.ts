@@ -30,11 +30,14 @@
 //   - Existing destinations must remain untouched.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from
+  "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { promisify } from "node:util";
 import { buildBrowserExtension, buildFirefoxExtension } from
   "../../../../src/platforms/distribution/adapter-outbound/extension.ts";
 
@@ -263,4 +266,72 @@ test(
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+
+test("browser and Firefox builds reject FIFO manifest inputs promptly", {
+  skip: process.platform === "win32",
+}, async () => {
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const root = await mkdtemp(join(repo, ".temp/extension-manifest-fifo-"));
+  try {
+    const compiler = join(root, ".dependencies/pnpm/node_modules/.bin/tsc");
+    await mkdir(join(root, ".dependencies/pnpm/node_modules/.bin"),
+      { recursive: true });
+    await writeFile(compiler, "#!/bin/sh\nexit 0\n");
+    await chmod(compiler, 0o700);
+    const presentation = join(root,
+      "src/ui/browser-extension/adapter-inbound");
+    await mkdir(presentation, { recursive: true });
+    for (const name of [
+      "popup.html", "popup.css", "popup.js", "workspace.js",
+    ]) await writeFile(join(presentation, name), "fixture");
+    await promisify(execFile)("mkfifo", [
+      join(presentation, "manifest.json"),
+    ]);
+    const entrypoint = new URL(
+      "../../../../src/platforms/distribution/adapter-outbound/extension.ts",
+      import.meta.url,
+    ).href;
+    const script = "import { buildBrowserExtension, " +
+      "buildFirefoxExtension } from " + JSON.stringify(entrypoint) + `;
+      const build = process.argv[2] === "firefox" ? buildFirefoxExtension
+        : buildBrowserExtension;
+      await build(process.argv[1], process.argv[1] + "/" +
+        process.argv[2]).then(
+          () => { throw Error("accepted-fifo-manifest"); },
+          error => {
+            if (!/browser-extension-build-failed/u.test(String(error)))
+              throw error;
+          },
+        );`;
+    for (const target of ["browser", "firefox"]) {
+      await promisify(execFile)(process.execPath,
+        ["--input-type=module", "-e", script, root, target],
+        { timeout: 8_000, killSignal: "SIGKILL" });
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("extension builders reject oversized manifest source", async () => {
+  const repo = fileURLToPath(new URL("../../../../", import.meta.url));
+  const root = await mkdtemp(join(repo, ".temp/extension-manifest-large-"));
+  try {
+    const compiler = join(root, ".dependencies/pnpm/node_modules/.bin/tsc");
+    await mkdir(join(root, ".dependencies/pnpm/node_modules/.bin"),
+      { recursive: true });
+    await writeFile(compiler, "#!/bin/sh\nexit 0\n");
+    await chmod(compiler, 0o700);
+    const presentation = join(root,
+      "src/ui/browser-extension/adapter-inbound");
+    await mkdir(presentation, { recursive: true });
+    for (const name of [
+      "popup.html", "popup.css", "popup.js", "workspace.js",
+    ]) await writeFile(join(presentation, name), "fixture");
+    await writeFile(join(presentation, "manifest.json"),
+      "x".repeat(65_537));
+    await assert.rejects(buildBrowserExtension(root, join(root, "output")),
+      /browser-extension-build-failed/u);
+    await assert.rejects(readdir(join(root, "output")), { code: "ENOENT" });
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

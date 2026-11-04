@@ -30,7 +30,8 @@
 //   - Existing destinations and failed compilation are never accepted.
 //
 import { execFile } from "node:child_process";
-import { cp, mkdir, rm, readFile, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { cp, mkdir, open, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { buildExtensionIcons } from "./icons.ts";
@@ -41,6 +42,34 @@ import {
 } from "../../../ir/product-version/contract/version.ts";
 
 const execute = promisify(execFile);
+const MAX_MANIFEST_BYTES = 65_536;
+
+async function readExtensionManifest(path: string): Promise<string> {
+  // Caller-selected input or replaced output must not block assembly on FIFO.
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  try {
+    const before = await file.stat();
+    if (!before.isFile() || before.size < 1 ||
+        before.size > MAX_MANIFEST_BYTES)
+      throw new Error("extension-manifest-source-invalid");
+    const bytes = Buffer.alloc(before.size + 1);
+    let size = 0;
+    while (size < bytes.length) {
+      const part = await file.read(bytes, size, bytes.length - size, null);
+      if (!part.bytesRead) break;
+      size += part.bytesRead;
+    }
+    const after = await file.stat();
+    if (size !== before.size || after.size !== before.size ||
+        after.dev !== before.dev || after.ino !== before.ino ||
+        after.mtimeMs !== before.mtimeMs ||
+        after.ctimeMs !== before.ctimeMs)
+      throw new Error("extension-manifest-source-invalid");
+    return bytes.subarray(0, size).toString("utf8");
+  } finally { await file.close(); }
+}
+
 export async function buildBrowserExtension(
   repo: string,
   destination: string,
@@ -79,9 +108,9 @@ export async function buildBrowserExtension(
         join(repo, presentation, name),
         join(destination, presentation, name),
       );
-    const manifest = JSON.parse(
-      await readFile(join(repo, presentation, "manifest.json"), "utf8"),
-    );
+    const manifest = JSON.parse(await readExtensionManifest(
+      join(repo, presentation, "manifest.json"),
+    ));
     manifest.version = extensionVersion(PRODUCT_VERSION);
     manifest.version_name = PRODUCT_VERSION;
     await writeFile(
@@ -106,7 +135,7 @@ export async function buildFirefoxExtension(
   await buildBrowserExtension(repo, destination);
   try {
     const path = join(destination, "manifest.json");
-    const manifest = JSON.parse(await readFile(path, "utf8"));
+    const manifest = JSON.parse(await readExtensionManifest(path));
     delete manifest.minimum_chrome_version;
     manifest.background = {
       scripts: ["src/service/browser-extension/adapter-inbound/worker.js"],
