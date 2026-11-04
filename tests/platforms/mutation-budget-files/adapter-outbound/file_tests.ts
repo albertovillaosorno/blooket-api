@@ -30,6 +30,7 @@
 //   - Symlink, malformed, oversized, and conflicting files fail closed.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   chmod,
   link,
@@ -42,6 +43,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   loadMutationBudgetFile,
@@ -143,6 +145,39 @@ test(
     });
     assert.equal(await readFile(path, "utf8"), before);
   });
+  },
+);
+
+
+// A preexisting FIFO cannot be a budget record or stall reservation.
+test("FIFO mutation budgets refuse loads and reservations without hanging",
+  async () => {
+    await temporary(async directory => {
+      const run = promisify(execFile);
+      const path = join(directory, "budget.json");
+      await run("mkfifo", [path]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/mutation-budget-files/" +
+        "adapter-outbound/file.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { loadMutationBudgetFile, reserveMutationBudgetStart } ` +
+        `from ${JSON.stringify(moduleUrl)};` +
+        "const path = process.argv[1];" +
+        "const loaded = await loadMutationBudgetFile(path, 'plan:synthetic');" +
+        "const saved = await reserveMutationBudgetStart(path, " +
+        "'plan:synthetic', { maximumStarts: 2, " +
+        "maximumDurationMs: 60000 }, 10000);" +
+        "process.stdout.write(JSON.stringify([loaded, saved]));";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, path],
+        { timeout: 8_000 });
+      assert.deepEqual(JSON.parse(stdout), [
+        { ok: false, kind: "io", code: "mutation-budget-file-unsafe" },
+        { ok: false, kind: "io", code: "mutation-budget-file-unsafe" },
+      ]);
+    });
   },
 );
 
