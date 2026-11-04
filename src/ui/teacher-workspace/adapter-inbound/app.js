@@ -946,7 +946,16 @@ async function api(path, body, signal) {
           body: JSON.stringify(body),
         };
   if (signal) request.signal = signal;
-  const response = await fetch(path, request);
+  const response = await fetch(path, { ...request, redirect: "error" });
+  // A full 200 reply completes ordinary requests; shutdown alone uses 202.
+  // Do not mistake a ranged or unexpected 2xx representation for success.
+  const expectedStatus = path === "/api/service-stop" ? 202 : 200;
+  if (response.ok && (response.status !== expectedStatus ||
+      response.redirected || response.headers.has("content-range") ||
+      !response.body)) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("operation-failed");
+  }
   const value = await response.json();
   if (!response.ok || value.ok === false)
     throw new Error(

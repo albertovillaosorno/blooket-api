@@ -607,3 +607,61 @@ test("stale failing Refresh does not interrupt an active publication",
   ui.finished.resolve({ phase: "paused", published: false });
   await flush();
 });
+
+test("workspace API rejects partial success without losing error semantics",
+  async () => {
+  const source = await readFile(new URL(
+    "../../../../src/ui/teacher-workspace/adapter-inbound/app.js",
+    import.meta.url,
+  ), "utf8");
+  const start = source.indexOf("async function api(");
+  const end = source.indexOf("\nasync function command(", start);
+  assert.ok(start > 0 && end > start);
+  const sandbox = {
+    bootstrap: { csrf: "synthetic-csrf" },
+    fetch: async (_path: string, request: RequestInit) => {
+      assert.equal(request.redirect, "error");
+      return new Response(JSON.stringify({ ok: true, value: 7 }),
+        { status: 200 });
+    },
+  };
+  const api = runInNewContext("(" + source.slice(start, end) + ")",
+    sandbox) as (path: string, body?: unknown) => Promise<{
+      ok?: boolean; value?: number;
+    }>;
+  assert.equal((await api("/api/command", {})).value, 7);
+  sandbox.fetch = async () => new Response(
+    JSON.stringify({ ok: true }), { status: 202 });
+  assert.equal((await api("/api/service-stop", {})).ok, true);
+
+  // A syntactically valid JSON body does not make HTTP 201, 206, a ranged
+  // HTTP 200, or a non-stop HTTP 202 an authoritative complete operation.
+  for (const { status, headers } of [
+    { status: 201 }, { status: 206 }, { status: 202 },
+    { status: 200, headers: { "Content-Range": "bytes 0-20/21" } },
+  ]) {
+    sandbox.fetch = async () => new Response(
+      JSON.stringify({ ok: true, value: 7 }), { status, headers });
+    await assert.rejects(api("/api/command", {}), /operation-failed/u,
+      `UI admitted an unexpected HTTP ${status} reply`);
+  }
+  sandbox.fetch = async () => new Response(
+    JSON.stringify({ ok: true, value: 7 }), { status: 206 });
+  await assert.rejects(api("/api/service-stop", {}), /operation-failed/u);
+
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"ok":true}'));
+    },
+    cancel() { cancelled = true; },
+  });
+  sandbox.fetch = async () => new Response(stream, { status: 206 });
+  await assert.rejects(api("/api/command", {}), /operation-failed/u);
+  assert.equal(cancelled, true, "rejected HTTP bytes were not cancelled");
+
+  // A legitimate 4xx response still keeps its safe server error code.
+  sandbox.fetch = async () => new Response(
+    JSON.stringify({ ok: false, code: "service-busy" }), { status: 429 });
+  await assert.rejects(api("/api/command", {}), /service-busy/u);
+});
