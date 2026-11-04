@@ -53,7 +53,10 @@ export async function readPublicationSnapshot(
   path: string,
 ): Promise<unknown | undefined> {
   let handle;
-  try { handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW); }
+  try {
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
+  }
   catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT")
       return undefined;

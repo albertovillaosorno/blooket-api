@@ -30,7 +30,9 @@
 //   - A missing file represents operation index zero.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
 import { chmod, link, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -59,6 +61,30 @@ test("publication snapshots are exclusive and do not replace recovery state",
     assert.deepEqual(await readPublicationSnapshot(paths.snapshot),
       { fixture: true });
   }); });
+
+
+// Snapshot recovery cannot wait for an arbitrary writer on a named pipe.
+test("publication snapshots refuse FIFO files without blocking",
+  async () => { await fixture(async root => {
+    const path = join(root, "snapshot.fifo");
+    const run = promisify(execFile);
+    await run("mkfifo", [path]);
+    const moduleUrl = new URL(
+      "../../../../src/platforms/write-checkpoint-files/" +
+      "adapter-outbound/publication.ts", import.meta.url,
+    ).href;
+    const script =
+      `import { readPublicationSnapshot } from ` +
+      `${JSON.stringify(moduleUrl)};` +
+      "try { await readPublicationSnapshot(process.argv[1]); " +
+      "process.stdout.write('unexpected-success'); } " +
+      "catch (error) { process.stdout.write(error.message); }";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, path],
+      { timeout: 8_000 });
+    assert.equal(stdout, "publication-snapshot-invalid");
+  }); },
+);
 
 test("snapshot reads reject symbolic files and oversized bytes",
   async () => { await fixture(async root => {
