@@ -33,6 +33,7 @@ import { abortable, downloadResponse } from "./response.ts";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { syncStagedDirectory } from "./staging.ts";
 import {
   verifySignedUpdateManifest,
   type ManifestVerification,
@@ -143,9 +144,7 @@ export async function downloadSignedUpdate(
     }
     if (controller.signal.aborted) throw new Error("cancelled");
     await rename(partial, destination);
-    const folder = await open(temporary, "r");
-    try { await folder.sync(); }
-    finally { await folder.close(); }
+    await syncStagedDirectory(temporary);
     if (controller.signal.aborted) throw new Error("cancelled");
     published = true;
     return {

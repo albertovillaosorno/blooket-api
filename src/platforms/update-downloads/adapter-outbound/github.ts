@@ -32,6 +32,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { syncStagedDirectory } from "./staging.ts";
 import { releaseAssetUrl, releasePageUrl, MAX_UPDATE_ARCHIVE_BYTES } from
   "../../../ir/application-updates/contract/releases.ts";
 import { LINUX_UPDATE_ARCHIVE, MAC_UPDATE_ARCHIVE } from
@@ -136,9 +137,7 @@ export async function downloadGithubAsset(options: {
     }
     if (controller.signal.aborted) throw new Error("cancelled");
     await rename(partial, destination);
-    const folder = await open(temporary, "r");
-    try { await folder.sync(); }
-    finally { await folder.close(); }
+    await syncStagedDirectory(temporary);
     if (controller.signal.aborted) throw new Error("cancelled");
     published = true;
     return { status: "downloaded", archivePath: destination,
