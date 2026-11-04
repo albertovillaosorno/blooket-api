@@ -917,11 +917,12 @@ Architecture decisions cover [browser hosting and online MCP][browser-mcp],
 [coelho-excerpt]: https://www.penguinlibros.com/mx/literatura-contemporanea/325758-libro-el-alquimista-biblioteca-paulo-coelho-9786073831420/fragmento
 
 The quoted passage is reproduced from the cited work and is not covered by
-this repository's MIT license.
+this repository's proprietary license.
 
 ## License
 
-[MIT](LICENSE-MIT). See
+Current owner-controlled material is proprietary under [LICENSE](LICENSE).
+Valid prior licenses remain effective for earlier copies. See
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for
 third-party trademarks, assets, and dependency notices.
 

@@ -1,11 +1,11 @@
 // Copyright:
 //   - Copyright © 2026 Alberto Villa Osorno.
 // SPDX-License-Identifier:
-//   - MIT
+//   - LicenseRef-Proprietary
 // Confidential:
-//   - false
+//   - true
 // License-File:
-//   - LICENSE-MIT
+//   - LICENSE
 //
 // Boundary-Contract:
 // - Owns:
@@ -272,7 +272,7 @@ export async function buildDistribution(
       "src",
       "assets/icon",
       "docs/skills",
-      "LICENSE-MIT",
+      "LICENSE",
       "THIRD-PARTY-NOTICES.md",
     ])
       await cp(join(repo, file), join(app, file), { recursive: true });

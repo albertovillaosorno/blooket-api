@@ -41,7 +41,7 @@ paths = ["src/projects/"]
 
 [role.root_governance]
 # jig-ignore-next-line: Root governance is one exact TOML path array.
-paths = [".editorconfig", ".env.example", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE-MIT", "README.md", "THIRD-PARTY-NOTICES.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
+paths = [".editorconfig", ".env.example", ".gitattributes", ".gitignore", "AGENTS.md", "LICENSE", "README.md", "THIRD-PARTY-NOTICES.md", "TODO.md", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"]
 
 [role.security]
 paths = ["src/security/"]
