@@ -30,7 +30,9 @@
 //   - Missing authority, invalid archives and cancellation preserve files.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
 import { generateKeyPairSync } from "node:crypto";
 import { mkdtemp, readFile, realpath, rm, symlink, writeFile, open, mkdir } from
   "node:fs/promises";
@@ -130,6 +132,41 @@ test("invalid archives and aliases cannot receive publisher signatures",
     await assert.rejects(readFile(join(options.directory,
       "update-manifest.json")));
   }); });
+
+// The signing path must never wait on a substituted archive or identity FIFO.
+for (const input of ["archive", "metadata"] as const) {
+  test(`release publisher refuses FIFO ${input} without blocking`,
+    async () => { await fixture(async options => {
+      const path = input === "archive"
+        ? join(options.directory, "darwin-arm64.zip")
+        : join(options.directory, "darwin-arm64", embedded);
+      const run = promisify(execFile);
+      await rm(path);
+      await run("mkfifo", [path]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/distribution/adapter-outbound/" +
+        "update-manifest.ts", import.meta.url,
+      ).href;
+      const script =
+        `import { createSignedReleaseManifest } from ` +
+        `${JSON.stringify(moduleUrl)};` +
+        `import { generateKeyPairSync } from "node:crypto";` +
+        `const keys = generateKeyPairSync("ed25519");` +
+        `const result = await createSignedReleaseManifest({` +
+        `directory: process.argv[1], version: "26.4.1",` +
+        `sourceCommit: "a".repeat(40), privateKey: keys.privateKey,` +
+        `trustedKeys: [keys.publicKey] });` +
+        `process.stdout.write(JSON.stringify(result));`;
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, options.directory],
+        { timeout: 8_000 });
+      assert.deepEqual(JSON.parse(stdout),
+        { status: "manifest-failed", reason: "archive" });
+      await assert.rejects(readFile(join(options.directory,
+        "update-manifest.json")));
+    }); },
+  );
+}
 
 test("pre-existing public output remains unchanged on publication conflict",
   async () => { await fixture(async options => {

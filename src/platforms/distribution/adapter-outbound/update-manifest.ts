@@ -92,7 +92,8 @@ export async function createSignedReleaseManifest(
       return fail("storage");
     reason = "archive";
     archive = await open(archivePath,
-      constants.O_RDONLY | constants.O_NOFOLLOW);
+      constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
     const before = await archive.stat({ bigint: true });
     if (!before.isFile() || before.size < 1n ||
         before.size > BigInt(MAX_UPDATE_ARCHIVE_BYTES) ||
@@ -117,7 +118,8 @@ export async function createSignedReleaseManifest(
     const metadataPath = join(directory, "darwin-arm64", embeddedPath);
     if (await realpath(metadataPath) !== metadataPath) return fail("archive");
     const metadata = await open(metadataPath,
-      constants.O_RDONLY | constants.O_NOFOLLOW);
+      constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
     let identity;
     try {
       const information = await metadata.stat();
