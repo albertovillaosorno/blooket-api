@@ -74,7 +74,8 @@ export async function downloadResponse(
       url = next.href;
       continue;
     }
-    if (response.status !== 200) {
+    // A ranged 200 cannot prove the complete signed asset was transferred.
+    if (response.status !== 200 || response.headers.has("content-range")) {
       void response.body?.cancel().catch(() => undefined);
       throw new Error("http");
     }

@@ -286,6 +286,33 @@ test("HTTP failures are download errors rather than no-update success",
     });
   });
 
+test("signed archive refuses a 200 response marked as a partial range",
+  async () => {
+  await temporary(async directory => {
+    const { bytes, verification } = fixture();
+    const result = await downloadSignedUpdate({
+      directory, verification,
+      fetch: async () => new Response(bytes, {
+        headers: {
+          "Content-Range": `bytes 0-${bytes.length - 1}/99999`,
+        },
+      }),
+    });
+    assert.deepEqual(result, { status: "download-failed", reason: "http" });
+    assert.deepEqual(await readdir(directory), []);
+    let cancelled = false;
+    const response = new Response(new ReadableStream({
+      cancel() { cancelled = true; },
+    }), { headers: { "Content-Range": "bytes 0-1/100" } });
+    assert.deepEqual(await downloadSignedUpdate({
+      directory, verification, fetch: async () => response,
+      timeoutMs: 100,
+    }), { status: "download-failed", reason: "http" });
+    assert.equal(cancelled, true);
+    assert.deepEqual(await readdir(directory), []);
+  });
+});
+
 test("rejected response headers cancel the unconsumed network body",
   async () => {
   await temporary(async directory => {

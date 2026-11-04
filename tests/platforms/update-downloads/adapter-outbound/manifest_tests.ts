@@ -172,6 +172,18 @@ test("manifest JSON and streamed byte limits release their response bodies",
     assert.equal(cancelled, true);
   });
 
+test("signed manifest refuses a 200 response marked as a partial range",
+  async () => {
+  const input = fixture();
+  const body = JSON.stringify(input.document);
+  assert.deepEqual(await fetchSignedUpdateManifest({
+    ...input,
+    fetch: async () => new Response(body, {
+      headers: { "Content-Range": `bytes 0-${body.length - 1}/99999` },
+    }),
+  }), { status: "manifest-failed", reason: "http" });
+});
+
 test("manifest timeout bounds uncooperative fetch and response reads",
   async () => {
     const input = fixture();
