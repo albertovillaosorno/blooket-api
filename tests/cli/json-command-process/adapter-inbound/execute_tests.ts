@@ -123,11 +123,54 @@ test("CLI completion preserves correlation and structured failures",
           }))
         : assert.rejects(pending, { message: "invalid-cli-result" });
       child.stdout.emit("data", Buffer.from(JSON.stringify(envelope)));
-      child.emit("close", envelope.ok ? 0 : 1);
+      child.emit("close", envelope.ok ? 0 : 2);
       await observed;
       // Fresh streams prevent a previous stdin end from owning the next call.
       child.stdin = new PassThrough();
       child.stdout = new PassThrough();
+    }
+  } finally {
+    spawn.mock.restore();
+    syncBuiltinESMExports();
+  }
+});
+
+
+test("CLI receipts require exit status consistent with their envelope",
+  async t => {
+  const child = Object.assign(new EventEmitter(), {
+    stdin: new PassThrough(), stdout: new PassThrough(), kill: () => true,
+  });
+  const spawn = t.mock.method(childProcess, "spawn", () => child);
+  syncBuiltinESMExports();
+  try {
+    const failure = { version: 1, operationId, ok: false,
+      issues: [{ path: "$", code: "synthetic-stop", message: "Synthetic" }],
+    };
+    for (const scenario of [
+      { envelope: result, code: 0, signal: null, accepted: true },
+      { envelope: result, code: 2, signal: null, accepted: false },
+      { envelope: result, code: 3, signal: null, accepted: false },
+      { envelope: result, code: null, signal: "SIGTERM", accepted: false },
+      { envelope: failure, code: 0, signal: null, accepted: false },
+      { envelope: failure, code: 1, signal: null, accepted: false },
+      { envelope: failure, code: 2, signal: null, accepted: true },
+      { envelope: failure, code: 3, signal: null, accepted: true },
+      { envelope: failure, code: null, signal: "SIGKILL", accepted: false },
+    ] as const) {
+      child.stdin = new PassThrough();
+      child.stdout = new PassThrough();
+      const pending = executeJsonCommand(
+        "drafts.list", {}, operationId, "synthetic-data-root",
+      );
+      const observed = scenario.accepted
+        ? assert.doesNotReject(pending.then(value => {
+            assert.deepEqual(value, scenario.envelope);
+          }))
+        : assert.rejects(pending, { message: "invalid-cli-result" });
+      child.stdout.emit("data", Buffer.from(JSON.stringify(scenario.envelope)));
+      child.emit("close", scenario.code, scenario.signal);
+      await observed;
     }
   } finally {
     spawn.mock.restore();

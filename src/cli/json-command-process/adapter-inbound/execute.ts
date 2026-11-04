@@ -84,7 +84,9 @@ export async function executeJsonCommand(
         stop("cli-result-too-large", true);
       } else chunks.push(chunk);
     });
-    child.once("close", () => {
+    child.once("close", (
+      code: number | null, signal: NodeJS.Signals | null,
+    ) => {
       clearTimeout(timer);
       if (failure !== undefined) {
         reject(new Error(failure));
@@ -94,7 +96,12 @@ export async function executeJsonCommand(
         const result = decodeResultEnvelope(
           JSON.parse(Buffer.concat(chunks).toString("utf8")),
         );
-        if (!result.ok || result.value.operationId !== operationId)
+        // A valid JSON prefix is not a completed CLI receipt if the child
+        // failed, was signaled, or disagrees with the canonical exit code.
+        // Structured command failures use exit 2; internal errors use 3.
+        if (!result.ok || result.value.operationId !== operationId ||
+            signal != null || (result.value.ok
+              ? code !== 0 : code !== 2 && code !== 3))
           throw new Error("invalid-cli-result");
         resolve(result.value);
       } catch {
