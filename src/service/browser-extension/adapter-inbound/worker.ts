@@ -417,10 +417,9 @@ async function read(
           origin <= 0 || origin !== afterOrigin ||
           Date.now() >= readDeadline - 750)
         throw new Error("browser-session-changed");
-      if (error !== true) {
-        upstreamErrorReloads.delete(current.tabId);
-        break;
-      }
+      // An unrecognized page is not proof of successful recovery. Only a
+      // verified session state below may clear the reload budget.
+      if (error !== true) break;
       const attempts = prior?.url === tab.url ? prior.attempts : 0;
       if (attempts >= MAX_UPSTREAM_ERROR_RELOADS) return observed;
       // Reserve the attempt BEFORE reloading; a missing reload reply must

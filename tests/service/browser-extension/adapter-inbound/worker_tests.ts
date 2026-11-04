@@ -2515,6 +2515,18 @@ test(
     assert.equal(afterRePair.value, "unexpected-page");
     assert.equal(rawUpstreamReloads, 3,
       "re-pairing the same Chrome tab must preserve the reload cap");
+    // An unrelated unknown document on the same URL is not verified
+    // recovery. It must not grant three more refreshes on the next error.
+    rawUpstreamError = false;
+    observedSessionOverride = "unexpected-page";
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "unexpected-page");
+    observedSessionOverride = null;
+    rawUpstreamError = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "unexpected-page");
+    assert.equal(rawUpstreamReloads, 3,
+      "unknown pages cannot reset a spent upstream reload budget");
     rawUpstreamError = false;
     assert.equal((await expectReply({ kind: "session.observe" })).value,
       "edit");
