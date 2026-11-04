@@ -227,6 +227,22 @@ test("catalog length must match the complete decoded response", async () => {
   assert.equal(decoded.status, "available");
 });
 
+test("unknown catalog content codings cannot bypass length verification",
+  async () => {
+  const page = JSON.stringify([release("26.4.1")]);
+  for (const coding of ["unrecognized", "gzip, unknown", ""]) {
+    const result = await checkPublicUpdates({ ...options, request: requests([
+      new Response(page, { headers: {
+        "content-type": "application/json",
+        "content-encoding": coding, "content-length": "1",
+      } }),
+    ]).request });
+    assert.deepEqual(result, {
+      status: "untrusted-metadata", reason: "partial-response",
+    }, coding);
+  }
+});
+
 test("partial, redirected and foreign 200 catalogs cannot authorize updates",
   async () => {
   for (const scenario of [

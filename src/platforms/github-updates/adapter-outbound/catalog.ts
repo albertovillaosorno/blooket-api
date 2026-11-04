@@ -208,9 +208,15 @@ async function boundedJson(
     if (signal.aborted) return sourceFailure("cancelled");
     // Fetch decompresses encoded bodies but retains their wire length
     // header. Only an identity body's bytes can be compared to that length.
-    const encoding = response.headers.get("content-encoding");
+    const encoding = response.headers.get("content-encoding")
+      ?.trim().toLowerCase();
+    // Unknown or chained codings do not establish that Fetch decoded the
+    // body, so they cannot bypass declared-length integrity checks.
+    if (encoding !== undefined &&
+        !["identity", "gzip", "deflate", "br", "zstd"].includes(encoding))
+      return metadataFailure("partial-response");
     if (length !== null &&
-        (encoding === null || encoding.trim().toLowerCase() === "identity") &&
+        (encoding === undefined || encoding === "identity") &&
         Number(length) !== bytes)
       return metadataFailure("partial-response");
     const text = new TextDecoder("utf-8", { fatal: true }).decode(
