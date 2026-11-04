@@ -40,7 +40,8 @@ import type { ArchiveLayout } from "./layout.ts";
 export async function snapshotArchive(source: string, destination: string,
   asset: ManifestAsset, signal: AbortSignal) {
   signal.throwIfAborted();
-  const input = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const input = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
   try {
     const original = await input.stat();
     if (!original.isFile() || original.size !== asset.size)
@@ -77,8 +78,10 @@ export async function snapshotArchive(source: string, destination: string,
 
 export async function hashFile(path: string, signal: AbortSignal) {
   signal.throwIfAborted();
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
   try {
+    if (!(await file.stat()).isFile()) throw new Error("extracted-bytes");
     const hash = createHash("sha256");
     const stream = file.createReadStream({ autoClose: false });
     const cancel = () => stream.destroy(new Error("cancelled"));
@@ -156,7 +159,8 @@ export async function validateAndFreezeTree(directory: string,
 }
 
 export async function syncDirectory(path: string) {
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK | constants.O_DIRECTORY);
   try { await file.sync(); }
   finally { await file.close(); }
 }
