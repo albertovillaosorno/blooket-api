@@ -2505,6 +2505,16 @@ test(
     assert.equal(repeated.value, "unexpected-page");
     assert.equal(rawUpstreamReloads, 3,
       "separate session polls must not reset the exhausted retry budget");
+    // Re-pairing the same tab after a local workspace restart is not a new
+    // provider outage and must not buy another three automatic refreshes.
+    const newWorkspaceToken = "z".repeat(43);
+    token = newWorkspaceToken;
+    assert.equal((await announce({ origin, token: newWorkspaceToken })).ok,
+      true);
+    const afterRePair = await expectReply({ kind: "session.observe" });
+    assert.equal(afterRePair.value, "unexpected-page");
+    assert.equal(rawUpstreamReloads, 3,
+      "re-pairing the same Chrome tab must preserve the reload cap");
     rawUpstreamError = false;
     assert.equal((await expectReply({ kind: "session.observe" })).value,
       "edit");

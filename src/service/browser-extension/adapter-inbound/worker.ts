@@ -198,9 +198,10 @@ function pairedBrowserLabel(): Promise<string> {
 }
 const AUTOMATIC_VERIFICATION_GRACE_MS = 6_000;
 const MAX_UPSTREAM_ERROR_RELOADS = 3;
-// Keep the retry count across separate session polls, not just one command.
-// A persistent provider outage must not cause an endless reload loop.
-const upstreamErrorReloads = new WeakMap<Connection, {
+// Bind the budget to the owned browser tab, not a workspace connection:
+// re-pairing that same tab must not restart a persistent outage's reload cap.
+// Remove its entry on tab closure, route change, or verified recovery.
+const upstreamErrorReloads = new Map<number, {
   url: string; attempts: number;
 }>();
 const pendingChallengeAttention = new WeakSet<Connection>();
@@ -399,8 +400,8 @@ async function read(
       const tab = await browser.tabs.get(current.tabId);
       if (tab.status !== "complete" || !tab.url ||
           tab.pendingUrl !== undefined) break;
-      const prior = upstreamErrorReloads.get(current);
-      if (prior?.url !== tab.url) upstreamErrorReloads.delete(current);
+      const prior = upstreamErrorReloads.get(current.tabId);
+      if (prior?.url !== tab.url) upstreamErrorReloads.delete(current.tabId);
       const origin = await script(current, browser,
         inspectBlooketSessionDocumentOrigin as
           (...args: never[]) => unknown, [tab.url]);
@@ -417,14 +418,14 @@ async function read(
           Date.now() >= readDeadline - 750)
         throw new Error("browser-session-changed");
       if (error !== true) {
-        upstreamErrorReloads.delete(current);
+        upstreamErrorReloads.delete(current.tabId);
         break;
       }
       const attempts = prior?.url === tab.url ? prior.attempts : 0;
       if (attempts >= MAX_UPSTREAM_ERROR_RELOADS) return observed;
       // Reserve the attempt BEFORE reloading; a missing reload reply must
       // never permit an unbounded number of further refreshes.
-      upstreamErrorReloads.set(current,
+      upstreamErrorReloads.set(current.tabId,
         { url: tab.url, attempts: attempts + 1 });
       await browser.tabs.reload(current.tabId, { bypassCache: true });
       let ready = false;
@@ -452,7 +453,7 @@ async function read(
       observed = await readPage(current, browser, operation, readDeadline);
     }
     if (exactSessionObservation(observed) !== "unexpected-page")
-      upstreamErrorReloads.delete(current);
+      upstreamErrorReloads.delete(current.tabId);
     if (exactSessionObservation(observed) !== "security-challenge")
       return observed;
     const graceDeadline = Math.min(readDeadline - 500,
@@ -1923,6 +1924,7 @@ chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
 // close a teacher-adopted tab or infer its disappearance from a failed get.
 chrome.tabs.onRemoved?.addListener(tabId => {
   temporaryReadTabs.delete(tabId);
+  upstreamErrorReloads.delete(tabId);
 });
 
 async function restoreConnection() {
