@@ -32,13 +32,15 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from
+  "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { hashFile, snapshotArchive, syncDirectory } from
+import { hashFile, snapshotArchive, syncDirectory,
+  syncAndFreezeExtractedFile } from
   "../../../../src/platforms/update-extraction/adapter-outbound/files.ts";
 
 const run = promisify(execFile);
@@ -108,6 +110,43 @@ test("directory syncing refuses FIFO paths without blocking", async () => {
     await syncDirectory(root);
   });
 });
+
+test("frozen extracted files use the exact admitted regular inode",
+  async () => {
+    await fixture(async root => {
+      const file = join(root, "candidate");
+      await writeFile(file, "protected update");
+      await chmod(file, 0o400);
+      await syncAndFreezeExtractedFile(file, 16, 0);
+      assert.equal((await stat(file)).mode & 0o777, 0o444);
+      assert.equal(await readFile(file, "utf8"), "protected update");
+      await assert.rejects(syncAndFreezeExtractedFile(file, 15, 0));
+      const directory = join(root, "directory");
+      await mkdir(directory);
+      try {
+        await assert.rejects(syncAndFreezeExtractedFile(directory, 0, 0));
+      } finally { await chmod(directory, 0o700); }
+      const alias = join(root, "alias");
+      await symlink(file, alias);
+      await assert.rejects(syncAndFreezeExtractedFile(alias, 16, 0));
+      assert.equal((await stat(file)).mode & 0o777, 0o444);
+    });
+  });
+
+test("frozen extracted file sync refuses FIFO substitution without hanging",
+  { skip: process.platform === "win32" }, async () => {
+    await fixture(async root => {
+      const path = join(root, "replacement");
+      await run("mkfifo", [path]);
+      const script = `import { syncAndFreezeExtractedFile } from ` +
+        `${JSON.stringify(moduleUrl)};` +
+        `await syncAndFreezeExtractedFile(process.argv[1], 16, 0).then(` +
+        `() => { throw Error("accepted-fifo"); }, () => undefined);`;
+      await run(process.execPath,
+        ["--input-type=module", "-e", script, path],
+        { timeout: 3_000, killSignal: "SIGKILL" });
+    });
+  });
 
 test("regular archive snapshots and file hashes preserve exact bytes",
   async () => {

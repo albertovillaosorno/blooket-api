@@ -101,6 +101,24 @@ export async function hashFile(path: string, signal: AbortSignal) {
   } finally { await file.close(); }
 }
 
+export async function syncAndFreezeExtractedFile(
+  path: string, size: number, executable: number,
+): Promise<void> {
+  // Open one descriptor before changing permissions. Reopening the name after
+  // chmod could block on a swapped FIFO or freeze a different inode.
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  try {
+    const info = await file.stat();
+    if (!info.isFile() || info.nlink !== 1 || info.size !== size)
+      throw new Error("extracted-layout");
+    await file.chmod(0o600 | executable);
+    await file.sync();
+    await file.chmod(0o444 | executable);
+    await file.sync();
+  } finally { await file.close(); }
+}
+
 export async function validateAndFreezeTree(directory: string,
   layout: ArchiveLayout, signal: AbortSignal) {
   const seen = new Set<string>();
@@ -136,14 +154,7 @@ export async function validateAndFreezeTree(directory: string,
     signal.throwIfAborted();
     if (record.kind !== "file") continue;
     const path = join(directory, record.path);
-    await chmod(path, 0o600 | record.executable);
-    const file = await open(path, constants.O_RDWR | constants.O_NOFOLLOW);
-    try { await file.sync(); }
-    finally { await file.close(); }
-    await chmod(path, 0o444 | record.executable);
-    const frozen = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-    try { await frozen.sync(); }
-    finally { await frozen.close(); }
+    await syncAndFreezeExtractedFile(path, record.size, record.executable);
   }
   const directories = [...layout.bundle.values()]
     .filter(record => record.kind === "directory")
