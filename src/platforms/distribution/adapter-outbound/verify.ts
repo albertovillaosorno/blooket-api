@@ -31,6 +31,7 @@
 //
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { constants } from "node:fs";
 import {
   mkdtemp,
   readFile,
@@ -38,10 +39,13 @@ import {
   rm,
   access,
   readdir,
+  open,
 } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { MAX_UPDATE_ARCHIVE_BYTES } from
+  "../../../ir/application-updates/contract/releases.ts";
 import { preparedMediaBytesAdmitted } from
   "../../../media/rendition-optimization/domain/limits.ts";
 import { defaultTeacherPreferences } from
@@ -61,6 +65,56 @@ import { PRODUCT_VERSION, extensionVersion, appleBuildVersion } from
   "../../../ir/product-version/contract/version.ts";
 
 const execute = promisify(execFile);
+
+export async function snapshotDistributionVerificationArchive(
+  source: string,
+  destination: string,
+): Promise<void> {
+  // The named artifact is mutable while a local verification is running.
+  // Copy its exact admitted descriptor before invoking native tar or unzip,
+  // which otherwise could wait indefinitely on a substituted FIFO.
+  const input = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  try {
+    const before = await input.stat({ bigint: true });
+    if (!before.isFile() || before.size < 1n ||
+        before.size > BigInt(MAX_UPDATE_ARCHIVE_BYTES))
+      throw new Error("distribution-archive-invalid");
+    const output = await open(destination, "wx", 0o600);
+    try {
+      const buffer = Buffer.alloc(65_536);
+      let copied = 0;
+      for (;;) {
+        const { bytesRead } = await input.read(buffer, 0,
+          Math.min(buffer.length, Number(before.size) - copied + 1), null);
+        if (bytesRead === 0) break;
+        copied += bytesRead;
+        if (copied > Number(before.size))
+          throw new Error("distribution-archive-changed");
+        let written = 0;
+        while (written < bytesRead) {
+          const result = await output.write(buffer, written,
+            bytesRead - written, null);
+          if (!result.bytesWritten)
+            throw new Error("distribution-archive-changed");
+          written += result.bytesWritten;
+        }
+      }
+      const after = await input.stat({ bigint: true });
+      if (copied !== Number(before.size) || after.dev !== before.dev ||
+          after.ino !== before.ino || after.size !== before.size ||
+          after.mtimeNs !== before.mtimeNs || after.ctimeNs !== before.ctimeNs)
+        throw new Error("distribution-archive-changed");
+      await output.sync();
+    } catch (error) {
+      await output.close();
+      await rm(destination, { force: true });
+      throw error;
+    }
+    await output.close();
+  } finally { await input.close(); }
+}
+
 export async function verifyDistribution(
   target: DistributionTarget,
   release = false,
@@ -87,6 +141,7 @@ export async function verifyDistribution(
     XDG_RUNTIME_DIR: process.env["XDG_RUNTIME_DIR"],
   };
   let started = false;
+  let archiveSnapshot: string | undefined;
   const launch = (args: string[]) =>
     execute(launcher, args, {
       env,
@@ -94,20 +149,21 @@ export async function verifyDistribution(
       maxBuffer: 1_000_000,
     });
   try {
+    archiveSnapshot = await mkdtemp(join(repo,
+      ".temp/package verification archive "));
+    const archived = join(archiveSnapshot,
+      target + (mac ? ".zip" : ".tar.gz"));
+    await snapshotDistributionVerificationArchive(
+      join(directory, target + (mac ? ".zip" : ".tar.gz")), archived,
+    );
     if (mac)
-      await execute("unzip", [
-        "-q",
-        join(directory, target + ".zip"),
-        "-d",
-        root,
-      ]);
+      await execute("unzip", ["-q", archived, "-d", root],
+        { timeout: 120_000 });
     else
-      await execute("tar", [
-        "-xzf",
-        join(directory, target + ".tar.gz"),
-        "-C",
-        root,
-      ]);
+      await execute("tar", ["-xzf", archived, "-C", root],
+        { timeout: 120_000 });
+    await rm(archiveSnapshot, { recursive: true, force: true });
+    archiveSnapshot = undefined;
     const manifest = JSON.parse(
       await readFile(join(resources, "distribution.json"), "utf8"),
     ) as {
@@ -537,6 +593,8 @@ export async function verifyDistribution(
         "Service offline.",
       );
     }
+    if (archiveSnapshot)
+      await rm(archiveSnapshot, { recursive: true, force: true });
     await rm(root, { recursive: true, force: true });
   }
 }
