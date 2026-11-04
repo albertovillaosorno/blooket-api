@@ -60,7 +60,8 @@ test(
   let humanActivationGetter = false;
   let humanTabGetterReads = 0;
   let validStatus = true;
-  let partialJobResponse: false | "partial" | "ranged-200" = false;
+  let partialJobResponse: false | "partial" | "ranged-200" |
+    "length-mismatch" | "invalid-length" | "encoded-body" = false;
   let partialJobDelivered = false;
   let rejectedBridgeBodiesCancelled = 0;
   let reuseBridgeResponseChunks = false;
@@ -1133,16 +1134,26 @@ test(
       }, { highWaterMark: 0 }));
     }
     if (partialJobResponse && url.endsWith("/next") && value.job) {
-      const statusCode = partialJobResponse === "partial" ? 206 : 200;
+      const mode = partialJobResponse;
+      const statusCode = mode === "partial" ? 206 : 200;
+      const bytes = new TextEncoder().encode(JSON.stringify(value));
       partialJobResponse = false;
       partialJobDelivered = true;
       return new Response(new ReadableStream({
         start(controller) {
-          controller.enqueue(new TextEncoder().encode(JSON.stringify(value)));
+          controller.enqueue(bytes);
+          if (mode !== "partial" && mode !== "ranged-200")
+            controller.close();
         },
         cancel() { rejectedBridgeBodiesCancelled++; },
       }), { status: statusCode,
-        headers: { "Content-Range": "bytes 0-100/300" } });
+        headers: mode === "partial" || mode === "ranged-200"
+          ? { "Content-Range": "bytes 0-100/300" }
+          : mode === "length-mismatch"
+            ? { "Content-Length": String(bytes.byteLength + 1) }
+            : mode === "invalid-length"
+              ? { "Content-Length": "not-an-integer" }
+              : { "Content-Encoding": "gzip" } });
     }
     return Response.json(value);
   };
@@ -1362,7 +1373,8 @@ test(
     const fromReusedChunks = await expectReply({ kind: "session.observe" });
     assert.equal(fromReusedChunks.ok, true);
     assert.ok(recycledBridgeChunks >= 2);
-    for (const mode of ["partial", "ranged-200"] as const) {
+    for (const mode of ["partial", "ranged-200", "length-mismatch",
+      "invalid-length", "encoded-body"] as const) {
       const cancelledBefore = rejectedBridgeBodiesCancelled;
       partialJobResponse = mode;
       partialJobDelivered = false;
@@ -1379,8 +1391,10 @@ test(
       assert.equal(replies.some(reply => reply.id === partialJob.id), false);
       assert.equal(scripts.length, scriptsBeforePartial,
         "ranged response must never enter native browser scripts");
-      assert.equal(rejectedBridgeBodiesCancelled, cancelledBefore + 1,
-        "rejected ranged replies must release their response stream");
+      if (mode === "partial" || mode === "ranged-200") {
+        assert.equal(rejectedBridgeBodiesCancelled, cancelledBefore + 1,
+          "rejected browser jobs must release unread response streams");
+      }
     }
     // The observed provider navigation canonicalizes My Sets to recent.
     tabUrl = "https://dashboard.blooket.com/my-sets?filter=recent";

@@ -298,6 +298,17 @@ async function jsonResponse(
     await discardBridgeBody(response);
     throw new Error("bridge-unavailable");
   }
+  // The paired loopback relay serves identity JSON. Do not let an
+  // incomplete 200, unknown coding, or malformed length carry a browser job.
+  const coding = response.headers.get("content-encoding");
+  const declared = response.headers.get("content-length");
+  if ((coding !== null && coding.trim().toLowerCase() !== "identity") ||
+      (declared !== null && (!/^[1-9][0-9]*$/u.test(declared) ||
+        !Number.isSafeInteger(Number(declared)) ||
+        Number(declared) > maxBytes))) {
+    await discardBridgeBody(response);
+    throw new Error("bridge-unavailable");
+  }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -308,7 +319,11 @@ async function jsonResponse(
     if (!length) throw new Error("bridge-response-unavailable");
     while (true) {
       const part = await reader.read();
-      if (part.done) break;
+      if (part.done) {
+        if (declared !== null && size !== Number(declared))
+          throw new Error("bridge-response-length-mismatch");
+        break;
+      }
       if (!(part.value instanceof Uint8Array))
         throw new Error("bridge-response-invalid-chunk");
       const count = length.call(part.value) as number;
