@@ -88,7 +88,8 @@ export async function executeLocalBlooketRead(
       redirect: "error",
       signal,
     });
-    if (!bootResponse.ok) return failure("blooket-browser-unavailable");
+    if (!await completeServiceResponse(bootResponse))
+      return failure("blooket-browser-unavailable");
     const boot: unknown = JSON.parse(await boundedText(bootResponse));
     if (
       typeof boot !== "object" ||
@@ -109,7 +110,7 @@ export async function executeLocalBlooketRead(
       },
       body: JSON.stringify(command),
     });
-    if (!response.ok)
+    if (!await completeServiceResponse(response))
       return failure(
         response.status === 429
           ? "service-busy"
@@ -124,6 +125,15 @@ export async function executeLocalBlooketRead(
   } catch {
     return failure("blooket-browser-unavailable");
   }
+}
+
+async function completeServiceResponse(response: Response): Promise<boolean> {
+  if (response.status === 200 && !response.redirected && response.body &&
+      !response.headers.has("content-range")) return true;
+  // Never trust a partial HTTP representation as an entire CLI result.
+  // Release unread bytes while retaining the caller's error classification.
+  await response.body?.cancel().catch(() => undefined);
+  return false;
 }
 
 async function boundedText(response: Response) {

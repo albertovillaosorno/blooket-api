@@ -312,6 +312,83 @@ test("local reads and MCP traverse the real CLI and service bridge",
   }
 });
 
+test("canonical CLI denies incomplete local HTTP replies and closes bodies",
+  async () => {
+  const root = await mkdtemp(join(tmpdir(), "read-transport-"));
+  const instance = randomUUID();
+  const bridge = createBlooketBrowserBridgeBroker();
+  const service = await startBrowserService({
+    root, port: 0, instance, browserBridge: bridge,
+  });
+  const originalFetch = globalThis.fetch;
+  let phase: "bootstrap" | "command" = "bootstrap";
+  let status = 206;
+  let headers: Record<string, string> = {};
+  let cancellations = 0;
+  let commandRequests = 0;
+  try {
+    await writeFile(join(root, "service-runtime.json"), JSON.stringify({
+      version: 1, pid: process.pid, instance, origin: service.origin,
+    }));
+    globalThis.fetch = async (input, init) => {
+      const route = new URL(String(input)).pathname;
+      if (route === "/api/command") commandRequests++;
+      if (route !== "/api/" + phase) return originalFetch(input, init);
+      const payload = phase === "bootstrap"
+        ? { csrf: "a".repeat(43) }
+        : { version: 1, operationId: command.operationId,
+            ok: true, value: { items: [], completeness: "complete" } };
+      let delivered = false;
+      return new Response(new ReadableStream({
+        pull(controller) {
+          if (delivered) controller.close();
+          else {
+            controller.enqueue(new TextEncoder().encode(
+              JSON.stringify(payload),
+            ));
+            delivered = true;
+          }
+        },
+        cancel() { cancellations++; },
+      }), { status, headers });
+    };
+    for (const target of ["bootstrap", "command"] as const) {
+      phase = target;
+      for (const variant of [
+        { status: 206, headers: { "Content-Range": "bytes 0-50/100" } },
+        { status: 201, headers: {} },
+        { status: 200, headers: { "Content-Range": "bytes 0-50/100" } },
+      ]) {
+        status = variant.status;
+        headers = variant.headers;
+        const before = cancellations;
+        const requestsBefore = commandRequests;
+        const result = await executeLocalBlooketRead(command, root);
+        assert.equal(result.ok, false,
+          `${target} HTTP ${status} cannot authorize a canonical result`);
+        assert.equal(cancellations, before + 1,
+          `${target} HTTP ${status} must cancel its unread body`);
+        if (target === "bootstrap")
+          assert.equal(commandRequests, requestsBefore,
+            "a partial bootstrap cannot authorize a command request");
+      }
+    }
+    status = 429;
+    headers = {};
+    const before = cancellations;
+    const busy = await executeLocalBlooketRead(command, root);
+    assert.equal(busy.ok, false);
+    if (!busy.ok) assert.equal(busy.issues[0]?.code, "service-busy");
+    assert.equal(cancellations, before + 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    bridge.close();
+    service.server.close();
+    service.server.closeAllConnections();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("local read discovery rejects stale and non-loopback runtimes",
   async () => {
   const root = await mkdtemp(join(tmpdir(), "read-offline-"));
