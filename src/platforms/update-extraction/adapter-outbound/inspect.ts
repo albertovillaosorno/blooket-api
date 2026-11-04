@@ -30,6 +30,8 @@
 //   - Ambiguous or unsupported archives fail closed without app replacement.
 //
 import { createHash } from "node:crypto";
+import { close, constants, fstat, open } from "node:fs";
+import { promisify } from "node:util";
 import { crc32 } from "node:zlib";
 // jig-ignore-next-line: Preserve the repository-owned dependency type path.
 import type * as ZipTypes from "../../../../.dependencies/pnpm/node_modules/@types/yauzl/index.d.ts";
@@ -43,12 +45,31 @@ const library: typeof ZipTypes = await import(new URL(
 // ASCII names need no alternate Unicode path authority in either header.
 const EXTRA_FIELDS = new Set([0x5455, 0x7875]);
 
+const openArchive = promisify(open);
+const statArchive = promisify(fstat);
+const closeArchive = promisify(close);
+
 export async function inspectUpdateArchive(path: string, signal: AbortSignal) {
   signal.throwIfAborted();
-  const pending = library.openPromise(path, { autoClose: false,
-    strictFileNames: true, validateEntrySizes: true });
-  void pending.then(zip => { if (signal.aborted) zip.close(); }, () => {});
-  const zip = await abortable(pending, signal);
+  // Pass one nonblocking, non-symlink descriptor to yauzl. Its ZipFile closes
+  // an adopted descriptor; failed admission must close it here instead.
+  const fd = await openArchive(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK);
+  let adopted = false;
+  try {
+    const info = await statArchive(fd);
+    if (!info.isFile() || info.nlink !== 1)
+      throw new Error("archive-layout");
+    const zip = await library.fromFdPromise(fd, { autoClose: false,
+      strictFileNames: true, validateEntrySizes: true });
+    adopted = true;
+    return await inspectEntries(zip, signal);
+  } finally {
+    if (!adopted) await closeArchive(fd);
+  }
+}
+
+async function inspectEntries(zip: ZipTypes.ZipFile, signal: AbortSignal) {
   const iterator = zip.eachEntry();
   // Keep close/read failures handled after the iterator releases its listeners.
   zip.on("error", () => {});

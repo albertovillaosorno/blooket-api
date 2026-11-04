@@ -30,11 +30,19 @@
 //   - Ambiguous or unsupported archives fail closed without app replacement.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
-import { writeFile } from "node:fs/promises";
+import { rename, rm, symlink, writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { inspectUpdateArchive } from
   "../../../../src/platforms/update-extraction/adapter-outbound/inspect.ts";
 import { fixture, baseEntries, type ZipEntryFixture } from "./fixtures.ts";
+
+const run = promisify(execFile);
+const moduleUrl = new URL(
+  "../../../../src/platforms/update-extraction/adapter-outbound/inspect.ts",
+  import.meta.url,
+).href;
 
 async function inspect(entries: ZipEntryFixture[], expected?: RegExp) {
   const item = await fixture(entries);
@@ -124,3 +132,33 @@ test("truncated archives and already cancelled reads do not yield a layout",
         AbortSignal.abort()));
     } finally { await item.cleanup(); }
   });
+
+
+test("ZIP inspection rejects a swapped FIFO without blocking", async () => {
+  const item = await fixture();
+  try {
+    await rm(item.options.archivePath);
+    await run("mkfifo", [item.options.archivePath]);
+    const script =
+      `import { inspectUpdateArchive } from ${JSON.stringify(moduleUrl)};` +
+      "try { await inspectUpdateArchive(process.argv[1], " +
+      "new AbortController().signal); " +
+      "process.stdout.write('unexpected-success'); } " +
+      "catch { process.stdout.write('rejected'); }";
+    const { stdout } = await run(process.execPath,
+      ["--input-type=module", "--eval", script, item.options.archivePath],
+      { timeout: 2_000 });
+    assert.equal(stdout, "rejected");
+  } finally { await item.cleanup(); }
+});
+
+test("ZIP inspection refuses symlink replacements", async () => {
+  const item = await fixture();
+  try {
+    const target = item.options.archivePath + ".target";
+    await rename(item.options.archivePath, target);
+    await symlink(target, item.options.archivePath);
+    await assert.rejects(inspectUpdateArchive(item.options.archivePath,
+      new AbortController().signal));
+  } finally { await item.cleanup(); }
+});
