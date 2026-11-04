@@ -42,6 +42,7 @@ import {
   link,
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { constants } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, dirname, resolve, basename } from "node:path";
@@ -105,9 +106,19 @@ interface ReleaseArtifact {
   sha256: string;
   integrityScope: "package-manifest" | "archive";
 }
-async function run(program: string, args: string[], cwd?: string) {
+async function run(
+  program: string, args: string[], cwd?: string, input?: Uint8Array,
+) {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(program, args, { cwd, stdio: "inherit" });
+    const child = spawn(program, args, {
+      cwd, stdio: input ? ["pipe", "inherit", "inherit"] : "inherit",
+    });
+    if (input) {
+      // tar can exit before consuming a malformed input; its close status
+      // remains the authoritative error rather than an unhandled EPIPE.
+      child.stdin?.on("error", () => undefined);
+      child.stdin?.end(input);
+    }
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       reject(new Error("distribution-command-timeout"));
@@ -155,6 +166,63 @@ export async function downloadDistributionFile(
 }
 const sha256 = (bytes: Uint8Array) =>
   createHash("sha256").update(bytes).digest("hex");
+const MAX_DISTRIBUTION_CACHE_BYTES = 160_000_000;
+
+export async function readDistributionCacheFile(
+  path: string,
+): Promise<Buffer | null> {
+  // The cache is mutable local state. Do not block on substituted pipes,
+  // follow a substituted symlink, or load an unbounded archive into memory.
+  let file;
+  try {
+    file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new Error("distribution-cache-invalid");
+  }
+  try {
+    const before = await file.stat({ bigint: true });
+    if (!before.isFile() || before.size < 1n ||
+        before.size > BigInt(MAX_DISTRIBUTION_CACHE_BYTES))
+      throw new Error("distribution-cache-invalid");
+    const bytes = Buffer.alloc(Number(before.size) + 1);
+    let size = 0;
+    while (size < bytes.length) {
+      const part = await file.read(bytes, size, bytes.length - size, null);
+      if (!part.bytesRead) break;
+      size += part.bytesRead;
+    }
+    const after = await file.stat({ bigint: true });
+    if (size !== Number(before.size) || after.dev !== before.dev ||
+        after.ino !== before.ino || after.size !== before.size ||
+        after.mtimeNs !== before.mtimeNs || after.ctimeNs !== before.ctimeNs)
+      throw new Error("distribution-cache-invalid");
+    return bytes.subarray(0, size);
+  } finally { await file.close(); }
+}
+
+export async function writeDistributionCacheFile(
+  path: string, bytes: Uint8Array,
+): Promise<void> {
+  // Never overwrite a cache entry substituted after a previous cache miss.
+  if (bytes.byteLength < 1 ||
+      bytes.byteLength > MAX_DISTRIBUTION_CACHE_BYTES)
+    throw new Error("distribution-cache-invalid");
+  await writeFile(path, bytes, { flag: "wx", mode: 0o600 });
+}
+
+export async function extractDistributionTar(
+  bytes: Uint8Array,
+  destination: string,
+  entries: string[] = [],
+  stripComponents = 0,
+): Promise<void> {
+  // Extract the verified bytes, not a mutable cache pathname reopened by tar.
+  await run("tar", ["-xzf", "-",
+    ...(stripComponents ? ["--strip-components=" + stripComponents] : []),
+    "-C", destination, ...entries], undefined, bytes);
+}
 async function manifest(path: string): Promise<PackageManifest> {
   return JSON.parse(
     await readFile(join(path, "package.json"), "utf8"),
@@ -212,19 +280,15 @@ async function npmPackage(
   )
     throw new Error("distribution-package-invalid");
   const path = join(cache, name.replaceAll("/", "-") + "-" + version + ".tgz");
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(path);
-  } catch {
-    bytes = await downloadDistributionFile(value.dist.tarball);
-  }
+  const cached = await readDistributionCacheFile(path);
+  const bytes = cached ?? await downloadDistributionFile(value.dist.tarball);
   const integrity =
     "sha512-" + createHash("sha512").update(bytes).digest("base64");
   if (integrity !== value.dist.integrity)
     throw new Error("distribution-package-integrity");
-  await writeFile(path, bytes);
+  if (!cached) await writeDistributionCacheFile(path, bytes);
   await mkdir(destination, { recursive: true });
-  await run("tar", ["-xzf", path, "--strip-components=1", "-C", destination]);
+  await extractDistributionTar(bytes, destination, [], 1);
   return {
     name,
     version,
@@ -333,27 +397,17 @@ export async function buildDistribution(
     if (!checksum || !/^[a-f0-9]{64}$/u.test(checksum))
       throw new Error("distribution-node-checksum-missing");
     const archive = join(cache, nodeFile);
-    let nodeBytes: Buffer;
-    try {
-      nodeBytes = await readFile(archive);
-    } catch {
-      nodeBytes = await downloadDistributionFile(nodeBase + nodeFile);
-    }
+    const cachedNode = await readDistributionCacheFile(archive);
+    const nodeBytes = cachedNode ??
+      await downloadDistributionFile(nodeBase + nodeFile);
     if (sha256(nodeBytes) !== checksum)
       throw new Error("distribution-node-integrity");
-    await writeFile(archive, nodeBytes);
+    if (!cachedNode) await writeDistributionCacheFile(archive, nodeBytes);
     const extracted = join(cache, "node-" + target);
     await mkdir(extracted, { recursive: true });
     const prefix = "node-v" + NODE_VERSION + "-" + target;
-    await run("tar", [
-      "-xzf",
-      archive,
-      "--strip-components=1",
-      "-C",
-      extracted,
-      prefix + "/bin/node",
-      prefix + "/LICENSE",
-    ]);
+    await extractDistributionTar(nodeBytes, extracted,
+      [prefix + "/bin/node", prefix + "/LICENSE"], 1);
     await cp(join(extracted, "bin/node"), join(runtime, "node"));
     await cp(join(extracted, "LICENSE"), join(runtime, "NODE-LICENSE"));
     const helper = join(runtime, EXCHANGE_HELPER_NAME);
@@ -374,22 +428,19 @@ export async function buildDistribution(
     });
     const connector = CONNECTOR_ASSETS[target];
     const connectorPath = join(cache, connector[0]);
-    let connectorBytes: Buffer;
-    try {
-      connectorBytes = await readFile(connectorPath);
-    } catch {
-      connectorBytes = await downloadDistributionFile(
+    const cachedConnector = await readDistributionCacheFile(connectorPath);
+    const connectorBytes = cachedConnector ??
+      await downloadDistributionFile(
         "https://github.com/cloudflare/cloudflared/releases/download/" +
-          CLOUDFLARED_VERSION +
-          "/" +
-          connector[0],
+          CLOUDFLARED_VERSION + "/" + connector[0],
       );
-    }
     if (sha256(connectorBytes) !== connector[1])
       throw new Error("distribution-connector-integrity");
-    await writeFile(connectorPath, connectorBytes);
-    if (mac) await run("tar", ["-xzf", connectorPath, "-C", runtime]);
-    else await cp(connectorPath, join(runtime, "cloudflared"));
+    if (!cachedConnector)
+      await writeDistributionCacheFile(connectorPath, connectorBytes);
+    if (mac) await extractDistributionTar(connectorBytes, runtime);
+    else await writeFile(join(runtime, "cloudflared"), connectorBytes,
+      { flag: "wx", mode: 0o755 });
     await chmod(join(runtime, "node"), 0o755);
     await chmod(join(runtime, "cloudflared"), 0o755);
     await writeFile(

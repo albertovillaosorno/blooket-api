@@ -30,7 +30,7 @@
 //   - Failed checks block release and cleanup only the owned fixture.
 //
 import assert from "node:assert/strict";
-import { readFile, readdir, mkdtemp, mkdir, writeFile, rm } from
+import { readFile, readdir, mkdtemp, mkdir, writeFile, rm, symlink, open } from
   "node:fs/promises";
 import { tmpdir } from "node:os";
 import { execFile } from "node:child_process";
@@ -44,6 +44,9 @@ import {
   distributionDirectory,
   createLinuxArchive,
   downloadDistributionFile,
+  readDistributionCacheFile,
+  writeDistributionCacheFile,
+  extractDistributionTar,
 } from "../../../../src/platforms/distribution/adapter-outbound/build.ts";
 import { join } from "node:path";
 
@@ -83,6 +86,107 @@ test("distribution downloads require a complete bounded HTTP representation",
     } finally {
       globalThis.fetch = original;
     }
+  });
+
+test("distribution cache reads admit only stable bounded regular files",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "package-cache-"));
+    try {
+      const path = join(root, "archive");
+      assert.equal(await readDistributionCacheFile(path), null);
+      const bytes = Buffer.from("cached verified bytes");
+      await writeDistributionCacheFile(path, bytes);
+      assert.deepEqual(await readDistributionCacheFile(path), bytes);
+      await assert.rejects(writeDistributionCacheFile(path,
+        Buffer.from("replacement")), { code: "EEXIST" });
+      assert.deepEqual(await readFile(path), bytes);
+      await rm(path);
+      await symlink(join(root, "target"), path);
+      await assert.rejects(readDistributionCacheFile(path),
+        /distribution-cache-invalid/u);
+      await rm(path);
+      const large = await open(path, "wx");
+      try { await large.truncate(160_000_001); }
+      finally { await large.close(); }
+      await assert.rejects(readDistributionCacheFile(path),
+        /distribution-cache-invalid/u);
+      await rm(path);
+      await writeFile(path, Buffer.alloc(0));
+      await assert.rejects(readDistributionCacheFile(path),
+        /distribution-cache-invalid/u);
+      await assert.rejects(writeDistributionCacheFile(join(root, "empty"),
+        Buffer.alloc(0)), /distribution-cache-invalid/u);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+test("distribution cache refuses FIFO entries and exclusive FIFO writes",
+  { skip: process.platform === "win32" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "package-cache-fifo-"));
+    try {
+      const path = join(root, "archive");
+      await promisify(execFile)("mkfifo", [path]);
+      const entrypoint = new URL(
+        "../../../../src/platforms/distribution/adapter-outbound/build.ts",
+        import.meta.url,
+      ).href;
+      const script = `import { readDistributionCacheFile,
+        writeDistributionCacheFile } from ${JSON.stringify(entrypoint)};
+        const path = process.argv[1];
+        await readDistributionCacheFile(path).then(
+          () => { throw Error("accepted-FIFO-cache"); },
+          error => {
+            if (!/distribution-cache-invalid/u.test(String(error)))
+              throw error;
+          },
+        );
+        await writeDistributionCacheFile(path, Buffer.from("x")).then(
+          () => { throw Error("overwrote-FIFO-cache"); },
+          error => {
+            if (error.code !== "EEXIST") throw error;
+          },
+        );`;
+      await promisify(execFile)(process.execPath,
+        ["--input-type=module", "-e", script, path],
+        { timeout: 10_000, killSignal: "SIGKILL" });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+
+test("distribution tar extraction uses verified bytes, not cache path",
+  { skip: process.platform === "win32" }, async () => {
+    const root = await mkdtemp(join(tmpdir(), "package-tar-input-"));
+    try {
+      const source = join(root, "source");
+      const output = join(root, "output");
+      await mkdir(source);
+      await mkdir(output);
+      await writeFile(join(source, "keep.txt"), "validated archive bytes");
+      const archive = join(root, "cache.tar.gz");
+      await promisify(execFile)("tar", ["-czf", archive,
+        "-C", source, "."]);
+      const bytes = await readFile(archive);
+      await rm(archive);
+      // Extraction succeeds after the original cache entry disappears.
+      await extractDistributionTar(bytes, output);
+      assert.equal(await readFile(join(output, "keep.txt"), "utf8"),
+        "validated archive bytes");
+      // Node packaging selects just two members and strips a directory.
+      const prefix = join(source, "node-v24");
+      await mkdir(join(prefix, "bin"), { recursive: true });
+      await writeFile(join(prefix, "bin/node"), "synthetic runtime");
+      await writeFile(join(prefix, "LICENSE"), "synthetic license");
+      await promisify(execFile)("tar", ["-czf", archive,
+        "-C", source, "node-v24"]);
+      const nodeBytes = await readFile(archive);
+      await rm(archive);
+      const selected = join(root, "selected");
+      await mkdir(selected);
+      await extractDistributionTar(nodeBytes, selected,
+        ["node-v24/bin/node", "node-v24/LICENSE"], 1);
+      assert.equal(await readFile(join(selected, "bin/node"), "utf8"),
+        "synthetic runtime");
+      assert.equal(await readFile(join(selected, "LICENSE"), "utf8"),
+        "synthetic license");
+    } finally { await rm(root, { recursive: true, force: true }); }
   });
 
 test("Linux archives exclude their reserved partial and keep a stable root",
