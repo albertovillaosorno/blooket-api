@@ -191,6 +191,16 @@ test("bounded response reader refuses forged size and invalid limits",
     headers: { "Content-Length": "9000" },
   });
   assert.equal(await boundedResponseText(declared, 20), undefined);
+  for (const length of ["1", "3", "0", "invalid", "9007199254740993"]) {
+    const reply = new Response("ok", {
+      headers: { "Content-Length": length },
+    });
+    assert.equal(await boundedResponseText(reply, 20), undefined, length);
+  }
+  const complete = new Response("ok", {
+    headers: { "Content-Length": "2" },
+  });
+  assert.equal(await boundedResponseText(complete, 20), "ok");
   for (const limit of [0, -1, 3.5, NaN, Infinity, 128_001]) {
     await assert.rejects(boundedResponseText(new Response("ok"), limit),
       /invalid-response-byte-limit/u);

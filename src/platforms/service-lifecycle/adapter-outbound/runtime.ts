@@ -170,8 +170,9 @@ export async function boundedResponseText(
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 ||
       maxBytes > 128_000) throw new Error("invalid-response-byte-limit");
   const declared = response.headers.get("content-length");
-  if (declared !== null && /^[0-9]+$/u.test(declared) &&
-      Number(declared) > maxBytes) {
+  if (declared !== null && (!/^[1-9][0-9]*$/u.test(declared) ||
+      !Number.isSafeInteger(Number(declared)) ||
+      Number(declared) > maxBytes)) {
     await response.body?.cancel().catch(() => undefined);
     return undefined;
   }
@@ -184,7 +185,11 @@ export async function boundedResponseText(
   try {
     while (true) {
       const part = await reader.read();
-      if (part.done) return text + decoder.decode();
+      if (part.done) {
+        if (declared !== null && bytes !== Number(declared))
+          return undefined;
+        return text + decoder.decode();
+      }
       bytes += part.value.byteLength;
       if (bytes > maxBytes) return undefined;
       text += decoder.decode(part.value, { stream: true });
