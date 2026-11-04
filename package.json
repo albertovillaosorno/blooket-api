@@ -7,14 +7,10 @@
   "scripts": {
     "check": ".dependencies/pnpm/node_modules/.bin/tsc -p tsconfig.json",
     "test": "node --test --test-concurrency=4 $(find tests -name '*_tests.ts')",
-    "provider:drift:check":
-      "npm run provider:drift:pages && npm run provider:drift:worker",
-    "provider:drift:pages":
-      "node --test tests/platforms/blooket-browser/adapter-outbound/*_tests.ts",
-    "provider:drift:worker":
-      "node --test tests/service/browser-extension/adapter-inbound/*_tests.ts",
-    "validate":
-      "npm run check && npm run roadmap:check && npm run validate:tests",
+    "provider:drift:check": "npm run provider:drift:pages && npm run provider:drift:worker",
+    "provider:drift:pages": "node --test tests/platforms/blooket-browser/adapter-outbound/*_tests.ts",
+    "provider:drift:worker": "node --test tests/service/browser-extension/adapter-inbound/*_tests.ts",
+    "validate": "npm run check && npm run roadmap:check && npm run validate:tests",
     "start": "node src/service/background-service/adapter-inbound/main.ts",
     "dev": "npm start -- --development",
     "validate:tests": "npm test && jig check --root . && jig validate --root .",
@@ -22,12 +18,9 @@
     "launch": "node src/service/desktop-launcher/adapter-inbound/launcher.ts",
     "package": "node src/platforms/distribution/adapter-inbound/package.ts",
     "package:verify": "npm run package -- --verify",
-    "release:manifest":
-      "node src/platforms/distribution/adapter-inbound/update-manifest.ts",
-    "macos:safari-smoke":
-      "node src/platforms/distribution/adapter-inbound/macos-safari-smoke.ts",
-    "roadmap:check":
-      "node src/platforms/roadmap-files/adapter-outbound/check.ts"
+    "release:manifest": "node src/platforms/distribution/adapter-inbound/update-manifest.ts",
+    "macos:safari-smoke": "node src/platforms/distribution/adapter-inbound/macos-safari-smoke.ts",
+    "roadmap:check": "node src/platforms/roadmap-files/adapter-outbound/check.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
@@ -39,5 +32,20 @@
     "yaml": "2.9.1",
     "yauzl": "3.4.0"
   },
-  "version": "26.4.0"
+  "version": "26.4.0",
+  "description": "Headless TypeScript planning, verification, and state-reconciliation core for browser-assisted Blooket automation; desktop, CLI, and MCP adapters are optional.",
+  "keywords": [
+    "headless",
+    "automation",
+    "state-reconciliation",
+    "write-planning",
+    "typescript",
+    "blooket"
+  ],
+  "exports": {
+    "./headless": {
+      "types": "./src/sdk/headless.ts",
+      "default": "./src/sdk/headless.ts"
+    }
+  }
 }

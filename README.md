@@ -1,5 +1,13 @@
 # blooket-api
 
+The headless core is a TypeScript engine for deterministic desired-state write
+planning, versioned verification evidence, and recovery-safe reconciliation of
+browser-automated workflows. It exposes a side-effect-free programmatic SDK at
+`@blooket-api/repository/headless`. Blooket is the currently implemented
+provider, **not** proof of provider-neutral compatibility; the user-facing
+CLI, MCP gateway, desktop launcher, and signed-update delivery remain supported
+adapters, not the core runtime dependency.
+
 A local-first TypeScript toolkit for a teacher who wants AI to help create
 Blooket quizzes without spending the afternoon uploading and formatting media.
 
@@ -330,6 +338,31 @@ returns only configured/missing status. `.env` is ignored development
 configuration, not
 production secret storage. Partial configuration saves report which secret
 replacements succeeded before a failure.
+
+## Headless SDK and adapter boundary
+
+`@blooket-api/repository/headless` exports deterministic write-plan builders,
+replacement/append planning, strict verification-baseline decoding, and
+collection-digest framing. Importing it does not start the desktop service,
+UI, browser extension, updater, MCP gateway, or network listener.
+
+```ts
+import {
+  decodeBlooketWriteVerificationBaseline,
+} from "@blooket-api/repository/headless";
+
+const baseline = decodeBlooketWriteVerificationBaseline({
+  schemaVersion: 1,
+  kind: "set-list",
+  itemCount: 0,
+  sha256: "a".repeat(64),
+});
+```
+
+The SDK is not a universal Web-DAG executor and does not bypass the Blooket
+provider's authorization or verification requirements. The distribution,
+CLI, and desktop surfaces remain in this repository as **optional adapters**;
+no code is removed to relabel a functional application as infrastructure.
 
 ## Execution and integration boundaries
 
