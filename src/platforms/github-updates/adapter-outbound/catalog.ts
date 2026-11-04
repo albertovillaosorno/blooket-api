@@ -60,7 +60,8 @@ export type UpdateCheckResult =
         | "json"
         | "content-type"
         | "response-limit"
-        | "pagination";
+        | "pagination"
+        | "partial-response";
     };
 class CatalogFailure extends Error {
   readonly result: UpdateCheckResult;
@@ -70,7 +71,8 @@ class CatalogFailure extends Error {
   }
 }
 function metadataFailure(
-  reason: "json" | "content-type" | "response-limit" | "pagination",
+  reason: "json" | "content-type" | "response-limit" | "pagination"
+    | "partial-response",
 ): never {
   throw new CatalogFailure({ status: "untrusted-metadata", reason });
 }
@@ -303,6 +305,12 @@ export async function checkPublicUpdates(options: {
           httpStatus: response.status,
           ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
         });
+      }
+      // Status 200 alone cannot prove this is the complete catalog page.
+      if (response.redirected || response.headers.has("content-range") ||
+          (response.url && response.url !== next)) {
+        await response.body?.cancel().catch(() => {});
+        return metadataFailure("partial-response");
       }
       const result = await boundedJson(
         response,

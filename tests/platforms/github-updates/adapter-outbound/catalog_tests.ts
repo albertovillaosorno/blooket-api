@@ -188,6 +188,37 @@ test(
     );
 });
 
+test("partial, redirected and foreign 200 catalogs cannot authorize updates",
+  async () => {
+  for (const scenario of [
+    "content-range", "redirected", "foreign-url",
+  ] as const) {
+    let cancelled = false;
+    const bytes = new TextEncoder().encode(JSON.stringify([release("26.4.1")]));
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(bytes); },
+      cancel() { cancelled = true; },
+    }), {
+      headers: {
+        "content-type": "application/json",
+        ...(scenario === "content-range" ? {
+          "content-range": `bytes 0-${bytes.length - 1}/${bytes.length + 20}`,
+        } : {}),
+      },
+    });
+    if (scenario === "redirected")
+      Object.defineProperty(response, "redirected", { value: true });
+    if (scenario === "foreign-url")
+      Object.defineProperty(response, "url", {
+        value: "https://example.invalid/releases",
+      });
+    assert.deepEqual(await checkPublicUpdates({
+      ...options, request: requests([response]).request, timeoutMs: 100,
+    }), { status: "untrusted-metadata", reason: "partial-response" });
+    assert.equal(cancelled, true);
+  }
+});
+
 test(
   "pagination follows the exact authority and stops before a third page",
   async () => {
