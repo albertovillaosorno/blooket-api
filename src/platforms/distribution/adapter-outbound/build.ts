@@ -123,10 +123,25 @@ async function run(program: string, args: string[], cwd?: string) {
     });
   });
 }
-async function download(url: string, maxBytes = 160_000_000) {
+export async function downloadDistributionFile(
+  url: string, maxBytes = 160_000_000,
+) {
   const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
-  if (!response.ok || !response.body)
+  if (response.status !== 200 ||
+      response.headers.has("content-range") || !response.body) {
+    await response.body?.cancel().catch(() => undefined);
     throw new Error("distribution-download-failed");
+  }
+  const length = response.headers.get("content-length");
+  if (length !== null && (!/^[1-9][0-9]*$/u.test(length) ||
+      !Number.isSafeInteger(Number(length)))) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error("distribution-download-failed");
+  }
+  if (length !== null && Number(length) > maxBytes) {
+    await response.body.cancel().catch(() => undefined);
+    throw new Error("distribution-download-too-large");
+  }
   const chunks: Uint8Array[] = [];
   let bytes = 0;
   for await (const chunk of response.body) {
@@ -134,6 +149,8 @@ async function download(url: string, maxBytes = 160_000_000) {
     if (bytes > maxBytes) throw new Error("distribution-download-too-large");
     chunks.push(chunk);
   }
+  if (bytes === 0 || (length !== null && bytes !== Number(length)))
+    throw new Error("distribution-download-failed");
   return Buffer.concat(chunks);
 }
 const sha256 = (bytes: Uint8Array) =>
@@ -178,7 +195,7 @@ async function npmPackage(
   cache: string,
   destination: string,
 ) {
-  const response = await download(
+  const response = await downloadDistributionFile(
     "https://registry.npmjs.org/" + encodeURIComponent(name) + "/" + version,
     1_000_000,
   );
@@ -199,7 +216,7 @@ async function npmPackage(
   try {
     bytes = await readFile(path);
   } catch {
-    bytes = await download(value.dist.tarball);
+    bytes = await downloadDistributionFile(value.dist.tarball);
   }
   const integrity =
     "sha512-" + createHash("sha512").update(bytes).digest("base64");
@@ -306,9 +323,10 @@ export async function buildDistribution(
     const nodeFile = "node-v" + NODE_VERSION + "-" + target + ".tar.gz";
     const nodeBase =
       "https://nodejs.org/download/release/v" + NODE_VERSION + "/";
-    const sums = (await download(nodeBase + "SHASUMS256.txt", 100_000))
-      .toString("utf8")
-      .split("\n");
+    const sumsBytes = await downloadDistributionFile(
+      nodeBase + "SHASUMS256.txt", 100_000,
+    );
+    const sums = sumsBytes.toString("utf8").split("\n");
     const checksum = sums
       .find((line) => line.endsWith("  " + nodeFile))
       ?.split(" ")[0];
@@ -319,7 +337,7 @@ export async function buildDistribution(
     try {
       nodeBytes = await readFile(archive);
     } catch {
-      nodeBytes = await download(nodeBase + nodeFile);
+      nodeBytes = await downloadDistributionFile(nodeBase + nodeFile);
     }
     if (sha256(nodeBytes) !== checksum)
       throw new Error("distribution-node-integrity");
@@ -360,7 +378,7 @@ export async function buildDistribution(
     try {
       connectorBytes = await readFile(connectorPath);
     } catch {
-      connectorBytes = await download(
+      connectorBytes = await downloadDistributionFile(
         "https://github.com/cloudflare/cloudflared/releases/download/" +
           CLOUDFLARED_VERSION +
           "/" +
@@ -376,7 +394,7 @@ export async function buildDistribution(
     await chmod(join(runtime, "cloudflared"), 0o755);
     await writeFile(
       join(runtime, "CLOUDFLARED-LICENSE"),
-      await download(
+      await downloadDistributionFile(
         "https://raw.githubusercontent.com/cloudflare/cloudflared/" +
           CLOUDFLARED_VERSION +
           "/LICENSE",

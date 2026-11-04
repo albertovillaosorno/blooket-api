@@ -43,8 +43,47 @@ import {
   macLoginAgentPlist,
   distributionDirectory,
   createLinuxArchive,
+  downloadDistributionFile,
 } from "../../../../src/platforms/distribution/adapter-outbound/build.ts";
 import { join } from "node:path";
+
+test("distribution downloads require a complete bounded HTTP representation",
+  async () => {
+    const original = globalThis.fetch;
+    const fetchReply = async (response: Response, maxBytes = 100):
+      Promise<Buffer> => {
+      globalThis.fetch = (async () => response) as typeof fetch;
+      return downloadDistributionFile("https://example.com/asset", maxBytes);
+    };
+    try {
+      for (const response of [
+        new Response("partial", { status: 206 }),
+        new Response("redirect", { status: 302 }),
+        new Response("partial", { status: 200,
+          headers: { "Content-Range": "bytes 0-6/100" } }),
+        new Response("short", { status: 200,
+          headers: { "Content-Length": "8" } }),
+        new Response("bytes", { status: 200,
+          headers: { "Content-Length": "garbage" } }),
+        new Response("bytes", { status: 200,
+          headers: { "Content-Length": "101" } }),
+        new Response(null, { status: 200 }),
+        new Response("", { status: 200 }),
+      ]) await assert.rejects(fetchReply(response),
+        /distribution-download-failed|distribution-download-too-large/u);
+      await assert.rejects(fetchReply(new Response("too much", {
+        status: 200,
+      }), 5), /distribution-download-too-large/u);
+      assert.deepEqual(await fetchReply(new Response("complete", {
+        status: 200, headers: { "Content-Length": "8" },
+      })), Buffer.from("complete"));
+      assert.deepEqual(await fetchReply(new Response("complete", {
+        status: 200,
+      })), Buffer.from("complete"));
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 
 test("Linux archives exclude their reserved partial and keep a stable root",
   { skip: process.platform !== "linux" }, async () => {
