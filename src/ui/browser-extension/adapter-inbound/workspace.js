@@ -55,6 +55,17 @@
         void response.body?.cancel().catch(() => undefined);
         return;
       }
+      // This loopback service serves identity JSON. Encoded or invalidly
+      // sized replies cannot establish a complete private bridge token.
+      const declared = response.headers.get("content-length");
+      const encoding = response.headers.get("content-encoding");
+      if ((declared !== null &&
+          (!/^[0-9]{1,7}$/u.test(declared) || Number(declared) > 1_000_000)) ||
+          (encoding !== null &&
+            encoding.trim().toLowerCase() !== "identity")) {
+        void response.body.cancel().catch(() => undefined);
+        return;
+      }
       const reader = response.body.getReader();
       let text = "",
         size = 0;
@@ -71,6 +82,7 @@
       } finally {
         await reader.cancel();
       }
+      if (declared !== null && Number(declared) !== size) return;
       const bridge = JSON.parse(text).browserBridge;
       if (
         bridge?.application !== "blooket-api" ||

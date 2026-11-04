@@ -195,6 +195,31 @@ test("workspace refuses partial and noncanonical successful bootstraps",
   }
 });
 
+test("workspace refuses bootstraps with inconsistent declared lengths",
+  async () => {
+  const content = JSON.stringify({
+    browserBridge: { application: "blooket-api", schemaVersion: 1, token },
+  });
+  const size = Buffer.byteLength(content);
+  for (const length of [String(size + 5), String(size - 1), "0", "bad"]) {
+    const response = new Response(content, {
+      headers: { "content-length": length },
+    });
+    const result = await fixture(response);
+    assert.equal(result.messages.length, 0,
+      `length ${length} cannot authorize a workspace token`);
+  }
+  const valid = await fixture(new Response(content, {
+    headers: { "content-length": String(size) },
+  }));
+  assert.equal(valid.messages.length, 1);
+  const encoded = await fixture(new Response(content, {
+    headers: { "content-encoding": "gzip" },
+  }));
+  assert.equal(encoded.messages.length, 0,
+    "loopback bootstrap does not support compressed representations");
+});
+
 test("workspace retries never overlap an unfinished bridge bootstrap",
   async () => {
   let tick: (() => void) | undefined;
