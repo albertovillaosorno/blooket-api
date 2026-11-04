@@ -30,6 +30,7 @@
 //   - A missing file represents operation index zero.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   chmod,
   lstat,
@@ -43,6 +44,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   loadWriteCheckpointFile,
@@ -424,6 +426,39 @@ test("checkpoint reads bound actual bytes and reject dangling aliases",
       ok: false, kind: "io", code: "checkpoint-file-unsafe",
     });
   });
+  },
+);
+
+
+// A named pipe cannot represent saved publication progress and must not hang.
+test("FIFO checkpoint files reject loads and saves without blocking",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const path = join(directory, "checkpoint.json");
+      const run = promisify(execFile);
+      await run("mkfifo", [path]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/write-checkpoint-files/" +
+        "adapter-outbound/file.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { loadWriteCheckpointFile, saveWriteCheckpointFile } ` +
+        `from ${JSON.stringify(moduleUrl)};` +
+        `const plan = ${JSON.stringify(plan)};` +
+        `const checkpoint = ${JSON.stringify(checkpoint(0))};` +
+        "const path = process.argv[1];" +
+        "const loaded = await loadWriteCheckpointFile(path, plan);" +
+        "const saved = await saveWriteCheckpointFile(path, plan, checkpoint);" +
+        "process.stdout.write(JSON.stringify([loaded, saved]));";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, path],
+        { timeout: 8_000 });
+      assert.deepEqual(JSON.parse(stdout), [
+        { ok: false, kind: "io", code: "checkpoint-file-unsafe" },
+        { ok: false, kind: "io", code: "checkpoint-file-unsafe" },
+      ]);
+    });
   },
 );
 

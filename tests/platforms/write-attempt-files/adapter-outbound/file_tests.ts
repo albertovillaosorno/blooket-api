@@ -30,6 +30,7 @@
 //   - Existing journals block a new attempt.
 //
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   chmod,
   link,
@@ -42,6 +43,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   beginWriteAttempt,
@@ -570,6 +572,38 @@ test("legacy attempts cannot hide duplicate version or phase fields",
     }
   });
 });
+
+
+// A FIFO cannot stand in for a pending remote write and must not stall reads.
+test("FIFO write-attempt journals refuse reads and clears without blocking",
+  async () => {
+    await withTemporaryDirectory(async directory => {
+      const path = join(directory, "attempt.json");
+      const run = promisify(execFile);
+      await run("mkfifo", [path]);
+      const moduleUrl = new URL(
+        "../../../../src/platforms/write-attempt-files/" +
+        "adapter-outbound/file.ts",
+        import.meta.url,
+      ).href;
+      const script =
+        `import { loadWriteAttemptFile, clearWriteAttempt } ` +
+        `from ${JSON.stringify(moduleUrl)};` +
+        `const plan = ${JSON.stringify(plan)};` +
+        "const path = process.argv[1];" +
+        "const loaded = await loadWriteAttemptFile(path, plan);" +
+        "const cleared = await clearWriteAttempt(path, plan);" +
+        "process.stdout.write(JSON.stringify([loaded, cleared]));";
+      const { stdout } = await run(process.execPath,
+        ["--input-type=module", "--eval", script, path],
+        { timeout: 8_000 });
+      assert.deepEqual(JSON.parse(stdout), [
+        { ok: false, kind: "io", code: "write-attempt-file-unsafe" },
+        { ok: false, kind: "io", code: "write-attempt-file-unsafe" },
+      ]);
+    });
+  },
+);
 
 test("journal reads bound file bytes and reject dangling aliases", async () => {
   await withTemporaryDirectory(async directory => {

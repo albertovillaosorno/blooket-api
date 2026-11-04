@@ -695,7 +695,8 @@ async function readOwnedTextFile(path: string): Promise<
   // follow a symlink swapped in between the two filesystem operations.
   let handle;
   try {
-    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+      constants.O_NONBLOCK);
   } catch (error: unknown) {
     if (error instanceof Error && "code" in error) {
       if (error.code === "ENOENT") return { kind: "missing" };
