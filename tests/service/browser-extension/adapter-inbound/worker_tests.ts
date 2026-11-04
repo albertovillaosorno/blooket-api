@@ -151,6 +151,8 @@ test(
   let rawUpstreamReloads = 0;
   let upstreamRecoveryAtReload = 0;
   let upstreamSwitchAfterReload = false;
+  let upstreamStorageReadFails = false;
+  let upstreamStorageWriteFails = false;
   let sessionObservations = 0;
   let listFailuresRemaining = 0;
   let listDrifts = false;
@@ -425,8 +427,16 @@ test(
         set: async value => Object.assign(persistentProfile, value),
       },
       session: {
-        get: async () => ({ ...stored }),
-        set: async (value) => Object.assign(stored, value),
+        get: async (key) => {
+          if (key === "blooket-upstream-reloads:7" &&
+              upstreamStorageReadFails) throw Error("session-store-unavailable");
+          return { ...stored };
+        },
+        set: async value => {
+          if (Object.hasOwn(value, "blooket-upstream-reloads:7") &&
+              upstreamStorageWriteFails) throw Error("session-store-unavailable");
+          Object.assign(stored, value);
+        },
         remove: async (key) => {
           delete stored[key];
         },
@@ -2529,6 +2539,10 @@ test(
     const exhausted = await expectReply({ kind: "session.observe" });
     assert.equal(exhausted.value, "unexpected-page");
     assert.equal(rawUpstreamReloads, 3);
+    const upstreamRetryKey = "blooket-upstream-reloads:7";
+    assert.deepEqual(stored[upstreamRetryKey], {
+      url: tabUrl, attempts: 3,
+    }, "the reload budget must survive a worker restart");
     const repeated = await expectReply({ kind: "session.observe" });
     assert.equal(repeated.value, "unexpected-page");
     assert.equal(rawUpstreamReloads, 3,
@@ -2575,7 +2589,43 @@ test(
     assert.equal((await expectReply({ kind: "session.observe" })).value,
       "edit");
     verificationRouteAfter = null;
+    assert.equal(stored[upstreamRetryKey], undefined,
+      "verified recovery must release the persisted reload budget");
+    // Simulate a new worker with an empty in-memory counter: the session
+    // store retains the exhausted cap from the previous worker instance.
+    stored[upstreamRetryKey] = { url: tabUrl, attempts: 3 };
     rawUpstreamError = true;
+    const afterRestart = await expectReply({ kind: "session.observe" });
+    assert.equal(afterRestart.value, "unexpected-page");
+    assert.equal(rawUpstreamReloads, 3,
+      "a persisted cap must prevent fresh reloads after worker restart");
+    rawUpstreamError = false;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "edit");
+    assert.equal(stored[upstreamRetryKey], undefined);
+    rawUpstreamError = true;
+    upstreamStorageReadFails = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "unexpected-page", "a failed budget read must not refresh");
+    upstreamStorageReadFails = false;
+    upstreamStorageWriteFails = true;
+    assert.equal((await expectReply({ kind: "session.observe" })).value,
+      "unexpected-page", "a failed budget reservation must not refresh");
+    upstreamStorageWriteFails = false;
+    const sessionDescriptor = Object.getOwnPropertyDescriptor(
+      browser.storage, "session");
+    try {
+      Object.defineProperty(browser.storage, "session", {
+        configurable: true, value: undefined,
+      });
+      assert.equal((await expectReply({ kind: "session.observe" })).value,
+        "unexpected-page", "missing persistence must not refresh");
+    } finally {
+      if (sessionDescriptor) Object.defineProperty(browser.storage,
+        "session", sessionDescriptor);
+    }
+    assert.equal(rawUpstreamReloads, 3);
+    assert.equal(stored[upstreamRetryKey], undefined);
     rawUpstreamReloads = 0;
     upstreamRecoveryAtReload = 1;
     assert.equal((await expectReply({ kind: "session.observe" })).value,
@@ -2735,7 +2785,10 @@ test(
         "worker did not stop its incompatible relay");
       await pause(20);
     }
-    assert.deepEqual(stored, {});
+    assert.equal(stored.connection, undefined);
+    assert.deepEqual(stored[upstreamRetryKey], {
+      url: "https://dashboard.blooket.com/edit?id=set-fixture", attempts: 1,
+    }, "a transport disconnect must not reset the upstream error cap");
     assert.equal(rejectedBridgeBodiesCancelled,
       cancelledBeforeCompatibility + 1,
       "incompatible poll must release its response stream");
@@ -2748,7 +2801,7 @@ test(
     assert.equal(rejectedBridgeBodiesCancelled,
       cancelledBeforeCompatibility + 2,
       "incompatible connection must release its response stream");
-    assert.deepEqual(stored, {});
+    assert.equal(stored.connection, undefined);
   } finally {
     if (priorPerformanceNow)
       Object.defineProperty(performance, "now", priorPerformanceNow);
@@ -2759,6 +2812,9 @@ test(
     releaseDetachedRead();
     releaseWriteOpen();
     closed = true;
+    // Closing the owned tab, unlike disconnecting its workspace, releases
+    // the tab-scoped persistent reload budget.
+    onTabRemoved?.(7);
     await pause(1100);
     assert.deepEqual(stored, {});
     globalThis.fetch = priorFetch;

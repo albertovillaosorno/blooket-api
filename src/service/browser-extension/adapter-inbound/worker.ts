@@ -201,9 +201,63 @@ const MAX_UPSTREAM_ERROR_RELOADS = 3;
 // Bind the budget to the owned browser tab, not a workspace connection:
 // re-pairing that same tab must not restart a persistent outage's reload cap.
 // Remove its entry on tab closure, route change, or verified recovery.
-const upstreamErrorReloads = new Map<number, {
-  url: string; attempts: number;
-}>();
+type UpstreamReloadBudget = { readonly url: string; readonly attempts: number };
+const upstreamErrorReloads = new Map<number, UpstreamReloadBudget>();
+const upstreamReloadKey = (tabId: number) =>
+  "blooket-upstream-reloads:" + tabId;
+
+async function upstreamReloadAttempts(tabId: number, url: string):
+  Promise<number> {
+  const cached = upstreamErrorReloads.get(tabId);
+  if (cached?.url !== url) upstreamErrorReloads.delete(tabId);
+  if (!chrome.storage.session)
+    return MAX_UPSTREAM_ERROR_RELOADS;
+  let saved: unknown;
+  try {
+    saved = (await chrome.storage.session.get(upstreamReloadKey(tabId)))
+      [upstreamReloadKey(tabId)];
+  } catch {
+    // An inaccessible prior budget is not permission for three more reloads.
+    return MAX_UPSTREAM_ERROR_RELOADS;
+  }
+  if (saved === undefined)
+    return cached?.url === url ? cached.attempts : 0;
+  const record = exactOwnData(saved, ["url", "attempts"]);
+  if (!record || typeof record["url"] !== "string" ||
+      typeof record["attempts"] !== "number" ||
+      !Number.isSafeInteger(record["attempts"]) ||
+      record["attempts"] < 1 ||
+      record["attempts"] > MAX_UPSTREAM_ERROR_RELOADS)
+    return MAX_UPSTREAM_ERROR_RELOADS;
+  if (record["url"] !== url) {
+    await clearUpstreamReloadBudget(tabId);
+    return 0;
+  }
+  const attempts = Math.max(record["attempts"],
+    cached?.url === url ? cached.attempts : 0);
+  upstreamErrorReloads.set(tabId, { url, attempts });
+  return attempts;
+}
+
+async function reserveUpstreamReload(tabId: number, url: string,
+  attempts: number): Promise<boolean> {
+  // Persist BEFORE navigating so an MV3 worker restart cannot rearm a spent
+  // retry budget. Failed persistence must not trigger an untracked reload.
+  if (!chrome.storage.session) return false;
+  try {
+    await chrome.storage.session.set({
+      [upstreamReloadKey(tabId)]: { url, attempts },
+    });
+  } catch { return false; }
+  upstreamErrorReloads.set(tabId, { url, attempts });
+  return true;
+}
+
+async function clearUpstreamReloadBudget(tabId: number): Promise<void> {
+  upstreamErrorReloads.delete(tabId);
+  try { await chrome.storage.session?.remove(upstreamReloadKey(tabId)); }
+  catch { /* A stale budget stays fail-closed across worker restarts. */ }
+}
 const pendingChallengeAttention = new WeakSet<Connection>();
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -426,8 +480,6 @@ async function read(
       const tab = await browser.tabs.get(current.tabId);
       if (tab.status !== "complete" || !tab.url ||
           tab.pendingUrl !== undefined) break;
-      const prior = upstreamErrorReloads.get(current.tabId);
-      if (prior?.url !== tab.url) upstreamErrorReloads.delete(current.tabId);
       const origin = await script(current, browser,
         inspectBlooketSessionDocumentOrigin as
           (...args: never[]) => unknown, [tab.url]);
@@ -446,12 +498,16 @@ async function read(
       // An unrecognized page is not proof of successful recovery. Only a
       // verified session state below may clear the reload budget.
       if (error !== true) break;
-      const attempts = prior?.url === tab.url ? prior.attempts : 0;
+      const attempts = await upstreamReloadAttempts(current.tabId, tab.url);
       if (attempts >= MAX_UPSTREAM_ERROR_RELOADS) return observed;
-      // Reserve the attempt BEFORE reloading; a missing reload reply must
-      // never permit an unbounded number of further refreshes.
-      upstreamErrorReloads.set(current.tabId,
-        { url: tab.url, attempts: attempts + 1 });
+      // Reserve the attempt BEFORE reloading; an absent reply or worker
+      // restart must never permit an unbounded number of refreshes.
+      if (!await reserveUpstreamReload(current.tabId, tab.url,
+        attempts + 1)) return observed;
+      const latest = await browser.tabs.get(current.tabId);
+      if (latest.status !== "complete" || latest.url !== tab.url ||
+          latest.pendingUrl !== undefined)
+        throw new Error("browser-session-changed");
       await browser.tabs.reload(current.tabId, { bypassCache: true });
       let ready = false;
       const reloadDeadline = Math.min(readDeadline - 500,
@@ -482,7 +538,7 @@ async function read(
     const state = exactSessionObservation(observed);
     if (state === "dashboard" || state === "my-sets" ||
         state === "create" || state === "edit")
-      upstreamErrorReloads.delete(current.tabId);
+      await clearUpstreamReloadBudget(current.tabId);
     if (exactSessionObservation(observed) !== "security-challenge")
       return observed;
     const graceDeadline = Math.min(readDeadline - 500,
@@ -504,7 +560,7 @@ async function read(
         // Only a verified usable page can rearm the exhausted reload budget.
         if (recovered === "dashboard" || recovered === "my-sets" ||
             recovered === "create" || recovered === "edit")
-          upstreamErrorReloads.delete(current.tabId);
+          await clearUpstreamReloadBudget(current.tabId);
         return observed;
       }
     }
@@ -1960,7 +2016,7 @@ chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
 // close a teacher-adopted tab or infer its disappearance from a failed get.
 chrome.tabs.onRemoved?.addListener(tabId => {
   temporaryReadTabs.delete(tabId);
-  upstreamErrorReloads.delete(tabId);
+  void clearUpstreamReloadBudget(tabId);
 });
 
 async function restoreConnection() {
