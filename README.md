@@ -31,6 +31,29 @@ remain in ongoing maintenance. [TODO.md](TODO.md) has no unfinished product
 work. [Completed media work](docs/todo/completed/media/save-and-gif-paste.mdc)
 and the other completed records retain dated acceptance evidence.
 
+## General-purpose protocol compiler and verifier
+
+The package exposes a separate **domain-independent** computational core at
+`@blooket-api/repository/protocol-kernel`: a dependency DAG compiler with
+stable topological stages, explicit cycle/missing-node detection, and an
+exhaustive finite-state protocol verifier that returns shortest counterexample
+traces when safety invariants fail. The public API accepts arbitrary states
+and dependencies; it neither requires Blooket nor any browser, desktop host,
+service, MCP process or filesystem. It is exercised against a non-Blooket
+transaction example in `tests/sdk/protocol-kernel_tests.ts`.
+
+These are not orphaned demos: `compileSequentialWriteProtocol` compiles the
+**actual production write plan** through the general DAG compiler and rejects
+invalid operation identities **before the persisted executor opens a lock or
+sends a remote mutation**. The recovery automaton uses the general state
+verifier to exhaustively check its modeled interruption states against the
+same `decideWriteRecovery` function called by the real journal recuperation
+path. This is a reusable engine behind the product interfaces, not a claim
+that the Blooket integration is provider-neutral.
+
+[Protocol kernel and execution dependency graph](docs/technical/recovery/protocol-kernel-and-execution-graph.md)
+provide source-level integration and executable contracts.
+
 ## Recovery protocol engine
 
 The runtime's technical core is an immutable write-plan compiler, a monotonic

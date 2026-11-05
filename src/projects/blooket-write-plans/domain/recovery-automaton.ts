@@ -23,6 +23,10 @@
 //   - Models crash windows of a journaled mutation as a finite transition
 //     system and reuses its safe decisions in the real recovery executor.
 //
+import { compileSequentialWriteProtocol } from "./plan-protocol.ts";
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+import { verifyFiniteStateProtocol } from "../../../ir/protocol-kernel/domain/model-checker.ts";
+
 import {
   advanceBlooketWriteCheckpoint,
   initialBlooketWriteCheckpoint,
@@ -114,139 +118,121 @@ export interface WriteRecoveryProtocolReport {
 }
 
 /**
- * Enumerate all modeled interruption cuts of a sequential write plan.
+ * Verify every modeled interruption cut using the shared finite-state engine.
  *
- * The graph includes a lost response after dispatch ("attempting"), an
- * external confirmation, a durable checkpoint save, and journal cleanup.
- * An externally verified negative resolution loops back to ready. All
- * reachable states are checked against the *same* recovery classifier used
- * by production. No branch assumes that ambiguity means remote failure.
- *
- * The state count is O(operations), rather than enumerating remote content;
- * an operation cap prevents a hostile plan from exhausting local analysis.
+ * The protocol compiler first validates the real operation dependency DAG;
+ * the verifier then checks all reachable crash cuts using the exact recovery
+ * classifier that handles durable production write-attempt journals. A caller
+ * cannot interpret budget exhaustion as a successful verification.
  */
 export function analyzeWriteRecoveryProtocol(
   plan: BlooketWritePlan,
 ): WriteRecoveryProtocolReport {
-  const violations: string[] = [];
-  if (plan.operations.length > 4096 || plan.operations.length === 0) {
-    return { ok: false, exploredStates: 0, exploredTransitions: 0,
-      reachedTerminal: false, violations: ["unsupported-operation-count"] };
+  const failures = (violations: string[]): WriteRecoveryProtocolReport => ({
+    ok: false, exploredStates: 0, exploredTransitions: 0,
+    reachedTerminal: false, violations,
+  });
+  if (plan.operations.length > 4096 || plan.operations.length === 0)
+    return failures(["unsupported-operation-count"]);
+  const graph = compileSequentialWriteProtocol(plan);
+  if (!graph.ok) {
+    if (graph.code === "duplicate-node")
+      return failures(["duplicate-operation-id:" + graph.nodes[0]]);
+    return failures(["invalid-operation-graph:" + graph.code]);
   }
-  const operationIds = new Set<string>();
-  for (const operation of plan.operations) {
-    if (operationIds.has(operation.operationId)) {
-      return { ok: false, exploredStates: 0, exploredTransitions: 0,
-        reachedTerminal: false,
-        violations: ["duplicate-operation-id:" + operation.operationId] };
-    }
-    operationIds.add(operation.operationId);
-  }
-  // Construct each exact checkpoint with the production checkpoint reducer.
-  // A fixed *symbolic* receipt stands only for a valid set-binding witness.
+  // Sequential journal semantics require every planned operation to be a
+  // distinct topological stratum, even though the graph engine supports DAGs.
+  if (graph.stages.length !== plan.operations.length ||
+      graph.ordered.some((id, index) =>
+        id !== plan.operations[index]?.operationId))
+    return failures(["invalid-operation-order"]);
+
   const checkpoints: BlooketWriteCheckpoint[] = [
     initialBlooketWriteCheckpoint(plan),
   ];
   for (const operation of plan.operations) {
     const previous = checkpoints.at(-1);
-    if (!previous) break;
+    if (!previous) return failures(["missing-initial-checkpoint"]);
     const receipt = operation.kind === "set"
       ? { kind: "set-created" as const, remoteSetId: "protocol-witness" }
       : null;
     const result = advanceBlooketWriteCheckpoint(
       plan, previous, operation.operationId, receipt,
     );
-    if (!result.ok) {
-      violations.push("unreachable-plan-operation:" + operation.operationId);
-      break;
-    }
+    if (!result.ok)
+      return failures(["unreachable-plan-operation:" + operation.operationId]);
     checkpoints.push(result.value);
   }
-  if (violations.length > 0) {
-    return { ok: false, exploredStates: 0, exploredTransitions: 0,
-      reachedTerminal: false, violations };
-  }
 
-  const first: WriteRecoveryProtocolState = {
-    nextOperationIndex: 0, phase: "ready",
-  };
-  const queue = [first];
-  const seen = new Set([key(first)]);
-  let transitions = 0;
-  let terminal = false;
-  for (let cursor = 0; cursor < queue.length; cursor += 1) {
-    const state = queue[cursor];
-    if (!state) break;
-    const index = state.nextOperationIndex;
-    const operation = plan.operations[index];
-    const checkpoint = checkpoints[index];
-    if (!checkpoint) {
-      violations.push("missing-checkpoint:" + index);
-      continue;
-    }
-    const receipt = operation?.kind === "set"
-      ? { kind: "set-created" as const, remoteSetId: "protocol-witness" }
-      : null;
-    const attempt = operation === undefined ? null : {
-      planId: plan.planId,
-      operationId: operation.operationId,
-      operationIndex: index,
-      phase: state.phase === "attempting" ? "attempting" as const
-        : "confirmed" as const,
-      receipt: state.phase === "attempting" ? null : receipt,
-    };
-    const decision = decideWriteRecovery(
-      plan,
-      state.phase === "checkpointed" ? checkpoints[index + 1]! : checkpoint,
-      state.phase === "ready" ? null : attempt,
-    );
-    const expected = {
-      ready: "ready",
-      attempting: "reconcile",
-      confirmed: "persist-confirmed",
-      checkpointed: "clear-confirmed",
-    }[state.phase];
-    if (decision.action !== expected) {
-      violations.push("wrong-decision:" + key(state));
-    } else if (state.phase === "attempting" &&
-        (decision.action !== "reconcile" ||
-         decision.reason !== "ambiguous-attempt")) {
-      violations.push("unsafe-ambiguous-decision:" + key(state));
-    } else if (state.phase === "confirmed" &&
-        (decision.action !== "persist-confirmed" ||
-         JSON.stringify(decision.checkpoint) !==
-           JSON.stringify(checkpoints[index + 1]))) {
-      violations.push("incorrect-confirmation:" + key(state));
-    }
-    if (index === plan.operations.length && state.phase === "ready") {
-      terminal = true;
-      continue;
-    }
-    const next: WriteRecoveryProtocolState[] = state.phase === "ready"
-      ? [{ nextOperationIndex: index, phase: "attempting" }]
-      : state.phase === "attempting"
-        ? [
-            { nextOperationIndex: index, phase: "confirmed" },
-            { nextOperationIndex: index, phase: "ready" },
-          ]
-        : state.phase === "confirmed"
-          ? [{ nextOperationIndex: index, phase: "checkpointed" }]
-          : [{ nextOperationIndex: index + 1, phase: "ready" }];
-    for (const successor of next) {
-      transitions += 1;
-      const identity = key(successor);
-      if (!seen.has(identity)) {
-        seen.add(identity);
-        queue.push(successor);
-      }
-    }
-  }
+  const result = verifyFiniteStateProtocol<WriteRecoveryProtocolState>({
+    initial: { nextOperationIndex: 0, phase: "ready" },
+    key,
+    maxStates: 4 * plan.operations.length + 1,
+    maxTransitions: 5 * plan.operations.length,
+    terminal: state => state.nextOperationIndex === plan.operations.length &&
+      state.phase === "ready",
+    invariant: state => {
+      const index = state.nextOperationIndex;
+      const operation = plan.operations[index];
+      const checkpoint = checkpoints[
+        state.phase === "checkpointed" ? index + 1 : index
+      ];
+      if (!checkpoint) return "missing-checkpoint:" + index;
+      const receipt = operation?.kind === "set"
+        ? { kind: "set-created" as const, remoteSetId: "protocol-witness" }
+        : null;
+      const attempt = operation === undefined ? null : {
+        planId: plan.planId,
+        operationId: operation.operationId,
+        operationIndex: index,
+        phase: state.phase === "attempting" ? "attempting" as const
+          : "confirmed" as const,
+        receipt: state.phase === "attempting" ? null : receipt,
+      };
+      const decision = decideWriteRecovery(
+        plan, checkpoint, state.phase === "ready" ? null : attempt,
+      );
+      const expected = {
+        ready: "ready",
+        attempting: "reconcile",
+        confirmed: "persist-confirmed",
+        checkpointed: "clear-confirmed",
+      }[state.phase];
+      if (decision.action !== expected)
+        return "wrong-decision:" + key(state);
+      if (state.phase === "attempting" &&
+          (decision.action !== "reconcile" ||
+           decision.reason !== "ambiguous-attempt"))
+        return "unsafe-ambiguous-decision:" + key(state);
+      if (state.phase === "confirmed" &&
+          (decision.action !== "persist-confirmed" ||
+           JSON.stringify(decision.checkpoint) !==
+             JSON.stringify(checkpoints[index + 1])))
+        return "incorrect-confirmation:" + key(state);
+      return null;
+    },
+    next: state => {
+      const index = state.nextOperationIndex;
+      if (index === plan.operations.length && state.phase === "ready")
+        return [];
+      const successor = (phase: WriteRecoveryProtocolState["phase"],
+        nextOperationIndex = index) => ({
+        label: state.phase + "->" + phase,
+        to: { nextOperationIndex, phase },
+      });
+      if (state.phase === "ready") return [successor("attempting")];
+      if (state.phase === "attempting")
+        return [successor("confirmed"), successor("ready")];
+      if (state.phase === "confirmed") return [successor("checkpointed")];
+      return [successor("ready", index + 1)];
+    },
+  });
   return {
-    ok: terminal && violations.length === 0,
-    exploredStates: seen.size,
-    exploredTransitions: transitions,
-    reachedTerminal: terminal,
-    violations,
+    ok: result.ok,
+    exploredStates: result.exploredStates,
+    exploredTransitions: result.exploredTransitions,
+    reachedTerminal: result.reachedTerminal,
+    violations: result.violations.map(violation => violation.reason),
   };
 }
 

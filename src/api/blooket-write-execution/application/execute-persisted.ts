@@ -34,8 +34,8 @@
 import {
   blooketNavigationDecision,
 } from "../../../ir/blooket-navigation/domain/navigation-state.ts";
-import { tryAcquireFileLock } from
-  "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+import { tryAcquireFileLock } from "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import {
   beginWriteAttempt,
   clearWriteAttempt,
@@ -68,6 +68,8 @@ import {
   "../../../projects/blooket-write-plans/domain/verification-baseline.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+import { compileSequentialWriteProtocol } from "../../../projects/blooket-write-plans/domain/plan-protocol.ts";
 import type { HostSecretStore } from
   "../../../security/host-secrets/domain/host-secret.ts";
 import { inspectBlooketSession } from
@@ -152,6 +154,12 @@ export interface ExecutePersistedBlooketWriteOptions {
 }
 
 export type ExecutePersistedBlooketWriteResult =
+  | {
+      readonly ok: false;
+      readonly stage: "plan-validation";
+      readonly code: "write-plan-protocol-invalid";
+      readonly reason: string;
+    }
   | PrepareTerminal
   | AdvancedWrite
   | RecoveryTerminal
@@ -272,6 +280,13 @@ export async function executePersistedBlooketWrite(
   verifier?: BlooketWriteVerificationPort,
   options: ExecutePersistedBlooketWriteOptions = {},
 ): Promise<ExecutePersistedBlooketWriteResult> {
+  // The same dependency compiler used by the headless model checker rejects
+  // impossible plans *before* acquiring a lock, writing a journal or opening
+  // a browser session. This validation is part of the production write path.
+  const protocol = compileSequentialWriteProtocol(plan);
+  if (!protocol.ok)
+    return { ok: false, stage: "plan-validation",
+      code: "write-plan-protocol-invalid", reason: protocol.code };
   // Freeze expected recovery facts before lock acquisition or session I/O.
   // Later caller mutation cannot redefine which prepared bytes were intended.
   const expectedMedia = options.expectedMedia === undefined ? undefined

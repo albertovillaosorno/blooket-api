@@ -32,8 +32,8 @@
 // - Defaults:
 //   - Mismatched or inconsistent evidence remains untouched.
 //
-import { tryAcquireFileLock } from
-  "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+import { tryAcquireFileLock } from "../../../platforms/file-locks/adapter-outbound/file-lock.ts";
 import {
   clearWriteAttempt,
   confirmWriteAttempt,

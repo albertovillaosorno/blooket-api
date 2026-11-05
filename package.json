@@ -33,7 +33,7 @@
     "yauzl": "3.4.0"
   },
   "version": "26.4.0",
-  "description": "Headless TypeScript planning, verification, and state-reconciliation core for browser-assisted Blooket automation; desktop, CLI, and MCP adapters are optional.",
+  "description": "Headless deterministic planning and finite-state protocol verification kernel with crash-safe journal recovery; Blooket browser, desktop, CLI and MCP adapters.",
   "keywords": [
     "headless",
     "automation",
@@ -46,6 +46,10 @@
     "./headless": {
       "types": "./src/sdk/headless.ts",
       "default": "./src/sdk/headless.ts"
+    },
+    "./protocol-kernel": {
+      "types": "./src/sdk/protocol-kernel.ts",
+      "default": "./src/sdk/protocol-kernel.ts"
     }
   }
 }

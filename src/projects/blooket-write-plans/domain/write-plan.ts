@@ -48,8 +48,8 @@ import { decodeProjectDocument, type ProjectDocument } from
   "../../project-documents/domain/project.ts";
 import { decodePreparedMediaIdentities, type PreparedMediaIdentities } from
   "./prepared-media-identities.ts";
-import { decodeBlooketSetId } from
-  "../../../ir/blooket-set-reads/contract/set-read.ts";
+// jig-ignore-next-line: TypeScript module specifier is indivisible.
+import { decodeBlooketSetId } from "../../../ir/blooket-set-reads/contract/set-read.ts";
 import { decodeBlooketWriteVerificationBaseline,
   type BlooketWriteVerificationBaseline } from "./verification-baseline.ts";
 import type {

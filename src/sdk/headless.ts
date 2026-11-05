@@ -40,3 +40,20 @@ export type {
   WriteRecoveryProtocolReport,
   WriteRecoveryProtocolState,
 } from "../projects/blooket-write-plans/domain/recovery-automaton.ts";
+
+// Domain-independent graph compilation and exhaustive transition verification.
+export {
+  compileDependencyGraph,
+  verifyFiniteStateProtocol,
+} from "./protocol-kernel.ts";
+export type {
+  DependencyGraphResult,
+  DependencyNode,
+  FiniteStateProtocol,
+  FiniteStateProtocolReport,
+  ProtocolCounterexample,
+  ProtocolTransition,
+} from "./protocol-kernel.ts";
+
+export { compileSequentialWriteProtocol } from
+  "../projects/blooket-write-plans/domain/plan-protocol.ts";

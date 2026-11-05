@@ -2614,3 +2614,26 @@ for (const conflict of [false, true]) {
       assert.equal(f.rows.length, 2);
     }));
 }
+
+test("invalid dependency protocol is refused before lock or filesystem writes",
+  async () => { await withTemporaryDirectory(async directory => {
+    const paths = persistence(join(directory, "checkpoint.json"));
+    const calls: string[] = [];
+    const forged: BlooketWritePlan = {
+      ...plan,
+      operations: [plan.operations[0]!, {
+        ...plan.operations[1]!,
+        operationId: plan.operations[0]!.operationId,
+      }],
+    };
+    const result = await executePersistedBlooketWrite(
+      paths, forged, browser([]), secrets(), writes(SET_SUCCESS, calls),
+    );
+    assert.deepEqual(result, { ok: false,
+      stage: "plan-validation", code: "write-plan-protocol-invalid",
+      reason: "duplicate-node" });
+    assert.deepEqual(calls, []);
+    assert.equal(existsSync(paths.checkpoint), false);
+    assert.equal(existsSync(paths.attempt), false);
+    assert.equal(existsSync(paths.attempt + ".lock"), false);
+  }); });
