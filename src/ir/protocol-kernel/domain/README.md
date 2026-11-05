@@ -16,3 +16,13 @@ persisted write execution. Neither verifier grants external commit authority.
 
 Direct tests: `tests/ir/protocol-kernel/domain/`. The headless SDK also exports
 the algorithms for other offline transaction and deployment protocols.
+
+`durable-recovery.ts` is the third domain-independent runtime primitive:
+caller-supplied storage adapters commit an explicitly authorized state change
+before finalization of write-ahead evidence. It supports hold, ready, commit,
+finalize and commit-and-finalize paths, plus precise error-phase propagation.
+In production, Blooket uses it to recover ambiguous journaled browser writes;
+the signed desktop-update installer uses the same engine to persist
+installation-phase transitions. Both call sites have independent integration
+tests. A storage adapter must enforce its own CAS/locking and durability; this
+is not a distributed transaction coordinator or a replacement for fsync.

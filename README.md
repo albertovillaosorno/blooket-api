@@ -1,12 +1,19 @@
 # blooket-api
 
-The headless core is a TypeScript engine for deterministic desired-state write
-planning, versioned verification evidence, and recovery-safe reconciliation of
-browser-automated workflows. It exposes a side-effect-free programmatic SDK at
-`@blooket-api/repository/headless`. Blooket is the currently implemented
-provider, **not** proof of provider-neutral compatibility; the user-facing
-CLI, MCP gateway, desktop launcher, and signed-update delivery remain supported
-adapters, not the core runtime dependency.
+The repository contains a reusable **TypeScript transaction-protocol runtime**
+and a Blooket browser integration that uses it. The independent
+`@blooket-api/repository/protocol-kernel` API provides deterministic DAG
+compilation, bounded finite-state model checking with shortest counterexample
+traces, and a **durable transition executor** that preserves commit-before-
+cleanup ordering across independent persistence adapters. Its core is called
+by **both the browser write-ahead journal recovery and the signed desktop
+update installer**; neither requires the other to run. The separate
+`@blooket-api/repository/headless` API supplies desired-state planning and
+verified Blooket-specific recovery semantics.
+
+Blooket is the currently implemented browser provider, **not** proof of
+provider-neutral browser execution. CLI, MCP, desktop and updater surfaces
+remain supported adapters to the appropriate domain components.
 
 A local-first TypeScript toolkit for a teacher who wants AI to help create
 Blooket quizzes without spending the afternoon uploading and formatting media.
@@ -41,6 +48,15 @@ traces when safety invariants fail. The public API accepts arbitrary states
 and dependencies; it neither requires Blooket nor any browser, desktop host,
 service, MCP process or filesystem. It is exercised against a non-Blooket
 transaction example in `tests/sdk/protocol-kernel_tests.ts`.
+
+The **production durable transition engine**, `executeDurableRecovery`,
+accepts a typed `ready | hold | commit | finalize | commit-and-finalize`
+decision and callback-driven persistence/cleanup ports. In the write executor,
+it persists a confirmed checkpoint before retiring the write-ahead attempt;
+when persistence fails, the attempt remains intact. In the signed-update
+installer, the same runtime advances installation-journal phases through the
+updater's own compare-and-swap persistence port. Tests independently simulate
+stale CAS, lost acknowledgements, cleanup failure and restart recovery.
 
 These are not orphaned demos: `compileSequentialWriteProtocol` compiles the
 **actual production write plan** through the general DAG compiler and rejects

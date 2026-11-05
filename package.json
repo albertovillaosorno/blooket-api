@@ -33,7 +33,7 @@
     "yauzl": "3.4.0"
   },
   "version": "26.4.0",
-  "description": "Headless deterministic planning and finite-state protocol verification kernel with crash-safe journal recovery; Blooket browser, desktop, CLI and MCP adapters.",
+  "description": "Reusable crash-safe transaction protocol runtime with typed durable recovery, DAG scheduling, finite-state verification, and Blooket/desktop update adapters.",
   "keywords": [
     "headless",
     "automation",

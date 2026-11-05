@@ -38,6 +38,8 @@ import { advanceUpdateInstallationJournal, decodeUpdateInstallationJournal,
   "../../../ir/application-updates/contract/installation.ts";
 import { assessInstallationRecovery } from
   "../../../ir/application-updates/domain/recovery.ts";
+import { executeDurableRecovery } from
+  "../../../ir/protocol-kernel/domain/durable-recovery.ts";
 import type { InstallationStopReason, InstallationTarget,
   UpdateInstallationPorts, UpdateInstallationResult } from
   "../contract/installation.ts";
@@ -118,8 +120,19 @@ async function runInstallation(authority: UpdateInstallationJournal | undefined,
     const next = advanceUpdateInstallationJournal(current!, phase);
     if (!next.ok) throw new Error("invalid-installation-transition");
     const admitted = freeze(next.value);
-    await ports.journal.replace(current!, admitted);
-    current = admitted;
+    // The generic transaction kernel owns persist-before-finalize ordering.
+    // The updater's replace port enforces durable compare-and-swap semantics.
+    const applied = await executeDurableRecovery({
+      kind: "commit", checkpoint: current!, next: admitted,
+    }, {
+      persist: async (before, after) => {
+        await ports.journal.replace(before, after);
+        return { ok: true as const };
+      },
+    });
+    if (!applied.ok || applied.kind !== "committed")
+      throw new Error("update-journal-commit-refused");
+    current = applied.checkpoint;
   }
   async function inspect(): Promise<Exclude<ExchangeOrientation,
     "unknown"> | undefined> {

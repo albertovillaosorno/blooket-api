@@ -51,6 +51,8 @@ import type { BlooketWriteCheckpoint } from
   "../../../projects/blooket-write-plans/domain/checkpoint.ts";
 import { decideWriteRecovery } from
   "../../../projects/blooket-write-plans/domain/recovery-automaton.ts";
+import { executeDurableRecovery } from
+  "../../../ir/protocol-kernel/domain/durable-recovery.ts";
 import type { BlooketWritePlan } from
   "../../../projects/blooket-write-plans/domain/write-plan.ts";
 
@@ -225,61 +227,40 @@ export async function recoverPersistedBlooketWriteUnderLock(
       checkpoint,
     };
   }
-  if (decision.action === "persist-confirmed") {
-    const saved = await saveWriteCheckpointFile(
-      checkpointPath, plan, decision.checkpoint,
-    );
-    if (!saved.ok) {
-      return {
-        ok: false,
-        stage: "checkpoint-recovery-save",
-        cause: saved,
-      };
-    }
-    return await clearConfirmedAttempt(
-      attemptPath, plan, attempt, decision.checkpoint, true,
-    );
+  // The generic durable protocol runtime owns persistence-before-cleanup.
+  // The caller already holds the exact write-attempt execution lock.
+  const instruction = decision.action === "persist-confirmed"
+    ? { kind: "commit-and-finalize" as const,
+        checkpoint, next: decision.checkpoint }
+    : decision.action === "clear-confirmed"
+      ? { kind: "finalize" as const, checkpoint }
+      : { kind: "hold" as const, checkpoint,
+          reason: "inconsistent-attempt-state" as const };
+  const settled = await executeDurableRecovery(instruction, {
+    persist: async (_before, next) => {
+      const result = await saveWriteCheckpointFile(checkpointPath, plan, next);
+      return result.ok ? { ok: true as const }
+        : { ok: false as const, cause: result };
+    },
+    finalize: async () => {
+      const result = await clearWriteAttempt(attemptPath, plan);
+      return result.ok ? { ok: true as const }
+        : { ok: false as const, cause: result };
+    },
+  });
+  if (!settled.ok) {
+    return settled.stage === "persist"
+      ? { ok: false, stage: "checkpoint-recovery-save", cause: settled.cause }
+      : { ok: false, stage: "attempt-cleanup",
+          cause: settled.cause, checkpoint: settled.checkpoint };
   }
-  if (decision.action === "clear-confirmed") {
-    return await clearConfirmedAttempt(
-      attemptPath, plan, attempt, checkpoint, false,
-    );
+  if (settled.kind === "recovered") {
+    return { ok: true, kind: "recovered", operationId: attempt.operationId,
+      checkpoint: settled.checkpoint };
   }
-  return {
-    ok: true,
-    kind: "reconciliation-required",
-    reason: "inconsistent-attempt-state",
-    attempt,
-    checkpoint,
-  };
-}
-
-async function clearConfirmedAttempt(
-  attemptPath: string,
-  plan: BlooketWritePlan,
-  attempt: WriteAttemptRecord,
-  checkpoint: BlooketWriteCheckpoint,
-  recovered: boolean,
-): Promise<RecoverPersistedBlooketWriteResult> {
-  const cleared = await clearWriteAttempt(attemptPath, plan);
-  if (!cleared.ok) {
-    return {
-      ok: false,
-      stage: "attempt-cleanup",
-      cause: cleared,
-      checkpoint,
-    };
+  if (settled.kind === "finalized") {
+    return { ok: true, kind: "ready", checkpoint: settled.checkpoint };
   }
-  return recovered
-    ? {
-        ok: true,
-        kind: "recovered",
-        operationId: attempt.operationId,
-        checkpoint,
-      }
-    : {
-        ok: true,
-        kind: "ready",
-        checkpoint,
-      };
+  return { ok: true, kind: "reconciliation-required",
+    reason: "inconsistent-attempt-state", attempt, checkpoint };
 }

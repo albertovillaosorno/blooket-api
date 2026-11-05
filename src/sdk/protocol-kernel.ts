@@ -20,3 +20,12 @@ export type {
   ProtocolCounterexample,
   ProtocolTransition,
 } from "../ir/protocol-kernel/domain/model-checker.ts";
+
+export { executeDurableRecovery } from
+  "../ir/protocol-kernel/domain/durable-recovery.ts";
+export type {
+  DurableRecoveryInstruction,
+  DurableRecoveryPorts,
+  DurableRecoveryResult,
+  DurableStepResult,
+} from "../ir/protocol-kernel/domain/durable-recovery.ts";

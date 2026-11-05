@@ -9,8 +9,11 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileDependencyGraph, verifyFiniteStateProtocol } from
-  "@blooket-api/repository/protocol-kernel";
+import {
+  compileDependencyGraph,
+  executeDurableRecovery,
+  verifyFiniteStateProtocol,
+} from "@blooket-api/repository/protocol-kernel";
 
 test("domain-agnostic protocol kernel can validate non-Blooket workflows", () => {
   const graph = compileDependencyGraph([
@@ -33,4 +36,20 @@ test("domain-agnostic protocol kernel can validate non-Blooket workflows", () =>
   });
   assert.equal(protocol.ok, true);
   assert.equal(protocol.reachedTerminal, true);
+});
+
+
+test("public protocol runtime commits arbitrary state without any Blooket host", async () => {
+  let saved = 0;
+  const result = await executeDurableRecovery({
+    kind: "commit", checkpoint: 0, next: 1,
+  }, {
+    persist: async (before, next) => {
+      assert.equal(before, saved);
+      saved = next;
+      return { ok: true as const };
+    },
+  });
+  assert.deepEqual(result, { ok: true, kind: "committed", checkpoint: 1 });
+  assert.equal(saved, 1);
 });
