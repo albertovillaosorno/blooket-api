@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Alberto Villa Osorno.
-// SPDX-License-Identifier: LicenseRef-Proprietary
+// SPDX-License-Identifier: MIT
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Alberto Villa Osorno.
-// SPDX-License-Identifier: LicenseRef-Proprietary
+// SPDX-License-Identifier: MIT
 // Public, side-effect-free planning/verification domain boundary.
 // No browser, updater, desktop process, network transport, or secret loading.
 

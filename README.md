@@ -1007,14 +1007,15 @@ Architecture decisions cover [browser hosting and online MCP][browser-mcp],
 [coelho-excerpt]: https://www.penguinlibros.com/mx/literatura-contemporanea/325758-libro-el-alquimista-biblioteca-paulo-coelho-9786073831420/fragmento
 
 The quoted passage is reproduced from the cited work and is not covered by
-this repository's proprietary license.
+this repository's MIT license.
 
 ## License
 
-Current owner-controlled material is proprietary under [LICENSE](LICENSE).
-Valid prior licenses remain effective for earlier copies. See
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for
-third-party trademarks, assets, and dependency notices.
+Original material owned by the repository author is licensed under the
+[MIT License](LICENSE). Third-party code, trademarks, assets, and quoted
+material retain their respective rights; see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Valid earlier grants remain effective for previously licensed copies.
 
 [browser-mcp]: docs/technical/adr/macos-browser-ui-and-online-mcp.md
 [library]: docs/technical/adr/teacher-settings-and-media-library.md
